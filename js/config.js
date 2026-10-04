@@ -13,8 +13,8 @@
  */
 window.ONW = window.ONW || {};
 ONW.config = {
-  SUPABASE_URL: "",        // 例: "https://xxxxxxxxxxxx.supabase.co"
-  SUPABASE_ANON_KEY: "",   // 例: "eyJhbGciOi..." （anon public）
+  SUPABASE_URL: "https://ducvyoaxksywohsiusad.supabase.co",        // 例: "https://xxxxxxxxxxxx.supabase.co"
+  SUPABASE_ANON_KEY: "sb_publishable_lXSDziD5H8p4B3FmMiMm0A_jZjeBIpR",   // 例: "eyJhbGciOi..." （anon public）
 
   // ログインIDを裏で「<ID>@<このドメイン>」というメール形式に変換して Supabase Auth に渡します。
   // 実在しないドメインなのでメールは一切送られません。
