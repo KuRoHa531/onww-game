@@ -58,8 +58,11 @@ window.ONW = window.ONW || {};
   };
 
   acc._loadProfile = async function (uid) {
-    const { data, error } = await acc.sb.from("profiles")
-      .select("id,user_id,display_name,avatar_updated_at").eq("id", uid).maybeSingle();
+    let { data, error } = await acc.sb.from("profiles")
+      .select("id,user_id,display_name,avatar_updated_at,bio").eq("id", uid).maybeSingle();
+    if (error) {   // setup.sql(8)をまだ実行していない場合は bio 列が無い → bio なしで読む
+      ({ data, error } = await acc.sb.from("profiles").select("id,user_id,display_name,avatar_updated_at").eq("id", uid).maybeSingle());
+    }
     if (error || !data) { acc.user = null; return false; }
     acc.user = data;
     return true;
@@ -189,6 +192,18 @@ window.ONW = window.ONW || {};
     if (error) return { ok: false, msg: errText(error, "表示名を変更できませんでした。") };
     acc.user.display_name = name;
     notify();
+    return { ok: true };
+  };
+
+  // ---------------------------------------------------------
+  // ひとこと（プロフィールのコメント）
+  // ---------------------------------------------------------
+  acc.setBio = async function (text) {
+    text = String(text || "").trim().slice(0, 200);
+    if (!acc.user) return { ok: false, msg: "ログインしてください。" };
+    const { error } = await acc.sb.from("profiles").update({ bio: text }).eq("id", acc.user.id);
+    if (error) return { ok: false, msg: errText(error, "保存できませんでした。（管理者向け: setup.sql の「8.」を実行してください）") };
+    acc.user.bio = text;
     return { ok: true };
   };
 

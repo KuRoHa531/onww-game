@@ -106,14 +106,31 @@ window.ONW = window.ONW || {};
     const { data: target, error } = await sb().from("profiles").select("id,user_id,display_name").eq("user_id", id).maybeSingle();
     if (error) return say("検索に失敗しました。");
     if (!target) return say("そのIDのユーザーは見つかりません。");
-    if (f.friends.some((x) => x.uid === target.id)) return say("すでにフレンドです。");
-    if (f.outgoing.some((x) => x.uid === target.id)) return say("すでに申請済みです。");
+    const r = await f.requestTo(target);
+    say(r.msg, r.ok);
+  };
+
+  /** 相手(profiles の行: id, display_name)にフレンド申請する。相手から申請が来ていれば承認になる。{ ok, msg } を返す */
+  f.requestTo = async function (target) {
+    if (!me() || !target || !target.id) return { ok: false, msg: "申請できませんでした。" };
+    if (target.id === me().id) return { ok: false, msg: "自分自身には申請できません。" };
+    if (f.friends.some((x) => x.uid === target.id)) return { ok: false, msg: "すでにフレンドです。" };
+    if (f.outgoing.some((x) => x.uid === target.id)) return { ok: false, msg: "すでに申請済みです。" };
     const rev = f.incoming.find((x) => x.uid === target.id);
-    if (rev) { await f.accept(rev.fid); return say(`${target.display_name} さんからの申請を承認しました。`, true); }
+    if (rev) { await f.accept(rev.fid); return { ok: true, msg: `${target.display_name} さんからの申請を承認しました。` }; }
     const ins = await sb().from("friendships").insert({ requester: me().id, addressee: target.id, status: "pending" });
-    if (ins.error) return say("申請できませんでした。");
+    if (ins.error) return { ok: false, msg: ins.error.code === "23505" ? "すでに申請済み、または相手から申請が届いています。" : "申請できませんでした。" };
     await f.refresh();
-    say(`${target.display_name} さんに申請しました。`, true);
+    return { ok: true, msg: `${target.display_name} さんに申請しました。` };
+  };
+
+  /** 相手との関係: "self" | "friend" | "sent"(申請中) | "incoming"(相手から届いている) | "none" */
+  f.relation = function (uid) {
+    if (me() && me().id === uid) return "self";
+    if (f.friends.some((x) => x.uid === uid)) return "friend";
+    if (f.outgoing.some((x) => x.uid === uid)) return "sent";
+    if (f.incoming.some((x) => x.uid === uid)) return "incoming";
+    return "none";
   };
 
   f.accept = async function (fid) {
@@ -234,8 +251,8 @@ window.ONW = window.ONW || {};
   }
 
   const dot = (on) => `<span class="dot ${on ? "dot--on" : ""}" title="${on ? "オンライン" : "オフライン"}"></span>`;
-  const who = (p) => `${ONW.account.avatarHtml(p.display_name, { uid: p.uid, v: ONW.account.avatarVersion(p) }, "av--sm")}
-    <span class="fr-name">${esc(p.display_name)}<small>@${esc(p.user_id)}</small></span>`;
+  const who = (p) => ONW.profile.link(p.uid, p.display_name, `${ONW.account.avatarHtml(p.display_name, { uid: p.uid, v: ONW.account.avatarVersion(p) }, "av--sm")}
+    <span class="fr-name">${esc(p.display_name)}<small>@${esc(p.user_id)}</small></span>`);
 
   /** フレンド画面の中身（申請 / 一覧） */
   f.friendsHtml = function () {

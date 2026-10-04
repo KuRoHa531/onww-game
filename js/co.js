@@ -9,13 +9,13 @@ window.ONW = window.ONW || {};
   const rn = (r) => ONW.roles.getInfo(r).name;
   const esc = (s) => ONW.utils.esc(s);
   const nameOf = (id) => ((G().others || []).find((p) => p.id === id) || {}).name || "?";
-  const graveNeed = () => Math.min(2, G().graveCount || G().graveTotal || 0);
+  const graveNeed = () => ONW.seerGraveMax(G());
 
   // 役職COのあとに結果開示が必要な役職 → 結果開示の種類（狂った占い師は占い師と同じ形で開示する）
-  const KIND = { seer: "seer", mad_seer: "seer", robber: "robber", relic_robber: "relic", troublemaker: "tm", insomniac: "insom", mason: "mason" };
+  const KIND = { seer: "seer", mad_seer: "seer", robber: "robber", relic_robber: "relic", troublemaker: "tm", insomniac: "insom", mason: "mason", love_tanner: "love" };
 
   function set(s) { G().co = s; co.render(); }
-  function done(text, claim, setRole, flag) { ONW.net.sendCo(text, claim, setRole, flag); set(null); }
+  function done(text, claim, setRole, flag, short) { ONW.net.sendCo(text, claim, setRole, flag, short); set(null); }   // short: 一覧に出す短い結果（「対象 → 結果」）
 
   co.open = () => set(G().co ? null : { step: "menu" });
   co.close = () => set(null);
@@ -26,6 +26,7 @@ window.ONW = window.ONW || {};
     if (!el) return;
     ONW.net.sendChat(el.value);
     el.value = "";
+    if (el.id === "chat-in-big") el.focus({ preventScroll: true });   // 送信してもキーボードを閉じない（画面がずれない）
   };
 
   // ---- 役職CO ----
@@ -53,18 +54,20 @@ window.ONW = window.ONW || {};
     if (kind === "tm") return set({ step: "tm", kind, chain, sel: [] });
     if (kind === "insom") return set({ step: "irole", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
+    if (kind === "love") return set({ step: "love", kind, chain });
     return set({ step: "target", kind, chain });
   }
+  co.pickLove = (id) => done(`${nameOf(id)} に一目惚れしました`, { kind: "love_tanner", target: id }, null, "disclose", `→ ${nameOf(id)}`);
   co.pickRelicGrave = (i) => set({ step: "rrole", kind: "relic", idx: i });
   co.relicRole = function (role) {
     const s = G().co;
-    if (role === "hide") return done(`墓地${s.idx + 1} と役職を交換しました。役職は伏せます。`, null, null, "disclose");
-    done(`墓地${s.idx + 1} と役職を交換して ${rn(role)} になりました`, { kind: "relic", role }, null, "disclose");
+    if (role === "hide") return done(`墓地${s.idx + 1} と役職を交換しました。役職は伏せます。`, null, null, "disclose", `墓地${s.idx + 1} → 伏せ`);
+    done(`墓地${s.idx + 1} と役職を交換して ${rn(role)} になりました`, { kind: "relic", role }, null, "disclose", `墓地${s.idx + 1} → ${rn(role)}`);
   };
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
-    done(`${nameOf(sel[0])} と ${nameOf(sel[1])} を入れ替えました`, { kind: "troublemaker" }, null, "disclose");
+    done(`${nameOf(sel[0])} と ${nameOf(sel[1])} を入れ替えました`, { kind: "troublemaker" }, null, "disclose", `${nameOf(sel[0])} ⇄ ${nameOf(sel[1])}`);
   };
   co.pickMason = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
@@ -72,32 +75,32 @@ window.ONW = window.ONW || {};
   };
   co.masonDone = function () {
     const sel = G().co.sel || [];
-    done(sel.length ? `共有者は 自分と ${sel.map((id) => nameOf(id)).join("、")} でした` : "共有者は 自分だけでした", { kind: "mason" }, null, "disclose");
+    done(sel.length ? `共有者は 自分と ${sel.map((id) => nameOf(id)).join("、")} でした` : "共有者は 自分だけでした", { kind: "mason" }, null, "disclose", sel.length ? `相方: ${sel.map((id) => nameOf(id)).join("、")}` : "自分だけ");
   };
   co.insomRole = function (role) {
-    if (role === "hide") return done("最終的な役職は伏せます。", null, null, "disclose");
-    done(`最終的な役職は ${rn(role)} でした`, { kind: "insomniac", role }, null, "disclose");
+    if (role === "hide") return done("最終的な役職は伏せます。", null, null, "disclose", "→ 伏せ");
+    done(`最終的な役職は ${rn(role)} でした`, { kind: "insomniac", role }, null, "disclose", `→ ${rn(role)}`);
   };
   co.pickPlayer = (id) => set({ ...G().co, step: "prole", target: id });
   co.pickGrave = function (i) {
     const sel = [...(G().co.sel || []), i];
     if (sel.length < graveNeed()) set({ ...G().co, step: "gpick", sel });
-    else set({ step: "grole", sel, k: 0, results: [] });
+    else set({ step: "grole", sel, k: 0, results: [], shorts: [] });
   };
   co.pickRole = function (role) {            // role: 役職ID or "hide"
     const s = G().co, who = nameOf(s.target);
     if (s.kind === "seer") {
-      if (role === "hide") return done(`${who} を占いました。結果は伏せます。`, null, null, "disclose");
-      return done(`${who} を占って ${rn(role)} でした`, { kind: "seer", target: s.target, role }, null, "disclose");
+      if (role === "hide") return done(`${who} を占いました。結果は伏せます。`, null, null, "disclose", `${who} → 伏せ`);
+      return done(`${who} を占って ${rn(role)} でした`, { kind: "seer", target: s.target, role }, null, "disclose", `${who} → ${rn(role)}`);
     }
-    if (role === "hide") return done(`${who} の役職を奪いました。役職は伏せます。`, null, null, "disclose");
-    return done(`${who} の役職を奪って ${rn(role)} になりました`, { kind: "robber", target: s.target, role }, null, "disclose");
+    if (role === "hide") return done(`${who} の役職を奪いました。役職は伏せます。`, null, null, "disclose", `${who} → 伏せ`);
+    return done(`${who} の役職を奪って ${rn(role)} になりました`, { kind: "robber", target: s.target, role }, null, "disclose", `${who} → ${rn(role)}`);
   };
   co.graveRole = function (role) {
     const s = G().co, idx = s.sel[s.k];
-    const results = [...s.results, `墓地${idx + 1} を見て ${rn(role)}`];
-    if (s.k + 1 < s.sel.length) return set({ ...s, k: s.k + 1, results });
-    done(`${results.join("、")} でした`, null, null, "disclose");
+    const results = [...s.results, `墓地${idx + 1} を見て ${rn(role)}`], shorts = [...(s.shorts || []), `墓地${idx + 1} → ${rn(role)}`];
+    if (s.k + 1 < s.sel.length) return set({ ...s, k: s.k + 1, results, shorts });
+    done(`${results.join("、")} でした`, null, null, "disclose", shorts.join("、"));
   };
 
   co.history = () => set({ step: "history" });
@@ -150,13 +153,15 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">他に共有者がいたら選んでください。いなければそのまま確定します。${s.sel.length ? `（選択中: ${s.sel.map((id) => esc(nameOf(id))).join("、")}）` : ""}</p>` +
         (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + esc(p.name), `ONW.co.pickMason('${p.id}')`)).join("") +
         btn(s.sel.length ? "この人たちで確定" : "自分だけで確定", "ONW.co.masonDone()") + back;
+    } else if (s.step === "love") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "irole") {
       title = "結果開示";
       body = `<p class="night-step__hint">夜が終わったあとの、最終的な役職を選んでください。</p>` + roleBtns("insomRole", btn("伏せる", "ONW.co.insomRole('hide')")) + back;
     } else if (s.step === "history") {
       title = "CO履歴";
-      const lines = (G().chatLog || []).filter((c) => c.kind === "co");
-      body = (lines.length ? lines.map((c) => `<div class="chat-line chat-co">${esc(c.text)}</div>`).join("") : `<p class="night-step__hint">まだCO履歴はありません。</p>`) + back;
+      body = `<div class="co-hist">${ONW.ui.coTable()}</div>` + back;
     }
     el.innerHTML = `<div class="co-panel"><div class="co-title">${title}</div><div class="co-grid">${body}</div></div>`;
   };

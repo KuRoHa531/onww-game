@@ -59,6 +59,7 @@ window.ONW = window.ONW || {};
     if (!ONW.net.isHost || g.inGame) return;
     if (!g.debugOn && !window.confirm("デバッグモードをONにします。\n参加者全員の画面に「デバッグモード中」と表示されます。")) return;
     g.debugOn = !g.debugOn;
+    try { localStorage.setItem("onw.debugOn.v1", g.debugOn ? "1" : "0"); } catch (e) {}   // ブラウザを開き直してもON/OFFを維持（ルーム作成時に復元）
     if (!g.debugOn) { ui.open = false; ui.pick = null; }
     ONW.net.syncLobby();
   };
@@ -148,6 +149,21 @@ window.ONW = window.ONW || {};
   }
 
   // ---- CPUの能力先指定 ----
+  /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
+  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", troublemaker: "tm", relic_robber: "rel" };
+  function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
+    const d = data(), r = d.roles[key];
+    if (!r) return null;
+    const grp = ONW.TRANSFORM_GROUPS[r];
+    if (grp) return d.tf[key] ? [d.tf[key]] : grp.slice();
+    return [r];
+  }
+  function cpuKinds(key) {
+    const rs = cpuRoles(key), k = { seer: false, rob: false, tm: false, rel: false };
+    if (!rs) { k.seer = k.rob = k.tm = k.rel = true; return k; }   // 固定なし: どの役職になるか分からないので全部出す
+    rs.forEach((r) => { if (ABILITY[r]) k[ABILITY[r]] = true; });
+    return k;
+  }
   function tabCpu() {
     const g = G(), d = data();
     if (!inLobby()) return hint("CPUの能力先はルーム（ロビー）で設定します。次の試合に反映されます。");
@@ -155,25 +171,44 @@ window.ONW = window.ONW || {};
     if (!cpus.length) return hint("CPU人数を1人以上にすると設定できます。");
     const nameOfKey = (k) => (players.find((s) => s.key === k) || {}).name || "?";
     const rows = cpus.map((s) => {
-      const t = d.cpu[s.key], role = d.roles[s.key];
-      const lab = !t ? "指定なし" : t.player ? esc(nameOfKey(t.player)) : (t.graves || []).map((i) => `墓地${i + 1}`).join("・");
-      let h = row(esc(s.name) + cpuBadge + (role ? ` <small class="dbg-dim">(${esc(rn(role))}固定)</small>` : ""), `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["c:" + s.key])}`);
+      const t = d.cpu[s.key] || {}, role = d.roles[s.key], k = cpuKinds(s.key), rs = cpuRoles(s.key);
+      const parts = [];
+      if (t.player) parts.push(esc(nameOfKey(t.player)));
+      if ((t.players || []).length) parts.push(t.players.map((id) => esc(nameOfKey(id))).join(" と "));
+      if ((t.graves || []).length) parts.push(t.graves.map((i) => `墓地${i + 1}`).join("・"));
+      const lab = parts.length ? parts.join(" / ") : "指定なし";
+      const fixed = role ? ` <small class="dbg-dim">(${esc(rn(role))}${d.tf[s.key] ? " → " + esc(rn(d.tf[s.key])) : ""}固定)</small>` : "";
+      let h = row(esc(s.name) + cpuBadge + fixed, `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["c:" + s.key])}`);
       if (ui.pick === "c:" + s.key) {
-        const pb = players.filter((o) => o.key !== s.key).map((o) => b(esc(o.name), "cpuPlayer", [s.key, o.key], t && t.player === o.key ? "dbg-on" : "")).join("");
-        const gb = Array.from({ length: g.graveCount || 0 }, (_, i) => b(`墓地${i + 1}`, "cpuGrave", [s.key, String(i)], t && (t.graves || []).includes(i) ? "dbg-on" : "")).join("");
-        h += `<div class="dbg-pick"><div class="dbg-sub">プレイヤー</div>${pb}<div class="dbg-sub">墓地（2枚まで）</div>${gb}${b("指定なし", "cpuClear", [s.key], "dbg-clear")}${b("閉じる", "pick", ["c:" + s.key])}</div>`;
+        const others = players.filter((o) => o.key !== s.key);
+        const maxG = k.seer ? ONW.seerGraveMax(g) : 1;
+        const sec = (title, inner) => `<div class="dbg-sub">${title}</div>${inner}`;
+        const pb = (fn, sel) => others.map((o) => b(esc(o.name), fn, [s.key, o.key], sel(o.key) ? "dbg-on" : "")).join("");
+        const gb = Array.from({ length: g.graveCount || 0 }, (_, i) => b(`墓地${i + 1}`, "cpuGrave", [s.key, String(i)], (t.graves || []).includes(i) ? "dbg-on" : "")).join("");
+        let body = "";
+        if (rs && !Object.values(k).some(Boolean)) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
+        else {
+          if (k.seer || k.rob) body += sec(k.seer && k.rob ? "プレイヤー（占う相手 / 交換・一目惚れの相手）" : k.seer ? "プレイヤー（占う相手）" : "プレイヤー（交換・一目惚れの相手）", pb("cpuPlayer", (id) => t.player === id));
+          if (k.tm) body += sec("プレイヤー2人（入れ替える2人）", pb("cpuPlayers", (id) => (t.players || []).includes(id)));
+          if (k.seer || k.rel) body += sec(k.seer ? `墓地（${ONW.seerGraveMax(g)}枚まで）` : "墓地（交換する1枚）", gb);
+        }
+        h += `<div class="dbg-pick">${rs && rs.length > 1 ? hint(`変化後がランダムなので、候補（${esc(rs.map(rn).join("・"))}）の指定がすべて出ています。`) : ""}${body}${b("指定なし", "cpuClear", [s.key], "dbg-clear")}${b("閉じる", "pick", ["c:" + s.key])}</div>`;
       }
       return h;
     }).join("");
-    return hint("占い師のCPUは占い先/墓地、怪盗のCPUは交換相手に使います（他の役職には使いません）。墓地を1枚だけ指定すると、もう1枚はランダムです。") + rows;
+    return hint("固定した役職（光の使徒などは変化後の指定まで）から、そのCPUが使える能力先だけを出します。占い師=プレイヤーか墓地(設定した枚数まで)、怪盗・一目惚れしてるてる=プレイヤー1人、いたずらっ子=プレイヤー2人、墓荒らし=墓地1枚。固定なしのときは全部出ます。一部だけ指定すると、残りはランダムです。") + rows;
   }
 
   // ---- その他（CPU議論発言 / 夜ログ）----
   function tabMisc() {
     const g = G(), d = data();
     const logs = inGame() ? ((g.nightLogsAll || []).length ? g.nightLogsAll.map((t) => `<div class="dbg-log">${esc(t)}</div>`).join("") : hint("まだ夜のログはありません。")) : hint("試合中に表示されます。");
+    const canKill = inGame() && [PH().ONLINE_DAY, PH().ONLINE_VOTE].includes(g.phase);
+    const kill = canKill
+      ? g.players.map((p) => row(esc(p.name) + (p.isCpu ? cpuBadge : ""), (g.deadIds || []).includes(p.id) ? `<span class="dbg-val">死亡済み</span>` : b("死亡させる", "kill", [p.id]))).join("")
+      : hint("昼の議論〜投票の間に使えます。死亡した人は投票・発言ができず、霊界チャットに入ります。");
     return row("CPU議論発言", `<span class="dbg-val">${d.cpuTalkOff ? "OFF" : "ON"}</span> ${b("切り替え", "talkToggle")}`) +
-      hint("OFFにすると、昼のCPUのCO・結果開示・投票表明の発言をしません。") + `<div class="dbg-h">夜ログ（GM用）</div>${logs}`;
+      hint("OFFにすると、昼のCPUのCO・結果開示・投票表明の発言をしません。") + `<div class="dbg-h">昼中に死亡させる（霊界チャットの確認用）</div>${kill}<div class="dbg-h">夜ログ（GM用）</div>${logs}`;
   }
 
   const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "CPU能力先", tabCpu], ["misc", "その他", tabMisc]];
@@ -201,6 +236,7 @@ window.ONW = window.ONW || {};
   debug.pick = (k) => { ui.pick = ui.pick === k ? null : k; refresh(); };
   debug.talkToggle = () => { const d = data(); d.cpuTalkOff = !d.cpuTalkOff; refresh(); };
 
+  debug.kill = (id) => { ONW.net.killPlayer(id); refresh(); };
   debug.voteSet = (vid, tid) => { ui.pick = null; ONW.net.debugVote(vid, tid || null); refresh(); };
   debug.voteAll = (tid) => { ui.pick = null; ONW.net.debugVoteAll(tid); refresh(); };
   debug.voteClear = () => { ui.pick = null; ONW.net.debugVoteClearAll(); refresh(); };
@@ -218,12 +254,22 @@ window.ONW = window.ONW || {};
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; refresh(); };
   debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; G().dbgWarn = []; ui.pick = null; refresh(); };
 
-  debug.cpuPlayer = (id, target) => { data().cpu[id] = { player: target }; ui.pick = null; refresh(); };
+  // 指定を書き換える（空になったら項目ごと消す）
+  const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };
+  debug.cpuPlayer = (id, target) => {
+    const k = cpuKinds(id), cur = data().cpu[id] || {};
+    setCpu(id, { player: cur.player === target ? null : target, ...(k.seer && !k.rel ? { graves: null } : {}) });   // 占い師だけならプレイヤーと墓地は同時に指定できない
+    refresh();
+  };
+  debug.cpuPlayers = (id, target) => {   // いたずらっ子: 入れ替える2人（押し直しで解除。3人目を押すと古い方が外れる）
+    const cur = (data().cpu[id] || {}).players || [];
+    setCpu(id, { players: cur.includes(target) ? cur.filter((x) => x !== target) : [...cur, target].slice(-2) });
+    refresh();
+  };
   debug.cpuGrave = (id, i) => {
-    const d = data(), cur = d.cpu[id] || {}, k = Number(i);
-    let gs = [...(cur.graves || [])];
-    gs = gs.includes(k) ? gs.filter((x) => x !== k) : [...gs, k].slice(-2);
-    if (gs.length) d.cpu[id] = { graves: gs }; else delete d.cpu[id];
+    const k = cpuKinds(id), cur = data().cpu[id] || {}, n = Number(i), max = k.seer ? ONW.seerGraveMax(G()) : 1;
+    const gs = (cur.graves || []).includes(n) ? cur.graves.filter((x) => x !== n) : [...(cur.graves || []), n].slice(-max);
+    setCpu(id, { graves: gs, ...(k.seer && !k.rob ? { player: null } : {}) });
     refresh();
   };
   debug.cpuClear = (id) => { delete data().cpu[id]; ui.pick = null; refresh(); };

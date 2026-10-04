@@ -19,8 +19,12 @@ window.ONW = window.ONW || {};
   const $t = () => document.getElementById("table");
 
   let key = null;                     // 試合が変わったらテーブルを作り直す目印
+  let deathMarks = [];                 // 「死亡」の札を付けた席（結果では外す）
   let up = {}, dead = {}, badge = {}, glow = {}; // 表向きの役職 / 追放された席 / 票数などの札 / 光らせる札(大狼の目)
-  const NIGHT_ACT = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker"];   // 夜にカードを押して行動する役職
+  const NIGHT_ACT = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker", "love_tanner"];   // 夜にカードを押して行動する役職
+  let shin = {};                       // 無理心中で道連れになった席（死因の演出用）
+  const WOLF_MARK = "__wolf";
+  let nightKeys = [];                  // 夜の始まりに開いたカード（神・大狼）。夜時間が終わるまで裏に戻さない
   let busy = false;                   // 演出中は操作を受け付けない
   let seq = false;                    // 結果演出を開始済みか
   let timers = [], paperTimers = [];
@@ -28,6 +32,8 @@ window.ONW = window.ONW || {};
   const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
 
   const VISIBLE = () => [ONW.PHASE.ONLINE_NIGHT, ONW.PHASE.ONLINE_MORNING, ONW.PHASE.ONLINE_DAY, ONW.PHASE.ONLINE_VOTE, ONW.PHASE.ONLINE_RESULT];
+  const ph = (g) => (g.phase === ONW.PHASE.ONLINE_SPECTATE ? g.specPhase : g.phase);   // 観戦者は本当のフェーズで判断する
+  const graveN = (g) => ((g.isSpectator || hostWatching(g)) && g.specInfo ? g.specInfo.center.length : g.graveCount || 0);
   const hostWatching = (g) => !!(g.hostSpec && ONW.net.isHost);
 
   /** 席の一覧。自分が先頭。観戦のホストは全員、観戦者はCO欄の名簿から */
@@ -36,7 +42,7 @@ window.ONW = window.ONW || {};
     if (g.others && !g.isSpectator) return [{ id: ONW.net.myId(), name: g.myName || "あなた", me: true }, ...g.others];
     return (g.boardView || []).map((p) => ({ id: p.id, name: p.name }));
   }
-  stage.hasTable = (g) => VISIBLE().includes(g.phase) && roster(g).length > 0;
+  stage.hasTable = (g) => VISIBLE().includes(ph(g)) && roster(g).length > 0;
 
   // ---------------------------------------------------------
   // 土台（一度だけ作る）
@@ -48,7 +54,7 @@ window.ONW = window.ONW || {};
     </div>`;
   function build(g, list) {
     const av = (n) => (ONW.account.avatarMap[n] ? ONW.account.avatarHtml(n, null, "av--xs") : "");
-    const graves = Array.from({ length: g.graveCount || 0 }, (_, i) => seatHtml(`g:${i}`, `墓地${i + 1}`, "tb-grave")).join("");
+    const graves = Array.from({ length: graveN(g) }, (_, i) => seatHtml(`g:${i}`, `墓地${i + 1}`, "tb-grave")).join("");
     const players = list.map((p) => seatHtml(`p:${p.id}`, `${av(p.name)}${esc(p.name)}`, p.me ? "me" : "")).join("");
     const el = $t();
     el.innerHTML = `<div class="tb-table">
@@ -65,16 +71,18 @@ window.ONW = window.ONW || {};
   // 今の操作モード（夜に選ぶ / 投票で選ぶ / なし）
   // ---------------------------------------------------------
   function mode(g) {
-    if (busy || g.isSpectator || hostWatching(g)) return null;
-    if (g.phase === ONW.PHASE.ONLINE_NIGHT && !g.nightDone && NIGHT_ACT.includes(g.actRole)) return { type: "night", role: g.actRole };   // actRole: 墓荒らしが交換した後は新しい役職
+    if (busy || g.isSpectator || g.isDead || hostWatching(g)) return null;
+    if (g.phase === ONW.PHASE.ONLINE_NIGHT && !g.nightDone && NIGHT_ACT.includes(g.actRole)) return { type: "night", role: g.actRole };
+    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.morningChain && g.morningChainReady && !g.morningChainDone) return { type: "morning", role: g.morningChain };   // 墓荒らしが交換した後の役職の能力を朝に使う
     if (g.phase === ONW.PHASE.ONLINE_VOTE && !g.voted) return { type: "vote" };
     return null;
   }
   function pickable(k, m, g) {
     if (!m) return false;
     const me = ONW.net.myId(), isP = k.startsWith("p:");
+    if (isP && dead[k]) return false;   // 死亡した人には投票できない
     if (isP) return k.slice(2) !== me && m.role !== "relic_robber";   // 墓荒らしが選べるのは墓地だけ
-    if (m.type !== "night") return false;
+    if (m.type === "vote") return false;
     // 墓地: 占い師・狂った占い師(設定枚数まで) / 墓荒らし(1枚)
     return m.role === "seer" || m.role === "mad_seer" || m.role === "relic_robber";
   }
@@ -83,6 +91,7 @@ window.ONW = window.ONW || {};
   // 描画の反映（再描画のたびに呼ばれる。DOMは作り直さずクラスだけ更新）
   // ---------------------------------------------------------
   function faceHtml(role) {
+    if (role === WOLF_MARK) return `<div class="tb-wolfmark">🐺</div>`;   // 狂信者に見える「人狼」の印（役職名は出さない）
     const info = ONW.roles.getInfo(role);
     return `${ONW.ui.roleIcon(role, "role-icon--face")}<b>${esc(info.name)}</b>`;
   }
@@ -94,14 +103,15 @@ window.ONW = window.ONW || {};
         s.dataset.role = role;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role);
-        f.className = `tb-front tb-team-${ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${role === WOLF_MARK ? "wolf" : ONW.roles.getInfo(role).team}`;
       }
-      const sel = (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && m.type === "night" && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
+      const sel = (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
       s.classList.toggle("pick", pickable(k, m, g));
       s.classList.toggle("sel", !!sel);
       s.classList.toggle("dead", !!dead[k]);
       s.classList.toggle("glow", !!glow[k]);
+      s.classList.toggle("shinju", !!shin[k]);
       const b = s.querySelector(".tb-badge");
       const text = badge[k] || (g.voted && g.myVote && k === `p:${g.myVote}` && g.phase === ONW.PHASE.ONLINE_VOTE ? "投票" : "");
       if (b.textContent !== text) { b.textContent = text; b.classList.toggle("tb-badge--dead", !!dead[k]); }
@@ -112,21 +122,43 @@ window.ONW = window.ONW || {};
     const el = $t();
     if (!el) return;
     const list = roster(g);
-    if (!VISIBLE().includes(g.phase) || !list.length) {
-      if (key !== null) { clearAll(); key = null; up = {}; dead = {}; badge = {}; glow = {}; busy = false; seq = false; el.innerHTML = ""; }
+    if (!VISIBLE().includes(ph(g)) || !list.length) {
+      if (key !== null) { clearAll(); key = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
-    const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${g.graveCount || 0}`;
-    if (k !== key) { clearAll(); key = k; up = {}; dead = {}; badge = {}; glow = {}; busy = false; seq = false; build(g, list); }
+    const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
+    if (k !== key) { clearAll(); key = k; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
+    // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
+    if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) {
+      g.specInfo.players.forEach((p) => { up[`p:${p.id}`] = p.cur || p.ini; });
+      g.specInfo.center.forEach((c, i) => { up[`g:${i}`] = c.cur || c.ini; });
+    }
+    // 昼中に死亡した席には「死亡」の札（結果発表では外す）
+    if (g.phase === ONW.PHASE.ONLINE_RESULT) {
+      deathMarks.forEach((k) => { delete dead[k]; if (badge[k] === "死亡") delete badge[k]; });
+      deathMarks = [];
+    } else {
+      (g.boardView || []).filter((p) => p.dead).forEach((p) => { const k = `p:${p.id}`; if (!dead[k]) { dead[k] = true; badge[k] = "死亡"; deathMarks.push(k); } });
+    }
     paint(g);
     // 朝になったら、夜の選択が実行される演出（占い=表に / 怪盗・墓荒らし=入れ替わって表に / いたずらっ子=入れ替わる）
-    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.morningReveal && !g.morningShown && !g.isSpectator) {
-      g.morningShown = true; const r = g.morningReveal;
-      later(() => playMorning(r), 700);
+    if (g.phase === ONW.PHASE.ONLINE_MORNING && (g.morningReveal || g.morningInsom) && !g.morningShown && !g.isSpectator) {
+      g.morningShown = true; const r = g.morningReveal, ins = g.morningInsom;
+      if (r) later(() => playMorning(r), 700);
+      // 墓荒らしが交換した後の役職の能力は、朝の演出が終わってから使える
+      if (g.morningChain) later(() => { g.morningChainReady = true; ONW.ui.render(G()); }, (r ? 700 + morningDur(r) : 300) + 300);
+      // 後覚者（元々 / 後から）: 夜能力の演出があればその後に、なければ朝になってすぐ、自分のカードが最終役職で表になる
+      if (ins) later(() => show(`p:${ONW.net.myId()}`, ins), r ? 700 + morningDur(r) : 300);
     }
-    if (g.phase !== ONW.PHASE.ONLINE_MORNING && g.morningUp && g.morningUp.length) { g.morningUp.forEach((k) => delete up[k]); g.morningUp = []; paint(G()); }   // 昼になったら伏せる
+    // 朝が終わった直後の待機時間: 後覚者の最終役職がここで表になる
+    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settleInsom && !g.settleShown && !g.isSpectator) { g.settleShown = true; show(`p:${ONW.net.myId()}`, g.settleInsom); }
+    if (g.phase !== ONW.PHASE.ONLINE_MORNING && g.morningUp && g.morningUp.length) { g.morningUp.forEach((k) => delete up[k]); g.morningUp = []; paint(G()); }   // 占い結果などは朝時間の間ずっと表のまま。昼になったら伏せる
+    if (g.phase !== ONW.PHASE.ONLINE_NIGHT && nightKeys.length) { nightKeys.forEach((k) => { delete up[k]; delete glow[k]; }); nightKeys = []; paint(G()); }   // 神・大狼のカードは夜時間が終わったら伏せる   // 昼になったら伏せる
+    if (g.godReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.godReveal; g.godReveal = null; later(() => godPeek(r), 700); }   // 神: 夜の始まりに全員と墓地のカードが開く
+    if (g.cultReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.cultReveal; g.cultReveal = null; later(() => cultPeek(r), 700); }   // 狂信者: 夜の始まりに人狼のカードが表になって🐺が出る
+    if (g.masonReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.masonReveal; g.masonReveal = null; later(() => masonPeek(r), 700); }   // 共有者: 夜の始まりに仲間の共有者のカードが表になる
     if (g.bigReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.bigReveal; g.bigReveal = null; later(() => bigPeek(r), 700); }   // 大狼: 夜の始まりに墓地が全部開く
     if (g.phase === ONW.PHASE.ONLINE_RESULT && g.result && g.resultStage !== "sheet" && !seq) startResult(g);
   };
@@ -138,13 +170,8 @@ window.ONW = window.ONW || {};
     const g = G(), m = mode(g);
     if (!pickable(k, m, g)) return;
     const id = k.slice(2);
-    if (m.type === "night") {
-      // 朝になるまで何度でも選び直せる。同じカードをもう一度押すと選択解除
-      if (m.role === "relic_robber") {              // 墓荒らし: 押した墓地とその場で交換（やり直しなし）
-        busy = true;
-        ONW.net.relic(+id);
-        return;
-      }
+    if (m.type === "night" || m.type === "morning") {
+      // 夜: 朝になるまで何度でも選び直せる（同じカードをもう一度押すと解除）。朝: 選んで「能力を使う」で確定
       const sel = g.nightSel = g.nightSel || { players: [], graves: [] }, isP = k.startsWith("p:");
       const toggle = (arr, v, max) => { const at = arr.indexOf(v); if (at >= 0) arr.splice(at, 1); else { if (arr.length >= max) arr.shift(); arr.push(v); } };
       if (isP) {
@@ -152,11 +179,12 @@ window.ONW = window.ONW || {};
         toggle(sel.players, id, max);
         if (m.role === "seer" || m.role === "mad_seer") sel.graves = [];     // 墓地とプレイヤーは同時に占えない
       } else {
-        const max = Math.min(2, g.graveCount || 0);
+        const max = (m.role === "seer" || m.role === "mad_seer") ? ONW.seerGraveMax(g) : 1;
+        if (max <= 0) return;
         toggle(sel.graves, +id, max);
         sel.players = [];
       }
-      ONW.net.setSel(sel);
+      if (m.type === "night") ONW.net.setSel(sel);
       ONW.ui.render(g);
     } else {
       g.voteSel = g.voteSel === id ? null : id;     // 同じ人をもう一度押すと未投票に戻る
@@ -167,20 +195,28 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   // 朝: 夜の選択が実行され、入れ替わる演出 → 自分のカードが表に（昼になるまで見える）
   // ---------------------------------------------------------
-  stage.onAck = function (d) {      // 夜のうちに演出するのは墓荒らしの交換だけ（他は朝にまとめて再生）
-    if (!d.reveal) { busy = false; return; }
-    busy = true;
-    relic(d.reveal, true);
+  stage.onAck = function (d) {      // 朝に使った能力は、結果が返った瞬間に演出する
+    busy = false;
+    if (d.reveal) playMorning(d.reveal);
   };
   function show(k, role) {
     const g = G();
     up[k] = role; (g.morningUp = g.morningUp || []).push(k); paint(g);
+  }
+  function morningDur(r) {   // 朝の演出（playMorning）が終わるまでのおおよその時間(ms)
+    if (r.kind === "peek") return (r.items.length - 1) * 450 + 1000;
+    if (r.kind === "swap") return 1050 + 700;
+    if (r.kind === "relic") return 540 + 1050 + 700;
+    if (r.kind === "tm") return 1250 + 500;
+    return 1000;
   }
   function playMorning(r) {
     if (r.kind === "peek") r.items.forEach((it, i) => later(() => show(it.k, it.role), i * 450));
     else if (r.kind === "swap") swap(r);
     else if (r.kind === "relic") relic(r);
     else if (r.kind === "tm") tmSwap(r);
+    // 墓荒らしで人狼系・狂信者・共有者を取ったとき: 交換の演出のあと、相方のカードが表になる（昼になるまで）
+    if (r.mates) later(() => r.mates.ids.forEach((id, i) => later(() => show(`p:${id}`, r.mates.role), i * 380)), morningDur(r) + 200);
   }
   function swap(r, temp) {
     const mine = `p:${ONW.net.myId()}`, theirs = r.kind === "relic" ? `g:${r.target}` : `p:${r.target}`, el = $t();
@@ -236,10 +272,25 @@ window.ONW = window.ONW || {};
     later(() => { A.cancel(); B.cancel(); a.style.zIndex = b.style.zIndex = ""; }, 1250);   // 裏面は同じなので、元の席に戻すと入れ替わったまま見える
   }
 
-  // ---- 大狼: 夜の始まりに墓地のカードが順に全部開き、赤く光る → 閉じる ----
+  // ---- 神: 夜の始まりに全員と墓地のカードが順に開き、金色に光る → 夜時間の間ずっと開いたまま ----
+  function godPeek(r) {
+    const keys = [...Object.keys(r.players).map((id) => [`p:${id}`, r.players[id]]), ...r.graves.map((c, i) => [`g:${i}`, c])];
+    keys.forEach(([k, role], i) => later(() => { if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = role; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 300));
+  }   // 閉じるのは夜時間が終わったとき（sync）
+
+  // ---- 狂信者: 夜の始まりに人狼プレイヤーのカードが順に表になり、🐺が出る → 夜時間の間ずっと開いたまま ----
+  function cultPeek(ids) {
+    ids.forEach((id, i) => later(() => { const k = `p:${id}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = WOLF_MARK; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 380));
+  }
+
+  // ---- 共有者: 夜の始まりに仲間の共有者のカードが順に表になる → 夜時間の間ずっと開いたまま ----
+  function masonPeek(ids) {
+    ids.forEach((id, i) => later(() => { const k = `p:${id}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = "mason"; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 380));
+  }
+
+  // ---- 大狼: 夜の始まりに墓地のカードが順に全部開き、赤く光る → 夜時間の間ずっと開いたまま ----
   function bigPeek(roles) {
-    roles.forEach((role, i) => later(() => { up[`g:${i}`] = role; glow[`g:${i}`] = true; paint(G()); }, i * 380));
-    later(() => { roles.forEach((_, i) => { delete up[`g:${i}`]; delete glow[`g:${i}`]; }); paint(G()); }, roles.length * 380 + 4200);
+    roles.forEach((role, i) => later(() => { const k = `g:${i}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = role; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 380));
   }
 
   // ---------------------------------------------------------
@@ -257,7 +308,9 @@ window.ONW = window.ONW || {};
   function startResult(g) {
     seq = true;
     const res = g.result, P = (id) => `p:${id}`;
-    const exec = res.history.filter((h) => h.dead);
+    const order = res.chainOrder || [];
+    const exec = res.history.filter((h) => h.dead && h.cause !== "chain");
+    const chain = res.history.filter((h) => h.cause === "chain").sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     const rest = [...res.history.filter((h) => !h.dead).map((h) => [P(h.id), h.role]), ...res.grave.map((c, i) => [`g:${i}`, c.role])];
     let t = 600;
     setCap(`<div class="res-cap__t">投票の結果</div>`);
@@ -269,6 +322,15 @@ window.ONW = window.ONW || {};
       paint(G());
     }, t);
     t += exec.length ? 3200 : 1500;
+    // 一目惚れしてるてるが先にめくれ、そのあとで道連れにされた人が1人ずつ無理心中でめくれる
+    chain.forEach((h) => {
+      later(() => {
+        setCap(`<div class="res-cap__t t-wolf">無理心中</div><div>${esc(h.name)}</div>`);
+        shin[P(h.id)] = true; dead[P(h.id)] = true; badge[P(h.id)] = "無理心中"; paint(G());
+      }, t);
+      later(() => { up[P(h.id)] = h.role; paint(G()); }, t + 1300);   // 演出のあとでカードが表に
+      t += 3400;
+    });
     later(() => setCap(`<div class="res-cap__t">結果発表</div>`), t);
     rest.forEach(([k, r], i) => later(() => { up[k] = r; paint(G()); }, t + 500 + i * 320));
     t += 500 + rest.length * 320 + 700;
@@ -284,7 +346,7 @@ window.ONW = window.ONW || {};
     const g = G(), res = g.result;
     if (!res) return;
     clearAll();
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = "追放"; } });
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.cause === "chain" ? "無理心中" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     res.counts.forEach((c) => { if (!badge[`p:${c.id}`]) badge[`p:${c.id}`] = `${c.c}票`; });
     toSheet();
@@ -314,6 +376,24 @@ window.ONW = window.ONW || {};
     paper.style.opacity = "0";
     paperTimers.push(setTimeout(() => finishPaper(wrap), 1050));
   }
+  /** 変化公開の文字を、改行されない範囲で一番大きくする（画面の幅が変わっても合わせ直す） */
+  function fitPaper(wrap) {
+    const paper = wrap.querySelector(".tfp-paper");
+    if (!paper || !wrap.isConnected) return;
+    const BASE = 26, MIN = 10;
+    const cs = getComputedStyle(paper);
+    const avail = paper.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    paper.style.setProperty("--tfp-fs", BASE + "px");
+    let ratio = 1;
+    wrap.querySelectorAll(".tfp-line span").forEach((sp) => { const w = sp.offsetWidth; if (w > avail && w > 0) ratio = Math.min(ratio, avail / w); });
+    paper.style.setProperty("--tfp-fs", Math.max(MIN, Math.floor(BASE * ratio * 10 * 0.98) / 10) + "px");   // 全行で同じ大きさにそろえる
+  }
+  /** 変化公開の紙が出始めてから下の欄に収まるまでの時間(ms)。昼のタイマー・CPUの発言はこの後に始める */
+  stage.paperMs = function (lines) {
+    if (!lines || !lines.length) return 0;
+    const dur = (t) => Math.min(0.7, Math.max(0.3, [...t].length * 0.05)), last = lines[lines.length - 1];
+    return Math.round((0.55 + (lines.length - 1) * 0.75 + dur(last) + 1.3 + 1.05 + 0.3) * 1000);
+  };
   stage.paper = function (lines) {
     document.querySelectorAll(".tfp-wrap").forEach((w) => w.remove());
     paperTimers.forEach(clearTimeout); paperTimers = [];
@@ -328,6 +408,12 @@ window.ONW = window.ONW || {};
         <div class="tfp-hint">タップでスキップ</div>
       </div>`;
     document.body.appendChild(wrap);
+    fitPaper(wrap);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitPaper(wrap));   // フォントの読み込み後にも合わせ直す
+    const onResize = () => fitPaper(wrap);
+    window.addEventListener("resize", onResize);
+    const mo = new MutationObserver(() => { if (!wrap.isConnected) { window.removeEventListener("resize", onResize); mo.disconnect(); } });
+    mo.observe(document.body, { childList: true });
     wrap.onclick = () => fly(wrap);
     const endAt = start(lines.length - 1) + dur(lines[lines.length - 1]) + 1.3;   // 書き終えて少し読ませてから下へ
     paperTimers.push(setTimeout(() => fly(wrap), endAt * 1000));

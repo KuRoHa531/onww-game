@@ -15,7 +15,7 @@
   <button id="fs-btn" class="fs-btn" aria-label="全画面" title="全画面" onclick="ONW.ui.toggleFullscreen()">□</button>
 
   <header class="onw-header">
-    <div class="onw-header__phase" id="phase-label">支度中</div>
+    <div class="onw-header__phase" id="phase-label"></div>
     <h1 class="onw-header__title">
       <span class="onw-header__title-sub">ONE NIGHT WEREWOLF</span>
       混沌に潜みし狼達
@@ -23,12 +23,17 @@
     <div class="onw-header__day" id="day-clock">――</div>
   </header>
 
-  <p class="wiki-link" style="text-align:center; margin: 0 0 -10px;">
-    <a href="https://kuroha531.github.io/ONWW-wiki/" target="_blank" rel="noopener" style="color: var(--gold-dim); font-size: 13px; text-decoration: underline;">→ 役職辞典を見る</a>
-  </p>
+  <!-- 右上: 📕（役職辞典）とアカウント表示を横に並べる（js/account-ui.js の acct-fixed もここに入る） -->
+  <div id="top-right" class="top-right">
+  <a class="wiki-btn" href="https://kuroha531.github.io/ONWW-wiki/" target="_blank" rel="noopener" aria-label="役職辞典を見る" title="役職辞典を見る">📕</a>
+  </div>
 
   <!-- ゲーム中ずっと出ているカードのテーブル（js/stage.js が管理。#app の再描画では消えない） -->
-  <div id="table" class="tb-wrap" aria-label="カードのテーブル"></div>
+  <div id="stage-col" class="stage-col">
+    <!-- PC版のみ表示: 左側の大きなタイマー（js/ui.js の updateTimer が更新） -->
+    <div id="big-timer" class="big-timer" aria-hidden="true"><span class="big-timer__phase"></span><span class="big-timer__time"></span></div>
+    <div id="table" class="tb-wrap" aria-label="カードのテーブル"></div>
+  </div>
 
   <main id="app" class="onw-app">
     <!-- 各フェーズの画面は js/ui.js が動的に描画する -->
@@ -58,6 +63,8 @@
   <script src="js/ui.js"></script>
   <script src="js/stage.js"></script>
   <script src="js/account-ui.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/profile.js"></script>
   <script src="js/co.js"></script>
   <script src="js/debug.js"></script>
   <script>

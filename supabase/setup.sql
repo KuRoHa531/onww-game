@@ -282,3 +282,44 @@ end $$;
 -- ============================================================
 -- 完了。続きは docs/supabase-setup.md の「手順5」へ。
 -- ============================================================
+
+
+-- ============================================================
+-- 8. プロフィールのひとこと(bio) と 戦績(match_results)   ※後から追加した機能。再実行OK
+-- ============================================================
+alter table public.profiles add column if not exists bio text not null default '';
+alter table public.profiles drop constraint if exists profiles_bio_len;
+alter table public.profiles add constraint profiles_bio_len check (char_length(bio) <= 200);
+grant update (display_name, avatar_updated_at, bio) on public.profiles to authenticated;
+
+-- 1試合につき1人1行。自分の結果だけ自分で書く（P2P対戦なので「自己申告」の記録です）
+create table if not exists public.match_results (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references public.profiles(id) on delete cascade,
+  played_at    timestamptz not null default now(),
+  match_key    text not null check (char_length(match_key) <= 64),   -- 部屋コード+開始時刻（二重登録防止）
+  initial_role text not null check (char_length(initial_role) <= 32), -- 最初に配られた役職
+  final_role   text not null check (char_length(final_role) <= 32),   -- 最終的な役職
+  team         text not null check (team in ('village','wolf','third')), -- 最終役職の陣営
+  won          boolean not null,
+  executed     boolean not null default false,                       -- 追放されたか
+  players      smallint not null check (players between 1 and 30),
+  unique (user_id, match_key)
+);
+create index if not exists match_results_user_idx on public.match_results (user_id, played_at desc);
+
+revoke all on public.match_results from anon, authenticated;
+grant select, insert, delete on public.match_results to authenticated;
+alter table public.match_results enable row level security;
+
+drop policy if exists "match_results_select_all" on public.match_results;
+drop policy if exists "match_results_insert_self" on public.match_results;
+drop policy if exists "match_results_delete_self" on public.match_results;
+-- 戦績はプロフィールで他の人にも見える（ログイン済みのみ）
+create policy "match_results_select_all" on public.match_results
+  for select to authenticated using (true);
+create policy "match_results_insert_self" on public.match_results
+  for insert to authenticated with check (user_id = auth.uid());
+-- 自分の戦績だけ削除（リセット）できる
+create policy "match_results_delete_self" on public.match_results
+  for delete to authenticated using (user_id = auth.uid());

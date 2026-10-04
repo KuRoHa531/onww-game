@@ -21,18 +21,6 @@ window.ONW = window.ONW || {};
     if (res.counts.length) res.counts.forEach((c) => add(T(c.name), T(" : ", C.dim), T(`${c.c}票`, C.vote)));
     else add(T("得票はありません。", C.dim));
     if (res.promoted.length) { sep(); add(T("[狂人昇格] 今回は ", C.dim), T(res.promoted.join("、")), T(" が人狼判定になっていました。", C.dim)); }
-    sep(); head("夜行動結果");
-    if (res.nightLogs.length) res.nightLogs.forEach((t) => add(T(t))); else add(T("夜行動ログはありません。", C.dim));
-    sep(); L.push({ segs: [{ t: "=== 最終結果 ===", c: C.head, b: true }], center: true }); head("役職履歴");
-    res.history.forEach((h) => {
-      const segs = [T(h.name + " ")];
-      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); });
-      segs.push(T(" " + h.status, h.status === "［追放］" ? C.dead : C.alive));
-      add(...segs);
-    });
-    sep();
-    res.grave.forEach((c) => { const segs = [T(c.label + " ")]; c.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); }); add(...segs); });
-    add(T("欠け: なし", C.dim));
     sep();
     const wt = res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
     L.push({ segs: [{ t: res.title, c: wt, b: true }], big: true });
@@ -40,6 +28,18 @@ window.ONW = window.ONW || {};
     add(T("勝利陣営: ", C.info), T(res.teams.join("＆") || "なし"));
     add(T("勝者: ", C.good), T(res.winners.join("、") || "なし"));
     add(T("敗者: ", C.dead), T(res.losers.join("、") || "なし"));
+    sep(); head("役職履歴");
+    res.history.forEach((h) => {
+      const segs = [T(h.name + " ")];
+      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); });
+      segs.push(T(" " + h.status, h.dead ? C.dead : C.alive));
+      add(...segs);
+    });
+    sep();
+    res.grave.forEach((c) => { const segs = [T(c.label + " ")]; c.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); }); add(...segs); });
+    add(T("欠け: なし", C.dim));
+    sep(); head("夜行動結果");
+    if (res.nightLogs.length) res.nightLogs.forEach((t) => add(T(t))); else add(T("夜行動ログはありません。", C.dim));
     return L;
   };
 

@@ -19,3 +19,6 @@ big_wolf.png       大狼
 cultist.png        狂信者
 mad_seer.png       狂った占い師
 relic_robber.png   墓荒らし
+love_tanner.png    一目惚れしてるてる
+god.png            神
+opportunist.png    オポチュニスト

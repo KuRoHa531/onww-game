@@ -24,65 +24,97 @@ window.ONW = window.ONW || {};
     // 人狼系は互いを、狂信者は人狼系を知っている / 大狼は墓地をすべて知っている
     if (all || stage === "init") cpus.forEach((p) => {
       if (isWolf(role(p))) g.players.forEach((q) => { if (q.id !== p.id && isWolf(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
-      if (role(p) === "cultist") g.players.forEach((q) => { if (isWolf(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
+      if (role(p) === "cultist") {
+        g.players.forEach((q) => { if (isWolf(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
+        const mid = g.players.some((q) => isWolf(role(q))) ? null : ONW.vote.certainPromotion(g);   // 人狼不在で昇格が確定している狂人 = ご主人
+        if (mid && mid !== p.id) infoOf(g, p.id).known[mid] = "werewolf";                           // CPUは人狼側の仲間として扱う（役職は不明）
+      }
       if (role(p) === "mason") g.players.forEach((q) => { if (q.id !== p.id && role(q) === "mason") infoOf(g, p.id).known[q.id] = "mason"; });   // 共有者は互いを知っている
       if (role(p) === "big_wolf") g.center0.forEach((c, idx) => infoOf(g, p.id).grave.push({ idx, role: c }));
+      if (role(p) === "god") {   // 神: 全員の初期役職と墓地を知っている
+        g.players.forEach((q) => { infoOf(g, p.id).known[q.id] = role(q); });
+        g.center0.forEach((c, idx) => infoOf(g, p.id).grave.push({ idx, role: c }));
+      }
     });
     const forced = (p) => (ONW.debug ? ONW.debug.cpuTarget(g, p.id) : null) || {};   // デバッグ: 能力先の指定
     const validPlayer = (p, id) => id && id !== p.id && g.players.some((q) => q.id === id);
 
-    const doSeer = (p, label) => {
+    const doSeer = (p, label, cur) => {   // cur: 朝に使うとき（朝の時点の実際のカードを見る）
+      const rolesNow = cur ? g.currentRoles : g.initialRoles, graveNow = cur ? g.center : g.center0;
       const i = infoOf(g, p.id), f = forced(p);
-      const fg = (f.graves || []).filter((k) => k >= 0 && k < g.center.length);
+      const lim = ONW.seerGraveMax(g);   // 設定された「占える墓地の枚数」
+      const fg = (f.graves || []).filter((k) => k >= 0 && k < g.center.length).slice(0, lim);
       const fp = validPlayer(p, f.player) ? f.player : null;
       i.grave = [];
-      if (fg.length || (!fp && g.center.length >= 2 && Math.random() < 0.4)) {
+      if (fg.length || (!fp && lim > 0 && g.center.length >= lim && Math.random() < 0.4)) {
         i.mode = "grave";
-        const idxs = [...fg];
-        ONW.utils.shuffle([...g.center.keys()].filter((k) => !idxs.includes(k))).forEach((k) => { if (idxs.length < 2) idxs.push(k); });
-        idxs.slice(0, 2).forEach((k) => i.grave.push({ idx: k, role: g.center0[k] }));
+        const idxs = fg.slice(0, lim);
+        ONW.utils.shuffle([...g.center.keys()].filter((k) => !idxs.includes(k))).forEach((k) => { if (idxs.length < lim) idxs.push(k); });
+        idxs.slice(0, lim).forEach((k) => i.grave.push({ idx: k, role: graveNow[k] }));
         i.grave.forEach((x) => g.nightLogsAll.push(`${label} ${p.name} は 墓地${x.idx + 1} を確認し、${rn(x.role)} でした。`));
       } else {
         const t = fp ? g.players.find((q) => q.id === fp) : pick(g.players.filter((q) => q.id !== p.id));
-        i.mode = "player"; i.target = t.id; i.known[t.id] = g.initialRoles[t.id];
-        g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${rn(g.initialRoles[t.id])} でした。`);
+        i.mode = "player"; i.target = t.id; i.known[t.id] = rolesNow[t.id];
+        g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${rn(rolesNow[t.id])} でした。`);
       }
     };
     const doRobber = (p, label) => {
       const f = forced(p), i = infoOf(g, p.id);
       const t = validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : pick(g.players.filter((q) => q.id !== p.id));
-      [g.currentRoles[p.id], g.currentRoles[t.id]] = [g.currentRoles[t.id], g.currentRoles[p.id]];
+      ONW.swapPlayers(g, p.id, t.id);
       i.mode = "robber"; i.target = t.id; i.newRole = g.currentRoles[p.id];
       i.known[p.id] = i.newRole; i.known[t.id] = "robber";
       g.nightLogsAll.push(`${label} ${p.name} は ${t.name} と役職を交換し、${rn(i.newRole)} になりました。`);
     };
     const doTroublemaker = (p, label) => {
-      const i = infoOf(g, p.id), others = g.players.filter((q) => q.id !== p.id);
+      const i = infoOf(g, p.id), others = g.players.filter((q) => q.id !== p.id), f = forced(p);
       if (others.length < 2) return;
-      const [a, b] = ONW.utils.shuffle([...others]).slice(0, 2);
+      // デバッグ: 入れ替える2人の指定（1人だけ指定なら、もう1人はランダム）
+      let pair = (f.players || []).filter((id, k, arr) => validPlayer(p, id) && arr.indexOf(id) === k).slice(0, 2);
+      if (pair.length < 2) pair = [...pair, ...ONW.utils.shuffle(others.filter((q) => !pair.includes(q.id))).slice(0, 2 - pair.length).map((q) => q.id)];
+      const [a, b] = pair.map((id) => g.players.find((q) => q.id === id));
       g.tmQueue.push({ id: p.id, a: a.id, b: b.id });     // 反映は夜の終わり（net.js）
       i.mode = "tm"; i.pair = [a.id, b.id];
       g.nightLogsAll.push(`${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);
     };
+    const doLove = (p, label) => {   // 一目惚れしてるてる: 一目惚れする相手を選ぶ（記録は「役職の持ち主」単位。役職が動いたら移動先の人の選択になる）
+      const f = forced(p), i = infoOf(g, p.id);
+      const t = validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : pick(g.players.filter((q) => q.id !== p.id));
+      ONW.setRoleBound(g, "loveTargets", p.id, t.id);   // 役職についていく（state.js の【必読】メモ参照）。移動「あと」に選んでも現在の持ち主に予約される
+      i.mode = "love"; i.target = t.id;
+      g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を選んでいました。`);
+    };
     const doRelic = (p) => {
       const i = infoOf(g, p.id);
       if (!g.center.length) return;
-      const idx = pick([...g.center.keys()]), got = g.center[idx];
-      g.center[idx] = g.currentRoles[p.id]; g.currentRoles[p.id] = got;
+      const fg = (forced(p).graves || []).filter((k) => k >= 0 && k < g.center.length);   // デバッグ: 交換する墓地の指定
+      const idx = fg.length ? fg[0] : pick([...g.center.keys()]), got = g.center[idx];
+      ONW.swapGrave(g, p.id, idx);
       i.mode = "relic"; i.graveIdx = idx; i.newRole = got; i.known[p.id] = got;
-      g.nightLogsAll.push(`墓荒らし ${p.name} は 墓地${idx + 1} と役職を交換し、${rn(got)} になりました。`);
-      // 交換後の役職に夜行動があればそのまま使う（占い系・怪盗・いたずらっ子）
-      if (got === "seer" || got === "mad_seer") { const keep = { mode: i.mode, graveIdx: i.graveIdx, newRole: i.newRole }; doSeer(p, rn(got)); i.relic = keep; }
-      else if (got === "robber") { const keep = { graveIdx: idx, newRole: got }; doRobber(p, rn(got)); i.relic = keep; }
-      else if (got === "troublemaker") { i.relic = { graveIdx: idx, newRole: got }; doTroublemaker(p, rn(got)); }
-      else i.relic = { graveIdx: idx, newRole: got };
+      g.nightLogsAll.push(`${rn("relic_robber")} ${p.name} は 墓地${idx + 1} と役職を交換し、${rn(got)} になりました。`);
+      i.relic = { graveIdx: idx, newRole: got };
+      // 交換後の役職に夜行動があれば、朝に使う（runNight の "morning" 段階）
+      i.pendingChain = ["seer", "mad_seer", "robber", "troublemaker", "love_tanner"].includes(got) ? got : null;
     };
 
     const on = (s) => all || stage === s;
     if (on("seer")) cpus.filter((p) => role(p) === "seer" || role(p) === "mad_seer").forEach((p) => doSeer(p, rn(role(p))));
+    if (on("seer")) cpus.filter((p) => role(p) === "love_tanner").forEach((p) => doLove(p, rn(role(p))));
     if (on("relic")) cpus.filter((p) => role(p) === "relic_robber").forEach((p) => doRelic(p));
     if (on("robber")) cpus.filter((p) => role(p) === "robber").forEach((p) => doRobber(p, rn(role(p))));
     if (on("tm")) cpus.filter((p) => role(p) === "troublemaker").forEach((p) => doTroublemaker(p, rn(role(p))));
+    // 朝: 墓荒らしが交換した後の役職の能力を即座に使う（朝の時点の実際のカードが対象。いたずらっ子の入れ替えは呼び出し側で反映）
+    if (on("morning")) cpus.forEach((p) => {
+      const i = infoOf(g, p.id), got = i.pendingChain;
+      if (!got) return;
+      i.pendingChain = null;
+      const label = rn(got), keep = i.relic ? { ...i.relic } : null;
+      if (got === "seer" || got === "mad_seer") doSeer(p, label, true);
+      else if (got === "robber") doRobber(p, label);
+      else if (got === "troublemaker") doTroublemaker(p, label);
+      else if (got === "love_tanner") doLove(p, label);
+      i.relic = keep;
+    });
   };
 
   /** 夜が全部終わったあと（いたずらっ子の反映後）に、CPUの後覚者が最終役職を知る */
@@ -90,13 +122,12 @@ window.ONW = window.ONW || {};
     g.players.filter((p) => p.isCpu && g.initialRoles[p.id] === "insomniac").forEach((p) => {
       const i = infoOf(g, p.id), fin = g.currentRoles[p.id];
       i.mode = "insomniac"; i.finalRole = fin; i.known[p.id] = fin;
-      g.nightLogsAll.push(`後覚者 ${p.name} は 最終的な役職が ${rn(fin)} でした。`);
     });
   };
 
   /**
    * 昼の発言プラン（CPU1, CPU2… の順に1人ずつ）。
-   * 各CPUは「COします。〇〇です。」の直後に結果開示を続けて言う。
+   * 各CPUは人間のCOボタンと同じ形（「〇〇CO」）で名乗り、その直後に結果開示を続けて言う。
    * 戻り値: [{ p, text, claim, gap(次の発言までのms) }]
    */
   cpu.plan = function (g) {
@@ -107,47 +138,47 @@ window.ONW = window.ONW || {};
       let coRole = "villager", result = null;
       if (r === "seer" && i.mode === "player") {
         coRole = "seer";
-        result = { text: `${nameOf(g, i.target)} を占って ${rn(i.known[i.target])} でした`, claim: { kind: "seer", target: i.target, role: i.known[i.target] } };
+        result = { short: `${nameOf(g, i.target)} → ${rn(i.known[i.target])}`, text: `${nameOf(g, i.target)} を占って ${rn(i.known[i.target])} でした`, claim: { kind: "seer", target: i.target, role: i.known[i.target] } };
       } else if (r === "seer") {
         coRole = "seer";
-        result = { text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(c.role)}`).join("、") + " でした", claim: { kind: "seer-grave" } };
+        result = { short: i.grave.map((c) => `墓地${c.idx + 1} → ${rn(c.role)}`).join("、"), text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(c.role)}`).join("、") + " でした", claim: { kind: "seer-grave" } };
       } else if (r === "robber") {
         coRole = "robber";
         const shown = i.newRole === "werewolf" ? "villager" : i.newRole; // 人狼になったら村人と偽る
-        result = { text: `${nameOf(g, i.target)} の役職を奪って ${rn(shown)} になりました`, claim: { kind: "robber", target: i.target, role: shown } };
+        result = { short: `${nameOf(g, i.target)} → ${rn(shown)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(shown)} になりました`, claim: { kind: "robber", target: i.target, role: shown } };
       } else if (r === "mad_seer" && i.mode === "player") {            // 狂った占い師: 偽の占い結果（人狼は白、それ以外は人狼と言う）
         coRole = "seer";
         const shown = isWolf(i.known[i.target]) ? "villager" : "werewolf";
-        result = { text: `${nameOf(g, i.target)} を占って ${rn(shown)} でした`, claim: { kind: "seer", target: i.target, role: shown } };
+        result = { short: `${nameOf(g, i.target)} → ${rn(shown)}`, text: `${nameOf(g, i.target)} を占って ${rn(shown)} でした`, claim: { kind: "seer", target: i.target, role: shown } };
       } else if (r === "mad_seer") {
         coRole = "seer";
-        result = { text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(isWolf(c.role) ? "villager" : c.role)}`).join("、") + " でした", claim: { kind: "seer-grave" } };
+        result = { short: i.grave.map((c) => `墓地${c.idx + 1} → ${rn(isWolf(c.role) ? "villager" : c.role)}`).join("、"), text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(isWolf(c.role) ? "villager" : c.role)}`).join("、") + " でした", claim: { kind: "seer-grave" } };
       } else if (r === "relic_robber" && i.relic) {                    // 墓荒らし
         coRole = "relic_robber";
         const shown = isWolf(i.relic.newRole) ? "villager" : i.relic.newRole;   // 人狼になったら村人と偽る
-        result = { text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(shown)} になりました`, claim: { kind: "relic", role: shown } };
+        result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(shown)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(shown)} になりました`, claim: { kind: "relic", role: shown } };
       } else if (r === "troublemaker" && i.pair) {                     // いたずらっ子
         coRole = "troublemaker";
-        result = { text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました`, claim: { kind: "troublemaker" } };
+        result = { short: `${nameOf(g, i.pair[0])} ⇄ ${nameOf(g, i.pair[1])}`, text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました`, claim: { kind: "troublemaker" } };
       } else if (r === "insomniac" && i.finalRole) {                   // 後覚者
         coRole = "insomniac";
         const shown = isWolf(i.finalRole) ? "insomniac" : i.finalRole;   // 人狼になっていたら隠す
-        result = { text: `最終的な役職は ${rn(shown)} でした`, claim: { kind: "insomniac", role: shown } };
+        result = { short: `→ ${rn(shown)}`, text: `最終的な役職は ${rn(shown)} でした`, claim: { kind: "insomniac", role: shown } };
       } else if (r === "mason") {                                       // 共有者: 相方の名前を開示
         coRole = "mason";
         const mates = others.filter((q) => i.known[q.id] === "mason");
-        result = { text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした` : "共有者は 私だけでした", claim: { kind: "mason" } };
+        result = { short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした` : "共有者は 私だけでした", claim: { kind: "mason" } };
       } else if (isWolf(r) && Math.random() < 0.5) {
         coRole = "seer";
         const t = pick(others.filter((q) => !isWolf(g.initialRoles[q.id]))) || pick(others);
-        result = { text: `${t.name} を占って ${rn("villager")} でした`, claim: { kind: "seer", target: t.id, role: "villager" } };
+        result = { short: `${t.name} → ${rn("villager")}`, text: `${t.name} を占って ${rn("villager")} でした`, claim: { kind: "seer", target: t.id, role: "villager" } };
       } else if ((r === "madman" || r === "cultist") && Math.random() < 0.5) {
         coRole = "seer";
         const t = pick(others.filter((q) => !isWolf(i.known[q.id]))) || pick(others);   // 狂信者は人狼を告発しない
-        result = { text: `${t.name} を占って ${rn("werewolf")} でした`, claim: { kind: "seer", target: t.id, role: "werewolf" } };
+        result = { short: `${t.name} → ${rn("werewolf")}`, text: `${t.name} を占って ${rn("werewolf")} でした`, claim: { kind: "seer", target: t.id, role: "werewolf" } };
       }
-      plan.push({ p, text: `COします。${rn(coRole)}です。`, co: coRole, claim: result ? null : { kind: "villager" }, gap: result ? 1200 : 3500 });
-      if (result) plan.push({ p, text: result.text, result: true, claim: result.claim, gap: 3500 });
+      plan.push({ p, text: `${rn(coRole)}CO`, co: coRole, claim: result ? null : { kind: "villager" }, gap: result ? 1200 : 3500 });
+      if (result) plan.push({ p, text: result.text, short: result.short, result: true, claim: result.claim, gap: 3500 });
     });
     return plan;
   };

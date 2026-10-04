@@ -9,7 +9,7 @@ window.ONW = window.ONW || {};
 (function (ONW) {
   const esc = (s) => ONW.utils.esc(s);
   const A = () => ONW.account;
-  const s = { mode: "login", id: "", busy: false, msg: "", nameDraft: null };
+  const s = { mode: "login", id: "", busy: false, msg: "", nameDraft: null, bioDraft: null };
   const ui = { s, STEPS: ["login", "account", "friends"] };
   ONW.accountUi = ui;
 
@@ -33,7 +33,37 @@ window.ONW = window.ONW || {};
     return `<div class="acct-bar"><button class="acct-chip acct-chip--me" onclick="ONW.accountUi.openAccount()">
       ${a.myAvatarHtml("av--xs")}<span class="acct-chip__name">${esc(a.user.display_name)}</span>${n ? `<span class="badge">${n}</span>` : ""}</button></div>`;
   };
+  // ---------------------------------------------------------
+  // トップ以外の画面の右上チップ（ルーム・ゲーム中も自分のアカウントへ）
+  // ---------------------------------------------------------
+  ui.updateFixed = function () {
+    const a = A(), g = ONW.game;
+    let el = document.getElementById("acct-fixed");
+    if (!el) { el = document.createElement("div"); el.id = "acct-fixed"; el.className = "acct-fixed"; (document.getElementById("top-right") || document.body).appendChild(el); }
+    const show = !!(a && a.enabled && a.ready) && g.phase !== ONW.PHASE.TITLE;
+    const n = ONW.friends ? ONW.friends.incoming.length : 0;
+    const html = !show ? "" : a.user
+      ? `<button class="acct-chip acct-chip--me" aria-label="アカウント" onclick="ONW.accountUi.openFromGame()">${a.myAvatarHtml("av--xs")}<span class="acct-chip__name">${esc(a.user.display_name)}</span>${n ? `<span class="badge">${n}</span>` : ""}</button>`
+      : `<button class="acct-chip" onclick="ONW.accountUi.openFromGame()">ログイン</button>`;
+    if (el.__html === html) return;
+    el.__html = html; el.innerHTML = html;
+  };
+  /** ルーム・ゲーム中: ログイン済みなら自分のプロフィールを重ねて表示（退出しない）/ 未ログインはログイン画面へ（退出の確認あり） */
+  ui.openFromGame = function () {
+    const a = A();
+    if (a && a.user && ONW.profile) { ONW.profile.open(a.user.id, a.user.display_name); return; }
+    ui.leaveToAccount("login");
+  };
+  /** 今のルームを退出してアカウント関連の画面へ */
+  ui.leaveToAccount = function (step) {
+    if (ONW.game.phase !== ONW.PHASE.TITLE && !window.confirm("今のルームから退出して、アカウント画面へ移動します。よろしいですか？")) return;
+    if (ONW.profile) ONW.profile.close();
+    ONW.main.goToTitle();
+    if (step === "login") ui.openLogin(); else ui.openAccount();
+  };
+
   ui.updateBadge = function () {
+    ui.updateFixed();
     const el = document.querySelector(".acct-bar");
     if (el && ONW.game.phase === ONW.PHASE.TITLE) el.outerHTML = ui.bar();
   };
@@ -93,6 +123,10 @@ window.ONW = window.ONW || {};
         <div class="field-row"><label>表示名（1〜12文字）</label>
           <div class="chat-input"><input id="acc-name" class="onw-input" maxlength="12" value="${esc(draft)}" oninput="ONW.accountUi.s.nameDraft=this.value" onkeydown="if(event.key==='Enter')ONW.accountUi.saveName()">
           <button class="btn" onclick="ONW.accountUi.saveName()">保存</button></div></div>
+        <div class="field-row"><label>ひとこと（プロフィールに表示・200文字まで）</label>
+          <textarea id="acc-bio" class="onw-input pf-bio-in" maxlength="200" rows="3" placeholder="例: 狼のときは堂々と嘘をつきます" oninput="ONW.accountUi.s.bioDraft=this.value">${esc(s.bioDraft == null ? (u.bio || "") : s.bioDraft)}</textarea>
+          <div class="btn-row" style="margin:6px 0 0;justify-content:flex-start;"><button class="btn" onclick="ONW.accountUi.saveBio()">ひとことを保存</button>
+          <button class="btn" onclick="ONW.profile.open('${esc(u.id)}','${esc(u.display_name)}')">プロフィール・戦績を見る</button></div></div>
         <div class="field-row"><label>アイコン画像</label>
           <div class="btn-row" style="margin:0;">
             <label class="btn">画像を選ぶ<input id="acc-file" type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="ONW.accountUi.pickAvatar(this)"></label>
@@ -141,7 +175,7 @@ window.ONW = window.ONW || {};
 
   ui.logout = async function () {
     await A().signOut();
-    s.msg = ""; s.nameDraft = null;
+    s.msg = ""; s.nameDraft = null; s.bioDraft = null;
     ONW.main.titleBack();
   };
 
@@ -151,6 +185,14 @@ window.ONW = window.ONW || {};
     const r = await A().setDisplayName(val("acc-name"));
     s.busy = false;
     if (r.ok) { s.nameDraft = null; setMsg("表示名を変更しました。", true); } else setMsg(r.msg);
+  };
+
+  ui.saveBio = async function () {
+    if (s.busy) return;
+    s.busy = true;
+    const r = await A().setBio(val("acc-bio"));
+    s.busy = false;
+    if (r.ok) { s.bioDraft = null; setMsg("ひとことを保存しました。", true); } else setMsg(r.msg);
   };
 
   ui.pickAvatar = async function (input) {

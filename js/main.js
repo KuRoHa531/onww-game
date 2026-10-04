@@ -208,6 +208,10 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   // 起動
   // ---------------------------------------------------------
+  // ゲーム内の文字のコピー・選択・右クリックメニューを止める（入力欄の中だけは普通に使える）
+  const inField = (e) => { const t = e.target; return !!(t && t.closest && t.closest("input, textarea, [contenteditable='true']")); };
+  ["copy", "cut", "selectstart", "dragstart"].forEach((ev) => document.addEventListener(ev, (e) => { if (!inField(e)) e.preventDefault(); }));
+  document.addEventListener("contextmenu", (e) => { if (!inField(e)) e.preventDefault(); });
   document.addEventListener("DOMContentLoaded", () => {
     rerender();
     // アカウント機能の初期化（セッション復元）。失敗してもゲームには影響しない

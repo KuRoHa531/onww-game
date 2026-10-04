@@ -44,11 +44,74 @@ window.ONW = window.ONW || {};
     MAD_SEER: "mad_seer",
     CULTIST: "cultist",
     RELIC_ROBBER: "relic_robber",
+    LOVE_TANNER: "love_tanner",
+    GOD: "god",
+    OPPORTUNIST: "opportunist",
     // TODO: 拡張役職をここに追加していく（例: BELL_MIKO: "bell_miko" など）
   };
 
   /** 人狼系（人狼判定になる役職）/ 狂人系（人狼陣営だが人狼判定ではない役職） */
   ONW.WOLF_KIND = [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF];
+  /** 占い師・狂った占い師が占える墓地の枚数（設定値と墓地の枚数の小さい方） */
+  ONW.seerGraveMax = (g) => Math.max(0, Math.min(Number.isFinite(+g.seerGraveCount) ? +g.seerGraveCount : 2, g.graveCount || g.graveTotal || 0));
+  /* =====================================================================================
+   * 【必読・今後の役職追加で必ず守ること】役職の移動と「役職に紐づく状態」(role-bound state)
+   *
+   *  役職(カード)は 怪盗・いたずらっ子・墓荒らし などで人から人へ、人から墓地へ動きます。
+   *  「その役職を持っている人の判定・選択」(例: 一目惚れしてるてるが選んだ相手) は、
+   *  カードについていく(=役職が移動したら、移動した先の人の判定になる)のが正しい仕様です。
+   *
+   *  ルール
+   *   1. 役職は必ず ONW.swapPlayers / ONW.swapGrave で動かす（currentRoles / center を直接書き換えない）。
+   *   2. 「役職の持ち主ごと」に持たせる状態は、ゲームオブジェクトの上で { 持ち主のプレイヤーID: 値 } の形にし、
+   *      そのキー名を下の ONW.ROLE_BOUND_KEYS に足す。これだけで、移動のたびに自動で値が新しい持ち主へ移る
+   *      （墓地に入った役職の値は "g:墓地の番号" のキーに予約され、次にそのカードを取った人へ移る）。
+   *   3. 状態を書く時は ONW.setRoleBound(g, キー名, 今の持ち主のID, 値) を使う。
+   *      → 移動した「あと」で選んだ場合も、その時点の持ち主に書かれ、以降の移動にもついていく（予約される）。
+   *   4. 読む時は「最終盤面の持ち主のID」で引く（例: vote.js の resolveChain / determineWinners）。
+   *   5. 選ばれた「相手」(対象のプレイヤー)はプレイヤー単位のまま。対象の役職が動いても対象は変わらない。
+   *   新しい役職で夜に誰かを選ぶ・何かを記録するものは、すべてこのルールで作ること。
+   * ===================================================================================== */
+  ONW.ROLE_BOUND_KEYS = ["loveTargets"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
+  const holderKeyOfGrave = (i) => "g:" + i;
+  ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; };
+  ONW.getRoleBound = (g, key, holderId) => (g[key] || {})[holderId];
+  /** 持ち主AとBの「役職に紐づく状態」を入れ替える（キーはプレイヤーID、または墓地の "g:番号"） */
+  function swapBound(g, a, b) {
+    ONW.ROLE_BOUND_KEYS.forEach((key) => {
+      const m = (g[key] = g[key] || {}), va = m[a], vb = m[b];
+      if (vb === undefined) delete m[a]; else m[a] = vb;
+      if (va === undefined) delete m[b]; else m[b] = va;
+    });
+  }
+  /** カードの個体追跡（結果画面で「昇格した狂人」の移動前側にも (+人狼) を付けるため）。最初の移動の直前に初期化する */
+  function cards(g) {
+    if (g.cards) return g.cards;
+    const at = {}; g.players.forEach((p) => { at[p.id] = "P:" + p.id; }); (g.center || []).forEach((_, i) => { at[holderKeyOfGrave(i)] = "G:" + i; });
+    return (g.cards = { at, trail: {} });   // trail[持ち主キー] = roleTrail / centerTrail と同じ並びのカードID
+  }
+  ONW.cardAt = (g, holderKey) => (g.cards ? g.cards.at[holderKey] : null) || (String(holderKey).startsWith("g:") ? "G:" + holderKey.slice(2) : "P:" + holderKey);
+  /** 役職の入れ替え（履歴付き）。結果画面で「怪盗 → 狂った占い師 → 怪盗」のように、入れ替わるたびの役職を全部表示するため、変化のたびに記録する。
+   *  役職に紐づく状態(ROLE_BOUND_KEYS)も一緒に移す。 */
+  ONW.swapPlayers = (g, a, b) => {
+    const cd = cards(g);
+    [g.currentRoles[a], g.currentRoles[b]] = [g.currentRoles[b], g.currentRoles[a]];
+    [cd.at[a], cd.at[b]] = [cd.at[b], cd.at[a]];
+    swapBound(g, a, b);
+    const t = (g.roleTrail = g.roleTrail || {});
+    (t[a] = t[a] || []).push(g.currentRoles[a]); (t[b] = t[b] || []).push(g.currentRoles[b]);
+    (cd.trail[a] = cd.trail[a] || []).push(cd.at[a]); (cd.trail[b] = cd.trail[b] || []).push(cd.at[b]);
+  };
+  ONW.swapGrave = (g, pid, i) => {   // プレイヤーと墓地の i 枚目の入れ替え
+    const cd = cards(g), gk = holderKeyOfGrave(i);
+    const mine = g.currentRoles[pid];
+    g.currentRoles[pid] = g.center[i]; g.center[i] = mine;
+    [cd.at[pid], cd.at[gk]] = [cd.at[gk], cd.at[pid]];
+    swapBound(g, pid, gk);
+    const t = (g.roleTrail = g.roleTrail || {}), c = (g.centerTrail = g.centerTrail || {});
+    (t[pid] = t[pid] || []).push(g.currentRoles[pid]); (c[i] = c[i] || []).push(mine);
+    (cd.trail[pid] = cd.trail[pid] || []).push(cd.at[pid]); (cd.trail[gk] = cd.trail[gk] || []).push(cd.at[gk]);
+  };
   ONW.MAD_KIND = [ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST];
 
   // 役職の詳細情報。夜の行動順（wakeOrder）が小さいほど先に起きる。
@@ -58,7 +121,7 @@ window.ONW = window.ONW || {};
   ONW.TRANSFORM_GROUPS = {
     [ONW.ROLE.LIGHT_APOSTLE]: [ONW.ROLE.VILLAGER, ONW.ROLE.SEER, ONW.ROLE.ROBBER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.INSOMNIAC, ONW.ROLE.MASON],
     [ONW.ROLE.DARK_AVATAR]: [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF, ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST],
-    [ONW.ROLE.SILVER_SHADOW]: [ONW.ROLE.TANNER],
+    [ONW.ROLE.SILVER_SHADOW]: [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.GOD, ONW.ROLE.OPPORTUNIST],
   };
 
   ONW.ROLE_INFO = {
@@ -78,6 +141,9 @@ window.ONW = window.ONW || {};
     [ONW.ROLE.SILVER_SHADOW]: { name: "銀色の影",    team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "第三陣営。試合開始時に第三陣営の役職へランダムに変化します。" },
     [ONW.ROLE.VILLAGER]:     { name: "村人",         team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。能力はありません。" },
     [ONW.ROLE.TANNER]:       { name: "てるてる坊主", team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "第三陣営。自分が追放されると勝利です。" },
+    [ONW.ROLE.LOVE_TANNER]:  { name: "一目惚れしてるてる", team: ONW.TEAM.THIRD, wakeOrder: 5, desc: "第三陣営。夜に1人選び、自分が追放されたらその相手も一緒に追放扱いになり、自分と相手が勝利します。" },
+    [ONW.ROLE.GOD]:          { name: "神",           team: ONW.TEAM.THIRD,   wakeOrder: 1, desc: "第三陣営。全員の役職と墓地の役職を知っています。追放されなければ神の勝利です。追放された場合は神の祝福が発生し、神以外の全員が勝利します（オポチュニストは追放されていない場合のみ）。" },
+    [ONW.ROLE.OPPORTUNIST]:  { name: "オポチュニスト", team: ONW.TEAM.THIRD, wakeOrder: null, desc: "第三陣営。夜の能力はありません。最後まで追放されなければ、ほかの勝敗に追加で勝利します。" },
   };
 
   /**
@@ -117,7 +183,7 @@ window.ONW = window.ONW || {};
       phase: ONW.PHASE.TITLE,
 
       // --- セットアップ内容 ---
-      roleCounts: { werewolf: 2, big_wolf: 0, dark_avatar: 0, madman: 0, mad_seer: 0, cultist: 0, villager: 2, seer: 1, robber: 1, relic_robber: 0, troublemaker: 0, insomniac: 0, mason: 0, light_apostle: 0, tanner: 0, silver_shadow: 0 },
+      roleCounts: { werewolf: 2, big_wolf: 0, dark_avatar: 0, madman: 0, mad_seer: 0, cultist: 0, villager: 2, seer: 1, robber: 1, relic_robber: 0, troublemaker: 0, insomniac: 0, mason: 0, light_apostle: 0, tanner: 0, silver_shadow: 0, love_tanner: 0, god: 0, opportunist: 0 },
       revealTransforms: true,         // 変化公開（昼開始時に「変化前 → 変化後」を公開）
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）
@@ -125,10 +191,12 @@ window.ONW = window.ONW || {};
       debugOn: false, dbg: null, dbgWarn: [], dbgVotes: {},   // デバッグモード（debug.js）
       inGame: false,                  // 試合中か（ホストがルームに戻るまで true）
       spectators: [], specNames: {},  // 途中参加の観戦者
+      deadIds: [], ghostLog: [], chatTab: "main", isDead: false, specInfo: null, specInfoOpen: true, nightResolved: false,   // 死亡者 / 霊界チャット / 観戦者向けの全員情報
       codeText: "", importText: "", codeMsg: "", coBoard: [], boardView: [], tfView: null, tfLines: [], boardOpen: false, resultChatOpen: false, nightInfoClosed: false,
       lobbyPlayers: [], meIndex: 0, showSettings: false, roleOpen: {}, presetName: "", isSpectator: false,
       timers: { night: 45, morning: 10, day: 120, vote: 30 }, // 各フェーズの秒数（マイクラ版の初期値 / 朝のみ新規）
       graveCount: 2,                  // 墓地の枚数（マイクラ版の初期値）
+      seerGraveCount: 2,              // 占い師・狂った占い師が一度に占える墓地の枚数（マイクラ版の初期値 seerCenterCount）
       cpuCount: 0,                    // CPU人数
       fakeWolfWhenNoWolf: true,       // 狂人代用人狼（人狼不在時に狂人を1人人狼判定へ昇格）
       promotedWolfIds: [],            // 昇格した狂人のID
