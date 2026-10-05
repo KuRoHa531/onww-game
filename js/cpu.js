@@ -125,6 +125,77 @@ window.ONW = window.ONW || {};
     });
   };
 
+  // =========================================================
+  // 昼の発言（CO・騙り・結果開示）と投票。本家(マイクラ版)のCPUの考え方に合わせてある
+  // =========================================================
+  const isWolfSide = (r) => isWolf(r) || isMad(r);                       // 人狼陣営（狂人含む）= 本家の isWolfTeam
+  const WOLF_LIKE = () => ONW.WOLF_KIND;                                  // 占い結果で「人狼」と見える役職
+  const AVOID_RESULT = ["tanner", "love_tanner", "opportunist"];          // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles）
+  const setupRoles = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])];   // 占い結果に出してよい（実在する）役職
+  const roleInSetup = (g, role) => setupRoles(g).includes(role) || (g.coDeck || []).some((x) => x.r === role);
+  const weighted = (list) => {   // [[値, 重み], ...]
+    let r = Math.random() * list.reduce((a, b) => a + b[1], 0);
+    for (const [v, w] of list) { r -= w; if (r <= 0) return v; }
+    return list[list.length - 1][0];
+  };
+  /** 偽の占い結果に使う役職。実在する役職の中から、希望の役職を優先して選ぶ（本家 cpuPickSeerResultRole） */
+  function pickResultRole(g, preferred) {
+    const pool = [...new Set(setupRoles(g))];
+    const pref = preferred.filter((r) => pool.includes(r));
+    return pick(pref.length ? pref : pool.length ? pool : ["villager"]);
+  }
+  const wolfLikeResult = (g) => pickResultRole(g, WOLF_LIKE());
+  const villageLikeResult = (g) => pickResultRole(g, ["villager", "mason", "seer", "robber", "troublemaker", "insomniac"]);
+  /** 騙り占いの対象: 人狼陣営は本物の人狼を避ける（本家 chooseFakeSeerTarget） */
+  function fakeSeerTarget(g, p) {
+    const others = g.players.filter((q) => q.id !== p.id);
+    const nonWolf = others.filter((q) => !isWolf(g.currentRoles[q.id]));
+    return pick(nonWolf.length ? nonWolf : others);
+  }
+  /** 騙り占いの結果（本家 chooseFakeSeerResult） */
+  function fakeSeerResult(g, p, t, selfRole) {
+    const tr = g.currentRoles[t.id];
+    if (selfRole === "mad_seer") {   // 狂った占い師: 人狼・狂人には村人っぽい結果、それ以外には本当の結果
+      if (isWolf(tr) || isMad(tr) || (g.promotedWolfIds || []).includes(t.id)) return villageLikeResult(g);
+      return setupRoles(g).includes(g.initialRoles[t.id]) ? g.initialRoles[t.id] : villageLikeResult(g);
+    }
+    if (isWolfSide(selfRole)) {
+      if (isWolf(tr)) return villageLikeResult(g);                                // 仲間の人狼は白と言う
+      return Math.random() < 0.72 ? wolfLikeResult(g) : villageLikeResult(g);      // 72%で人狼だと告発
+    }
+    return Math.random() < 0.5 ? wolfLikeResult(g) : villageLikeResult(g);         // 非人狼の騙り（てるてる系）
+  }
+  /** 騙りで名乗る役職の抽選（本家 makeClaimPlan の人狼陣営の分）。山札に無い役職は名乗らない */
+  function pickLieRole(g) {
+    const chosen = weighted([["seer", 40], ["villager", 18], ["troublemaker", 12], ["robber", 12], ["mason", 9], ["merlin", 9]]);
+    if (chosen === "villager" || roleInSetup(g, chosen)) return chosen;
+    const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleInSetup(g, r));
+    return fb.length ? pick(fb) : "villager";
+  }
+  /** 騙りの CO と結果開示（本家の mem.fakeRole）。戻り値: { co, result }（resultはnullのこともある） */
+  function lieClaim(g, p, selfRole) {
+    const others = g.players.filter((q) => q.id !== p.id);
+    const co = pickLieRole(g);
+    if (co === "seer") {
+      const t = fakeSeerTarget(g, p);
+      if (!t) return { co: "villager", result: null };
+      const role = fakeSeerResult(g, p, t, selfRole);
+      return { co, result: { short: `${t.name} → ${rn(role)}`, text: `${t.name} を占って ${rn(role)} でした。`, claim: { kind: "seer", target: t.id, role } } };
+    }
+    if (co === "troublemaker" && others.length >= 2) {
+      const a = pick(others), b = pick(others.filter((q) => q.id !== a.id));
+      return { co, result: { short: `${a.name} ⇄ ${b.name}`, text: `${a.name} と ${b.name} を入れ替えました。`, claim: { kind: "troublemaker" } } };
+    }
+    if (co === "robber") {
+      const t = fakeSeerTarget(g, p);
+      const pool = ["villager", "mason", "insomniac", "troublemaker"].filter((r) => r === "villager" || roleInSetup(g, r));
+      const role = pick(pool);
+      return { co, result: { short: `${t.name} → ${rn(role)}`, text: `${t.name} の役職を奪って ${rn(role)} になりました。`, claim: { kind: "robber", target: t.id, role } } };
+    }
+    if (co === "mason") return { co, result: { short: "自分だけ", text: "共有者は 私だけでした。", claim: { kind: "mason" } } };
+    return { co: "villager", result: null };
+  }
+
   /**
    * 昼の発言プラン（CPU1, CPU2… の順に1人ずつ）。
    * 各CPUは人間のCOボタンと同じ形（「〇〇CO」）で名乗り、その直後に結果開示を続けて言う。
@@ -135,96 +206,137 @@ window.ONW = window.ONW || {};
     g.players.filter((p) => p.isCpu).forEach((p) => {
       const r = g.initialRoles[p.id], i = infoOf(g, p.id);
       const others = g.players.filter((q) => q.id !== p.id);
-      let coRole = "villager", result = null;
-      if (r === "seer" && i.mode === "player") {
+      let coRole = null, result = null;
+      if (isWolfSide(r)) {                                                 // 人狼陣営は必ず騙る（本家 liarMode）
+        const lie = lieClaim(g, p, r);
+        coRole = lie.co; result = lie.result;
+      } else if (r === "seer" && i.mode === "player") {
         coRole = "seer";
-        result = { short: `${nameOf(g, i.target)} → ${rn(i.known[i.target])}`, text: `${nameOf(g, i.target)} を占って ${rn(i.known[i.target])} でした`, claim: { kind: "seer", target: i.target, role: i.known[i.target] } };
+        result = { short: `${nameOf(g, i.target)} → ${rn(i.known[i.target])}`, text: `${nameOf(g, i.target)} を占って ${rn(i.known[i.target])} でした。`, claim: { kind: "seer", target: i.target, role: i.known[i.target] } };
       } else if (r === "seer") {
         coRole = "seer";
-        result = { short: i.grave.map((c) => `墓地${c.idx + 1} → ${rn(c.role)}`).join("、"), text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(c.role)}`).join("、") + " でした", claim: { kind: "seer-grave" } };
+        result = { short: i.grave.map((c) => `墓地${c.idx + 1} → ${rn(c.role)}`).join("、"), text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(c.role)}`).join("、") + " でした。", claim: { kind: "seer-grave" } };
       } else if (r === "robber") {
         coRole = "robber";
-        const shown = i.newRole === "werewolf" ? "villager" : i.newRole; // 人狼になったら村人と偽る
-        result = { short: `${nameOf(g, i.target)} → ${rn(shown)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(shown)} になりました`, claim: { kind: "robber", target: i.target, role: shown } };
-      } else if (r === "mad_seer" && i.mode === "player") {            // 狂った占い師: 偽の占い結果（人狼は白、それ以外は人狼と言う）
-        coRole = "seer";
-        const shown = isWolf(i.known[i.target]) ? "villager" : "werewolf";
-        result = { short: `${nameOf(g, i.target)} → ${rn(shown)}`, text: `${nameOf(g, i.target)} を占って ${rn(shown)} でした`, claim: { kind: "seer", target: i.target, role: shown } };
-      } else if (r === "mad_seer") {
-        coRole = "seer";
-        result = { short: i.grave.map((c) => `墓地${c.idx + 1} → ${rn(isWolf(c.role) ? "villager" : c.role)}`).join("、"), text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(isWolf(c.role) ? "villager" : c.role)}`).join("、") + " でした", claim: { kind: "seer-grave" } };
+        const shown = isWolf(i.newRole) ? "villager" : i.newRole; // 人狼になったら村人と偽る
+        result = { short: `${nameOf(g, i.target)} → ${rn(shown)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(shown)} になりました。`, claim: { kind: "robber", target: i.target, role: shown } };
       } else if (r === "relic_robber" && i.relic) {                    // 墓荒らし
         coRole = "relic_robber";
-        const shown = isWolf(i.relic.newRole) ? "villager" : i.relic.newRole;   // 人狼になったら村人と偽る
-        result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(shown)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(shown)} になりました`, claim: { kind: "relic", role: shown } };
+        const shown = isWolf(i.relic.newRole) ? "villager" : i.relic.newRole;
+        result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(shown)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(shown)} になりました。`, claim: { kind: "relic", role: shown } };
       } else if (r === "troublemaker" && i.pair) {                     // いたずらっ子
         coRole = "troublemaker";
-        result = { short: `${nameOf(g, i.pair[0])} ⇄ ${nameOf(g, i.pair[1])}`, text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました`, claim: { kind: "troublemaker" } };
+        result = { short: `${nameOf(g, i.pair[0])} ⇄ ${nameOf(g, i.pair[1])}`, text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました。`, claim: { kind: "troublemaker" } };
       } else if (r === "insomniac" && i.finalRole) {                   // 後覚者
         coRole = "insomniac";
         const shown = isWolf(i.finalRole) ? "insomniac" : i.finalRole;   // 人狼になっていたら隠す
-        result = { short: `→ ${rn(shown)}`, text: `最終的な役職は ${rn(shown)} でした`, claim: { kind: "insomniac", role: shown } };
+        result = { short: `→ ${rn(shown)}`, text: `最終的な役職は ${rn(shown)} でした。`, claim: { kind: "insomniac", role: shown } };
       } else if (r === "mason") {                                       // 共有者: 相方の名前を開示
         coRole = "mason";
         const mates = others.filter((q) => i.known[q.id] === "mason");
-        result = { short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした` : "共有者は 私だけでした", claim: { kind: "mason" } };
-      } else if (isWolf(r) && Math.random() < 0.5) {
-        coRole = "seer";
-        const t = pick(others.filter((q) => !isWolf(g.initialRoles[q.id]))) || pick(others);
-        result = { short: `${t.name} → ${rn("villager")}`, text: `${t.name} を占って ${rn("villager")} でした`, claim: { kind: "seer", target: t.id, role: "villager" } };
-      } else if ((r === "madman" || r === "cultist") && Math.random() < 0.5) {
-        coRole = "seer";
-        const t = pick(others.filter((q) => !isWolf(i.known[q.id]))) || pick(others);   // 狂信者は人狼を告発しない
-        result = { short: `${t.name} → ${rn("werewolf")}`, text: `${t.name} を占って ${rn("werewolf")} でした`, claim: { kind: "seer", target: t.id, role: "werewolf" } };
+        result = { short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした。` : "共有者は 私だけでした。", claim: { kind: "mason" } };
+      } else if (r === "villager") {                                    // 村人: 75%でCO、残りも60%は「COなし寄りだけど村人」と言う（本家）
+        if (Math.random() < 0.75 || Math.random() < 0.6) coRole = "villager";
+      } else if (r === "tanner" || r === "love_tanner") {               // てるてる系: 55%村人騙り、残りの半分は占い騙り（本家）
+        if (Math.random() < 0.55) coRole = "villager";
+        else if (Math.random() < 0.5) {
+          const t = fakeSeerTarget(g, p);
+          if (t) {
+            const role = fakeSeerResult(g, p, t, r);
+            coRole = "seer";
+            result = { short: `${t.name} → ${rn(role)}`, text: `${t.name} を占って ${rn(role)} でした。`, claim: { kind: "seer", target: t.id, role } };
+          }
+        }
+      } else if (ONW.roles.getInfo(r).team === "village" && Math.random() < 0.45) {   // その他の村人陣営: 45%で自分の役職をCO（本家）
+        coRole = r;
       }
+      if (!coRole) return;                                              // COしない
       plan.push({ p, text: `${rn(coRole)}CO`, co: coRole, claim: result ? null : { kind: "villager" }, gap: result ? 1200 : 3500 });
       if (result) plan.push({ p, text: result.text, short: result.short, result: true, claim: result.claim, gap: 3500 });
     });
     return plan;
   };
 
-  /** 残り20秒の投票意思表明。決めた先は投票でもそのまま使う */
+  const alive = (g, id) => !(g.deadIds || []).includes(id);
+  /** 投票先候補（本家 chooseBestVoteTarget: 自分以外・生存・共有者の相方は除く） */
+  function voteCandidates(g, p) {
+    const i = infoOf(g, p.id), me = g.currentRoles[p.id];
+    return g.players.filter((q) => q.id !== p.id && alive(g, q.id) && !(me === "mason" && i.known[q.id] === "mason"));
+  }
+
+  /** 投票先の評価点（本家 scoreTargetForCpu を、この版にある役職に合わせたもの） */
+  function scoreVote(g, p, q) {
+    const i = infoOf(g, p.id), me = g.currentRoles[p.id], ini = g.initialRoles[p.id];
+    const wolfSide = isWolfSide(me);
+    const k = i.known[q.id];
+    const claims = g.cpuClaims || [];
+    const co = (g.coBoard && g.coBoard[q.id] && g.coBoard[q.id].co) || null;
+    let s = 0;
+    // 仲間は投票しない（人狼系は仲間の人狼、狂信者は人狼）
+    if ((isWolf(me) || ini === "cultist") && isWolf(k)) s -= 100;
+    // 自分が見て知っている情報: 村人側と分かっている人は避ける / 投票を避ける結果役職は避ける / 人狼と分かっている人は狙う
+    if (k && !wolfSide) {
+      if (isWolf(k)) s += 12;
+      else if (AVOID_RESULT.includes(k)) s -= 100;
+      else if (ONW.roles.getInfo(k).team === "village") s -= 100;
+    }
+    // 他人のCO（役職）
+    if (co === "villager") s += wolfSide ? 1.8 : 0.8;
+    if (co && WOLF_LIKE().includes(co) || co === "team:wolf") s += wolfSide ? -1.0 : 2.4;
+    if (co === "tanner" || co === "love_tanner") s -= wolfSide ? 0.6 : 2.4;
+    if (co === "seer" || co === "mad_seer") {
+      const n = g.players.filter((x) => { const c = g.coBoard && g.coBoard[x.id] && g.coBoard[x.id].co; return c === "seer" || c === "mad_seer"; }).length;
+      s += n >= 2 ? (wolfSide ? 0.6 : 1.5) : (wolfSide ? -0.3 : -0.8);
+    }
+    if (co === "mason") s -= wolfSide ? 0.2 : 1.4;
+    // 占い師COの結果（この人を占ったという報告）
+    claims.filter((c) => c.kind === "seer" && c.target === q.id).forEach((c) => {
+      if (WOLF_LIKE().includes(c.role)) s += wolfSide ? 0.8 : 2.8;
+      else if (c.role === "tanner" || c.role === "love_tanner") s -= wolfSide ? 0.5 : 2.2;
+      else s += wolfSide ? -0.4 : -1.0;
+      if (c.from === p.id) {   // 自分が報告した結果には従う（本家）
+        if (WOLF_LIKE().includes(c.role)) s += 12;
+        else if (AVOID_RESULT.includes(c.role) || ONW.roles.getInfo(c.role).team === "village") s -= 100;
+      }
+    });
+    // 人狼を奪ったと名乗る怪盗系（本家に近い読み）
+    if (!wolfSide) claims.forEach((c) => { if ((c.kind === "robber" || c.kind === "relic" || c.kind === "insomniac") && WOLF_LIKE().includes(c.role) && c.from === q.id && c.from !== p.id) s += 3; });
+    // 他のCPUの投票予告（同調）+0.6、味方の予告 +1.2
+    const plans = g.cpuVotePlan || {};
+    Object.entries(plans).forEach(([vid, t]) => {
+      if (t !== q.id || vid === p.id) return;
+      s += 0.6;
+      if ((isWolf(me) || ini === "cultist") && isWolf(i.known[vid])) s += 1.2;
+    });
+    if (me === "tanner" || me === "love_tanner") s += 1.0;
+    return s;
+  }
+
+  /** 評価点から投票先を選ぶ（本家 chooseBestVoteTarget + weightedCpuVoteChoice: 上位4点差以内から温度1.8で抽選） */
+  function chooseVote(g, p) {
+    const cands = voteCandidates(g, p);
+    if (!cands.length) return null;
+    const scored = cands.map((q) => ({ id: q.id, score: scoreVote(g, p, q) })).filter((x) => x.score > -50).sort((a, b) => b.score - a.score);
+    if (!scored.length) return pick(cands).id;
+    const top = scored[0].score, pool = scored.filter((x) => x.score >= top - 4.0);
+    if (pool.length === 1) return pool[0].id;
+    const w = pool.map((x) => Math.exp((x.score - top) / 1.8));
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let n = 0; n < pool.length; n++) { r -= w[n]; if (r <= 0) return pool[n].id; }
+    return pool[pool.length - 1].id;
+  }
+
+  /** 残り20秒の投票意思表明。決めた先は投票でもそのまま使う（死亡・大幅な評価低下がなければ） */
   cpu.announceVote = function (g, p) {
     g.cpuVotePlan = g.cpuVotePlan || {};
-    const t = g.cpuVotePlan[p.id] || (g.cpuVotePlan[p.id] = cpu.decideVote(g, p));
+    const cur = g.cpuVotePlan[p.id];
+    const ok = cur && alive(g, cur) && cur !== p.id && voteCandidates(g, p).some((q) => q.id === cur) && scoreVote(g, p, g.players.find((q) => q.id === cur)) > -50;
+    const t = ok ? cur : (g.cpuVotePlan[p.id] = chooseVote(g, p));
     return { target: t, text: `${nameOf(g, t)}に入れようと思います。` };
   };
 
-  /** 投票先を決める（自分以外から、点数に比例してランダム） */
-  cpu.decideVote = function (g, p) {
-    const i = infoOf(g, p.id), me = g.currentRoles[p.id];
-    const wolfSide = isWolf(me) || isMad(me);
-    const claims = g.cpuClaims || [];
-    const seerClaimers = claims.filter((c) => c.kind === "seer" || c.kind === "seer-grave").map((c) => c.from);
-    const cands = g.players.filter((q) => q.id !== p.id);
-    const scored = cands.map((q) => {
-      let s = 1;
-      const k = i.known[q.id];
-      if (isWolf(me)) {
-        if (isWolf(k)) s -= 8;                      // 仲間は避ける
-        if (seerClaimers.includes(q.id)) s += 2;    // 占い師COは邪魔
-      } else if (isMad(me)) {
-        if (isWolf(k)) s -= 6;                      // 狂信者は人狼を守る
-        if (seerClaimers.includes(q.id)) s += 1.5;
-      } else {
-        if (isWolf(k)) s += 10;                     // 人狼と分かっている相手
-        else if (k) s -= 3;                          // 人狼ではないと分かっている相手
-        claims.forEach((c) => {
-          if (c.from === p.id) return;
-          if (c.kind === "seer" && c.role === "werewolf" && c.target === q.id && k !== "villager") s += 4;
-          if (c.kind === "seer" && c.target && isWolf(i.known[c.target]) && !isWolf(c.role) && c.from === q.id) s += 4; // 人狼を白と言った
-        });
-        if (seerClaimers.includes(q.id) && seerClaimers.length >= 2) s += 1.5; // 占いCO被り
-        claims.forEach((c) => {
-          if ((c.kind === "robber" || c.kind === "relic" || c.kind === "insomniac") && isWolf(c.role) && c.from === q.id && c.from !== p.id) s += 3; // 人狼を奪ったと名乗る怪盗
-        });
-      }
-      return { id: q.id, w: Math.pow(Math.max(0.1, s), 2) };
-    });
-    let r = Math.random() * scored.reduce((a, b) => a + b.w, 0);
-    for (const c of scored) { r -= c.w; if (r <= 0) return c.id; }
-    return scored[scored.length - 1].id;
-  };
+  /** 投票先を決める */
+  cpu.decideVote = function (g, p) { return chooseVote(g, p); };
 
   ONW.cpu = cpu;
 })(window.ONW);

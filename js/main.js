@@ -26,10 +26,14 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   main.goToTitle = function goToTitle() {
     stopDayTimer();
-    ONW.net.leave();
+    ONW.net.leave({ forget: true });   // 自分から退出したときだけ再入室の記録を消す
     Object.assign(game, ONW.createInitialState());
     rerender();
+    ONW.net.checkRejoin();
   };
+
+  /** タイトル画面の「ルームに戻る」 */
+  main.rejoin = () => ONW.net.rejoin(fail);
 
   function readInputs() {
     const name = (document.getElementById("in-name")?.value || "").trim();
@@ -39,7 +43,7 @@ window.ONW = window.ONW || {};
     game.error = "";
     return { name, code };
   }
-  function fail(msg) { Object.assign(game, { phase: ONW.PHASE.TITLE, error: msg }); rerender(); }
+  function fail(msg) { Object.assign(game, { phase: ONW.PHASE.TITLE, error: msg }); rerender(); ONW.net.checkRejoin(); }
 
   main.titleStep = function (step) { readInputs(); game.titleStep = step; rerender(); };
   main.titleBack = function () { readInputs(); game.titleStep = "menu"; rerender(); };

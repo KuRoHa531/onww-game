@@ -7,7 +7,10 @@
  */
 window.ONW = window.ONW || {};
 (function (ONW) {
-  const net = { peer: null, conns: {}, hostConn: null, isHost: false, code: "", meta: {}, hostMeta: null };   // meta: 参加者のアイコン情報 { peerId: {uid, av} }（表示専用）
+  // meta: 参加者のアイコン情報 { 席ID: {uid, av} }（表示専用）
+  // 席ID(seat): 参加者の「席」を表す変わらないID。最初に入ったときの peer.id（ルーム作成者だけ "host"）。再接続や、ホストが別の人に代わっても同じ席IDを使い続ける。
+  // hostSeat: いまホスト権限を持っている席ID / selfSeat: この端末の席ID / keys: 席ごとの再入室キー（ホスト側だけが持つ）
+  const net = { peer: null, conns: {}, hostConn: null, isHost: false, code: "", meta: {}, hostSeat: "host", selfSeat: "", keys: {}, origHost: null, order: [], gen: 0, myKey: "", myName: "", rec: null, xfer: null, frozen: false, snapStr: "", snapPlanned: false, rejoinInfo: null };
   const CH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const genCode = () => Array.from({ length: 4 }, () => CH[Math.floor(Math.random() * CH.length)]).join("");
   const PREFIX = "onww-";
@@ -19,7 +22,8 @@ window.ONW = window.ONW || {};
   const rn = (r) => ONW.roles.getInfo(r).name;
   const TEAM = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
-  net.myId = () => (net.isHost ? "host" : net.peer && net.peer.id);
+  net.myId = () => net.selfSeat || (net.peer && net.peer.id) || "";
+  const HS = () => net.hostSeat;   // いまホスト権限を持っている席ID
   /** 夜の行動をまだ選んでいない（またはまだ足りない）人の数 */
   const selComplete = (role, sel) => {
     sel = sel || {}; const np = (sel.players || []).length, ng = (sel.graves || []).length;
@@ -52,11 +56,12 @@ window.ONW = window.ONW || {};
     stopTimer();
     if (g.pumpId) clearTimeout(g.pumpId);
     if (g.dayStartId) clearTimeout(g.dayStartId);
+    g.dayBegin = null;
     g.pumpId = null; g.dayStartId = null; g.cpuQueue = [];
   }
   function pushChat(name, text, kind) {
     const g = G();
-    g.chatLog.push({ name, text, kind });
+    g.chatLog.push({ name, text, kind, at: Date.now() });
     sendAll({ t: "chatlog", log: g.chatLog }); sendSpec({ t: "chatlog", log: g.chatLog });
   }
   /** CPUの発言キュー。1人ずつ順番に話し、人間がCO→結果開示の途中なら待つ */
@@ -91,53 +96,51 @@ window.ONW = window.ONW || {};
     }));
   }
 
-  net.leave = function () {
-    try { clearTimers(); } catch (e) {}
-    try { net.peer && net.peer.destroy(); } catch (e) {}
-    Object.assign(net, { peer: null, conns: {}, hostConn: null, isHost: false, code: "", meta: {}, hostMeta: null });
-  };
-
   // ---- 送信 ----
   function send(id, msg) {
-    if (id === "host") return onMsg(msg);
+    if (net.isHost && id === net.selfSeat) return onMsg(msg);   // 自分（ホスト）の席は通信せずに直接届ける
     const c = net.conns[id];
     if (c && c.open) c.send(msg);
   }
   function sendAll(fn) {
-    const g = G(), list = g.hostSpec && g.inGame ? [...g.players, { id: "host", name: "", isCpu: false }] : g.players;   // 観戦中のホストにも進行を流す
+    const g = G(), list = g.hostSpec && g.inGame ? [...g.players, { id: net.selfSeat, name: "", isCpu: false }] : g.players;   // 観戦中のホストにも進行を流す
     list.forEach((p) => send(p.id, typeof fn === "function" ? fn(p) : fn));
+    if (typeof fn !== "function" && fn && fn.t === "tick") return;
+    scheduleSnap();   // 後継者へ進行状態を送る（まとめて少し後に）
   }
 
   // ---- 受信（ホスト・参加者共通：自分の画面を更新する）----
-  function onMsg(d) {
+  function onMsg(d, quiet) {
     const g = G();
-    if (d.t === "spectate") { Object.assign(g, { tfShown: true, tfIntro: false, isSpectator: true, isDead: false, specInfo: null, ghostLog: d.ghost || [], chatTab: "main", debugOn: !!d.dbg, specPhase: d.phase, chatLog: d.log || [], boardView: d.board || [], tfView: d.tf || null, remain: d.remain, phase: PH().ONLINE_SPECTATE }); }
+    if (d.t === "batch") { (d.msgs || []).forEach((m) => onMsg(m, true)); rerender(); return; }   // 再入室: 複数のメッセージをまとめて反映（途中の画面を出さない）
+    if (d.t === "spectate") { if (d.phase === PH().ONLINE_ROLE) g.dealStart = Date.now(); Object.assign(g, { tfShown: true, tfIntro: false, isSpectator: true, isDead: false, specInfo: null, ghostLog: d.ghost || [], chatTab: "main", debugOn: !!d.dbg, specPhase: d.phase, chatLog: d.log || [], boardView: d.board || [], tfView: d.tf || null, remain: d.remain, phase: PH().ONLINE_SPECTATE }); }
     if (d.t === "specphase") { if (g.phase === PH().ONLINE_RESULT) return; g.specPhase = d.phase; g.remain = null; g.phase = PH().ONLINE_SPECTATE; }
-    if (d.t === "lobby") { g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.timers = d.timers; g.revealTransforms = d.reveal; g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; g.debugOn = !!d.dbg; g.phase = PH().LOBBY; g.remain = null; }
+    if (d.t === "lobby") { g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.villageSize = d.vsize || 4; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.timers = d.timers; g.revealTransforms = d.reveal; g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; g.debugOn = !!d.dbg; g.phase = PH().LOBBY; g.remain = null; }
+    if (d.t === "tfskip") { ONW.stage.skipPaper(); return; }   // ホストが変化公開をスキップした → 全員の紙を飛ばす
     if (d.t === "tick") { g.remain = d.sec; ONW.ui.updateTimer(); return; }
     if (d.t === "coboard") { g.boardView = d.board || []; g.tfView = d.tf || null; ONW.ui.updateBoard(); if (g.co && g.co.step === "history" && ONW.co) ONW.co.render(); ONW.stage.sync(g); return; }
-    if (d.t === "specinfo") { g.specInfo = d.info || null; ONW.ui.updateSpecInfo(); ONW.stage.sync(g); return; }   // 観戦者: 全員の役職・夜の行動・投票
+    if (d.t === "specinfo") { g.specInfo = d.info || null; if (ONW.ui.isSpecDeal(g)) ONW.ui.render(g); ONW.ui.updateSpecInfo(); ONW.stage.sync(g); return; }   // 観戦者: 全員の役職・夜の行動・投票
     if (d.t === "ghostlog") { g.ghostLog = d.log || []; ONW.ui.updateChat(); return; }                              // 霊界チャット
     if (d.t === "dead") { g.isDead = !!d.v; if (d.v) { g.chatTab = "ghost"; g.ghostLog = d.log || g.ghostLog || []; } }   // 昼中に死亡した（霊界チャットに入る）
     if (d.t === "chatlog") { g.chatLog = d.log; ONW.ui.updateChat(); return; }
     if (d.t === "role") {
-      Object.assign(g, { isDead: false, specInfo: null, ghostLog: [], chatTab: "main", tfShown: false, tfIntro: false, tfAppeared: false, voteSel: null, myVote: null, resultStage: null, resultCap: "", debugOn: !!d.dbg, deck: d.deck, myFrom: d.from, myName: d.me || "", dealStart: Date.now(), myCo: null, co: null, boardView: [], tfView: null, resultChatOpen: false, nightInfoClosed: false, chatLog: [], myRole: d.role, others: d.others, graveCount: d.graveCount, seerGraveCount: d.seerGraveCount, nightLogs: [], nightDone: false, morningChain: null, morningChainDone: false, morningChainReady: false, settleInsom: null, settleShown: false, morningReveal: null, morningShown: false, phase: PH().ONLINE_ROLE });
+      Object.assign(g, { isDead: false, specInfo: null, ghostLog: [], chatTab: "main", tfShown: false, tfIntro: false, tfAppeared: false, voteSel: null, myVote: null, resultStage: null, resultCap: "", debugOn: !!d.dbg, deck: d.deck, myFrom: d.from, myName: d.me || "", dealStart: d.ds || Date.now(), myCo: null, co: null, boardView: [], tfView: null, resultChatOpen: false, nightInfoClosed: false, chatLog: [], myRole: d.role, others: d.others, graveCount: d.graveCount, seerGraveCount: d.seerGraveCount, nightLogs: [], nightDone: false, morningChain: null, morningChainDone: false, morningChainReady: false, settleInsom: null, settleShown: false, morningReveal: null, morningShown: false, phase: PH().ONLINE_ROLE });
     }
-    if (d.t === "night") { g.nightLogs = [d.text, d.text2, ...(d.lines || [])].filter(Boolean); g.godReveal = d.godPeek || null; g.nightAck = []; g.nightDone = !d.act; g.actRole = d.act ? g.myRole : null; g.nightSel = { players: [], graves: [] }; g.bigReveal = d.bigGraves || null; g.cultReveal = d.cultWolves || null; g.masonReveal = d.masonMates || null; g.phase = PH().ONLINE_NIGHT; }
+    if (d.t === "night") { g.nightLogs = [d.text, d.text2, ...(d.lines || [])].filter(Boolean); g.godReveal = d.godPeek || null; g.nightAck = []; g.nightDone = !d.act; g.actRole = d.act ? g.myRole : null; g.nightSel = d.sel ? { players: [...(d.sel.players || [])], graves: [...(d.sel.graves || [])] } : { players: [], graves: [] }; g.bigReveal = d.bigGraves || null; g.cultReveal = d.cultWolves || null; g.masonReveal = d.masonMates || null; g.phase = PH().ONLINE_NIGHT; }
     if (d.t === "ack") {   // 朝に使った能力の結果（即座に返る）
       if (g.phase === PH().ONLINE_MORNING) { g.nightLogs = [...(g.nightLogs || []), ...(d.lines || [])]; g.morningChainDone = true; }
       ONW.stage.onAck(d);
     }
-    if (d.t === "morning") { g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.morningReveal = d.reveal || null; g.morningInsom = d.insom || null; g.morningShown = false; g.morningChain = d.chain || null; g.settleInsom = null; g.settleShown = false; g.morningChainDone = false; g.morningChainReady = false; g.nightSel = { players: [], graves: [] }; g.remain = null; g.settling = false; g.phase = PH().ONLINE_MORNING; }
-    if (d.t === "settle") { g.settling = true; g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.settleInsom = d.insom || null; g.settleShown = false; g.morningChainReady = false; }
-    if (d.t === "day") { g.chatLog = []; g.co = null; g.phase = PH().ONLINE_DAY; }
-    if (d.t === "vote_start") { g.voted = false; g.voteSel = null; g.myVote = null; g.phase = PH().ONLINE_VOTE; }
+    if (d.t === "morning") { g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.morningReveal = d.reveal || null; g.morningInsom = d.insom || null; g.morningShown = !!d.quiet; g.morningChain = d.chain || null; g.settleInsom = null; g.settleShown = false; g.morningChainDone = !!d.chainDone; g.morningChainReady = !!d.quiet; g.nightSel = { players: [], graves: [] }; g.remain = null; g.settling = false; g.phase = PH().ONLINE_MORNING; }
+    if (d.t === "settle") { g.settling = true; g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.settleInsom = d.insom || null; g.settleShown = !!d.quiet; g.morningChainReady = !!d.quiet; }
+    if (d.t === "day") { g.chatLog = d.resync ? g.chatLog : []; g.co = null; if (d.resync) g.myCo = d.myCo || null; g.phase = PH().ONLINE_DAY; }
+    if (d.t === "vote_start") { g.voted = !!d.forced; g.voteSel = d.my || null; g.myVote = d.my || null; g.phase = PH().ONLINE_VOTE; }
     if (d.t === "forcevote") { g.voted = !!d.v; }   // デバッグ: ホストが投票先を指定した/解除した
     if (d.t === "result") {
-      g.result = d.result; g.resultStage = "exec"; g.resultCap = ""; g.phase = PH().ONLINE_RESULT;
+      g.result = d.result; if (d.ghost) g.ghostLog = d.ghost; g.resultStage = "exec"; g.resultCap = ""; g.phase = PH().ONLINE_RESULT;
       if (ONW.stats && !g.isSpectator && !g.debugOn) ONW.stats.record(d.result, `${net.code || ""}:${g.dealStart || 0}`);   // 自分の戦績を保存（ログイン中のみ・デバッグモード中は保存しない）
     }
-    rerender();
+    if (!quiet) rerender();
   }
 
   // ---- COボード（プレイヤー一覧 + 誰が何をCOしたか）----
@@ -148,7 +151,7 @@ window.ONW = window.ONW || {};
   /** プレイヤー一覧の下に出す「変化公開」: 公開ON→変化前→変化後 / OFFで候補あり→変化先の候補 / それ以外→なし */
   function tfView() {
     const g = G();
-    if (g.revealTransforms) return g.tfLines && g.tfLines.length ? { mode: "reveal", lines: g.tfLines } : null;
+    if (g.revealTransforms) return g.tfLines && g.tfLines.length ? { mode: "reveal", lines: g.tfLines, pairs: g.tfPairs || [] } : null;   // pairs: ガイドの「現在の配役」を変化後で数え直すための { b: 変化前, a: 変化後 }
     const lines = (g.coDeck || []).filter((x) => x.cand).map((x) => rn(x.r));
     return lines.length ? { mode: "cand", lines } : null;
   }
@@ -165,14 +168,14 @@ window.ONW = window.ONW || {};
   net.canGhost = function () { const g = G(); return !!(g.isSpectator || g.isDead || (g.hostSpec && net.isHost && g.inGame)); };
   function ghostRecipients() {
     const g = G(), ids = [...g.spectators, ...(g.deadIds || []).filter((id) => { const p = g.players.find((q) => q.id === id); return p && !p.isCpu; })];
-    if (g.hostSpec && g.inGame) ids.push("host");
+    if (g.hostSpec && g.inGame) ids.push(net.selfSeat);
     return [...new Set(ids)];
   }
   function sendGhost() { const g = G(), m = { t: "ghostlog", log: g.ghostLog }; ghostRecipients().forEach((id) => send(id, m)); }
   function ghostNameOf(id) {
     const g = G(), p = g.players.find((q) => q.id === id);
     if (p) return p.name;
-    if (id === "host") return ((g.specRoster || []).find((x) => x.id === "host") || {}).name || "ホスト";
+    if (id === HS()) return ((g.specRoster || []).find((x) => x.id === HS()) || {}).name || "ホスト";
     return g.specNames[id] || "観戦者";
   }
   /** 観戦者に見せる「全員の役職・夜の行動・投票」。参加者には送らない */
@@ -197,7 +200,7 @@ window.ONW = window.ONW || {};
   function sendSpecInfo() {
     const g = G(), m = specInfoMsg();
     sendSpec(m);
-    if (g.hostSpec && g.inGame && net.isHost) send("host", m);
+    if (g.hostSpec && g.inGame && net.isHost) send(net.selfSeat, m);
   }
 
   /** 昼中に死亡させる（ホストのみ）。死亡した人は投票・発言ができなくなり、霊界チャットに入る */
@@ -219,77 +222,584 @@ window.ONW = window.ONW || {};
     const g = G(), humans = g.players.filter((p) => !p.isCpu);
     return {
       t: "lobby", code: net.code, me: humans.findIndex((p) => p.id === forId),
-      players: humans.map((p) => { const m = (p.id === "host" ? net.hostMeta : net.meta[p.id]) || {}; return { name: p.name, status: p.id === "host" ? "host" : p.status, spec: !!p.spectate, uid: m.uid || null, av: m.av || 0 }; }),
-      counts: g.roleCounts, fake: g.fakeWolfWhenNoWolf, cpu: g.cpuCount, grave: g.graveCount, sgrave: g.seerGraveCount, timers: g.timers, reveal: g.revealTransforms, cand: g.transformCandidates, off: g.transformOff || [], cpuNames: g.cpuNames || [], dbg: !!g.debugOn,
+      players: humans.map((p) => { const m = net.meta[p.id] || {}; return { name: p.name, status: p.id === HS() ? "host" : p.off ? "offline" : p.status, spec: !!p.spectate, uid: m.uid || null, av: m.av || 0 }; }),
+      counts: g.roleCounts, fake: g.fakeWolfWhenNoWolf, vsize: g.villageSize, cpu: g.cpuCount, grave: g.graveCount, sgrave: g.seerGraveCount, timers: g.timers, reveal: g.revealTransforms, cand: g.transformCandidates, off: g.transformOff || [], cpuNames: g.cpuNames || [], dbg: !!g.debugOn,
     };
   }
   /** ロビーを見ている人（結果確認中の人を除く）へ送る */
   function broadcastLobby() {
     G().players.filter((p) => !p.isCpu && p.status !== "result").forEach((p) => send(p.id, lobbyMsg(p.id)));
+    scheduleSnap();
   }
   const persist = () => ONW.settings.save(G());
 
+  /** 村の埋まり具合: 参加者(観戦ONでない人間)＋CPU。CPUも定員に含む */
+  const occupied = (g) => g.players.filter((p) => !p.isCpu && !p.spectate).length + (g.cpuCount || 0);
+  net.occupied = occupied;
+  /** 定員（何人村）を超えているとき、CPUを減らし、それでも超えるなら後から入った人から観戦側へ移す */
+  function fitVillage() {
+    const g = G();
+    while (occupied(g) > g.villageSize && g.cpuCount > 0) g.cpuCount--;
+    while (occupied(g) > g.villageSize) {
+      const last = [...g.players].reverse().find((p) => !p.isCpu && !p.spectate && p.id !== HS());
+      if (!last) break;
+      last.spectate = true; last.status = "waiting";
+    }
+  }
+
+  // =====================================================================
+  // 接続まわり: ルーム作成 / 参加 / 自動再接続 / ホストの譲渡・一時委譲
+  // ---------------------------------------------------------------------
+  //  ・席ID(seat)は変わらない。ホストが代わっても、再接続しても同じ席IDで進行状態を引き継ぐ。
+  //  ・参加者は最初に自分で作った「再入室キー」を持ち、ホストは席ごとにそのキーを覚える。
+  //    再接続のときはキーが合う人だけが元の席に戻れる（他人が席を奪えない）。
+  //  ・ホストは「ホストの次に参加した人（接続中）」へ、進行状態のスナップショットを送り続ける。
+  //    ホストが落ちたら、その人が同じルームコード(onww-XXXX)を取り直して新しいホストになる。
+  //  ・元のホスト（ルームを作った人 / 譲渡された人）が同じ席で戻ってきたら、自動でホストを返す。
+  // =====================================================================
+  const HB_MS = 3000, HB_DEAD_MS = 15000, REC_MAX_MS = 120000, LOBBY_GRACE_MS = 30000;
+  const randKey = () => {
+    try { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 32); }
+    catch (e) { return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+  };
+  /** ホストだけが持つ「進行状態」。これをスナップショットにして後継者へ送る */
+  const AUTH_KEYS = [
+    "roleCounts", "villageSize", "graveCount", "seerGraveCount", "cpuCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "transformCandidates", "transformOff", "cpuNames", "debugOn", "dbg", "dbgWarn",
+    "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "playerCount", "selectedRoles",
+    "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds", "ghostLog", "nightResolved", "dbgVotes", "nightResults",
+    "coBoard", "tfLines", "tfPairs", "chatLog", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "executed", "chainIds", "chainBy",
+    "masterPick", "masterCard", "cpuVotePlan", "cpuInfo", "announced", "holdUntil", "remain", "settling", "promotedWolfIds", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "dealStart", "resultObj",
+  ];
+  /** 参加者としての画面にも同じ意味で入っている項目。ホストを引き継ぐ人は、自分が見ていた最新の値を優先する */
+  const SHARED_KEYS = ["chatLog", "remain", "settling", "dealStart", "debugOn", "roleCounts", "villageSize", "cpuCount", "graveCount", "seerGraveCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "transformCandidates", "transformOff", "cpuNames"];
+  /** ホストをやめて参加者に戻るとき、消す項目（参加者の画面では使わないもの） */
+  const HOST_ONLY_KEYS = [
+    "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds",
+    "nightResolved", "dbgVotes", "nightResults", "coBoard", "tfLines", "tfPairs", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets",
+    "executed", "chainIds", "chainBy", "masterPick", "masterCard", "cpuVotePlan", "cpuInfo", "announced", "holdUntil", "promotedWolfIds", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "resultObj", "dbg", "dbgWarn",
+  ];
+
+  // ---- 画面上部の通知（再接続中・ホスト交代中など）----
+  let bannerEl = null;
+  function banner(msg, opt) {
+    if (!msg) { if (bannerEl) { bannerEl.remove(); bannerEl = null; } return; }
+    if (!bannerEl) { bannerEl = document.createElement("div"); bannerEl.id = "net-banner"; document.body.appendChild(bannerEl); }
+    bannerEl.innerHTML = `<span>${ONW.utils.esc(msg)}</span>${opt && opt.cancel ? `<button class="btn" onclick="ONW.net.cancelRecovery()">あきらめる</button>` : ""}`;
+  }
+  net.banner = banner;
+
+  const connSeat = new Map();   // ホスト側: DataConnection → 席ID
+  let hbId = null, snapTimer = null, snapPeriodic = null, watchId = null, touchId = null, backTimer = null, lastOrder = "", dropTimers = {};
+  net.rx = {};   // ホスト側: 席ごとの最後に受信した時刻
+
+  net.leave = function (opt) {
+    net.gen++;
+    const peer = net.peer, conn = net.hostConn, wasHost = net.isHost;
+    try { if (wasHost) flushSnap(); } catch (e) {}           // 抜けるホストは、最後にもう一度後継者へ状態を渡す
+    try { clearTimers(); } catch (e) {}
+    clearInterval(hbId); clearInterval(snapPeriodic); clearTimeout(snapTimer); clearInterval(touchId); clearTimeout(backTimer); stopClientWatch();
+    hbId = snapPeriodic = snapTimer = touchId = backTimer = null; lastOrder = "";
+    Object.values(dropTimers).forEach(clearTimeout); dropTimers = {};
+    if (net.xfer && net.xfer.timer) clearTimeout(net.xfer.timer);
+    const sendBye = !!(conn && conn.open);
+    if (sendBye) { try { conn.send({ t: "bye" }); } catch (e) {} }
+    if (peer) setTimeout(() => { try { peer.destroy(); } catch (e) {} }, sendBye || wasHost ? 150 : 0);
+    connSeat.clear();
+    banner(null);
+    if (opt && opt.forget && ONW.account && ONW.account.roomClear) net.forgetP = ONW.account.roomClear();   // 消し終わる前に checkRejoin が古い記録を拾わないよう待てるようにする
+    Object.assign(net, { peer: null, conns: {}, hostConn: null, isHost: false, code: "", meta: {}, hostSeat: "host", selfSeat: "", keys: {}, origHost: null, order: [], myKey: "", myName: "", rec: null, xfer: null, frozen: false, snapStr: "", snapPlanned: false, rx: {}, onFail: null });
+  };
+
+  // ---------------------------------------------------------------------
+  // 進行状態のスナップショット（ホスト → 後継者）
+  // ---------------------------------------------------------------------
+  function makeSnapshot() {
+    const g = G();
+    const s = { v: 1, code: net.code, hostSeat: HS(), origHost: net.origHost, keys: net.keys, meta: net.meta, g: {}, gphase: g.phase, dayWaiting: !!g.dayStartId, at: Date.now() };
+    AUTH_KEYS.forEach((k) => { if (g[k] !== undefined && typeof g[k] !== "function") s.g[k] = g[k]; });
+    return JSON.stringify(s);
+  }
+  function scheduleSnap() {
+    if (!net.isHost || snapTimer) return;
+    snapTimer = setTimeout(() => { snapTimer = null; flushSnap(); }, 800);
+  }
+  function flushSnap() {
+    if (!net.isHost || net.frozen) return;
+    const to = net.order[0], c = to && net.conns[to];
+    if (!c || !c.open) return;
+    try { c.send({ t: "snap", s: makeSnapshot() }); } catch (e) {}
+  }
+  /** 後継者の並び: ホスト以外の接続中の人間を、参加した順に */
+  function computeOrder() {
+    const g = G();
+    return g.players.filter((p) => !p.isCpu && p.id !== HS() && !p.off && net.conns[p.id] && net.conns[p.id].open).map((p) => p.id);
+  }
+  function pushOrder() {
+    if (!net.isHost) return;
+    const o = computeOrder(), str = o.join(",");
+    net.order = o;
+    if (str === lastOrder) return;
+    lastOrder = str;
+    Object.values(net.conns).forEach((c) => { if (c && c.open) { try { c.send({ t: "succ", order: o, hostSeat: HS() }); } catch (e) {} } });
+    scheduleSnap();
+  }
+  const welcomeMsg = (seat) => ({ t: "welcome", seat, hostSeat: HS(), order: net.order, code: net.code });
+
+  // ---------------------------------------------------------------------
+  // ホスト側: 接続の受け付け
+  // ---------------------------------------------------------------------
+  function startHosting(peer) {
+    peer.on("connection", (conn) => {
+      conn.on("data", (d) => {
+        if (!d || typeof d !== "object") return;
+        if (d.t === "join") return onJoin(conn, d);
+        const seat = connSeat.get(conn);
+        if (!seat || net.conns[seat] !== conn) return;
+        net.rx[seat] = Date.now();
+        if (d.t === "hb") return;
+        if (d.t === "bye") return onBye(seat, conn);
+        if (d.t === "xfer-ack") return onXferAck(seat);
+        if (net.frozen) return;   // ホスト交代の準備中は操作を受け付けない
+        hostRecv(seat, d);
+        scheduleSnap();
+      });
+      conn.on("close", () => onClientClose(conn));
+    });
+    peer.on("disconnected", () => {   // 合図用サーバーとの接続だけ切れた場合は、つなぎ直す（参加者とのP2P接続は生きている）
+      const again = (n) => {
+        if (net.peer !== peer || !net.isHost || !peer.disconnected || peer.destroyed) return;
+        try { peer.reconnect(); } catch (e) {}
+        if (n < 40) setTimeout(() => again(n + 1), 3000);
+      };
+      again(0);
+    });
+    peer.on("error", (e) => {
+      if (net.peer !== peer || !net.isHost) return;
+      if (e.type === "unavailable-id") demoteToClient();   // 切れている間に別の人がルームを引き継いだ → 参加者として戻る
+    });
+    clearInterval(hbId); hbId = setInterval(hostTick, HB_MS);
+    clearInterval(snapPeriodic); snapPeriodic = setInterval(flushSnap, 5000);
+    startTouch();
+  }
+  function hostTick() {
+    if (!net.isHost) return;
+    const now = Date.now();
+    Object.keys(net.conns).forEach((seat) => {
+      const c = net.conns[seat];
+      if (!c || !c.open) return;
+      try { c.send({ t: "hb" }); } catch (e) {}
+      if (now - (net.rx[seat] || now) > HB_DEAD_MS) { try { c.close(); } catch (e) {} }   // 返事が無い → 切れたものとして扱う
+    });
+  }
+
+  function onJoin(conn, d) {
+    const g = G();
+    const key = typeof d.key === "string" && d.key.length >= 16 && d.key.length <= 64 ? d.key : "";
+    if (!key) { conn.send({ t: "deny", why: "key" }); return; }
+    if (net.frozen) { conn.send({ t: "deny", why: "busy" }); return; }
+    const pname = String(d.name || "名無し").slice(0, 12);
+    const want = typeof d.resume === "string" ? d.resume.slice(0, 80) : "";
+    const isOrig = !!(net.origHost && want && net.origHost.seat === want && net.origHost.key === key);   // 元のホストの席
+    let seat = conn.peer, resumed = false;
+    if (want) {
+      if (want === net.selfSeat) { conn.send({ t: "deny", why: "key" }); return; }
+      const known = g.players.some((p) => !p.isCpu && p.id === want) || g.spectators.includes(want) || (g.specRoster || []).some((x) => x.id === want) || Object.prototype.hasOwnProperty.call(g.specNames || {}, want);
+      if (known) {
+        if (net.keys[want] !== key && !isOrig) { conn.send({ t: "deny", why: "key" }); return; }
+        seat = want; resumed = true;
+      } else if (isOrig) { seat = want; resumed = true; }
+      // 知らない席番号なら、新しい参加者として扱う
+    }
+    const isPlayerSeat = g.players.some((p) => !p.isCpu && p.id === seat);
+    if (!g.inGame && !isPlayerSeat && g.players.filter((p) => !p.isCpu).length >= 20) { conn.send({ t: "full" }); return; }
+    // 同じ席の古い接続は閉じる
+    const old = net.conns[seat];
+    if (old && old !== conn) { connSeat.delete(old); try { old.close(); } catch (e) {} }
+    net.conns[seat] = conn; connSeat.set(conn, seat); net.keys[seat] = key; net.rx[seat] = Date.now();
+    net.meta[seat] = ONW.account.cleanMeta(d);               // アイコン情報（表示専用。UUID/数値の形だけ確認）
+    clearTimeout(dropTimers[seat]); delete dropTimers[seat];
+
+    if (g.inGame) {
+      if (isPlayerSeat) {                                     // 試合中に落ちた参加者が戻ってきた → 画面を作り直して送る
+        const p = g.players.find((q) => q.id === seat); delete p.off;
+        conn.send(welcomeMsg(seat));
+        conn.send({ t: "batch", msgs: resyncMsgs(seat) });
+      } else {                                                // 試合中の途中参加 / 観戦席の再入室 → 観戦
+        if (!g.spectators.includes(seat)) g.spectators.push(seat);
+        g.specNames[seat] = (resumed && g.specNames[seat]) || pname;
+        conn.send(welcomeMsg(seat));
+        conn.send({ t: "spectate", phase: g.phase, log: g.chatLog, ghost: g.ghostLog || [], remain: g.remain, board: boardView(), tf: tfView(), dbg: !!g.debugOn });
+        conn.send(specInfoMsg());
+      }
+    } else {
+      let p = g.players.find((q) => !q.isCpu && q.id === seat);
+      if (p) delete p.off;
+      else { p = { id: seat, name: pname, isCpu: false, status: "waiting", spectate: occupied(g) >= g.villageSize }; g.players.push(p); }   // 定員（何人村。CPU含む）に達していたら観戦で入る
+      conn.send(welcomeMsg(seat));
+      broadcastLobby();
+    }
+    pushOrder(); scheduleSnap();
+    maybeHandBack(seat);
+  }
+
+  function onClientClose(conn) {
+    const seat = connSeat.get(conn);
+    connSeat.delete(conn);
+    if (!seat || net.conns[seat] !== conn) return;   // 席をすでに別の接続に引き継いだ古い接続
+    const g = G();
+    delete net.conns[seat];
+    g.spectators = g.spectators.filter((id) => id !== seat);
+    if (!g.inGame) {                                  // ロビー: 少しの間は席を残して、戻ってきたら同じ席に戻す
+      const p = g.players.find((q) => q.id === seat);
+      if (p && !net.xfer) { p.off = true; dropTimers[seat] = setTimeout(() => removeSeat(seat), LOBBY_GRACE_MS); }
+      broadcastLobby();
+    }                                                 // 試合中は残し、戻る時に整理する
+    pushOrder(); scheduleSnap();
+  }
+  function removeSeat(seat) {
+    const g = G();
+    clearTimeout(dropTimers[seat]); delete dropTimers[seat];
+    if (g.inGame || !net.isHost) return;
+    g.players = g.players.filter((p) => p.id !== seat);
+    delete net.conns[seat]; delete net.meta[seat]; delete net.keys[seat]; delete net.rx[seat];
+    broadcastLobby(); pushOrder(); scheduleSnap();
+  }
+  /** 参加者が自分から退出した */
+  function onBye(seat, conn) {
+    const g = G();
+    connSeat.delete(conn); delete net.conns[seat];
+    g.spectators = g.spectators.filter((id) => id !== seat);
+    delete net.keys[seat];                            // 退出した席には戻れない
+    if (!g.inGame) removeSeat(seat); else { pushOrder(); scheduleSnap(); }
+  }
+
+  // ---------------------------------------------------------------------
+  // 再入室した人へ、いまの画面を作り直すためのメッセージ（試合中）
+  // ---------------------------------------------------------------------
+  function resyncMsgs(seat) {
+    const g = G(), P = PH(), p = g.players.find((q) => q.id === seat), ph = g.phase, m = [];
+    if (!p) return m;
+    m.push(roleMsg(p));
+    if (ph !== P.ONLINE_ROLE) m.push({ ...nightMsg(p), sel: (g.nightSels || {})[seat] || null });
+    if ([P.ONLINE_MORNING, P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_RESULT].includes(ph)) {
+      const inMorning = ph === P.ONLINE_MORNING;
+      m.push({ t: "morning", logs: [...((g.nightResults || {})[seat] || []), ...(((g.morningAck || {})[seat]) || [])], reveal: inMorning ? ((g.morningReveals || {})[seat] || null) : null, insom: null, chain: (g.morningAct || {})[seat] || null, chainDone: !!(g.morningDone || {})[seat], quiet: !inMorning });
+      if (g.settling || !inMorning) { const tx = insomniacResults(g)[seat]; m.push({ t: "settle", logs: tx ? [tx] : [], insom: tx ? g.currentRoles[seat] : null, quiet: !inMorning }); }
+    }
+    if ([P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_RESULT].includes(ph)) m.push({ t: "day", resync: true, myCo: (g.coState || {})[seat] || null });
+    if (isDead(seat)) m.push({ t: "dead", v: true, log: g.ghostLog });
+    if (ph === P.ONLINE_VOTE) m.push({ t: "vote_start", my: (g.votes || {})[seat] || null, forced: !!(g.dbgVotes || {})[seat] });
+    if (ph === P.ONLINE_RESULT && g.resultObj) m.push({ t: "result", result: g.resultObj, ghost: g.ghostLog || [] });
+    if ([P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_RESULT].includes(ph)) { m.push({ t: "chatlog", log: g.chatLog || [] }); m.push({ t: "coboard", board: boardView(), tf: tfView() }); }
+    if (ph !== P.ONLINE_RESULT && Number.isFinite(g.remain)) m.push({ t: "tick", sec: g.remain });
+    return m;
+  }
+
+  // ---------------------------------------------------------------------
+  // ホストを引き継ぐ / 手放す
+  // ---------------------------------------------------------------------
+  /** スナップショットを受け取って、この端末が新しいホストになる（peer は onww-XXXX を取れた状態） */
+  function becomeHost(peer, snapStr) {
+    const g = G();
+    let s;
+    try { s = JSON.parse(snapStr); } catch (e) { return false; }
+    if (!s || !s.g || s.code !== net.code || !net.selfSeat) return false;
+    const own = {};
+    SHARED_KEYS.forEach((k) => { if (g[k] !== undefined && g[k] !== null) own[k] = g[k]; });
+    Object.assign(g, s.g, own);
+    net.peer = peer; net.isHost = true; net.hostConn = null; net.hostSeat = net.selfSeat; net.code = s.code;
+    net.conns = {}; net.rx = {}; net.keys = s.keys || {}; net.meta = s.meta || {}; net.origHost = s.origHost || null;
+    net.rec = null; net.xfer = null; net.frozen = false; net.snapStr = ""; net.snapPlanned = false; net.order = []; lastOrder = "";
+    connSeat.clear();
+    net.keys[net.selfSeat] = net.myKey; net.meta[net.selfSeat] = ONW.account.me();
+    const oldHost = s.hostSeat;
+    g.hostSpec = false;                               // 引き継いだ人は参加者（試合中の観戦席は後継者にならない）
+    g.players.forEach((p) => {
+      if (p.isCpu) return;
+      if (p.id === net.selfSeat) p.status = "host";
+      else if (p.id === oldHost && p.status === "host") p.status = g.inGame ? "playing" : "waiting";
+    });
+    if (g.inGame) { if (s.gphase) g.phase = s.gphase; g.cpuQueue = []; g.pumpId = null; g.dayStartId = null; g.dayBegin = null; g.tickId = null; }
+    else {                                            // ロビー: みんなが戻ってくるまで待ち、戻らなかった席は少ししたら外す
+      g.phase = PH().LOBBY;
+      g.players.forEach((p) => { if (!p.isCpu && p.id !== net.selfSeat) { p.off = true; dropTimers[p.id] = setTimeout(() => removeSeat(p.id), LOBBY_GRACE_MS); } });
+    }
+    banner(null);
+    startHosting(peer);
+    if (ONW.account && ONW.account.roomSave) ONW.account.roomSave(net.code, net.selfSeat, net.myKey);
+    resumeTimers(s);
+    if (!g.inGame) broadcastLobby(); else rerender();
+    return true;
+  }
+  /** ホストを引き継いだ直後 / 引き継ぎをやめた直後に、止まっていた時計を続きから動かす */
+  function resumeTimers(s) {
+    const g = G(), P = PH();
+    if (!g.inGame) return;
+    const ph = g.phase, remain = Math.max(1, Math.round(Number.isFinite(g.remain) ? g.remain : 1));
+    g.cpuQueue = []; g.pumpId = null;                 // CPUの発言予定は引き継げないので、引き継ぎ後は新しい発言だけになる
+    if (ph === P.ONLINE_ROLE) startTimer(remain, toNight);
+    else if (ph === P.ONLINE_NIGHT) startTimer(remain, toMorning);
+    else if (ph === P.ONLINE_MORNING) startTimer(remain, g.settling ? toDay : toSettle);
+    else if (ph === P.ONLINE_DAY) {
+      if (s && s.dayWaiting) beginDay();
+      else { startTimer(remain, toVote, (r) => { if (r <= 20) announceVotes(); }); if (remain <= 20) announceVotes(); }
+    }
+    else if (ph === P.ONLINE_VOTE) startTimer(remain, finishVoting);
+  }
+
+  /** この端末のホスト権限を手放して、参加者として同じ席に戻る */
+  function demoteToClient(newHost) {
+    if (!net.isHost) return;
+    const g = G(), mySeat = net.selfSeat, code = net.code, name = net.myName, onFail = net.onFail, peer = net.peer;
+    try { clearTimers(); } catch (e) {}
+    clearInterval(hbId); clearInterval(snapPeriodic); clearTimeout(snapTimer); clearTimeout(backTimer);
+    hbId = snapPeriodic = snapTimer = backTimer = null; lastOrder = "";
+    Object.values(dropTimers).forEach(clearTimeout); dropTimers = {};
+    if (net.xfer && net.xfer.timer) clearTimeout(net.xfer.timer);
+    net.gen++;
+    connSeat.clear();
+    Object.assign(net, { isHost: false, hostSeat: newHost || "", conns: {}, keys: {}, rx: {}, xfer: null, frozen: false, order: newHost ? [newHost] : [], peer: null, hostConn: null, snapStr: "", snapPlanned: false });
+    try { peer && peer.destroy(); } catch (e) {}
+    const init = ONW.createInitialState();
+    HOST_ONLY_KEYS.forEach((k) => { if (k in init) g[k] = init[k]; else delete g[k]; });
+    g.inGame = false;
+    banner(newHost ? "ホストを交代しています…" : "ホストとの接続が切れました。再接続しています…", { cancel: true });
+    clientStart({ code, name, resume: mySeat, retry: true, maxMs: REC_MAX_MS, onFail: (why) => recoveryFailed(why, onFail) });
+    rerender();
+  }
+
+  /** ホストを別の人に渡す（ロビーの「ホスト譲渡」/ 元のホストが戻ったときの返却）。permanent=true なら、その人が「元のホスト」になる */
+  net.handoffTo = function (seat, permanent) {
+    const g = G();
+    if (!net.isHost || net.xfer || net.frozen) return false;
+    const c = net.conns[seat], p = g.players.find((q) => !q.isCpu && q.id === seat);
+    if (!c || !c.open || !p || seat === net.selfSeat) return false;
+    net.xfer = { to: seat, permanent: !!permanent, prevOrig: net.origHost, timer: null, snap: "" };
+    net.frozen = true;
+    if (permanent) net.origHost = { seat, key: net.keys[seat] };
+    net.xfer.snap = makeSnapshot();                   // 時計を止める前に作る
+    clearTimers();
+    banner(permanent ? "ホストを譲渡しています…" : "ホストを元の人に返しています…");
+    try { c.send({ t: "xfer", s: net.xfer.snap }); } catch (e) { abortHandoff(); return false; }
+    net.xfer.timer = setTimeout(abortHandoff, 8000);
+    return true;
+  };
+  function onXferAck(seat) {
+    const x = net.xfer;
+    if (!x || x.to !== seat) return;
+    clearTimeout(x.timer);
+    Object.values(net.conns).forEach((c) => { if (c && c.open) { try { c.send({ t: "newhost", seat: x.to }); } catch (e) {} } });
+    setTimeout(() => demoteToClient(x.to), 300);
+  }
+  function abortHandoff() {
+    const x = net.xfer;
+    if (!x) return;
+    clearTimeout(x.timer);
+    net.origHost = x.prevOrig; net.xfer = null; net.frozen = false;
+    banner(null);
+    let s = null; try { s = JSON.parse(x.snap); } catch (e) {}
+    resumeTimers(s);
+  }
+  /** 元のホストが戻ってきたら、ホストを返す（試合中は参加者として戻ったときだけ。観戦席だった場合は試合が終わってから） */
+  function maybeHandBack(seat) {
+    const o = net.origHost, g = G();
+    if (!net.isHost || !o || o.seat !== seat || seat === net.selfSeat || backTimer) return;
+    if (g.inGame && !g.players.some((p) => !p.isCpu && p.id === seat)) return;
+    backTimer = setTimeout(() => {
+      backTimer = null;
+      if (net.isHost && net.origHost && net.origHost.seat === seat && !net.xfer) net.handoffTo(seat, false);
+    }, 1500);
+  }
+  /** ロビーのホスト譲渡ボタンから。idx はロビーの人間の並び（lobbyMsg の players と同じ順） */
+  net.transferHost = function (idx) {
+    const g = G();
+    if (!net.isHost || g.inGame || g.phase !== PH().LOBBY) return;
+    const p = g.players.filter((q) => !q.isCpu)[idx];
+    if (!p || p.id === net.selfSeat || p.off) return;
+    net.handoffTo(p.id, true);
+  };
+
+  // ---------------------------------------------------------------------
+  // 参加者側: 接続・再接続・（後継者なら）ホストの引き継ぎ
+  // ---------------------------------------------------------------------
+  function tryRegister(code, cb) {
+    const p = new Peer(PREFIX + code);
+    let done = false;
+    const fin = (ok, why) => { if (done) return; done = true; clearTimeout(to); if (!ok) { try { p.destroy(); } catch (e) {} } cb(ok ? p : null, why); };
+    const to = setTimeout(() => fin(false, "timeout"), 9000);
+    p.on("open", () => fin(true));
+    p.on("error", (e) => fin(false, e.type));
+  }
+  function dial(o, cb) {
+    const peer = new Peer();
+    let done = false, conn = null;
+    const fin = (ok, why) => { if (done) return; done = true; clearTimeout(to); if (!ok) { try { peer.destroy(); } catch (e) {} } cb(ok ? { peer, conn } : null, why); };
+    const to = setTimeout(() => fin(false, "timeout"), 10000);
+    peer.on("error", (e) => fin(false, e.type));
+    peer.on("open", () => {
+      conn = peer.connect(PREFIX + o.code, { reliable: true });
+      conn.on("error", () => fin(false, "conn"));
+      conn.on("open", () => {
+        conn.send({ t: "join", name: o.name, key: net.myKey, resume: o.resume || "", ...ONW.account.me() });
+        fin(true);
+      });
+    });
+  }
+  /** 接続を始める。retry=true なら、つながるまで（maxMs まで）繰り返す。後継者に選ばれている人は、必要ならここでホストを引き継ぐ */
+  function clientStart(o) {
+    const gen = net.gen, t0 = Date.now();
+    net.rec = o.retry ? { t0 } : null;
+    const hosted = (peer) => {
+      if (gen !== net.gen) { try { peer.destroy(); } catch (e) {} return; }
+      if (!becomeHost(peer, net.snapStr)) { try { peer.destroy(); } catch (e) {} setTimeout(loop, 1500); }
+    };
+    const loop = () => {
+      if (gen !== net.gen) return;
+      const el = Date.now() - t0;
+      if (o.retry && el > o.maxMs) return o.onFail("gone");
+      const rank = net.order.indexOf(net.selfSeat), hasSnap = !!net.snapStr, planned = hasSnap && net.snapPlanned;
+      if (planned) return tryRegister(o.code, (peer) => (peer ? hosted(peer) : setTimeout(loop, 700)));   // ホスト交代を頼まれた: すぐに新しいホストになる
+      dial(o, (res, why) => {
+        if (gen !== net.gen) { if (res) { try { res.peer.destroy(); } catch (e) {} } return; }
+        if (res) return adopt(res, o, gen);
+        if (!o.retry) return o.onFail(why);
+        if (hasSnap && rank >= 0 && el >= 1500 + rank * 3500 && (why === "peer-unavailable" || why === "timeout")) {   // ホストがいない: 先に参加した人から順に引き継ぐ
+          return tryRegister(o.code, (peer) => (peer ? hosted(peer) : setTimeout(loop, 1000)));
+        }
+        setTimeout(loop, 1200);
+      });
+    };
+    setTimeout(loop, o.delay || 0);
+  }
+  function adopt(res, o, gen) {
+    const { peer, conn } = res;
+    try { if (net.peer && net.peer !== peer) net.peer.destroy(); } catch (e) {}
+    net.peer = peer; net.hostConn = conn; net.code = o.code; net.isHost = false; net.lastRx = Date.now();
+    peer.on("error", () => {});
+    startClientWatch();
+    conn.on("data", (d) => { net.lastRx = Date.now(); clientRecv(d, o, gen); });
+    conn.on("close", () => { if (gen !== net.gen || net.hostConn !== conn) return; onHostLost(); });
+  }
+  function clientRecv(d, o, gen) {
+    if (!d || typeof d !== "object") return;
+    if (d.t === "hb") return;
+    if (d.t === "welcome") {
+      net.selfSeat = d.seat; net.hostSeat = d.hostSeat; net.order = d.order || []; net.rec = null;
+      banner(null);
+      if (ONW.account && ONW.account.roomSave) ONW.account.roomSave(net.code, net.selfSeat, net.myKey);
+      startTouch();
+      return;
+    }
+    if (d.t === "succ") { net.order = d.order || []; net.hostSeat = d.hostSeat; return; }
+    if (d.t === "snap") { net.snapStr = d.s; net.snapPlanned = false; return; }
+    if (d.t === "xfer") { net.snapStr = d.s; net.snapPlanned = true; try { net.hostConn.send({ t: "xfer-ack" }); } catch (e) {} banner("ホストを引き継いでいます…"); return; }
+    if (d.t === "newhost") { net.order = [d.seat]; banner("ホストを交代しています…", { cancel: true }); return; }
+    if (d.t === "full") { o.onFail("full"); return; }
+    if (d.t === "deny") {
+      if (d.why === "busy" && o.retry) { try { net.hostConn.close(); } catch (e) {} return; }   // ホスト交代の最中: 少し待ってつなぎ直す
+      o.onFail(d.why === "busy" ? "busy" : "deny"); return;
+    }
+    onMsg(d);
+  }
+  function onHostLost() {
+    const onFail = net.onFail;
+    net.hostConn = null;
+    stopClientWatch();
+    banner("ホストとの接続が切れました。再接続しています…", { cancel: true });
+    clientStart({ code: net.code, name: net.myName, resume: net.selfSeat, retry: true, maxMs: REC_MAX_MS, delay: 800, onFail: (why) => recoveryFailed(why, onFail) });
+  }
+  function recoveryFailed(why, onFail) {
+    const f = onFail || net.onFail;
+    if (why === "deny" && ONW.account && ONW.account.roomClear) ONW.account.roomClear();   // 席に戻れない記録は消す
+    net.leave();   // 再入室の情報は残す（トップ画面の「ルームに戻る」で再入室できる）
+    if (f) f("ルームとの接続が切れました。" + (ONW.account && ONW.account.user ? "トップ画面の「ルームに戻る」から再入室できる場合があります。" : ""));
+  }
+  net.cancelRecovery = function () {
+    const f = net.onFail;
+    net.leave();
+    if (f) f("再接続を中断しました。");
+  };
+  function startClientWatch() {
+    stopClientWatch();
+    watchId = setInterval(() => {
+      const c = net.hostConn;
+      if (!c || net.isHost) return;
+      if (c.open) { try { c.send({ t: "hb" }); } catch (e) {} }
+      if (Date.now() - (net.lastRx || 0) > HB_DEAD_MS) { try { c.close(); } catch (e) {} }   // ホストから何も届かない → 切れたものとして再接続
+    }, 4000);
+  }
+  function stopClientWatch() { clearInterval(watchId); watchId = null; }
+  /** 再入室の記録（ログイン中のみ）を、ルームにいる間は5分ごとに更新する */
+  function startTouch() {
+    clearInterval(touchId);
+    touchId = setInterval(() => { if (net.code && net.selfSeat && net.myKey && ONW.account && ONW.account.roomSave) ONW.account.roomSave(net.code, net.selfSeat, net.myKey); }, 5 * 60 * 1000);
+  }
+
+  const failText = (why) => (why === "peer-unavailable" ? "ルームが見つかりません。コードを確認してください。"
+    : why === "full" ? "このルームには参加できません（満員または開始済み）。"
+    : why === "busy" ? "ホストを交代しているところです。少し待ってからやり直してください。"
+    : why === "timeout" || why === "conn" ? "ルームに接続できませんでした。"
+    : "接続に失敗しました: " + why);
+
   net.createRoom = function (name, onError) {
     net.leave();
-    const code = genCode();
+    net.onFail = onError; net.myName = name; net.myKey = randKey();
+    const code = genCode(), gen = net.gen;
     const peer = new Peer(PREFIX + code);
     peer.on("open", () => {
-      net.peer = peer; net.isHost = true; net.code = code; net.hostMeta = ONW.account.me();
+      if (gen !== net.gen) { try { peer.destroy(); } catch (e) {} return; }
+      net.peer = peer; net.isHost = true; net.code = code; net.hostSeat = "host"; net.selfSeat = "host";
+      net.keys = { host: net.myKey }; net.meta = { host: ONW.account.me() }; net.origHost = { seat: "host", key: net.myKey };
       const g = G(), saved = ONW.settings.load();
       if (saved) ONW.settings.apply(g, saved);            // 前回のルールを復元
       try { g.debugOn = localStorage.getItem("onw.debugOn.v1") === "1"; } catch (e) {}   // デバッグモードのON/OFFも前回のまま
       Object.assign(g, { players: [{ id: "host", name, isCpu: false, status: "host" }], inGame: false, spectators: [], specNames: {}, phase: PH().LOBBY });
-      broadcastLobby();
+      fitVillage();
+      startHosting(peer);
+      if (ONW.account && ONW.account.roomSave) ONW.account.roomSave(code, "host", net.myKey);
+      broadcastLobby(); pushOrder();
     });
     peer.on("error", (e) => {
-      if (e.type === "unavailable-id") { peer.destroy(); net.createRoom(name, onError); }
+      if (net.peer === peer) return;                      // 開いたあとのエラーは startHosting 側で扱う
+      if (gen !== net.gen) return;
+      if (e.type === "unavailable-id") { try { peer.destroy(); } catch (x) {} net.createRoom(name, onError); }
       else onError("接続に失敗しました: " + e.type);
-    });
-    peer.on("connection", (conn) => {
-      conn.on("data", (d) => {
-        if (d.t !== "join") return hostRecv(conn.peer, d);
-        const g = G(), pname = (d.name || "名無し").slice(0, 12);
-        net.meta[conn.peer] = ONW.account.cleanMeta(d);               // アイコン情報（表示専用。UUID/数値の形だけ確認）
-        if (g.inGame) {                                   // 試合中の途中参加 → 観戦
-          net.conns[conn.peer] = conn;
-          g.spectators.push(conn.peer); g.specNames[conn.peer] = pname;
-          conn.send({ t: "spectate", phase: g.phase, log: g.chatLog, ghost: g.ghostLog || [], remain: g.remain, board: boardView(), tf: tfView(), dbg: !!g.debugOn });
-          conn.send(specInfoMsg());
-          return;
-        }
-        const humansNow = g.players.filter((p) => !p.isCpu);
-        if (humansNow.length >= 20) { conn.send({ t: "full" }); return; }
-        net.conns[conn.peer] = conn;
-        g.players.push({ id: conn.peer, name: pname, isCpu: false, status: "waiting", spectate: humansNow.filter((p) => !p.spectate).length >= 10 });   // 参加者が10人なら観戦で入る
-        broadcastLobby();
-      });
-      conn.on("close", () => {
-        const g = G();
-        delete net.conns[conn.peer]; delete net.meta[conn.peer];
-        g.spectators = g.spectators.filter((id) => id !== conn.peer);
-        if (g.inGame) return;                             // 試合中は残し、戻る時に整理する
-        g.players = g.players.filter((p) => p.id !== conn.peer);
-        broadcastLobby();
-      });
     });
   };
   net.joinRoom = function (code, name, onError) {
     net.leave();
     code = code.trim().toUpperCase();
-    const peer = new Peer();
-    net.peer = peer;
-    peer.on("error", (e) => onError(e.type === "peer-unavailable" ? "ルームが見つかりません。コードを確認してください。" : "接続に失敗しました: " + e.type));
-    peer.on("open", () => {
-      const conn = peer.connect(PREFIX + code, { reliable: true });
-      net.hostConn = conn; net.code = code;
-      conn.on("open", () => conn.send({ t: "join", name, ...ONW.account.me() }));
-      conn.on("close", () => { if (net.peer) { net.leave(); onError("ルームとの接続が切れました。"); } });
-      conn.on("data", (d) => {
-        if (d.t === "full") { net.leave(); onError("このルームには参加できません（満員または開始済み）。"); }
-        else onMsg(d);
-      });
-    });
+    net.onFail = onError; net.myName = name; net.myKey = randKey(); net.code = code;
+    clientStart({ code, name, resume: "", retry: false, onFail: (why) => { net.leave(); onError(failText(why)); } });
   };
+  /** トップ画面の「ルームに戻る」: ログイン中なら、記録しておいた席とキーで同じ席に再入室する */
+  net.rejoin = function (onError) {
+    const row = net.rejoinInfo;
+    if (!row || net.peer || net.rec) return;
+    net.leave();
+    const name = (ONW.account && ONW.account.displayName) || "名無し";
+    net.onFail = onError; net.myName = name; net.myKey = row.key; net.selfSeat = row.seat; net.code = row.code;
+    banner(`ルーム ${row.code} に再入室しています…`, { cancel: true });
+    clientStart({ code: row.code, name, resume: row.seat, retry: true, maxMs: 30000, onFail: () => {
+      if (ONW.account && ONW.account.roomClear) ONW.account.roomClear();
+      net.rejoinInfo = null; net.leave();
+      onError("ルームが見つかりませんでした。すでに終了している可能性があります。");
+    } });
+  };
+  /** タイトル画面を開いたとき: 参加中のルームの記録があるか調べる（ログイン中のみ） */
+  net.checkRejoin = async function () {
+    const A = ONW.account;
+    if (!A || !A.user || !A.roomLoad || net.peer || net.rec) { net.rejoinInfo = null; return; }
+    let row = null;
+    try { if (net.forgetP) await net.forgetP; } catch (e) {}
+    net.forgetP = null;
+    if (net.peer || net.rec) return;
+    try { row = await A.roomLoad(); } catch (e) {}
+    if (net.peer || net.rec) return;
+    net.rejoinInfo = row ? { code: row.room_code, seat: row.seat_id, key: row.resume_key } : null;
+    if (G().phase === PH().TITLE) rerender();
+  };
+  if (ONW.account && ONW.account.onChange) ONW.account.onChange(() => net.checkRejoin());
 
 
   net.changeRole = function (role, delta) {
@@ -301,8 +811,11 @@ window.ONW = window.ONW || {};
 
   /** 墓地枚数・CPU人数の増減（ホストのみ） */
   net.changeSetting = function (key, delta) {
-    if (!net.isHost || !["graveCount", "seerGraveCount", "cpuCount"].includes(key)) return;
-    G()[key] = Math.max(0, Math.min(10, (G()[key] ?? 2) + delta));
+    if (!net.isHost || !["graveCount", "seerGraveCount", "cpuCount", "villageSize"].includes(key)) return;
+    const g = G();
+    if (key === "villageSize") { g.villageSize = Math.max(3, Math.min(10, (g.villageSize ?? 4) + delta)); fitVillage(); }
+    else if (key === "cpuCount") { if (delta > 0 && occupied(g) >= g.villageSize) return; g.cpuCount = Math.max(0, Math.min(10, (g.cpuCount ?? 0) + delta)); }
+    else g[key] = Math.max(0, Math.min(10, (g[key] ?? 2) + delta));
     persist(); broadcastLobby();
   };
 
@@ -361,18 +874,19 @@ window.ONW = window.ONW || {};
     if (!net.isHost) { net.hostConn && net.hostConn.send({ t: "return" }); return; }
     clearTimers();
     g.inGame = false;
-    g.players = g.players.filter((p) => !p.isCpu && (p.id === "host" || (net.conns[p.id] && net.conns[p.id].open)));
-    g.players.forEach((p) => { if (p.id === "host") p.status = "host"; });
-    const hs = (g.specRoster || []).find((x) => x.id === "host");
-    if (hs && !g.players.some((p) => p.id === "host")) g.players.unshift({ id: "host", name: hs.name, isCpu: false, status: "host", spectate: true });   // 観戦していたホストをルームへ戻す
+    g.players = g.players.filter((p) => !p.isCpu && (p.id === HS() || (net.conns[p.id] && net.conns[p.id].open)));
+    g.players.forEach((p) => { if (p.id === HS()) p.status = "host"; delete p.off; });
+    const hs = (g.specRoster || []).find((x) => x.id === HS());
+    if (hs && !g.players.some((p) => p.id === HS())) g.players.unshift({ id: HS(), name: hs.name, isCpu: false, status: "host", spectate: true });   // 観戦していたホストをルームへ戻す
     // ロビーで観戦ONだった人は、試合が終わっても観戦のまま戻す（結果を見終わるまでは「結果確認中」）
-    (g.specRoster || []).filter((x) => x.id !== "host" && g.spectators.includes(x.id) && net.conns[x.id] && net.conns[x.id].open).forEach((x) => {
+    (g.specRoster || []).filter((x) => x.id !== HS() && g.spectators.includes(x.id) && net.conns[x.id] && net.conns[x.id].open).forEach((x) => {
       g.spectators = g.spectators.filter((id) => id !== x.id);
       g.players.push({ id: x.id, name: x.name, isCpu: false, status: "result", spectate: true });
     });
     g.hostSpec = false;
     g.phase = PH().LOBBY; g.remain = null;
-    broadcastLobby();
+    broadcastLobby(); pushOrder();
+    if (net.origHost) maybeHandBack(net.origHost.seat);   // 試合が終わった: 元のホストが戻っていれば、ホストを返す
   };
 
   /** 変化公開の ON・OFF */
@@ -393,16 +907,16 @@ window.ONW = window.ONW || {};
   /** 観戦ON/OFF（ロビー中のみ）。ONだと参加者から外れて観戦者の欄に移る */
   net.setSpectate = function (v) {
     const g = G();
-    if (net.isHost) { spectateOf("host", v); return; }
+    if (net.isHost) { spectateOf(net.selfSeat, v); return; }
     if (net.hostConn) net.hostConn.send({ t: "spec", v: !!v });
   };
   function spectateOf(id, v) {
     const g = G(), p = g.players.find((q) => q.id === id && !q.isCpu);
     if (!p || g.inGame || g.phase !== PH().LOBBY) return;
     v = !!v;
-    if (!v && g.players.filter((q) => !q.isCpu && !q.spectate).length >= 10) return;   // 参加者は10人まで
+    if (!v && occupied(g) >= g.villageSize) return;   // 定員（何人村。CPU含む）まで
     p.spectate = v;
-    if (id !== "host") p.status = "waiting";
+    if (id !== HS()) p.status = "waiting";
     broadcastLobby();
   }
 
@@ -438,15 +952,16 @@ window.ONW = window.ONW || {};
     const cpus = Array.from({ length: g.cpuCount }, (_, i) => ({ id: `cpu_${i + 1}`, name: cpuName(g, i), isCpu: true }));
     const n = humans.length + cpus.length;
     const roles = Object.entries(g.roleCounts).flatMap(([role, c]) => Array(c).fill(role));
-    if (n < 3 || roles.length !== n + g.graveCount) return;
-    if (humans.some((p) => p.id !== "host" && p.status !== "ready")) return;   // 全員の準備完了が必要
+    if (n < 3 || n !== g.villageSize || roles.length !== n + g.graveCount) return;   // 定員ぴったり（何人村）で開始
+    if (humans.some((p) => p.id !== HS() && p.status !== "ready")) return;   // 全員の準備完了が必要
     g.players = [...humans, ...cpus];
     g.inGame = true; g.spectators = []; g.specNames = {};
     g.specRoster = specs.map((p) => ({ id: p.id, name: p.name }));
-    g.hostSpec = specs.some((p) => p.id === "host");
-    specs.filter((p) => p.id !== "host").forEach((p) => { g.spectators.push(p.id); g.specNames[p.id] = p.name; });
-    humans.forEach((p) => { p.status = p.id === "host" ? "host" : "playing"; });
+    g.hostSpec = specs.some((p) => p.id === HS());
+    specs.filter((p) => p.id !== HS()).forEach((p) => { g.spectators.push(p.id); g.specNames[p.id] = p.name; });
+    humans.forEach((p) => { p.status = p.id === HS() ? "host" : "playing"; delete p.off; });
     g.playerCount = n;
+    g.dealStart = Date.now();   // 観戦ホストの配布演出用
     g.selectedRoles = roles;
     ONW.roles.dealRoles(g);
     g.center0 = [...g.center];   // 配役直後の墓地（占い・大狼が見るのはこちら。墓荒らしの交換は g.center に反映）
@@ -459,25 +974,32 @@ window.ONW = window.ONW || {};
     } else {
       [...new Set(g.selectedRoles)].forEach((b) => ONW.roles.enabledTargets(g, b).forEach((t) => addDeck(t, true)));
     }
-    g.coDeck = deck;
+    g.coDeck = deck.filter((d) => !ONW.TRANSFORM_GROUPS[d.r]);   // 光の使徒・闇の化身・銀色の影は試合開始時に別の役職へ変化するので、COの候補には出さない
     g.votes = {};
     g.nightSels = {}; g.morningReveals = {};
-    Object.assign(g, { deadIds: [], ghostLog: [], nightResolved: false, dbgVotes: {}, nightResults: {}, coBoard: {}, tfLines: [], chatLog: [], coState: {}, nightLogsAll: [], cpuClaims: [], tmQueue: [], roleTrail: {}, centerTrail: {}, cards: null, morningAct: {}, morningDone: {}, loveTargets: {}, executed: [], chainIds: [], masterPick: null, cpuQueue: [], cpuVotePlan: {}, announced: false, holdUntil: 0, remain: null });
+    Object.assign(g, { deadIds: [], ghostLog: [], nightResolved: false, dbgVotes: {}, nightResults: {}, coBoard: {}, tfLines: [], tfPairs: [], chatLog: [], coState: {}, nightLogsAll: [], cpuClaims: [], tmQueue: [], roleTrail: {}, centerTrail: {}, cards: null, morningAct: {}, morningDone: {}, loveTargets: {}, executed: [], chainIds: [], masterPick: null, masterCard: null, cpuQueue: [], cpuVotePlan: {}, announced: false, holdUntil: 0, remain: null, morningAck: {}, resultObj: null });
     clearTimers();
     g.spectators.forEach((id) => send(id, { t: "spectate", phase: PH().ONLINE_ROLE, log: [], ghost: [], remain: null, board: boardView(), tf: tfView(), dbg: !!g.debugOn }));
     startTimer(ONW.ui.dealDuration(g.center.length, g.players.length) + 5, toNight);   // 演出が終わって5秒後に自動で夜へ
-    sendAll((p) => ({
-      t: "role", me: p.name, dbg: !!g.debugOn, role: g.initialRoles[p.id], graveCount: g.center.length, seerGraveCount: g.seerGraveCount, deck: g.coDeck, from: g.transformFrom[p.id] || null,
-      others: g.players.filter((q) => q.id !== p.id).map((q) => ({ id: q.id, name: q.name })),
-    }));
+    sendAll(roleMsg);
     sendSpecInfo();   // 観戦者・観戦ホストへ全員の役職を送る（roleメッセージのあとに送る）
   };
 
+  /** 配役メッセージ（試合開始時と、再入室したときの両方で使う） */
+  function roleMsg(p) {
+    const g = G();
+    return {
+      t: "role", me: p.name, dbg: !!g.debugOn, role: g.initialRoles[p.id], graveCount: g.center.length, seerGraveCount: g.seerGraveCount, deck: g.coDeck, from: g.transformFrom[p.id] || null, ds: g.dealStart,
+      others: g.players.filter((q) => q.id !== p.id).map((q) => ({ id: q.id, name: q.name })),
+    };
+  }
+
   // ---- フェーズ進行（タイマーで自動。ホストの「スキップ」でも進める）----
-  function toNight() {
+  /** 夜の始まりに本人へ送る内容（夜の画面の説明・仲間の表示など）。再入室でも同じものを作り直す */
+  function nightMsg(p) {
     const g = G();
     const wolfNames = (self) => g.players.filter((q) => q.id !== self && ONW.WOLF_KIND.includes(g.initialRoles[q.id])).map((q) => q.name);
-    sendAll((p) => {
+    {
       const r = g.initialRoles[p.id];
       let text = "", text2 = "", bigGraves = null, cultWolves = null, masonMates = null;
       if (r === "werewolf" || r === "big_wolf") {
@@ -511,7 +1033,12 @@ window.ONW = window.ONW || {};
         godPeek = { players: Object.fromEntries(g.players.map((q) => [q.id, g.initialRoles[q.id]])), graves: g.center0.slice() };
       }
       return { t: "night", text, text2, lines, godPeek, bigGraves, cultWolves, masonMates, act: ACTIVE.includes(r) };
-    });
+    }
+  }
+  function toNight() {
+    const g = G();
+    ONW.vote.certainPromotion(g);   // 昇格する狂人（のカード）を夜の始まり＝配布直後の役職で決めておく
+    sendAll(nightMsg);
     sendSpec({ t: "specphase", phase: PH().ONLINE_NIGHT });
     sendSpecInfo();
     startTimer(g.timers.night, toMorning);
@@ -605,14 +1132,14 @@ window.ONW = window.ONW || {};
   function toMorning() {
     const g = G();
     // 夜の選択を起床順（占い → 墓荒らし → 怪盗 → いたずらっ子）に実行。各段階で人間 → CPU の順
-    g.morningReveals = {}; g.morningAct = {}; g.morningDone = {}; g.settling = false;
+    g.morningReveals = {}; g.morningAct = {}; g.morningDone = {}; g.morningAck = {}; g.settling = false;
     ONW.cpu.runNight(g, "init");
     ["seer", "relic", "robber", "tm"].forEach((kind) => { resolveNight(g, kind); ONW.cpu.runNight(g, kind); });
     applyTroublemakers(g);
     // 墓荒らしが交換した後の役職の能力は、朝に使う。CPUはここで即座に使い、人間は朝の画面で選ぶ
     ONW.cpu.runNight(g, "morning");
     applyTroublemakers(g);
-    sendAll((p) => ({ t: "morning", logs: g.nightResults[p.id] || [], reveal: (g.morningReveals && g.morningReveals[p.id]) || null, insom: null, chain: g.morningAct[p.id] || null }));
+    sendAll((p) => ({ t: "morning", logs: g.nightResults[p.id] || [], reveal: (g.morningReveals && g.morningReveals[p.id]) || null, insom: null, chain: g.morningAct[p.id] || null }));   // （再入室のときは resyncMsgs が同じ内容を作り直す）
     g.nightResolved = true;
     sendSpec({ t: "specphase", phase: PH().ONLINE_MORNING });
     sendSpecInfo();
@@ -645,9 +1172,19 @@ window.ONW = window.ONW || {};
     if (!list.length) return;
     list.sort((x, y) => (order[x.b] ?? 9) - (order[y.b] ?? 9) || Math.random() - 0.5);
     g.tfLines = list.map((e) => `${rn(e.b)} → ${rn(e.a)}`);
+    g.tfPairs = list.map((e) => ({ b: e.b, a: e.a }));   // tfLines と同じ並び
     // 変化公開はチャットには流さず、プレイヤー一覧の下の欄(tfLines)にだけ出す
   }
 
+  /** 変化公開の演出が終わってから、昼のタイマーとCPUの発言を始める */
+  function beginDay() {
+    const g = G();
+    g.dayStartId = null; g.dayBegin = null;
+    if (g.phase !== PH().ONLINE_DAY) return;
+    enqueue(ONW.cpu.plan(g));
+    startTimer(g.timers.day, toVote, (remain) => { if (remain <= 20) announceVotes(); });
+    if (g.timers.day <= 20) announceVotes();
+  }
   function toDay() {
     const g = G();
     g.announced = false; g.holdUntil = 0; g.cpuQueue = [];
@@ -658,15 +1195,10 @@ window.ONW = window.ONW || {};
     sendBoard();
     // 変化公開が出終わってから、昼のタイマーとCPUの発言を始める（その間、タイマーは満タンのまま止まる）
     const wait = g.revealTransforms && ONW.stage && ONW.stage.paperMs ? ONW.stage.paperMs(g.tfLines) : 0;
-    const begin = () => {
-      g.dayStartId = null;
-      if (g.phase !== PH().ONLINE_DAY) return;
-      enqueue(ONW.cpu.plan(g));
-      startTimer(g.timers.day, toVote, (remain) => { if (remain <= 20) announceVotes(); });
-      if (g.timers.day <= 20) announceVotes();
-    };
+    const begin = beginDay;
     if (wait > 0) {
       g.remain = g.timers.day; sendAll({ t: "tick", sec: g.remain }); sendSpec({ t: "tick", sec: g.remain });
+      g.dayBegin = begin;
       g.dayStartId = setTimeout(begin, wait);
     } else begin();
   }
@@ -721,6 +1253,19 @@ window.ONW = window.ONW || {};
   /** デバッグモードのON/OFFなど、ロビーの表示を全員に反映する */
   net.syncLobby = function () { if (net.isHost) { broadcastLobby(); rerender(); } };
 
+  /** 変化公開のスキップ（ホストのダブルタップ）: 全員の紙を飛ばし、昼のタイマーも紙が収まったらすぐ始める */
+  net.skipPaper = function () {
+    const g = G();
+    if (!net.isHost || g.phase !== PH().ONLINE_DAY) return;
+    sendAll({ t: "tfskip" }); sendSpec({ t: "tfskip" });
+    ONW.stage.skipPaper();
+    if (g.dayStartId && g.dayBegin) {
+      clearTimeout(g.dayStartId);
+      const b = g.dayBegin;
+      g.dayStartId = setTimeout(b, 1100);   // 紙が下の欄に収まるのを待ってから昼を始める
+    }
+  };
+
   /** 画面ごとの「次へ」（ホストのみ。タイマーを待たずに進めるスキップ） */
   net.hostNext = function () {
     const g = G();
@@ -739,32 +1284,32 @@ window.ONW = window.ONW || {};
     const g = G(), sel = g.nightSel || { players: [], graves: [] };
     if (!g.morningChain || g.morningChainDone || !selComplete(g.morningChain, sel)) return;
     const msg = { t: "act", kind: "mchain", sel: { players: [...sel.players], graves: [...sel.graves] } };
-    if (net.isHost) hostRecv("host", msg); else net.hostConn.send(msg);
+    if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
   };
   /** 夜の選択を送る（朝まで何度でも変更できる）。sel: { players: [id...], graves: [index...] } */
   net.setSel = function (sel) {
     const msg = { t: "act", kind: "sel", sel: { players: [...(sel.players || [])], graves: [...(sel.graves || [])] } };
-    if (net.isHost) hostRecv("host", msg); else net.hostConn.send(msg);
+    if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
   };
 
   net.sendChat = function (text) {
     text = String(text || "").trim();
     if (!text) return;
     const msg = { t: net.canGhost() ? "ghost" : "chat", text };   // 観戦者・死亡者の発言は霊界チャットへ
-    if (net.isHost) hostRecv("host", msg); else net.hostConn.send(msg);
+    if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
   };
 
   net.sendCo = function (text, claim, setRole, flag, short) {
     const msg = { t: "co", text, short: short ? String(short).slice(0, 80) : "", claim, setRole, hold: flag === "hold", disclose: flag === "disclose" };
     if (setRole) G().myCo = setRole;
-    if (net.isHost) hostRecv("host", msg); else net.hostConn.send(msg);
+    if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
   };
 
   net.vote = function (target) {   // target: 投票先のID / null（未投票に戻す）。最終的な票はタイマー終了時に数える
     const g = G();
     if (g.voted) return;           // デバッグでホストが固定した票は変えられない
     const msg = { t: "vote", target: target || null };
-    if (net.isHost) hostRecv("host", msg); else net.hostConn.send(msg);
+    if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
     rerender();
   };
 
@@ -818,6 +1363,7 @@ window.ONW = window.ONW || {};
       }
       if (!lines) return;
       g.morningDone[id] = true;
+      (g.morningAck = g.morningAck || {})[id] = lines;   // 再入室したときに朝の結果を復元するため
       send(id, { t: "ack", done: true, lines, text: lines.join(" "), reveal });
       sendSpecInfo();
       if (!chainPending(g)) startTimer(g.timers.morning, toSettle);   // 全員が使い終わったら、通常の朝の長さに戻す
@@ -851,7 +1397,7 @@ window.ONW = window.ONW || {};
       else if (g.spectators.includes(id) && g.players.filter((q) => !q.isCpu).length < 20) {   // 観戦者がルームに入る
         g.spectators = g.spectators.filter((x) => x !== id);
         const wasSpec = (g.specRoster || []).some((x) => x.id === id);   // ロビーで観戦ONだった人は観戦のまま戻る
-        const full = g.players.filter((q) => !q.isCpu && !q.spectate).length >= 10;
+        const full = occupied(g) >= g.villageSize;
         g.players.push({ id, name: g.specNames[id] || "名無し", isCpu: false, status: "waiting", spectate: wasSpec || full });
         broadcastLobby();
       }
@@ -861,11 +1407,11 @@ window.ONW = window.ONW || {};
       if (text && byId(id) && !isDead(id)) pushChat(byId(id).name, text, "chat");   // 死亡者・観戦者は議論に書き込めない
     }
     if (d.t === "ghost" && g.inGame && g.phase !== PH().ONLINE_RESULT) {   // 霊界チャット: 観戦者と昼中に死亡した人だけが読み書きできる
-      const spec = g.spectators.includes(id) || (id === "host" && g.hostSpec);
+      const spec = g.spectators.includes(id) || (id === HS() && g.hostSpec);
       if (!spec && !isDead(id)) return;
       const text = String(d.text || "").trim().slice(0, 100);
       if (!text) return;
-      g.ghostLog.push({ name: ghostNameOf(id), text, kind: "chat" });
+      g.ghostLog.push({ name: ghostNameOf(id), text, kind: "chat", at: Date.now() });
       sendGhost();
     }
     if (d.t === "co" && g.phase === PH().ONLINE_DAY && byId(id) && !isDead(id)) {
@@ -946,7 +1492,8 @@ window.ONW = window.ONW || {};
       }),
     };
     g.players.forEach((p) => { if (!p.isCpu) p.status = "result"; });   // 戻るまで「結果確認中」
-    sendAll({ t: "result", result });
+    g.resultObj = result;   // 再入室した人にも同じ結果を送るため
+    sendAll({ t: "result", result, ghost: g.ghostLog || [] });   // 霊界チャットも結果画面では全員が読める
     sendSpec({ t: "result", result });
   }
 

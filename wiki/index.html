@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全役職 | ワンナイト人狼ガイド 〜混沌に潜みし狼達〜</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/wiki.css">
+</head>
+<body>
+
+  <div class="moon-glow" aria-hidden="true"></div>
+
+  <header class="onw-header">
+    <h1 class="onw-header__title">
+      <span class="onw-header__title-sub">ONE NIGHT WEREWOLF GUIDE</span>
+      全役職
+    </h1>
+    <div class="onw-header__day" id="role-count">―件</div>
+  </header>
+
+  <main class="onw-app">
+    <section class="panel wiki-controls">
+      <input
+        id="search-input"
+        class="wiki-search"
+        type="search"
+        placeholder="キーワードで検索（例: 人狼、占い、てるてる坊主 …）"
+        autocomplete="off"
+      >
+      <div class="wiki-sort-row wiki-scope-row">
+        <span class="wiki-sort-label">検索対象:</span>
+        <div class="wiki-filter-row" id="search-scope"></div>
+      </div>
+      <div class="wiki-controls-toggle-row">
+        <button
+          id="sort-panel-toggle"
+          class="wiki-controls-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="sort-panel"
+        >並び替え ▼</button>
+        <button
+          id="filter-panel-toggle"
+          class="wiki-controls-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="filter-panel"
+        >絞り込み ▼</button>
+      </div>
+
+      <div id="sort-panel" hidden>
+        <div class="wiki-sort-row">
+          <span class="wiki-sort-label">並び順:</span>
+          <div class="wiki-filter-row" id="sort-toggle"></div>
+        </div>
+      </div>
+      <div id="filter-panel" hidden>
+        <div class="wiki-sort-row">
+          <span class="wiki-sort-label">対象:</span>
+          <div class="wiki-filter-row" id="web-filter"></div>
+        </div>
+        <p class="wiki-filter-note" id="web-filter-note"></p>
+        <div class="wiki-filter-row" id="team-filters"></div>
+      </div>
+    </section>
+
+    <section id="wiki-list" class="wiki-list"></section>
+    <p id="empty-state" class="wiki-empty" hidden>該当する役職が見つかりませんでした。</p>
+  </main>
+
+  <footer class="onw-footer">
+    <span>元データ: アップロードされた Minecraft アドオン(scripts/state.js) より転記</span>
+  </footer>
+
+  <script src="js/wiki-data.js"></script>
+  <script src="js/web-roles.js"></script>
+  <script src="js/wiki.js"></script>
+</body>
+</html>

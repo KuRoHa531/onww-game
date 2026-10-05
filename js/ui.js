@@ -66,14 +66,15 @@ window.ONW = window.ONW || {};
 
     const P = ONW.PHASE;
     const hostWatching = game.hostSpec && game.inGame && ONW.net.isHost && [P.ONLINE_ROLE, P.ONLINE_NIGHT, P.ONLINE_MORNING, P.ONLINE_DAY, P.ONLINE_VOTE].includes(game.phase);
-    let html = hostWatching ? ui.renderHostSpectate(game) : renderer ? renderer(game) : "<p>未知のフェーズです。</p>";
-    if (hostWatching || [P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_SPECTATE].includes(game.phase)) {
+    const specDeal = ui.isSpecDeal(game);   // 観戦者・観戦ホストにも配布の演出を見せる
+    let html = specDeal ? ui.renderSpecDeal(game) : hostWatching ? ui.renderHostSpectate(game) : renderer ? renderer(game) : "<p>未知のフェーズです。</p>";
+    if (!specDeal && (hostWatching || [P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_SPECTATE].includes(game.phase))) {
       const coBtn = (!hostWatching && game.phase === P.ONLINE_DAY)
         ? `<div id="co-panel"></div><div class="co-bar"><button class="btn" onclick="ONW.ui.openInfo()">情報確認</button> <button class="btn" onclick="ONW.co.open()">COボタン</button> <button class="btn" onclick="ONW.ui.useAbility('day')">昼能力</button> <button class="btn" onclick="ONW.ui.useAbility('night')">夜能力</button></div>` : "";
       html += `<div class="co-dock">${coBtn}<div id="co-board" class="co-board"></div></div>`;
     }
     // 議論・投票・観戦中は画面を縦に固定し、チャット本文だけをスクロールさせる
-    document.body.classList.toggle("chat-mode", !!(hostWatching || [P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_SPECTATE].includes(game.phase)));
+    document.body.classList.toggle("chat-mode", !specDeal && !!(hostWatching || [P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_SPECTATE].includes(game.phase)));
     // 設定の＋／−などで再描画しても、画面のスクロール位置がずれないようにする（同じ画面の再描画のときだけ）
     const keepY = ui._lastPhase === game.phase ? (window.scrollY || 0) : 0;
     const mp = document.querySelector(".settings-panel--modal"), keepM = mp ? mp.scrollTop : 0;   // 設定ウィンドウの中のスクロール位置も保つ
@@ -81,7 +82,7 @@ window.ONW = window.ONW || {};
     if (keepY) window.scrollTo(0, keepY);
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
-    if (game.phase === ONW.PHASE.ONLINE_ROLE) ui.setupDeal();
+    if (game.phase === ONW.PHASE.ONLINE_ROLE || ui.isSpecDeal(game)) ui.setupDeal();
     if (ONW.accountUi && ONW.accountUi.updateFixed) ONW.accountUi.updateFixed();
     ui.updateBoard();
     ui.updateSpecInfo();
@@ -119,20 +120,22 @@ window.ONW = window.ONW || {};
         <div class="field-row"><label>あなたの名前</label>
           <input id="in-name" class="onw-input" maxlength="12" value="${esc(nm)}"></div>
         <div class="field-row"><label>部屋コード</label>
-          <input id="in-code" class="onw-input" maxlength="4" placeholder="ABCD" style="text-transform:uppercase;" value="${esc(d.code)}" onkeydown="if(event.key==='Enter')ONW.main.joinRoom()"></div>
+          <input id="in-code" class="onw-input" maxlength="4" style="text-transform:uppercase;" value="${esc(d.code)}" onkeydown="if(event.key==='Enter')ONW.main.joinRoom()"></div>
         <div class="title-btns">
           <button class="btn btn--primary btn--wide" onclick="ONW.main.joinRoom()">ルーム参加</button>
           <button class="btn btn--wide" onclick="ONW.main.titleBack()">戻る</button>
         </div>
       </section>`;
+    const ri = ONW.net && ONW.net.rejoinInfo;
+    const rejoinBox = ri ? `<div class="rejoin-box"><p class="lede">参加中のルームがあります（コード ${esc(ri.code)}）</p><button class="btn btn--primary btn--wide" onclick="ONW.main.rejoin()">ルームに戻る</button></div>` : "";
     return `
       ${ONW.accountUi ? ONW.accountUi.bar() : ""}
       <section class="panel title-menu">
         ${err}
+        ${rejoinBox}
         <div class="title-btns">
           <button class="btn btn--primary btn--wide" onclick="ONW.main.titleStep('create')">ルーム作成</button>
           <button class="btn btn--primary btn--wide" onclick="ONW.main.titleStep('join')">ルーム参加</button>
-          <a class="btn btn--wide" href="https://kuroha531.github.io/ONWW-wiki/" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;box-sizing:border-box;">役職辞典</a>
         </div>
       </section>`;
   };
@@ -163,7 +166,7 @@ window.ONW = window.ONW || {};
 
   // ---- ルーム設定パネル（「ルーム設定」を押すと出る）----
   function settingsPanel(game, isHost, total) {
-    const c = game.roleCounts, need = total + game.graveCount, have = Object.values(c).reduce((a, b) => a + b, 0);
+    const c = game.roleCounts, need = game.villageSize + game.graveCount, have = Object.values(c).reduce((a, b) => a + b, 0);
     const row = (label, value, minus, plus) => `
       <div class="field-row"><label>${label}</label>
         ${isHost ? `<div class="stepper"><button onclick="${minus}">−</button><span>${value}</span><button onclick="${plus}">＋</button></div>` : `<span>${value}</span>`}
@@ -242,11 +245,13 @@ window.ONW = window.ONW || {};
       <div class="settings-panel settings-panel--modal">
         <h2>ルーム設定</h2>
         <p class="night-step__hint">${isHost ? "変更したルールは自動で保存され、次回のルーム作成時に復元されます。" : "ホストが設定を変更できます。"}</p>
-        ${sec("secPeople", "人数設定", `墓地${game.graveCount}枚 / CPU${game.cpuCount}人`, `
+        ${sec("secPeople", "人数設定", `${game.villageSize}人村 / 墓地${game.graveCount}枚 / CPU${game.cpuCount}人`, `
+          ${row("何人村", game.villageSize, "ONW.net.changeSetting('villageSize',-1)", "ONW.net.changeSetting('villageSize',1)")}
+          <p class="night-step__hint">参加者（CPUも含む）が${game.villageSize}人まで入れます。定員を超えて入った人は観戦側になります。</p>
           ${row("墓地の枚数", game.graveCount, "ONW.net.changeSetting('graveCount',-1)", "ONW.net.changeSetting('graveCount',1)")}
           ${row("CPU人数", game.cpuCount, "ONW.net.changeSetting('cpuCount',-1)", "ONW.net.changeSetting('cpuCount',1)")}`)}
         ${sec("secRoles", "配役設定", `${have}/${need}枚`, `
-          <p class="night-step__hint">必要枚数: ${need}枚（参加${total}人+墓地${game.graveCount}枚） / 現在 ${have}枚</p>
+          <p class="night-step__hint">必要枚数: ${need}枚（${game.villageSize}人村+墓地${game.graveCount}枚） / 現在 ${have}枚</p>
           ${roles}`)}
         ${sec("secTimer", "タイマー設定", `夜${game.timers.night}秒・昼${game.timers.day}秒`, timers)}
         ${sec("secAdv", "詳細設定", "", `
@@ -274,15 +279,15 @@ window.ONW = window.ONW || {};
   }
 
   // ---- ルーム（ロビー）----
-  const STATUS = { host: ["ホスト", "st-host"], waiting: ["準備中", "st-wait"], ready: ["準備完了", "st-ready"], result: ["結果確認中", "st-result"], playing: ["試合中", "st-wait"] };
+  const STATUS = { host: ["ホスト", "st-host"], waiting: ["準備中", "st-wait"], ready: ["準備完了", "st-ready"], result: ["結果確認中", "st-result"], playing: ["試合中", "st-wait"], offline: ["接続切れ", "st-wait"] };
   ui.renderLobby = function renderLobby(game) {
     const all = game.lobbyPlayers || [], isHost = ONW.net.isHost;
     const players = all.filter((p) => !p.spec), specs = all.filter((p) => p.spec);   // 観戦ONの人は参加者の下へ
     const total = players.length + (game.cpuCount || 0);
-    const need = total + game.graveCount, have = Object.values(game.roleCounts).reduce((a, b) => a + b, 0);
+    const size = game.villageSize || 4, need = size + game.graveCount, have = Object.values(game.roleCounts).reduce((a, b) => a + b, 0);
     const guests = players.filter((p) => p.status !== "host");
     const allReady = guests.every((p) => p.status === "ready");
-    const ok = total >= 3 && have === need && allReady;
+    const ok = total === size && have === need && allReady;
     const me = all[game.meIndex] || {};
     const badge = (st) => { const [t, cls] = STATUS[st] || STATUS.waiting; return `<span class="st ${cls}">${t}</span>`; };
     // 名前の左にアイコン（画像があれば画像、無ければ頭文字の丸）。画像のある他人には小さな通報ボタン
@@ -290,16 +295,16 @@ window.ONW = window.ONW || {};
     const plName = (p) => `<span class="pl">${ONW.profile.link(p.uid, p.name, `${A.avatarHtml(p.name, { uid: p.uid, v: p.av }, "av--sm")}<span>${esc(p.name)}</span>`)}${myUid && p.uid && p.av && p.uid !== myUid ? `<button class="rep-btn" title="アイコンを通報" onclick="ONW.friends.report('${esc(p.uid)}')">⚑</button>` : ""}</span>`;
     const canInvite = isHost && !!(A && A.user);
     let hint = "";
-    if (isHost) hint = total < 3 ? "参加者（CPU含む）が3人以上必要です。" : have !== need ? `配役の枚数が合っていません（必要${need}枚 / 現在${have}枚）。` : !allReady ? "全員が「準備完了」になると開始できます。" : "開始できます。";
-    else if (me.spec) hint = "観戦で参加します。ホストの開始を待っています…";
+    if (isHost) hint = total < size ? `あと${size - total}人必要です（CPUを増やして補えます）。` : have !== need ? `配役の枚数が合っていません（必要${need}枚 / 現在${have}枚）。` : !allReady ? "全員が「準備完了」になると開始できます。" : "開始できます。";
+    else if (me.spec) hint = total >= size ? "満員のため観戦で入りました。空きが出たら「観戦 OFF」で参加できます。" : "観戦で参加します。ホストの開始を待っています…";
     else hint = me.status === "ready" ? "準備完了です。ホストの開始を待っています…" : "準備ができたら「準備完了」を押してください。";
-    const summary = `${total}人 / 墓地${game.graveCount}枚 / 夜${game.timers.night}秒・議論${game.timers.day}秒・投票${game.timers.vote}秒`;
+    const summary = `${size}人村 / 墓地${game.graveCount}枚 / 夜${game.timers.night}秒・議論${game.timers.day}秒・投票${game.timers.vote}秒`;
     return `
       <section class="panel night-step">
         <p class="lede">部屋コード（友達に教えてください）</p>
         <div class="night-step__role" style="letter-spacing:.3em;">${ONW.net.code}</div>
-        <h2>参加者 ${players.length}/10</h2>
-        ${players.map((p) => `<div class="result-role">${plName(p)}${badge(p.status)}</div>`).join("")}
+        <h2>参加者 ${total}/${size}</h2>
+        ${players.map((p) => `<div class="result-role">${plName(p)}<span>${isHost && p.status !== "host" && p.status !== "offline" ? `<button class="btn tf-chip" onclick="ONW.ui.confirmTransfer(${all.indexOf(p)})">ホスト譲渡</button> ` : ""}${badge(p.status)}</span></div>`).join("")}
         ${Array.from({ length: game.cpuCount || 0 }, (_, i) => `<div class="result-role"><span>${esc((game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`).join("")}
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2>${specs.map((p) => `<div class="result-role">${plName(p)}<span class="st st-spec">観戦</span></div>`).join("")}` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
@@ -319,23 +324,26 @@ window.ONW = window.ONW || {};
   };
 
   /** 霊界チャット（観戦者・昼中に死亡した人）: 「議論」「霊界」の切り替えと入力欄 */
-  ui.canGhost = () => !!(ONW.net && ONW.net.canGhost && ONW.net.canGhost());
-  ui.setChatTab = function (t) { ONW.game.chatTab = t === "ghost" ? "ghost" : "main"; ui.render(ONW.game); };
-  ui.chatTabs = function (game) {
-    if (!ui.canGhost()) return "";
-    const ghost = game.chatTab === "ghost";
-    return `<div class="chat-tabs"><button class="chat-tab ${ghost ? "" : "on"}" onclick="ONW.ui.setChatTab('main')">議論</button><button class="chat-tab chat-tab--ghost ${ghost ? "on" : ""}" onclick="ONW.ui.setChatTab('ghost')">👻 霊界</button></div>`;
+  /** ロビー: ホスト譲渡（確認ダイアログ → 部屋設定ごと相手へ引き継ぐ） */
+  ui.confirmTransfer = function (idx) {
+    const p = (ONW.game.lobbyPlayers || [])[idx];
+    if (!p || !ONW.net.isHost) return;
+    if (confirm(`ホストを「${p.name}」さんに譲渡しますか？\n部屋の設定はそのまま引き継がれます。`)) ONW.net.transferHost(idx);
   };
-  /** 霊界タブのときだけ出す入力欄（観戦者・死亡者向け） */
+
+  ui.canGhost = () => !!(ONW.net && ONW.net.canGhost && ONW.net.canGhost());
+  /** マイクラ版と同じく、議論と霊界のタブ分けはしない（霊界の発言は見える人にだけ同じ欄に流れる） */
+  ui.chatTabs = function () { return ""; };
+  /** 観戦者・死亡者向けの入力欄（送信すると自動で霊界チャットになる） */
   ui.ghostInput = function (game) {
-    if (!ui.canGhost() || game.chatTab !== "ghost") return "";
-    return `<div class="chat-input"><input id="chat-in" class="onw-input" maxlength="100" placeholder="霊界チャット（観戦者と死亡した人だけに届きます）" ${ui.isPc() ? "" : "readonly"} onclick="ONW.ui.openChat()" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onclick="ONW.co.sendChat()">送信</button></div>`;
+    if (!ui.canGhost()) return "";
+    return `<div class="chat-input"><input id="chat-in" class="onw-input" maxlength="100" placeholder="発言（霊界チャット: 観戦者と死亡者にだけ届きます）" ${ui.isPc() ? "" : "readonly"} onclick="ONW.ui.openChat()" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onclick="ONW.co.sendChat()">送信</button></div>`;
   };
   ui.renderSpectate = function renderSpectate(game) {
     return `
       <section class="panel">
         <h2>観戦中</h2>
-        <p class="lede">全員の役職と行動が見えます。霊界チャットで観戦者同士・死亡した人と話せます。</p>
+        <p class="lede">全員の役職と行動が見えます。発言は霊界チャットになり、観戦者と死亡した人にだけ届きます。</p>
         <div id="spec-info" class="spec-info"></div>
         ${ui.chatTabs(game)}
         <div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>
@@ -359,26 +367,55 @@ window.ONW = window.ONW || {};
 
   // ---- 観戦者向け: 全員の役職・夜の行動・投票 ----
   ui.toggleSpecInfo = function () { const g = ONW.game; g.specInfoOpen = g.specInfoOpen === false; const el = document.getElementById("spec-info"); if (el) el.__html = null; ui.updateSpecInfo(); };
+  /**
+   * 観戦者の「夜ログ」: ヘッダーの1行だけが場所を取り、中身は背景半透明で上に重ねる（チャットの位置が動かない）。
+   * 役職の一覧はここには出さない（役職の変化は、テーブルのカードを押すと見られる → ui.showRoleHistory）
+   */
   ui.updateSpecInfo = function () {
     const el = document.getElementById("spec-info");
     if (!el) return;
     const g = ONW.game, info = g.specInfo, open = g.specInfoOpen !== false;
-    if (!info) { if (el.__html !== "") { el.__html = ""; el.innerHTML = ""; } return; }
-    const tcls = (r) => "t-" + ONW.roles.getInfo(r).team;
-    const rl = (r) => `<span class="${tcls(r)}">${esc(ONW.roles.getInfo(r).name)}</span>`;
-    const chain = (o) => [o.from ? rl(o.from) : "", rl(o.ini), o.cur && o.cur !== o.ini ? rl(o.cur) : ""].filter(Boolean).join(' <span class="rs-dim">→</span> ');
     const row = (l, r) => `<div class="si-row"><span class="si-l">${l}</span><span class="si-r">${r}</span></div>`;
-    const roles = info.players.map((p) => row(`${esc(p.name)}${p.cpu ? '<small class="cb-cpu">CPU</small>' : ""}${p.dead ? " 💀" : ""}`, chain(p))).join("");
-    const grave = info.center.map((c, i) => row(`墓地${i + 1}`, chain(c))).join("");
-    const live = info.night && info.sels.length ? `<div class="si-h">夜の選択（朝に実行）</div>${info.sels.map((x) => row(`${esc(x.name)} <small class="rs-dim">${esc(ONW.roles.getInfo(x.role).name)}</small>`, esc(x.text))).join("")}` : "";
-    const votes = info.vote ? `<div class="si-h">投票状況（変更あり）</div>${info.votes.map((v) => row(esc(v.from), v.to ? `→ <strong>${esc(v.to)}</strong>` : '<span class="rs-dim">未投票</span>')).join("")}` : "";
-    const log = info.log.length ? `<div class="si-h">夜の行動ログ</div>${info.log.map((t) => `<div class="si-log">${esc(t)}</div>`).join("")}` : "";
-    const html = `<div class="night-info__head"><span>全員の役職・行動</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
-      (open ? `<div class="si-body"><div class="si-h">役職（配られた役職 → 夜の後）</div>${roles}${grave}${live}${votes}${log}</div>` : "");
+    let body = "";
+    if (info) {
+      const live = info.night && info.sels.length ? `<div class="si-h">夜の選択（朝に実行）</div>${info.sels.map((x) => row(`${esc(x.name)} <small class="rs-dim">${esc(ONW.roles.getInfo(x.role).name)}</small>`, esc(x.text))).join("")}` : "";
+      const votes = info.vote ? `<div class="si-h">投票状況（変更あり）</div>${info.votes.map((v) => row(esc(v.from), v.to ? `→ <strong>${esc(v.to)}</strong>` : '<span class="rs-dim">未投票</span>')).join("")}` : "";
+      const log = info.log.length ? `<div class="si-h">夜の行動ログ</div>${info.log.map((t) => `<div class="si-log">${esc(t)}</div>`).join("")}` : "";
+      body = live + votes + log || `<div class="si-log">まだ記録はありません。</div>`;
+    }
+    const html = `<div class="night-info__head"><span>夜ログ</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
+      (open && info ? `<div class="si-body">${body}</div>` : "");
     if (el.__html === html) return;
     const old = el.querySelector(".si-body"), top = old ? old.scrollTop : 0;
     el.__html = html; el.innerHTML = html;
     const nb = el.querySelector(".si-body"); if (nb) nb.scrollTop = top;
+  };
+
+  /** 観戦者がテーブルのカードを押したとき: そのカードの役職が どう変わってきたか を重ねて表示する */
+  ui.closeRoleHistory = function () { const w = document.getElementById("rh-overlay"); if (w) w.remove(); };
+  ui.showRoleHistory = function (k) {
+    const g = ONW.game, info = g.specInfo;
+    if (!info) return;
+    const isP = k.startsWith("p:"), id = k.slice(2);
+    const o = isP ? info.players.find((p) => String(p.id) === id) : info.center[+id];
+    if (!o) return;
+    const name = isP ? o.name : `墓地${+id + 1}`;
+    const rl = (r) => `<span class="t-${ONW.roles.getInfo(r).team}">${esc(ONW.roles.getInfo(r).name)}</span>`;
+    const step = (label, html) => `<div class="rh-step"><span class="rh-l">${label}</span><span class="rh-r">${html}</span></div>`;
+    const steps = [];
+    if (o.from) steps.push(step("変化前", rl(o.from)));
+    steps.push(step(o.from ? "変化後（配られた役職）" : "配られた役職", rl(o.ini)));
+    if (!o.cur) steps.push(step("夜の後", '<span class="rs-dim">夜はまだ明けていません</span>'));
+    else if (o.cur === o.ini) steps.push(step("夜の後", `${rl(o.cur)} <span class="rs-dim">（変化なし）</span>`));
+    else steps.push(step("夜の後", rl(o.cur)));
+    ui.closeRoleHistory();
+    const w = document.createElement("div");
+    w.id = "rh-overlay";
+    w.onclick = (e) => { if (e.target === w) ui.closeRoleHistory(); };
+    w.innerHTML = `<div class="rh-box" role="dialog" aria-modal="true">
+      <div class="rh-head"><span>${esc(name)}${isP && o.cpu ? '<small class="cb-cpu">CPU</small>' : ""}${isP && o.dead ? " 💀" : ""}</span><button class="btn" onclick="ONW.ui.closeRoleHistory()">閉じる</button></div>
+      <div class="rh-sub">役職の変化</div>${steps.join("")}</div>`;
+    document.body.appendChild(w);
   };
 
   /**
@@ -483,16 +520,69 @@ window.ONW = window.ONW || {};
         </div>
       </section>`;
   };
-  /** 山札から各スロットへ飛ぶ軌道（--dx/--dy）を実測して入れる */
+  /** 観戦者（観戦ONのホスト含む）が配布の演出を見る時間か */
+  ui.isSpecDeal = function (game) {
+    const P = ONW.PHASE;
+    if (game.phase === P.ONLINE_SPECTATE && game.isSpectator) return game.specPhase === P.ONLINE_ROLE;
+    return !!(game.hostSpec && game.inGame && ONW.net.isHost && game.phase === P.ONLINE_ROLE);
+  };
+  /** 観戦者向けの配布演出: 全員と墓地のカードが山札から配られ、順に表になる（役職は全部見える） */
+  ui.renderSpecDeal = function (game) {
+    const info = game.specInfo;
+    const list = info ? info.players : ((game.isSpectator ? game.boardView : game.players) || []);
+    const graves = info ? info.center : [];
+    const N = list.length, G = graves.length;
+    const elapsed = game.dealStart ? (Date.now() - game.dealStart) / 1000 : 99;
+    const D = (t) => `animation-delay:${(t - elapsed).toFixed(2)}s;`;
+    const t0 = 0.4, gStep = 0.3, pStep = 0.28;
+    const pStart = t0 + gStep * G + 0.2;
+    const flip1 = pStart + pStep * N + 0.5 + 0.4, flip2 = flip1 + 1.6;
+    const card = (o, fly) => {
+      if (!o || !o.ini) return `<div class="dl-card dl-fly" data-fly style="${D(fly)}"></div>`;
+      const a = o.from || o.ini, ia = ONW.roles.getInfo(a), ib = ONW.roles.getInfo(o.ini);
+      return `<div class="dl-card dl-fly" data-fly style="${D(fly)}"><div class="dl-flipper" style="${D(flip1)}">
+        <div class="dl-face dl-face--a dl-team-${ia.team}" style="${o.from ? D(flip2 - 0.2) : ""}"><b>${esc(ia.name)}</b></div>
+        ${o.from ? `<div class="dl-face dl-face--b dl-team-${ib.team}" style="${D(flip2)}"><b>${esc(ib.name)}</b></div>` : ""}
+      </div></div>`;
+    };
+    const gHtml = Array.from({ length: G }, (_, i) => `<div class="dl-slot">${card(graves[i], t0 + gStep * i)}<span class="dl-name">墓地${i + 1}</span></div>`).join("");
+    const pHtml = list.map((p, i) => `
+      <div class="dl-player">
+        <div class="dl-icon">${ONW.account.avatarHtml(p.name, null, "av--fill")}</div>
+        <div class="dl-slot">${card(p, pStart + pStep * i)}</div>
+        <span class="dl-name">${esc(p.name)}</span>
+      </div>`).join("");
+    return `
+      <section class="panel night-step deal-stage dl-spec" data-deal>
+        <p class="lede">役職を配っています…（観戦中は全員の役職が見えます）</p>
+        <div class="dl-deck"><div class="dl-card dl-deck-card"></div><div class="dl-card dl-deck-card"></div><div class="dl-card dl-deck-card"></div></div>
+        ${G ? `<div class="dl-row dl-graves">${gHtml}</div>` : ""}
+        <div class="dl-row dl-players">${pHtml}</div>
+        <div class="btn-row">${game.isSpectator ? `<button class="btn" onclick="ONW.main.goToTitle()">退出</button>` : ""}</div>
+      </section>`;
+  };
+
+  /** 山札から各スロットへ飛ぶ軌道（--dx/--dy）を実測して入れる。
+   *  ・出発点は山札の「いちばん上のカード」（手前に見えている1枚）
+   *  ・配る順が早いカードほど手前（z-index が大きい）にして、山札の上から順に1枚ずつ取って配っているように見せる */
   ui.setupDeal = function () {
     const root = document.querySelector("[data-deal]");
     if (!root) return;
-    const deck = root.querySelector(".dl-deck-card").getBoundingClientRect();
-    root.querySelectorAll("[data-fly]").forEach((el) => {
+    const stack = root.querySelectorAll(".dl-deck-card");
+    const top = stack[stack.length - 1];
+    const deck = top.getBoundingClientRect(), cs = getComputedStyle(top);
+    const fly = Array.from(root.querySelectorAll("[data-fly]"));
+    fly.forEach((el) => {
       const r = el.getBoundingClientRect();
       el.style.setProperty("--dx", `${deck.left + deck.width / 2 - (r.left + r.width / 2)}px`);
       el.style.setProperty("--dy", `${deck.top + deck.height / 2 - (r.top + r.height / 2)}px`);
+      el.style.setProperty("--dw", `${top.offsetWidth}px`);
+      el.style.setProperty("--dh", `${top.offsetHeight}px`);
+      el.style.setProperty("--df", cs.fontSize);
     });
+    fly.map((el, i) => ({ el, i, t: parseFloat(el.style.animationDelay) || 0 }))
+      .sort((a, b) => (a.t - b.t) || (a.i - b.i))
+      .forEach((x, rank) => { x.el.style.zIndex = String(500 - rank); });
     root.classList.add("go");
   };
 
@@ -537,14 +627,17 @@ window.ONW = window.ONW || {};
   ui.useAbility = function (kind) { /* kind: "day" | "night" — 未実装 */ };
 
   // ---- チャット ----
-  function chatHtml(game, forceMain) {
-    const ghost = !forceMain && ui.canGhost() && game.chatTab === "ghost";   // 霊界タブ
-    const lines = (ghost ? (game.ghostLog || []) : (game.chatLog || [])).map((c) => c.kind === "sys"
+  function chatHtml(game) {
+    // 観戦者・死亡者には、議論と霊界の発言が時刻順に1本で流れる。生存者には議論だけ（霊界の発言は届かない）
+    const src = ui.canGhost() ? mergedChat(game) : (game.chatLog || []);
+    const lines = src.map((c) => c.ghost
+      ? `<div class="chat-line chat-ghost"><span class="chat-ghost__tag">【霊界】</span><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`
+      : c.kind === "sys"
       ? `<div class="chat-line chat-sys">${esc(c.text)}</div>`
       : c.kind === "co"
       ? `<div class="chat-line chat-co">${esc(c.text)}</div>`
       : `<div class="chat-line"><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`).join("");
-    return lines || `<div class="chat-line chat-empty">${ghost ? "霊界チャットはまだ静かです。" : "まだ発言はありません。"}</div>`;
+    return lines || `<div class="chat-line chat-empty">まだ発言はありません。</div>`;
   }
   /** ヘッダーのフェーズ名に残り時間を出す */
   ui.updateTimer = function () {
@@ -634,10 +727,10 @@ window.ONW = window.ONW || {};
   ui.openChat = function () {
     if (document.getElementById("chat-overlay")) return;
     if (ui.isPc()) return;   // PC版はチャット欄が最初から大きいので、全画面にしない
-    const g = ONW.game, day = g.phase === ONW.PHASE.ONLINE_DAY, canGhost = ui.canGhost(), canSend = canGhost ? g.chatTab === "ghost" : (day && !g.isSpectator);   // 観戦者・死亡者は霊界タブでだけ書ける
+    const g = ONW.game, day = g.phase === ONW.PHASE.ONLINE_DAY, canGhost = ui.canGhost(), canSend = canGhost || (day && !g.isSpectator);   // 観戦者・死亡者はいつでも書ける（霊界チャットになる）
     const wrap = document.createElement("div");
     wrap.id = "chat-overlay";
-    wrap.innerHTML = `<div class="co-head"><span>${canGhost && g.chatTab === "ghost" ? "👻 霊界チャット" : "チャット"}</span><button class="btn" onclick="ONW.ui.closeChat()">閉じる</button></div>
+    wrap.innerHTML = `<div class="co-head"><span>チャット</span><button class="btn" onclick="ONW.ui.closeChat()">閉じる</button></div>
       <div id="chat-log-big" class="chat-log chat-log--big"></div>
       ${canSend ? `<div class="chat-input"><input id="chat-in-big" class="onw-input" maxlength="100" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" ontouchend="event.preventDefault();ONW.co.sendChat()" onclick="ONW.co.sendChat()">送信</button></div>` : ""}`;
     document.body.appendChild(wrap);
@@ -732,7 +825,7 @@ window.ONW = window.ONW || {};
     return `
       <section class="panel">
         <h2>議論タイム</h2>
-        <p class="lede">${game.isDead ? "あなたは死亡しました。議論には書き込めません。霊界タブで観戦者と話せます。" : "誰が人狼か話し合いましょう。"}</p>
+        <p class="lede">${game.isDead ? "あなたは死亡しました。発言は霊界チャットになり、死亡者と観戦者にだけ届きます。" : "誰が人狼か話し合いましょう。"}</p>
         ${ui.chatTabs(game)}
         <div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>
         ${game.isDead ? ui.ghostInput(game) : `<div class="chat-input">
@@ -759,13 +852,24 @@ window.ONW = window.ONW || {};
   // ---- 最終結果（マイクラ版の並び）----
   /** 最終結果の「チャットを見る」: 画面の上に重ねて表示（position:fixed なので結果画面はずれない）。保存ボタンはここを開いている間だけ出る */
   ui.closeResultChat = function () { const w = document.getElementById("rchat-overlay"); if (w) w.remove(); };
+  /** 議論と霊界チャットを発言の時刻順に1本へまとめる（霊界の発言には ghost: true が付く） */
+  const mergedChat = (g) => {
+    const a = (g.chatLog || []).map((c, n) => ({ ...c, _o: n })), b = (g.ghostLog || []).map((c, n) => ({ ...c, ghost: true, _o: n }));
+    return [...a, ...b].sort((x, y) => ((x.at || 0) - (y.at || 0)) || (x.ghost ? 1 : 0) - (y.ghost ? 1 : 0) || x._o - y._o);
+  };
   ui.openResultChat = function () {
     if (document.getElementById("rchat-overlay")) return;
+    // 結果画面では、霊界チャットも含めて全員が読める。場所は分けず、発言順に並べる（霊界の発言は 👻 付き）
+    const lines = mergedChat(ONW.game).map((c) => c.ghost
+      ? `<div class="chat-line chat-ghost"><span class="chat-ghost__tag">👻</span><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`
+      : c.kind === "sys" ? `<div class="chat-line chat-sys">${esc(c.text)}</div>`
+      : c.kind === "co" ? `<div class="chat-line chat-co">${esc(c.text)}</div>`
+      : `<div class="chat-line"><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`).join("");
     const wrap = document.createElement("div");
     wrap.id = "rchat-overlay";
     wrap.innerHTML = `<div class="rchat-box" role="dialog" aria-modal="true">
       <div class="rchat-head"><span>試合のチャット</span><span class="rchat-btns"><button class="btn" onclick="ONW.ui.saveResultChat()">保存</button><button class="btn" onclick="ONW.ui.closeResultChat()">閉じる</button></span></div>
-      <div class="chat-log result-chat rchat-log">${chatHtml(ONW.game, true)}</div></div>`;
+      <div class="chat-log result-chat rchat-log">${lines || '<div class="chat-line chat-empty">まだ発言はありません。</div>'}</div></div>`;
     document.body.appendChild(wrap);
     const log = wrap.querySelector(".rchat-log"); if (log) log.scrollTop = log.scrollHeight;
   };
@@ -773,7 +877,7 @@ window.ONW = window.ONW || {};
   ui.saveResultChat = function () {
     const g = ONW.game, d = new Date(), z = (n) => String(n).padStart(2, "0");
     const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
-    const lines = (g.chatLog || []).map((c) => (c.kind === "sys" || c.kind === "co" ? c.text : `${c.name}: ${c.text}`));
+    const lines = mergedChat(g).map((c) => (c.ghost ? `[霊界] ${c.name}: ${c.text}` : c.kind === "sys" || c.kind === "co" ? c.text : `${c.name}: ${c.text}`));
     const head = [`ワンナイト人狼 チャット履歴`, `保存日時: ${d.getFullYear()}/${z(d.getMonth() + 1)}/${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`, g.result && g.result.title ? `結果: ${g.result.title}` : "", "----------------------------------------"].filter((x, i) => x || i !== 2);
     const blob = new Blob(["\uFEFF" + head.concat(lines.length ? lines : ["（発言はありませんでした）"]).join("\r\n") + "\r\n"], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
@@ -800,7 +904,6 @@ window.ONW = window.ONW || {};
         ${res.votes.map((v) => L(`${esc(v.from)} <span class="rs-dim">→</span> ${v.to ? `<span class="rs-vote">${esc(v.to)}</span><span class="rs-dim">(1)</span>` : `<span class="rs-dim">未投票</span>`}`)).join("")}
         ${sep}${H("得票数")}
         ${res.counts.length ? res.counts.map((c) => L(`${esc(c.name)} <span class="rs-dim">:</span> <span class="rs-vote">${c.c}票</span>`)).join("") : none("得票はありません。")}
-        ${res.promoted.length ? `${sep}${L(`<span class="rs-dim">[狂人昇格] 今回は</span> ${res.promoted.map(esc).join("、")} <span class="rs-dim">が人狼判定になっていました。</span>`)}` : ""}
         ${sep}
         <div class="rs-win t-${winTeam}">${esc(res.title)}</div>
         ${L(`<span class="rs-dim">${esc(res.detail)}</span>`)}
@@ -814,14 +917,18 @@ window.ONW = window.ONW || {};
         ${none("欠け: なし")}
         ${sep}${H("夜行動結果")}
         ${res.nightLogs.length ? res.nightLogs.map((t) => L(esc(t))).join("") : none("夜行動ログはありません。")}
+        ${/* 【昇格情報】結果画面の一番下。今後「姫君 → 女王」などの昇格を足すときも、ここ（昇格情報）に1行ずつ並べる */ ""}
+        ${res.promoted.length ? `${sep}${H("昇格情報")}${L(`<span class="rs-dim">[狂人昇格] 今回は</span> ${res.promoted.map(esc).join("、")} <span class="rs-dim">が人狼判定になっていました。</span>`)}` : ""}
         ${sep}${H("試合のチャット")}
         <div class="btn-row"><button class="btn" onclick="ONW.ui.openResultChat()">チャットを見る</button></div>
+      </section>
+      <div class="res-dock">
         <div class="btn-row">
           <button class="btn" onclick="ONW.png.save(ONW.game.result)">PNGで保存</button>
           <button class="btn" onclick="ONW.main.goToTitle()">退出</button>
           <button class="btn btn--primary" onclick="ONW.net.returnToRoom()">${game.isSpectator ? "ルームに入る" : "ルームに戻る"}</button>
         </div>
-      </section>`;
+      </div>`;
   };
 
   // ---------------------------------------------------------

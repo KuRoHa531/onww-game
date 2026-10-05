@@ -20,7 +20,6 @@ window.ONW = window.ONW || {};
     sep(); head("得票数");
     if (res.counts.length) res.counts.forEach((c) => add(T(c.name), T(" : ", C.dim), T(`${c.c}票`, C.vote)));
     else add(T("得票はありません。", C.dim));
-    if (res.promoted.length) { sep(); add(T("[狂人昇格] 今回は ", C.dim), T(res.promoted.join("、")), T(" が人狼判定になっていました。", C.dim)); }
     sep();
     const wt = res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
     L.push({ segs: [{ t: res.title, c: wt, b: true }], big: true });
@@ -40,6 +39,8 @@ window.ONW = window.ONW || {};
     add(T("欠け: なし", C.dim));
     sep(); head("夜行動結果");
     if (res.nightLogs.length) res.nightLogs.forEach((t) => add(T(t))); else add(T("夜行動ログはありません。", C.dim));
+    // 【昇格情報】一番下。今後「姫君 → 女王」などの昇格を足すときも、ここ（昇格情報）に1行ずつ並べる
+    if (res.promoted.length) { sep(); head("昇格情報"); add(T("[狂人昇格] 今回は ", C.dim), T(res.promoted.join("、")), T(" が人狼判定になっていました。", C.dim)); }
     return L;
   };
 

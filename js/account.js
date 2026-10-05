@@ -299,6 +299,34 @@ window.ONW = window.ONW || {};
     return { ok: true };
   };
 
+  // ---------------------------------------------------------
+  // 参加中のルームの記録（room_members）: 回線落ち・タブを閉じた後でも、同じアカウントなら
+  // トップ画面から同じ席に再入室できる。席ID と再入室キーは本人だけが読める（RLS）。
+  // テーブルが無い（setup.sql の「9.」を未実行）場合は黙って何もしない。
+  // ---------------------------------------------------------
+  const ROOM_TTL_MS = 12 * 60 * 60 * 1000;
+  acc.roomSave = async function (code, seat, key) {
+    if (!acc.user || !acc.sb || !code || !seat || !key) return;
+    try {
+      await acc.sb.from("room_members").upsert(
+        { user_id: acc.user.id, room_code: String(code).toUpperCase(), seat_id: String(seat), resume_key: String(key), updated_at: new Date().toISOString() },
+        { onConflict: "user_id" });
+    } catch (e) { /* 記録できなくてもゲームは続ける */ }
+  };
+  acc.roomClear = async function () {
+    if (!acc.user || !acc.sb) return;
+    try { await acc.sb.from("room_members").delete().eq("user_id", acc.user.id); } catch (e) {}
+  };
+  acc.roomLoad = async function () {
+    if (!acc.user || !acc.sb) return null;
+    try {
+      const { data, error } = await acc.sb.from("room_members").select("room_code,seat_id,resume_key,updated_at").eq("user_id", acc.user.id).maybeSingle();
+      if (error || !data) return null;
+      if (Date.now() - new Date(data.updated_at).getTime() > ROOM_TTL_MS) { acc.roomClear(); return null; }
+      return data;
+    } catch (e) { return null; }
+  };
+
   acc.avatarVersion = avatarVersion;
   ONW.account = acc;
 })(window.ONW);

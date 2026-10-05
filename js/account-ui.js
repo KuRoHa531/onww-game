@@ -100,12 +100,14 @@ window.ONW = window.ONW || {};
         ${signup ? `
         <div class="field-row"><label>パスワード（確認）</label>
           <input id="acc-pw2" class="onw-input" type="password" maxlength="72" autocomplete="new-password" onkeydown="if(event.key==='Enter')ONW.accountUi.submit()"></div>
+        <div class="field-row"><label>認証コード</label>
+          <input id="acc-code" class="onw-input" type="text" inputmode="numeric" maxlength="8" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="教えられたコード" oninput="ONW.accountUi.checkCode()" onkeydown="if(event.key==='Enter')ONW.accountUi.submit()"></div>
         <div class="acct-warn"><strong>パスワードを忘れると復旧できません。</strong><br>
           メールアドレスを登録しないため、再設定の手段がありません。忘れた場合は新しいIDで作り直しになります。
           IDは後から変更できません（表示名は何度でも変えられます）。</div>` : ""}
         <p id="acct-msg" class="acct-msg">${esc(s.msg)}</p>
         <div class="title-btns">
-          <button class="btn btn--primary btn--wide" onclick="ONW.accountUi.submit()">${signup ? "アカウントを作成" : "ログイン"}</button>
+          <button id="acc-submit" class="btn btn--primary btn--wide" ${signup && !codeOk() ? "disabled" : ""} onclick="ONW.accountUi.submit()">${signup ? "アカウントを作成" : "ログイン"}</button>
           <button class="btn btn--wide" onclick="ONW.accountUi.back()">戻る（ログインせずに遊ぶ）</button>
         </div>
       </section>`;
@@ -124,7 +126,7 @@ window.ONW = window.ONW || {};
           <div class="chat-input"><input id="acc-name" class="onw-input" maxlength="12" value="${esc(draft)}" oninput="ONW.accountUi.s.nameDraft=this.value" onkeydown="if(event.key==='Enter')ONW.accountUi.saveName()">
           <button class="btn" onclick="ONW.accountUi.saveName()">保存</button></div></div>
         <div class="field-row"><label>ひとこと（プロフィールに表示・200文字まで）</label>
-          <textarea id="acc-bio" class="onw-input pf-bio-in" maxlength="200" rows="3" placeholder="例: 狼のときは堂々と嘘をつきます" oninput="ONW.accountUi.s.bioDraft=this.value">${esc(s.bioDraft == null ? (u.bio || "") : s.bioDraft)}</textarea>
+          <textarea id="acc-bio" class="onw-input pf-bio-in" maxlength="200" rows="3" oninput="ONW.accountUi.s.bioDraft=this.value">${esc(s.bioDraft == null ? (u.bio || "") : s.bioDraft)}</textarea>
           <div class="btn-row" style="margin:6px 0 0;justify-content:flex-start;"><button class="btn" onclick="ONW.accountUi.saveBio()">ひとことを保存</button>
           <button class="btn" onclick="ONW.profile.open('${esc(u.id)}','${esc(u.display_name)}')">プロフィール・戦績を見る</button></div></div>
         <div class="field-row"><label>アイコン画像</label>
@@ -158,12 +160,18 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   // 操作
   // ---------------------------------------------------------
+  // アカウント作成の認証コード（ゲーム側の入力制限のみ。コードを教えた人だけが作成できるようにする）
+  const SIGNUP_CODE = "2525";
+  const codeOk = () => val("acc-code").trim() === SIGNUP_CODE;
+  ui.checkCode = function () { const b = document.getElementById("acc-submit"); if (b) b.disabled = !codeOk(); };
+
   ui.tab = function (mode) { s.id = val("acc-id").trim(); s.mode = mode; s.msg = ""; rerender(); };
 
   ui.submit = async function () {
     if (s.busy) return;
     const id = val("acc-id").trim(), pw = val("acc-pw");
     s.id = id;
+    if (s.mode === "signup" && !codeOk()) return setMsg("認証コードが違います。");
     if (s.mode === "signup" && pw !== val("acc-pw2")) return setMsg("確認用のパスワードが一致しません。");
     s.busy = true; setMsg("処理中…", true);
     const r = s.mode === "signup" ? await A().signUp(id, pw) : await A().signIn(id, pw);

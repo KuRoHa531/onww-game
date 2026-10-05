@@ -192,12 +192,13 @@ window.ONW = window.ONW || {};
       inGame: false,                  // 試合中か（ホストがルームに戻るまで true）
       spectators: [], specNames: {},  // 途中参加の観戦者
       deadIds: [], ghostLog: [], chatTab: "main", isDead: false, specInfo: null, specInfoOpen: true, nightResolved: false,   // 死亡者 / 霊界チャット / 観戦者向けの全員情報
-      codeText: "", importText: "", codeMsg: "", coBoard: [], boardView: [], tfView: null, tfLines: [], boardOpen: false, resultChatOpen: false, nightInfoClosed: false,
+      codeText: "", importText: "", codeMsg: "", coBoard: [], boardView: [], tfView: null, tfLines: [], tfPairs: [], boardOpen: false, resultChatOpen: false, nightInfoClosed: false,
       lobbyPlayers: [], meIndex: 0, showSettings: false, roleOpen: {}, presetName: "", isSpectator: false,
       timers: { night: 45, morning: 10, day: 120, vote: 30 }, // 各フェーズの秒数（マイクラ版の初期値 / 朝のみ新規）
       graveCount: 2,                  // 墓地の枚数（マイクラ版の初期値）
       seerGraveCount: 2,              // 占い師・狂った占い師が一度に占える墓地の枚数（マイクラ版の初期値 seerCenterCount）
-      cpuCount: 0,                    // CPU人数
+      villageSize: 4,                 // 何人村（参加者＋CPUの定員。超えて入った人は観戦側）
+      cpuCount: 0,                    // CPU人数（定員に含む）
       fakeWolfWhenNoWolf: true,       // 狂人代用人狼（人狼不在時に狂人を1人人狼判定へ昇格）
       promotedWolfIds: [],            // 昇格した狂人のID
       playerCount: 3,                 // 実プレイヤー人数（墓地カードは自動で +3）

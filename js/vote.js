@@ -22,8 +22,10 @@ window.ONW = window.ONW || {};
 
   /**
    * 狂人の人狼判定昇格（狂人代用人狼）。
-   * 設定ONで、最終盤面に本物の人狼が1人もおらず、狂人がいるとき、
-   * 狂人のうち1人をランダムで人狼判定に昇格させる。
+   * 設定ONで、最終盤面に本物の人狼が1人もおらず、狂人がいるとき、狂人のうち1人を人狼判定に昇格させる。
+   * 昇格するのは「配布時に決めておいたカード」（certainPromotion が決める）で、役職が入れ替わっても
+   * 昇格の判定ごとカードについていく。最終的にそのカードを持っている人が昇格する。
+   * （カードが墓地にあるなど持ち主がいない場合や、将来の「上書き型」の能力で狂人でなくなった場合は、残った狂人からランダム）
    */
   vote.updatePromotion = function updatePromotion(game) {
     game.promotedWolfIds = [];
@@ -31,28 +33,25 @@ window.ONW = window.ONW || {};
     const ids = game.players.map((p) => p.id);
     if (ids.some((id) => ONW.WOLF_KIND.includes(game.currentRoles[id]))) return;
     const mads = ids.filter((id) => ONW.MAD_KIND.includes(game.currentRoles[id]));
-    // 配布時にすでに決めてある昇格者（certainPromotion が決めたもの）が、まだ狂人系ならその人を優先する
-    if (mads.length) game.promotedWolfIds = [mads.includes(game.masterPick) ? game.masterPick : ONW.utils.randomChoice(mads)];
+    if (!mads.length) return;
+    const holder = game.masterCard ? ids.find((id) => ONW.cardAt(game, id) === game.masterCard) : null;
+    game.promotedWolfIds = [holder && mads.includes(holder) ? holder : ONW.utils.randomChoice(mads)];
   };
 
   /**
-   * 配布時点で「この狂人が昇格する」と確定しているときだけ、そのプレイヤーIDを返す（なければ null）。
-   * 確定する条件: 狂人代用人狼ON / 人狼系が誰にも配られていない / 狂人系が1人以上（2人以上なら配布時に1人を抽選して固定） /
-   *              役職を動かす役職（怪盗・墓荒らし・いたずらっ子）が配られていない（動くと昇格先が変わるため）
-   * 墓地は、墓荒らしがいなければ誰にも届かないので条件に含めない。
+   * 配布時点で「どの狂人（のカード）が昇格するか」を決める（なければ null）。狂信者に「ご主人」として見せる人でもある。
+   * 条件: 狂人代用人狼ON / 人狼系が誰にも配られていない / 狂人系が1人以上（2人以上なら配布時に1人を抽選して固定）。
+   * 役職を動かす役職（怪盗・墓荒らし・いたずらっ子）がいても、昇格の判定はカードについていく。
    */
   vote.certainPromotion = function certainPromotion(game) {
     if (!game.fakeWolfWhenNoWolf) return null;
-    const R = ONW.ROLE, ids = game.players.map((p) => p.id), ini = game.initialRoles;
-    if (ids.some((id) => [R.ROBBER, R.RELIC_ROBBER, R.TROUBLEMAKER].includes(ini[id]))) return null;
+    const ids = game.players.map((p) => p.id), ini = game.initialRoles;
     if (ids.some((id) => ONW.WOLF_KIND.includes(ini[id]))) return null;
     const mads = ids.filter((id) => ONW.MAD_KIND.includes(ini[id]));
-    if (mads.length === 1) return mads[0];
-    if (mads.length >= 2) {   // 狂人系が複数いても、配布の時点で昇格する1人を決めておく（狂信者に見せるため。最後の昇格もこの人になる）
-      if (!mads.includes(game.masterPick)) game.masterPick = ONW.utils.randomChoice(mads);
-      return game.masterPick;
-    }
-    return null;
+    if (!mads.length) return null;
+    if (!mads.includes(game.masterPick)) game.masterPick = mads.length === 1 ? mads[0] : ONW.utils.randomChoice(mads);
+    game.masterCard = "P:" + game.masterPick;   // 昇格の判定はこのカードについていく
+    return game.masterPick;
   };
 
   /** 人狼判定のプレイヤーID（本物の人狼 + 昇格した狂人） */

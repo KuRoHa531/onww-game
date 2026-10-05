@@ -19,7 +19,7 @@ window.ONW = window.ONW || {};
   const S = {};
 
   S.ROLES = ROLES;
-  S.snapshot = (g) => ({ roleCounts: { ...g.roleCounts }, graveCount: g.graveCount, seerGrave: g.seerGraveCount, cpuCount: g.cpuCount, timers: { ...g.timers }, fake: !!g.fakeWolfWhenNoWolf, reveal: g.revealTransforms !== false, cand: g.transformCandidates !== false, off: [...(g.transformOff || [])], cpuNames: [...(g.cpuNames || [])] });
+  S.snapshot = (g) => ({ roleCounts: { ...g.roleCounts }, villageSize: g.villageSize, graveCount: g.graveCount, seerGrave: g.seerGraveCount, cpuCount: g.cpuCount, timers: { ...g.timers }, fake: !!g.fakeWolfWhenNoWolf, reveal: g.revealTransforms !== false, cand: g.transformCandidates !== false, off: [...(g.transformOff || [])], cpuNames: [...(g.cpuNames || [])] });
 
   /** 壊れた/古いデータでも安全な値に直す */
   S.sanitize = function (raw) {
@@ -27,7 +27,7 @@ window.ONW = window.ONW || {};
     const rc = {}, t = raw.timers || {};
     ROLES.forEach((r) => { rc[r] = clamp(raw.roleCounts && raw.roleCounts[r], 0, 10, 0); });
     return {
-      roleCounts: rc, graveCount: clamp(raw.graveCount, 0, 10, 2), seerGrave: clamp(raw.seerGrave, 0, 10, 2), cpuCount: clamp(raw.cpuCount, 0, 10, 0), fake: raw.fake !== false, reveal: raw.reveal !== false, cand: raw.cand !== false,
+      roleCounts: rc, villageSize: clamp(raw.villageSize ?? (Object.values(rc).reduce((a, b) => a + b, 0) - clamp(raw.graveCount, 0, 10, 2)), 3, 10, 4), graveCount: clamp(raw.graveCount, 0, 10, 2), seerGrave: clamp(raw.seerGrave, 0, 10, 2), cpuCount: clamp(raw.cpuCount, 0, 10, 0), fake: raw.fake !== false, reveal: raw.reveal !== false, cand: raw.cand !== false,
       cpuNames: (Array.isArray(raw.cpuNames) ? raw.cpuNames : []).slice(0, 10).map((n) => (typeof n === "string" ? n.trim().slice(0, 12) : "")),
       off: (Array.isArray(raw.off) ? raw.off : []).filter((k) => typeof k === "string" && Object.keys(ONW.TRANSFORM_GROUPS).some((b) => (ONW.TRANSFORM_GROUPS[b] || []).some((t) => k === `${b}:${t}`))),
       timers: { night: clamp(t.night, 5, 600, 45), morning: clamp(t.morning, 5, 600, 10), day: clamp(t.day, 5, 600, 120), vote: clamp(t.vote, 5, 600, 30) },
@@ -35,7 +35,7 @@ window.ONW = window.ONW || {};
   };
 
   S.apply = function (g, x) {
-    g.roleCounts = { ...x.roleCounts }; g.graveCount = x.graveCount; g.seerGraveCount = x.seerGrave; g.cpuCount = x.cpuCount;
+    g.roleCounts = { ...x.roleCounts }; g.villageSize = x.villageSize; g.graveCount = x.graveCount; g.seerGraveCount = x.seerGrave; g.cpuCount = x.cpuCount;
     g.timers = { ...x.timers }; g.fakeWolfWhenNoWolf = x.fake; g.revealTransforms = x.reveal; g.transformCandidates = x.cand; g.transformOff = [...(x.off || [])]; g.cpuNames = [...(x.cpuNames || [])];
   };
 
@@ -44,7 +44,7 @@ window.ONW = window.ONW || {};
   const chk = (s) => { let n = 0; for (const c of s) n = (n * 31 + c.charCodeAt(0)) % 1296; return n.toString(36).toUpperCase().padStart(2, "0"); };
   S.encode = function (rules) {
     const r = S.sanitize(rules), t = r.timers;
-    const body = b64.enc(JSON.stringify([ROLES.map((k) => r.roleCounts[k]), r.graveCount, r.cpuCount, r.fake ? 1 : 0, [t.night, t.morning, t.day, t.vote], r.reveal ? 1 : 0, r.cand ? 1 : 0, r.off, r.seerGrave]));
+    const body = b64.enc(JSON.stringify([ROLES.map((k) => r.roleCounts[k]), r.graveCount, r.cpuCount, r.fake ? 1 : 0, [t.night, t.morning, t.day, t.vote], r.reveal ? 1 : 0, r.cand ? 1 : 0, r.off, r.seerGrave, r.villageSize]));
     return `ONW5-${body}-${chk(body)}`;
   };
   /** 正しいコードならルールを返す。壊れていれば null（旧形式 ONW1 も読める） */
@@ -56,7 +56,7 @@ window.ONW = window.ONW || {};
       const a = JSON.parse(b64.dec(m[2]));
       if (!Array.isArray(a) || !Array.isArray(a[0]) || a[0].length !== names.length || !Array.isArray(a[4])) return null;
       const rc = {}; names.forEach((k, i) => { rc[k] = a[0][i]; });
-      return S.sanitize({ roleCounts: rc, graveCount: a[1], cpuCount: a[2], fake: a[3] === 1, timers: { night: a[4][0], morning: a[4][1], day: a[4][2], vote: a[4][3] }, reveal: v2 ? a[5] === 1 : true, cand: v2 ? a[6] === 1 : true, off: v2 && Array.isArray(a[7]) ? a[7] : [], seerGrave: a[8] });
+      return S.sanitize({ roleCounts: rc, graveCount: a[1], cpuCount: a[2], fake: a[3] === 1, timers: { night: a[4][0], morning: a[4][1], day: a[4][2], vote: a[4][3] }, reveal: v2 ? a[5] === 1 : true, cand: v2 ? a[6] === 1 : true, off: v2 && Array.isArray(a[7]) ? a[7] : [], seerGrave: a[8], villageSize: a[9] });
     } catch (e) { return null; }
   };
 

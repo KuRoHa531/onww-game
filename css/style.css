@@ -491,8 +491,9 @@ body {
 .co-bar { padding: 6px 10px; border-top: 1px solid var(--line); text-align: center; }
 
 /* デバッグモード（ホスト専用パネル / 全員に出る表示） */
-.dbg-badge { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 300; background: rgba(155,90,200,.92); color: #fff; font-size: 12px; font-weight: 700; padding: 2px 12px; border-radius: 999px; pointer-events: none; }
-.dbg-fab { position: fixed; right: 10px; top: 36px; z-index: 300; width: 40px; height: 40px; border-radius: 50%; border: 1px solid #9b5ac8; background: rgba(35,37,57,.95); color: #fff; font-size: 18px; }
+.dbg-badge { position: relative; z-index: 2; flex: 0 0 auto; align-self: stretch; text-align: center; background: rgba(155,90,200,.92); color: #fff; font-size: 12px; font-weight: 700; line-height: 1.4; padding: 1px 12px; pointer-events: none; }   /* ヘッダー直下の細い帯（タイトルに重ならない） */
+.dbg-fab { flex: 0 0 auto; order: 3; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid #9b5ac8; background: rgba(35,37,57,.95); color: #fff; font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; }   /* 右上の列(#top-right)の一番下。📖と重ならない */
+.dbg-fab--open { background: #5b3a7a; }
 .dbg-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 400; max-height: 78vh; display: flex; flex-direction: column; background: var(--bg-panel); border-top: 2px solid #9b5ac8; border-radius: 12px 12px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); text-align: left; }
 .dbg-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; color: var(--gold); }
 .dbg-tabs { display: flex; gap: 6px; padding: 0 12px 8px; overflow-x: auto; }
@@ -512,6 +513,14 @@ body {
 .dbg-actions { margin: 10px 0 4px; }
 .dbg-warn { border: 1px solid var(--blood-soft); border-radius: 8px; padding: 6px 10px; margin: 8px 0; font-size: 13px; color: #e58a83; }
 .dbg-log { font-size: 13px; padding: 2px 0; word-break: break-all; }
+/* PC: 画面幅いっぱいの帯ではなく、右下に浮かぶパネルにする（試合の画面を見ながら操作できる） */
+@media (min-width: 1000px) {
+  .dbg-sheet { left: auto; right: 16px; bottom: 16px; width: clamp(440px, 36vw, 640px); max-height: min(78vh, 760px); border: 2px solid #9b5ac8; border-radius: 14px; padding-bottom: 0; box-shadow: 0 12px 40px rgba(0,0,0,.55); }
+  .dbg-head { padding: 10px 16px; font-size: 16px; }
+  .dbg-tabs { flex-wrap: wrap; overflow-x: visible; padding: 0 16px 10px; }
+  .dbg-body { padding: 0 16px 16px; }
+  .dbg-row { font-size: 15px; }
+}
 
 /* 最終結果の色は本家(マイクラ版)に合わせる: 村人=緑 / 人狼=赤 / 第三=灰 */
 .result-sheet .t-village { color: #55ff55; }
@@ -558,14 +567,18 @@ body {
 .dl-fly { opacity: 0; }
 .go .dl-fly { animation: dl-fly .55s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes dl-fly {
-  from { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(-12deg); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(0deg); }
+  0.01% { z-index: 2000; }   /* 配られ始めたら、ほかのカード（配られ済み・山札）より手前を通る。待機中は JS が付けた順番(z-index)のまま */
+  35%  { opacity: 1; transform: translate(calc(var(--dx) * .62), calc(var(--dy) * .62)) rotate(-7deg); }
+  to   { opacity: 1; transform: none; z-index: 2000; }
 }
 /* 自分のカード: 山札と同じ大きさ・同じ見た目で飛び出し、着いたら大きく広がる（拡大ではなく実寸で変えるので模様や角丸が崩れない） */
 .go .dl-me .dl-card.dl-big.dl-fly { animation-name: dl-fly-big; animation-duration: .75s; }
 @keyframes dl-fly-big {
-  from { opacity: 1; width: 44px; height: 62px; font-size: 18px; transform: translate(var(--dx), var(--dy)) rotate(-12deg); }
-  to   { opacity: 1; width: 96px; height: 134px; font-size: 34px; transform: none; }
+  from { opacity: 1; width: var(--dw, 44px); height: var(--dh, 62px); font-size: var(--df, 18px); transform: translate(var(--dx), var(--dy)) rotate(0deg); }
+  0.01% { z-index: 2000; }
+  35%  { opacity: 1; transform: translate(calc(var(--dx) * .62), calc(var(--dy) * .62)) rotate(-7deg); }
+  to   { opacity: 1; width: 96px; height: 134px; font-size: 34px; transform: none; z-index: 2000; }
 }
 /* 自分のカード: 裏面 → 表(変化前) → 表(変化後) */
 .dl-flipper { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 2; pointer-events: none; }
@@ -592,6 +605,59 @@ body {
 /* 左上の□（全画面） */
 .top-right { position: absolute; top: 4px; right: 6px; z-index: 450; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }   /* 固定せず、スクロールしたら一緒に流れて見えなくなる。上: ログイン / 下: 📕 */
 .wiki-btn { flex: 0 0 auto; order: 2; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--gold-dim); background: rgba(27,29,43,.9); display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; text-decoration: none; }
+.wiki-btn { padding: 0; cursor: pointer; color: inherit; font-family: inherit; }   /* <a> から <button> に変えた分の見た目合わせ */
+
+/* ---- ワンナイト人狼ガイドのオーバーレイ（js/wikiview.js） ---- */
+.wikiv { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(8,9,15,.72); overscroll-behavior: contain; }
+.wikiv.open { display: flex; }
+.wikiv__box { display: flex; flex-direction: column; width: min(760px, 100%); height: min(calc(var(--app-h, 100vh) - 32px), 100%); background: var(--bg-night); border: 1px solid var(--gold-dim); border-radius: 8px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,.6); }
+.wikiv__bar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 16px; background: var(--bg-panel); border-bottom: 1px solid var(--line); }
+.wikiv__title { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: .04em; color: var(--gold); }
+.wikiv__close { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 1px solid var(--gold-dim); background: transparent; color: var(--gold); font-size: 15px; line-height: 1; cursor: pointer; }
+.wikiv__close:hover { background: rgba(217, 196, 143, 0.12); }
+.wikiv__tabs { flex: 0 0 auto; display: flex; gap: 6px; padding: 8px 10px 0; background: var(--bg-panel); border-bottom: 1px solid var(--line); }
+.wikiv__tab { flex: 1 1 0; padding: 8px 6px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg-night); color: var(--ink-dim); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.wikiv__tab.on { color: var(--gold); border-color: var(--gold-dim); background: var(--bg-panel-raised); }
+.wikiv__body { flex: 1 1 auto; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.wikiv__pane, .wikiv__frame { display: none; flex: 1 1 auto; min-height: 0; width: 100%; border: 0; background: var(--bg-night); }
+.wikiv__pane.on, .wikiv__frame.on { display: block; }
+.wikiv__pane { overflow-y: auto; padding: 12px 14px 28px; text-align: left; overscroll-behavior: contain; }
+/* ガイド: ルーム設定 / 現在の配役 */
+.gd-note { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: var(--ink-dim); }
+.gd-summary { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
+.gd-summary b { color: var(--gold); }
+.gd-empty { margin: 28px 8px; text-align: center; line-height: 1.8; color: var(--ink-dim); }
+.gd-sec { margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; padding: 4px 12px 8px; background: rgba(27, 29, 43, .5); }
+.gd-h { margin: 8px 0 4px; font-size: 14px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
+.gd-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.gd-row:last-child { border-bottom: 0; }
+.gd-l { color: var(--ink); }
+.gd-r { color: var(--gold); font-weight: 700; text-align: right; }
+.gd-v { display: inline-block; min-width: 3em; text-align: center; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+.gd-on { color: #7ee08a; border-color: #4f9a5a; }
+.gd-off { color: var(--ink-dim); }
+.gd-tf { padding: 6px 0 4px; }
+.gd-tf__name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.gd-tf__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gd-chip { padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+.gd-chip--on { color: var(--ink); border-color: #4f9a5a; }
+.gd-chip--off { color: var(--ink-dim); text-decoration: line-through; opacity: .7; }
+.gd-team { border-left: 3px solid currentColor; padding: 2px 0 2px 12px; margin: 12px 0; }
+.gd-team .gd-h { margin: 4px 0; color: inherit; }
+.gd-role { border-bottom: 1px solid var(--line); }
+.gd-role summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 2px; cursor: pointer; list-style: none; font-size: 15px; }
+.gd-role summary::-webkit-details-marker { display: none; }
+.gd-role summary::before { content: "▸"; color: var(--ink-dim); margin-right: 6px; font-size: 12px; }
+.gd-role[open] summary::before { content: "▾"; }
+.gd-name { flex: 1 1 auto; font-weight: 700; }
+.gd-n { flex: 0 0 auto; color: var(--gold); font-weight: 700; }
+.gd-n--cand { font-size: 12px; font-weight: 400; color: var(--ink-dim); border: 1px dashed var(--line); border-radius: 999px; padding: 1px 8px; }
+.gd-desc { padding: 0 4px 12px 20px; font-size: 13.5px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; }
+@media (min-width: 1000px) { .wikiv__box { width: min(860px, 100%); } .wikiv__pane { padding: 16px 22px 32px; } .gd-row { font-size: 15px; } }
+@media (max-width: 600px) {
+  .wikiv { padding: 0; }
+  .wikiv__box { height: 100%; border: 0; border-radius: 0; }
+}
 .fs-btn { position: fixed; top: 6px; left: 6px; z-index: 500; width: 28px; height: 28px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: rgba(27,29,43,.85); color: var(--gold-dim); font-size: 16px; line-height: 1; cursor: pointer; }
 body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glow, body.pseudo-fs .onw-app + * { }
 body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glow, body.pseudo-fs body > p { display: none; }
@@ -827,6 +893,7 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
 #skip-confirm .sc-q { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--gold); }
 #skip-confirm .sc-btns { display: flex; gap: 10px; justify-content: center; }
 #skip-confirm .sc-btns .btn { flex: 1 1 0; }
+.res-dock { padding: 0 8px 16px; }   /* スマホ: 従来どおり結果の下に並べる（固定は PC のみ） */
 .stage-col { display: contents; }           /* スマホでは包みを無かったことにする */
 .big-timer { display: none; }
 
@@ -836,6 +903,7 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
   .onw-app { grid-column: 1; grid-row: 3; max-width: 860px; }
   .onw-footer { grid-column: 1 / -1; grid-row: 4; }
   .stage-col { display: none; }
+  .dbg-badge { grid-column: 1 / -1; grid-row: 2; }
 
   /* ---- カードのテーブルがある間: 画面にぴったり収まる2カラム ---- */
   body:has(#table.on) {
@@ -899,6 +967,20 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
   body:has(#table.on).chat-mode .chat-log:not(.result-chat) { cursor: default; }
   body:has(#table.on).chat-mode .co-board { max-height: 30vh; }
   body:has(#table.on) .vote-grid { max-height: none; }
+  /* 右カラムの文字（配役・夜・朝・結果発表の演出など）は縦の真ん中に出す。
+     議論・投票・観戦（chat-mode: チャットが縦いっぱいに伸びる画面）と、最終結果の一覧（下に固定ボタンがある）は除く */
+  body:has(#table.on):not(.chat-mode) .onw-app:not(:has(.result-sheet)) { display: flex; flex-direction: column; justify-content: safe center; }
+  body:has(#table.on):not(.chat-mode) .onw-app:not(:has(.result-sheet)) > * { flex: 0 0 auto; }
+
+  /* ---- 最終結果: 「PNGで保存 / 退出 / ルームに戻る」を画面の下に固定し、その上だけをスクロールさせる ---- */
+  .result-sheet + .res-dock { margin-top: 0; }
+  .res-dock {
+    position: sticky; bottom: 0; z-index: 5;
+    padding: 10px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+    background: #14151f; border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 18px rgba(8, 9, 14, .55);
+  }
+  .res-dock .btn-row { margin-top: 0; justify-content: center; }
 
   /* ---- 1カラムの画面（タイトル・ロビー・配役）も少しゆったり ---- */
   .panel { padding: 32px 36px; }
@@ -951,9 +1033,9 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
 /* =========================================================
    観戦者: 全員の役職・行動 / 霊界チャット
    ========================================================= */
-.spec-info { border: 1px solid var(--gold-dim); border-radius: 10px; background: var(--bg-panel-raised); padding: 6px 10px; margin: 4px 0; text-align: left; }
+.spec-info { position: relative; z-index: 30; border: 1px solid var(--gold-dim); border-radius: 10px; background: var(--bg-panel-raised); padding: 6px 10px; margin: 4px 0; text-align: left; }   /* 場所を取るのはヘッダーの1行だけ（開閉・内容の増減でチャットがずれない） */
 .spec-info:empty { display: none; }
-.si-body { max-height: 26vh; overflow-y: auto; margin-top: 4px; font-size: 13px; }
+.si-body { position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 34vh; overflow-y: auto; padding: 6px 10px 8px; font-size: 13px; background: rgba(18, 19, 28, .82); border: 1px solid var(--gold-dim); border-radius: 10px; backdrop-filter: blur(2px); box-shadow: 0 6px 20px rgba(0, 0, 0, .45); overscroll-behavior: contain; }   /* 背景半透明で、チャットの上に重ねる */
 .si-h { margin: 6px 0 2px; font-size: 11px; color: var(--gold-dim); }
 .si-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px solid rgba(52, 54, 77, .5); }
 .si-l { min-width: 0; word-break: break-all; }
@@ -1024,3 +1106,29 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 #rchat-overlay .rchat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--gold); font-size: 16px; }
 #rchat-overlay .rchat-btns { display: flex; gap: 8px; }
 #rchat-overlay .rchat-log { flex: 1 1 auto; height: auto !important; min-height: 160px; max-height: calc(var(--app-h, 100dvh) - 120px); overflow-y: auto; margin: 0; overscroll-behavior: contain; cursor: default; }
+.chat-ghost { color: #b79cf0; }
+.chat-ghost__tag { margin-right: 4px; }
+.chat-ghost strong { color: #c9b4f5; }
+
+/* ---- 観戦者向けの配布演出（全員と墓地のカードが配られ、順に表になる）---- */
+.dl-spec .dl-card { perspective: 700px; transform-style: preserve-3d; }
+.dl-spec .dl-face { font-size: 10px; padding: 2px; line-height: 1.15; word-break: break-all; }
+.dl-spec .dl-face b { font-weight: 700; }
+.dl-spec .dl-players { gap: 14px 10px; }
+
+/* ---- 観戦: カードを押したときの「役職の変化」 ---- */
+#rh-overlay { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .55); overscroll-behavior: contain; }
+.rh-box { width: min(340px, 100%); padding: 14px 16px 16px; border-radius: 12px; border: 1px solid var(--gold-dim); background: rgba(27, 29, 43, .94); box-shadow: 0 10px 40px rgba(0, 0, 0, .6); text-align: left; }
+.rh-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+.rh-sub { font-size: 11px; color: var(--gold-dim); margin: 4px 0 2px; }
+.rh-step { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(52, 54, 77, .6); font-size: 14px; }
+.rh-step:last-child { border-bottom: 0; }
+.rh-l { color: var(--ink-dim); font-size: 12px; }
+.rh-r { font-weight: 700; text-align: right; }
+.rh-box .t-village { color: #55ff55; } .rh-box .t-wolf { color: #ff5555; } .rh-box .t-third { color: #cfcfd6; }
+
+/* ---- 接続・ホスト交代・再入室の通知バー（画面上部に固定）---- */
+#net-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 990; display: flex; align-items: center; justify-content: center; gap: 12px; padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 8px; background: rgba(27, 29, 43, .96); border-bottom: 1px solid var(--gold-dim); color: var(--gold); font-size: 13px; font-weight: 700; box-shadow: 0 4px 16px rgba(0, 0, 0, .5); }
+#net-banner .btn { padding: 4px 10px; font-size: 12px; }
+.rejoin-box { margin-bottom: 14px; padding: 10px 12px; border: 1px solid var(--gold-dim); border-radius: 10px; text-align: center; }
+.rejoin-box .lede { margin: 0 0 8px; }

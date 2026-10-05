@@ -323,3 +323,35 @@ create policy "match_results_insert_self" on public.match_results
 -- 自分の戦績だけ削除（リセット）できる
 create policy "match_results_delete_self" on public.match_results
   for delete to authenticated using (user_id = auth.uid());
+
+
+-- ============================================================
+-- 9. 参加中のルームの記録(room_members)   ※後から追加した機能。再実行OK
+--    ・回線落ち / タブを閉じた後でも、同じアカウントならトップ画面の「ルームに戻る」から同じ席に再入室できる
+--    ・1アカウントにつき1行（いまいるルームだけ）。席ID と 再入室キー は本人だけが読める
+--    ・ルームを自分から退出すると削除される。12時間以上前の記録はアプリ側で無視する
+-- ============================================================
+create table if not exists public.room_members (
+  user_id    uuid primary key references public.profiles(id) on delete cascade,
+  room_code  text not null check (room_code ~ '^[A-Z0-9]{4}$'),
+  seat_id    text not null check (char_length(seat_id) between 1 and 80),
+  resume_key text not null check (char_length(resume_key) between 16 and 64),
+  updated_at timestamptz not null default now()
+);
+
+revoke all on public.room_members from anon, authenticated;
+grant select, insert, update, delete on public.room_members to authenticated;
+alter table public.room_members enable row level security;
+
+drop policy if exists "room_members_select_self" on public.room_members;
+drop policy if exists "room_members_insert_self" on public.room_members;
+drop policy if exists "room_members_update_self" on public.room_members;
+drop policy if exists "room_members_delete_self" on public.room_members;
+create policy "room_members_select_self" on public.room_members
+  for select to authenticated using (user_id = auth.uid());
+create policy "room_members_insert_self" on public.room_members
+  for insert to authenticated with check (user_id = auth.uid());
+create policy "room_members_update_self" on public.room_members
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "room_members_delete_self" on public.room_members
+  for delete to authenticated using (user_id = auth.uid());

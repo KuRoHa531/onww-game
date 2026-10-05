@@ -27,6 +27,7 @@ window.ONW = window.ONW || {};
   let nightKeys = [];                  // 夜の始まりに開いたカード（神・大狼）。夜時間が終わるまで裏に戻さない
   let busy = false;                   // 演出中は操作を受け付けない
   let seq = false;                    // 結果演出を開始済みか
+  let specShown = {}, specBusy = false; // 観戦者: 各席に今見せている役職 / 入れ替え演出中
   let timers = [], paperTimers = [];
   const later = (fn, ms) => { const h = setTimeout(fn, ms); timers.push(h); return h; };
   const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
@@ -118,23 +119,70 @@ window.ONW = window.ONW || {};
     });
   }
 
+  // ---------------------------------------------------------
+  // 観戦者: 全員のカードを表にして見せる。夜が明けて役職が入れ替わったら、
+  //   いったん伏せる → 空中で入れ替わる → 新しい役職で表になる（表のまま中身が切り替わる「点滅」はしない）
+  // ---------------------------------------------------------
+  function specWant(g) {
+    const w = {};
+    g.specInfo.players.forEach((p) => { w[`p:${p.id}`] = p.cur || p.ini; });
+    g.specInfo.center.forEach((c, i) => { w[`g:${i}`] = c.cur || c.ini; });
+    return w;
+  }
+  function arcPair(ka, kb) {
+    const el = $t(), a = el.querySelector(`[data-k="${ka}"] .tb-card`), b = el.querySelector(`[data-k="${kb}"] .tb-card`);
+    if (!a || !b || !a.animate) return;
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(), dx = rb.left - ra.left, dy = rb.top - ra.top;
+    const path = (x, y, lift) => [
+      { transform: "translate(0,0) scale(1)" },
+      { transform: `translate(${x / 2}px,${y / 2 + lift}px) scale(1.2)`, offset: 0.5 },
+      { transform: `translate(${x}px,${y}px) scale(1)` },
+    ];
+    a.style.zIndex = 6; b.style.zIndex = 5;
+    const opt = { duration: 1000, easing: "ease-in-out", fill: "forwards" };
+    const A = a.animate(path(dx, dy, -22), opt), B = b.animate(path(-dx, -dy, 22), opt);
+    later(() => { A.cancel(); B.cancel(); a.style.zIndex = b.style.zIndex = ""; }, 1050);   // 裏面は同じなので、元の席に戻すと入れ替わったまま見える
+  }
+  function hop(k) {   // 入れ替えが3枚以上にまたがるときの、その席のカードの小さな跳ね
+    const c = $t().querySelector(`[data-k="${k}"] .tb-card`);
+    if (!c || !c.animate) return;
+    c.animate([{ transform: "translateY(0) scale(1)" }, { transform: "translateY(-16px) scale(1.12)", offset: 0.5 }, { transform: "translateY(0) scale(1)" }], { duration: 800, easing: "ease-in-out" });
+  }
+  function specSync(g) {
+    if (specBusy) return;                       // 演出中は触らない（終わってから最新を反映）
+    const want = specWant(g);
+    const changed = Object.keys(want).filter((k) => specShown[k] && specShown[k] !== want[k]);
+    if (!changed.length) { Object.keys(want).forEach((k) => { specShown[k] = want[k]; up[k] = want[k]; }); return; }
+    specBusy = true;
+    const old = { ...specShown };
+    changed.forEach((k) => { delete up[k]; });  // ① 全部伏せる
+    const done = new Set(), pairs = [];
+    changed.forEach((a) => {                    // 互いに役職を交換した2枚は組にする
+      if (done.has(a)) return;
+      const b = changed.find((x) => x !== a && !done.has(x) && old[a] === want[x] && old[x] === want[a]);
+      if (b) { done.add(a); done.add(b); pairs.push([a, b]); }
+    });
+    const rest = changed.filter((k) => !done.has(k));
+    later(() => { pairs.forEach(([a, b]) => arcPair(a, b)); rest.forEach(hop); }, 850);        // ② 空中で入れ替わる
+    const flipAt = 850 + (pairs.length ? 1100 : 0) + (rest.length ? 850 : 0);
+    changed.forEach((k, i) => later(() => { const w = G().specInfo ? specWant(G()) : want; up[k] = w[k] || want[k]; paint(G()); }, flipAt + i * 140));   // ③ 新しい役職で表に
+    later(() => { specShown = G().specInfo ? specWant(G()) : want; specBusy = false; stage.sync(G()); }, flipAt + changed.length * 140 + 900);
+  }
+
   stage.sync = function (g) {
     const el = $t();
     if (!el) return;
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
-      if (key !== null) { clearAll(); key = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
-    if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) {
-      g.specInfo.players.forEach((p) => { up[`p:${p.id}`] = p.cur || p.ini; });
-      g.specInfo.center.forEach((c, i) => { up[`g:${i}`] = c.cur || c.ini; });
-    }
+    if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
     // 昼中に死亡した席には「死亡」の札（結果発表では外す）
     if (g.phase === ONW.PHASE.ONLINE_RESULT) {
       deathMarks.forEach((k) => { delete dead[k]; if (badge[k] === "死亡") delete badge[k]; });
@@ -167,7 +215,9 @@ window.ONW = window.ONW || {};
   // カードを押したとき
   // ---------------------------------------------------------
   stage.click = function (k) {
-    const g = G(), m = mode(g);
+    const g = G();
+    if ((g.isSpectator || hostWatching(g)) && g.specInfo && ONW.ui.showRoleHistory) { ONW.ui.showRoleHistory(k); return; }   // 観戦: カードを押すと、その役職の変化がわかる
+    const m = mode(g);
     if (!pickable(k, m, g)) return;
     const id = k.slice(2);
     if (m.type === "night" || m.type === "morning") {
@@ -388,6 +438,13 @@ window.ONW = window.ONW || {};
     wrap.querySelectorAll(".tfp-line span").forEach((sp) => { const w = sp.offsetWidth; if (w > avail && w > 0) ratio = Math.min(ratio, avail / w); });
     paper.style.setProperty("--tfp-fs", Math.max(MIN, Math.floor(BASE * ratio * 10 * 0.98) / 10) + "px");   // 全行で同じ大きさにそろえる
   }
+  /** ホストのスキップが届いた: 紙を今すぐ下の欄へ飛ばす（まだ紙が出ていなければ、これから出さない） */
+  stage.skipPaper = function () {
+    const w = document.querySelector(".tfp-wrap");
+    if (w) { fly(w); return; }
+    const g = G();
+    if (!g.tfShown) { g.tfShown = true; g.tfIntro = false; ONW.ui.updateBoard(); }
+  };
   /** 変化公開の紙が出始めてから下の欄に収まるまでの時間(ms)。昼のタイマー・CPUの発言はこの後に始める */
   stage.paperMs = function (lines) {
     if (!lines || !lines.length) return 0;
@@ -401,11 +458,13 @@ window.ONW = window.ONW || {};
     wrap.className = "tfp-wrap";
     const dur = (t) => Math.min(0.7, Math.max(0.3, [...t].length * 0.05));
     const start = (i) => 0.55 + i * 0.75;
+    const canSkipPaper = !!(ONW.net && ONW.net.isHost);   // スキップできるのはホストだけ（表示も出さない）。ダブルタップで全員ぶん飛ばす
+    wrap.style.cursor = "default";
     wrap.innerHTML = `<div class="tfp-dim"></div>
       <div class="tfp-paper">
         <div class="tfp-title"><span style="--n:4;--d:.1s;--dur:.35s">変化公開</span></div>
         ${lines.map((t, i) => `<div class="tfp-line"><span style="--n:${[...t].length};--d:${start(i).toFixed(2)}s;--dur:${dur(t).toFixed(2)}s">${esc(t)}</span></div>`).join("")}
-        <div class="tfp-hint">タップでスキップ</div>
+        ${canSkipPaper ? `<div class="tfp-hint">ダブルタップでスキップ</div>` : ""}
       </div>`;
     document.body.appendChild(wrap);
     fitPaper(wrap);
@@ -414,7 +473,14 @@ window.ONW = window.ONW || {};
     window.addEventListener("resize", onResize);
     const mo = new MutationObserver(() => { if (!wrap.isConnected) { window.removeEventListener("resize", onResize); mo.disconnect(); } });
     mo.observe(document.body, { childList: true });
-    wrap.onclick = () => fly(wrap);
+    if (canSkipPaper) {
+      let last = 0, lx = 0, ly = 0;   // dblclick はスマホで不安定なので、自前でダブルタップを判定する
+      wrap.addEventListener("pointerup", (e) => {
+        const now = Date.now();
+        if (now - last < 400 && Math.abs(e.clientX - lx) < 40 && Math.abs(e.clientY - ly) < 40) { last = 0; ONW.net.skipPaper(); }
+        else { last = now; lx = e.clientX; ly = e.clientY; }
+      });
+    }
     const endAt = start(lines.length - 1) + dur(lines[lines.length - 1]) + 1.3;   // 書き終えて少し読ませてから下へ
     paperTimers.push(setTimeout(() => fly(wrap), endAt * 1000));
   };

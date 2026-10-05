@@ -57,17 +57,17 @@ window.ONW = window.ONW || {};
     if (kind === "love") return set({ step: "love", kind, chain });
     return set({ step: "target", kind, chain });
   }
-  co.pickLove = (id) => done(`${nameOf(id)} に一目惚れしました`, { kind: "love_tanner", target: id }, null, "disclose", `→ ${nameOf(id)}`);
+  co.pickLove = (id) => done(`${nameOf(id)} に一目惚れしました。`, { kind: "love_tanner", target: id }, null, "disclose", `→ ${nameOf(id)}`);
   co.pickRelicGrave = (i) => set({ step: "rrole", kind: "relic", idx: i });
   co.relicRole = function (role) {
     const s = G().co;
     if (role === "hide") return done(`墓地${s.idx + 1} と役職を交換しました。役職は伏せます。`, null, null, "disclose", `墓地${s.idx + 1} → 伏せ`);
-    done(`墓地${s.idx + 1} と役職を交換して ${rn(role)} になりました`, { kind: "relic", role }, null, "disclose", `墓地${s.idx + 1} → ${rn(role)}`);
+    done(`墓地${s.idx + 1} と役職を交換して ${rn(role)} になりました。`, { kind: "relic", role }, null, "disclose", `墓地${s.idx + 1} → ${rn(role)}`);
   };
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
-    done(`${nameOf(sel[0])} と ${nameOf(sel[1])} を入れ替えました`, { kind: "troublemaker" }, null, "disclose", `${nameOf(sel[0])} ⇄ ${nameOf(sel[1])}`);
+    done(`${nameOf(sel[0])} と ${nameOf(sel[1])} を入れ替えました。`, { kind: "troublemaker" }, null, "disclose", `${nameOf(sel[0])} ⇄ ${nameOf(sel[1])}`);
   };
   co.pickMason = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
@@ -75,11 +75,11 @@ window.ONW = window.ONW || {};
   };
   co.masonDone = function () {
     const sel = G().co.sel || [];
-    done(sel.length ? `共有者は 自分と ${sel.map((id) => nameOf(id)).join("、")} でした` : "共有者は 自分だけでした", { kind: "mason" }, null, "disclose", sel.length ? `相方: ${sel.map((id) => nameOf(id)).join("、")}` : "自分だけ");
+    done(sel.length ? `共有者は 自分と ${sel.map((id) => nameOf(id)).join("、")} でした。` : "共有者は 自分だけでした。", { kind: "mason" }, null, "disclose", sel.length ? `相方: ${sel.map((id) => nameOf(id)).join("、")}` : "自分だけ");
   };
   co.insomRole = function (role) {
     if (role === "hide") return done("最終的な役職は伏せます。", null, null, "disclose", "→ 伏せ");
-    done(`最終的な役職は ${rn(role)} でした`, { kind: "insomniac", role }, null, "disclose", `→ ${rn(role)}`);
+    done(`最終的な役職は ${rn(role)} でした。`, { kind: "insomniac", role }, null, "disclose", `→ ${rn(role)}`);
   };
   co.pickPlayer = (id) => set({ ...G().co, step: "prole", target: id });
   co.pickGrave = function (i) {
@@ -91,16 +91,16 @@ window.ONW = window.ONW || {};
     const s = G().co, who = nameOf(s.target);
     if (s.kind === "seer") {
       if (role === "hide") return done(`${who} を占いました。結果は伏せます。`, null, null, "disclose", `${who} → 伏せ`);
-      return done(`${who} を占って ${rn(role)} でした`, { kind: "seer", target: s.target, role }, null, "disclose", `${who} → ${rn(role)}`);
+      return done(`${who} を占って ${rn(role)} でした。`, { kind: "seer", target: s.target, role }, null, "disclose", `${who} → ${rn(role)}`);
     }
     if (role === "hide") return done(`${who} の役職を奪いました。役職は伏せます。`, null, null, "disclose", `${who} → 伏せ`);
-    return done(`${who} の役職を奪って ${rn(role)} になりました`, { kind: "robber", target: s.target, role }, null, "disclose", `${who} → ${rn(role)}`);
+    return done(`${who} の役職を奪って ${rn(role)} になりました。`, { kind: "robber", target: s.target, role }, null, "disclose", `${who} → ${rn(role)}`);
   };
   co.graveRole = function (role) {
     const s = G().co, idx = s.sel[s.k];
     const results = [...s.results, `墓地${idx + 1} を見て ${rn(role)}`], shorts = [...(s.shorts || []), `墓地${idx + 1} → ${rn(role)}`];
     if (s.k + 1 < s.sel.length) return set({ ...s, k: s.k + 1, results, shorts });
-    done(`${results.join("、")} でした`, null, null, "disclose", shorts.join("、"));
+    done(`${results.join("、")} でした。`, null, null, "disclose", shorts.join("、"));
   };
 
   co.history = () => set({ step: "history" });

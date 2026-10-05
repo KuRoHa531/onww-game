@@ -213,11 +213,29 @@ window.ONW = window.ONW || {};
 
   const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "CPU能力先", tabCpu], ["misc", "その他", tabMisc]];
 
+  /** 🛠ボタンは右上の縦並び(アカウント・📖ガイドと同じ列)に置く。重ならないよう、固定位置ではなく列の中に入れる */
+  function placeFab(show) {
+    let fab = document.getElementById("debug-fab");
+    if (!show) { if (fab) fab.remove(); return; }
+    if (!fab) {
+      fab = document.createElement("button");
+      fab.id = "debug-fab"; fab.type = "button"; fab.className = "dbg-fab";
+      fab.setAttribute("aria-label", "デバッグ"); fab.title = "デバッグ"; fab.textContent = "🛠";
+      fab.addEventListener("click", () => ONW.debug.toggleOpen());
+    }
+    const slot = document.getElementById("top-right") || document.body;
+    if (fab.parentNode !== slot) slot.appendChild(fab);
+    fab.classList.toggle("dbg-fab--open", ui.open);
+  }
+
   debug.render = function () {
     const g = G(), badge = el("debug-badge", "dbg-badge"), root = el("debug-root");
     const warn = (g.dbgWarn || []).length;
+    const hd = document.querySelector(".onw-header");
+    if (hd && badge.previousElementSibling !== hd) hd.after(badge);   // ヘッダーのすぐ下（流れの中）に置く＝タイトルと重ならない
     badge.style.display = g.debugOn ? "" : "none";
     badge.textContent = "🛠 デバッグモード中" + (warn ? " ⚠" : "");
+    placeFab(!!g.debugOn && ONW.net.isHost);
     if (!g.debugOn || !ONW.net.isHost) { root.innerHTML = ""; return; }
     const tab = TABS.find((t) => t[0] === ui.tab) || TABS[0];
     const sheet = ui.open ? `
@@ -226,7 +244,7 @@ window.ONW = window.ONW || {};
         <div class="dbg-tabs">${TABS.map((t) => b(t[1], "tab", [t[0]], t[0] === tab[0] ? "dbg-on" : "")).join("")}</div>
         <div class="dbg-body">${tab[2]()}</div>
       </div>` : "";
-    root.innerHTML = `<button class="dbg-fab" onclick="ONW.debug.toggleOpen()">🛠</button>${sheet}`;
+    root.innerHTML = sheet;
   };
 
   // ---- 操作 ----

@@ -74,10 +74,84 @@ window.ONW = window.ONW || {};
       <div class="pf-bio ${prof.bio ? "" : "pf-bio--empty"}">${prof.bio ? esc(prof.bio) : "ひとこと未設定"}</div>
       ${statsHtml(st)}
       <div class="btn-row" style="justify-content:center;margin-top:14px;">
-        ${mine ? `<button class="btn" onclick="ONW.accountUi.leaveToAccount('account')">プロフィールを編集</button>` : ""}
+        ${mine ? `<button class="btn" onclick="ONW.profile.edit()">プロフィールを編集</button>` : ""}
         ${!mine && prof.avatar_updated_at ? `<button class="btn" onclick="ONW.friends.report('${esc(prof.id)}')">アイコンを通報</button>` : ""}
         <button class="btn btn--primary" onclick="ONW.profile.close()">閉じる</button>
       </div>`);
+  };
+
+  // ---------------------------------------------------------
+  // ルームを抜けずにその場で編集（表示名・ひとこと・アイコン）
+  //  タイトル画面のときだけ、従来どおりアカウント画面へ移動する
+  // ---------------------------------------------------------
+  const em = { msg: "", ok: false, busy: false };
+  const emsg = (t, ok) => {
+    em.msg = t || ""; em.ok = !!ok;
+    const el = document.getElementById("pfe-msg");
+    if (el) { el.textContent = em.msg; el.className = "acct-msg" + (ok ? " ok" : ""); }
+  };
+  const editVal = (id) => (document.getElementById(id) ? document.getElementById(id).value : "");
+  const refreshChip = () => { try { ONW.accountUi.updateFixed(); } catch (e) {} };
+
+  function editHtml() {
+    const A = ONW.account, u = A.user;
+    return `
+      <div class="pf-head">${A.myAvatarHtml("av--lg")}<div><div class="pf-name">${esc(u.display_name)}</div><div class="rs-dim">@${esc(u.user_id)}</div></div></div>
+      <div class="field-row"><label>表示名（1〜12文字）</label>
+        <div class="chat-input"><input id="pfe-name" class="onw-input" maxlength="12" value="${esc(u.display_name)}" onkeydown="if(event.key==='Enter')ONW.profile.saveName()">
+        <button class="btn" onclick="ONW.profile.saveName()">保存</button></div></div>
+      <div class="field-row"><label>ひとこと（200文字まで）</label>
+        <textarea id="pfe-bio" class="onw-input pf-bio-in" maxlength="200" rows="3">${esc(u.bio || "")}</textarea>
+        <div class="btn-row" style="margin:6px 0 0;justify-content:flex-start;"><button class="btn" onclick="ONW.profile.saveBio()">ひとことを保存</button></div></div>
+      <div class="field-row"><label>アイコン画像</label>
+        <div class="btn-row" style="margin:0;">
+          <label class="btn">画像を選ぶ<input type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="ONW.profile.pickAvatar(this)"></label>
+          ${u.avatar_updated_at ? `<button class="btn" onclick="ONW.profile.removeAvatar()">アイコンを削除</button>` : ""}
+        </div></div>
+      <p class="night-step__hint">PNG / JPEG / WebP。中央が正方形に切り抜かれ、256×256・100KB以下に縮小されます。</p>
+      <p id="pfe-msg" class="acct-msg${em.ok ? " ok" : ""}">${esc(em.msg)}</p>
+      <div class="btn-row" style="justify-content:center;margin-top:14px;">
+        <button class="btn btn--primary" onclick="ONW.profile.open('${esc(u.id)}','${esc(u.display_name).replace(/'/g, "&#39;")}')">プロフィールに戻る</button>
+      </div>`;
+  }
+
+  pf.edit = function () {
+    const A = ONW.account;
+    if (!A || !A.user) return;
+    if (ONW.game.phase === ONW.PHASE.TITLE) { ONW.accountUi.leaveToAccount("account"); return; }   // タイトルなら退出の心配なし
+    token++; cur = null; em.msg = ""; em.ok = false;
+    shell(editHtml());
+  };
+
+  pf.saveName = async function () {
+    if (em.busy) return;
+    em.busy = true;
+    const r = await ONW.account.setDisplayName(editVal("pfe-name"));
+    em.busy = false;
+    if (r.ok) { refreshChip(); em.msg = "表示名を変更しました。"; em.ok = true; shell(editHtml()); } else emsg(r.msg);
+  };
+  pf.saveBio = async function () {
+    if (em.busy) return;
+    em.busy = true;
+    const r = await ONW.account.setBio(editVal("pfe-bio"));
+    em.busy = false;
+    emsg(r.ok ? "ひとことを保存しました。" : r.msg, r.ok);
+  };
+  pf.pickAvatar = async function (input) {
+    const file = input.files && input.files[0];
+    input.value = "";
+    if (!file || em.busy) return;
+    em.busy = true; emsg("画像を処理しています…", true);
+    const r = await ONW.account.uploadAvatar(file);
+    em.busy = false;
+    if (r.ok) { refreshChip(); em.msg = "アイコンを変更しました。"; em.ok = true; shell(editHtml()); } else emsg(r.msg);
+  };
+  pf.removeAvatar = async function () {
+    if (em.busy || !window.confirm("アイコン画像を削除しますか？")) return;
+    em.busy = true;
+    const r = await ONW.account.removeAvatar();
+    em.busy = false;
+    if (r.ok) { refreshChip(); em.msg = "アイコンを削除しました。"; em.ok = true; shell(editHtml()); } else emsg(r.msg);
   };
 
   function statsHtml(st) {
