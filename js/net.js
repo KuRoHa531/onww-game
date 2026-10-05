@@ -1243,7 +1243,7 @@ window.ONW = window.ONW || {};
     const order = { light_apostle: 0, dark_avatar: 1, silver_shadow: 2 };
     const list = [
       ...Object.keys(g.transformFrom).map((id) => ({ b: g.transformFrom[id], a: g.initialRoles[id] })),
-      ...Object.keys(g.centerTransformFrom).map((i) => ({ b: g.centerTransformFrom[i], a: g.center[i] })),
+      ...Object.keys(g.centerTransformFrom).map((i) => ({ b: g.centerTransformFrom[i], a: (g.center0 || g.center)[i] })),   // 配役直後の墓地で見る（墓荒らしの交換後の g.center だと変化先が墓荒らしになってしまう）
     ].filter((e) => e.b !== e.a);
     if (!list.length) return;
     list.sort((x, y) => (order[x.b] ?? 9) - (order[y.b] ?? 9) || Math.random() - 0.5);

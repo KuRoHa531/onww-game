@@ -94,7 +94,8 @@ window.ONW = window.ONW || {};
     ONW.SYNERGY_RULES.forEach((r) => {
       slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });
       if (!has(r.trigger)) return;   // trigger がいないルールの必要役職は守らない（別のルールの置き換え先にできるように）
-      r.required.forEach((q) => { const f = slots.find((s) => s.role === q); if (f) kept.add(f.key); });   // 必要役職は1枚だけ守る(余りは他の必要役職に回せる)
+      const need = {}; r.required.forEach((q) => { need[q] = (need[q] || 0) + 1; });
+      Object.keys(need).forEach((q) => { slots.filter((s) => s.role === q).slice(0, need[q]).forEach((f) => kept.add(f.key)); });   // 必要役職は必要な枚数だけ守る(余りは他の必要役職に回せる)
     });
     const set = (slot, role) => {
       slot.role = role; kept.add(slot.key);
@@ -102,13 +103,21 @@ window.ONW = window.ONW || {};
     };
     ONW.SYNERGY_RULES.forEach((rule) => {
       if (!has(rule.trigger)) return;
+      const seen = {};
       rule.required.forEach((req) => {
-        if (has(req)) return;
+        seen[req] = (seen[req] || 0) + 1;   // この役職を何枚必要とするか（共有者2枚など）
+        if (slots.filter((s) => s.role === req).length >= seen[req]) return;
         const can = (s) => s.from && ONW.roles.enabledTargets(game, s.from).includes(req);
         let cands = slots.filter((s) => !kept.has(s.key) && can(s));
-        // 置き換えられる枠がないときだけ、別の変化役の trigger 枠（デバッグで固定した枠・この rule の trigger は除く）を置き換える
+        // 置き換えられる枠がないときだけ、別の変化役の trigger 枠（この rule の trigger は除く）を置き換える
         // 例: 闇の化身が2枚とも忘却の人狼などに変化していて、狼夢人のための人狼を置く枠がない
         if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && !locked.has(s.key) && triggers.has(s.role) && s.role !== rule.trigger && can(s));
+        // それでもないときは、デバッグで変化先を固定した枠も置き換える（固定した変化でもシナジーを発動させる）。シナジー役の枠と、必要役職の枠は除く
+        if (!cands.length) {
+          const req1 = new Set(rule.required);
+          cands = slots.filter((s) => locked.has(s.key) && !triggers.has(s.role) && !req1.has(s.role) && can(s));   // 固定した別のシナジー役（狼夢人など）は壊さない
+          if (cands.length) { const c0 = ONW.utils.randomChoice(cands); (game.dbgWarn = game.dbgWarn || []).push(`変化先の固定が、闇鍋シナジー(${ONW.ROLE_INFO[rule.trigger].name})のため「${ONW.ROLE_INFO[req].name}」に変わりました。`); locked.delete(c0.key); cands = [c0]; }
+        }
         if (!cands.length) return;
         const c = cands.filter((s) => !triggers.has(s.role));
         set(ONW.utils.randomChoice(c.length ? c : cands), req);
@@ -128,6 +137,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.ASSASSIN,       required: [ONW.ROLE.MERLIN] },   // アサシンが出る闇鍋には、狙う相手のマーリンも最低1枚出す
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
+    { trigger: ONW.ROLE.MASON,          required: [ONW.ROLE.MASON, ONW.ROLE.MASON] },           // 共有者が出る闇鍋には、光の使徒から変化した共有者を合わせて最低2枚出す（共有者が1人だけにならない）
   ];
   /**
    * 本人に見せる「変化前」の役職。思い込み系（忘却の人狼・狼憑き・狼夢人）は、本当の変化前ではなく
