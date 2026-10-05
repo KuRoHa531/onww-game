@@ -797,6 +797,23 @@ window.ONW = window.ONW || {};
       onError("ルームが見つかりませんでした。すでに終了している可能性があります。");
     } });
   };
+  /** ルームのホストがいるか確かめる（参加はしない）。"alive" = いる / "gone" = いない / "unknown" = 通信できず判断できない */
+  function probeRoom(code) {
+    return new Promise((resolve) => {
+      let peer = null, done = false;
+      const fin = (v) => { if (done) return; done = true; clearTimeout(to); try { if (peer) peer.destroy(); } catch (e) {} resolve(v); };
+      const to = setTimeout(() => fin("unknown"), 9000);
+      try {
+        peer = new Peer();
+        peer.on("error", (e) => fin(e && e.type === "peer-unavailable" ? "gone" : "unknown"));
+        peer.on("open", () => {
+          const conn = peer.connect(PREFIX + code, { reliable: true });
+          conn.on("open", () => fin("alive"));
+          conn.on("error", () => fin("unknown"));
+        });
+      } catch (e) { fin("unknown"); }
+    });
+  }
   /** タイトル画面を開いたとき: 参加中のルームの記録があるか調べる（ログイン中のみ） */
   net.checkRejoin = async function () {
     const A = ONW.account;
@@ -807,6 +824,14 @@ window.ONW = window.ONW || {};
     if (net.peer || net.rec) return;
     try { row = await A.roomLoad(); } catch (e) {}
     if (net.peer || net.rec) return;
+    // 記録があっても、ルーム自体がもう無い（アプリを強制終了したあとにホストも落ちた・全員退出した）ことがある。
+    // 実際にそのルームがあるか確かめてから「参加中のルームがあります」を出す（無ければ記録を消す）
+    if (row) {
+      let st = await probeRoom(row.room_code);
+      if (st === "gone") { await new Promise((r) => setTimeout(r, 2500)); if (net.peer || net.rec) return; st = await probeRoom(row.room_code); }   // ホスト交代の最中かもしれないので、少し待ってもう一度
+      if (net.peer || net.rec) return;
+      if (st === "gone") { try { await A.roomClear(); } catch (e) {} row = null; }
+    }
     net.rejoinInfo = row ? { code: row.room_code, seat: row.seat_id, key: row.resume_key } : null;
     if (G().phase === PH().TITLE) rerender();
   };
