@@ -573,9 +573,7 @@ window.ONW = window.ONW || {};
           ${me
             ? `<div class="dl-card dl-fly dl-big" data-fly style="${D(pStart + pStep * idx)}">
                  <div class="dl-flipper" style="${D(flip1)}">
-                   ${game.myFrom === ONW.AMBIG_FROM
-                     ? `<div class="dl-face dl-face--a dl-face--amb" style="${D(flip2 - 0.2)}"><b class="amb-half amb-half--light">光の使徒</b><b class="amb-half amb-half--dark">闇の化身</b></div>`
-                     : `<div class="dl-face dl-face--a dl-team-${(from || info).team}" style="${from ? D(flip2 - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b></div>`}
+                   <div class="dl-face dl-face--a dl-team-${(from || info).team}" style="${from ? D(flip2 - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b></div>
                    ${from ? `<div class="dl-face dl-face--b dl-team-${info.team}" style="${D(flip2)}">${ui.roleIcon(game.myRole, "role-icon--face")}<b>${esc(info.name)}</b></div>` : ""}
                  </div>
                </div>`
@@ -593,7 +591,7 @@ window.ONW = window.ONW || {};
         <div class="dl-result" style="${D(doneAt)}">
           ${ui.roleIcon(game.myRole, "role-icon--big")}
           <div class="night-step__role t-${info.team}">${info.name}</div>
-          ${from ? `<p class="night-step__hint">${game.myFrom === ONW.AMBIG_FROM ? "光の使徒・闇の化身" : esc(from.name)} → ${esc(info.name)} に変化しました。</p>` : ""}
+          ${from ? `<p class="night-step__hint">${esc(from.name)} → ${esc(info.name)} に変化しました。</p>` : ""}
           <p class="night-step__hint">${info.desc}</p>
         </div>
       </section>`;

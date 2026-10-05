@@ -1152,13 +1152,6 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   .top-right { right: 4px; }
 }
 
-/* 「光の使徒／闇の化身」のカード: 枠は上半分が緑・下半分が赤、名前も上=光の使徒・下=闇の化身 */
-.dl-face--amb { padding: 0; gap: 0; justify-content: stretch; border: 2px solid transparent;
-  background: linear-gradient(#1b1d2b, #1b1d2b) padding-box, linear-gradient(to bottom, #55ff55 50%, #ff5555 50%) border-box; }
-.dl-face--amb .amb-half { flex: 1 1 50%; display: flex; align-items: center; justify-content: center; width: 100%; }
-.dl-face--amb .amb-half--light { color: #55ff55; }
-.dl-face--amb .amb-half--dark { color: #ff5555; }
-
 /* ---- スター公開（待機時間）: 表になったスターのカードが金色に光り、「★スター」の札が付く ---- */
 .tb-seat.starup .tb-card { filter: drop-shadow(0 0 12px rgba(255,205,70,.95)); }
 .tb-seat.starup .tb-badge { background: #b8860b; border-color: #ffd54a; color: #fff8dc; }

@@ -14,7 +14,6 @@ window.ONW = window.ONW || {};
 
   /** role のカードから表示情報を引く */
   roles.getInfo = function getInfo(role) {
-    if (role === ONW.AMBIG_FROM) return { name: "光の使徒／闇の化身", team: ONW.TEAM.THIRD, wakeOrder: null, desc: "光の使徒か闇の化身のどちらかです。" };
     return ONW.ROLE_INFO[role] || { name: role, team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "" };
   };
 
@@ -131,21 +130,17 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
   ];
   /**
-   * 本人に見せる「変化前」の役職。光の使徒→村人 / 闇の化身→忘却の人狼 のとき、
-   * 忘却の人狼になった人が変化前から正体を推理できないよう、両方書かれたカードにする
-   * (忘却の人狼が闇の化身の変化先に有効で、闇の化身が配役に入っているときだけ)。
+   * 本人に見せる「変化前」の役職。思い込み系（忘却の人狼・狼憑き・狼夢人）は、本当の変化前ではなく
+   * 「本人に見せている役職の陣営」の変化役から出たように見せて、変化前から正体が透けないようにする。
+   *   ・村人だと思い込む（忘却の人狼・狼憑き）→ 光の使徒から  （忘却の人狼は本当は闇の化身から）
+   *   ・人狼だと思い込む（狼夢人）          → 闇の化身から  （狼夢人は本当は光の使徒から）
+   * 変化していない人は変化前なし（null）。
    */
   roles.shownFrom = function shownFrom(game, base, after) {
-    // 縦2段にするのは、闇の化身が配役に入っていて、思い込み系(ONW.AMBIG_TRIGGERS)が実際にいる(プレイヤーか墓地)ときだけ。いなければ普通の演出
-    // ・村人自認(村人・忘却の人狼・狼憑き)になるとき: 忘却の人狼か狼夢人がいる
-    // ・人狼自認(人狼・狼夢人)になるとき: 狼夢人がいる(光の使徒から狼夢人になった人が、変化前から正体を推理できないように)
-    const present = [...Object.values(game.initialRoles || {}), ...(game.center || [])];
-    const dark = (game.selectedRoles || []).includes(ONW.ROLE.DARK_AVATAR);
-    const shown = ONW.shownRole(after), T = ONW.AMBIG_TRIGGERS;
-    const amb = dark && ((shown === ONW.ROLE.VILLAGER && T.villager.some((r) => present.includes(r))) || (shown === ONW.ROLE.WEREWOLF && T.wolf.some((r) => present.includes(r))));
-    // 変化していない普通の村人・人狼・最初から配られた思い込み系も、同じ「光の使徒／闇の化身」カードにする(変化の有無で正体がばれないように)
-    if (!base) return amb ? ONW.AMBIG_FROM : null;
-    if (amb && (base === ONW.ROLE.LIGHT_APOSTLE || base === ONW.ROLE.DARK_AVATAR)) return ONW.AMBIG_FROM;
+    if (!base) return null;
+    if (base !== ONW.ROLE.LIGHT_APOSTLE && base !== ONW.ROLE.DARK_AVATAR) return base;
+    if (ONW.SELF_AS_WOLF.includes(after)) return ONW.ROLE.DARK_AVATAR;
+    if (ONW.SELF_AS_VILLAGER.includes(after)) return ONW.ROLE.LIGHT_APOSTLE;
     return base;
   };
 

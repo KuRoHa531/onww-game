@@ -71,14 +71,10 @@ window.ONW = window.ONW || {};
   /** 占い師・狂った占い師がプレイヤーを占ったときに見える役職(白狼は村人、狼憑きは人狼と出る。それ以外は本当の役職) */
   ONW.seerSees = (role) => (role === ONW.ROLE.WHITE_WOLF ? ONW.ROLE.VILLAGER : role === ONW.ROLE.WOLF_MARKED ? ONW.ROLE.WEREWOLF : role);   // 白狼は村人・狼憑きは人狼と出る。それ以外は本当の役職
   /** 本人が見る自分の役職(忘却の人狼・狼憑きは村人、狼夢人は人狼だと思い込んでいる。怪盗・墓荒らし・後覚者で手にしたときも同じ) */
-  /** 思い込み系: 本人は別の役職だと思い込んでいる役職。今後増やすときはここに足す(配布の演出で「光の使徒／闇の化身」カードにする判定にも使われる) */
+  /** 思い込み系: 本人は別の役職だと思い込んでいる役職。今後増やすときはここに足す(配布の演出で、変化前を本人の自認の陣営の変化役に見せる判定にも使われる) */
   ONW.SELF_AS_VILLAGER = [ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.WOLF_MARKED];   // 本人は村人だと思い込む
   ONW.SELF_AS_WOLF = [ONW.ROLE.WOLF_DREAMER];                                // 本人は人狼だと思い込む(相方のいない一人の人狼)
-  /** 配布の演出で「光の使徒／闇の化身」カードにする条件。闇の化身が配役に入っていて、これらが実際にいるとき、村人自認(villager)・人狼自認(wolf)の人のカードがそうなる */
-  ONW.AMBIG_TRIGGERS = { villager: [ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.WOLF_DREAMER], wolf: [ONW.ROLE.WOLF_DREAMER] };
   ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : role);
-  /** 「光の使徒」と「闇の化身」の両方が書かれたカード(忘却の人狼が、変化前を推理できないようにするための表示用) */
-  ONW.AMBIG_FROM = "__light_dark";
   /** 占い師・狂った占い師が占える墓地の枚数（設定値と墓地の枚数の小さい方） */
   ONW.seerGraveMax = (g) => Math.max(0, Math.min(Number.isFinite(+g.seerGraveCount) ? +g.seerGraveCount : 2, g.graveCount || g.graveTotal || 0));
   /* =====================================================================================
