@@ -47,11 +47,38 @@ window.ONW = window.ONW || {};
     LOVE_TANNER: "love_tanner",
     GOD: "god",
     OPPORTUNIST: "opportunist",
+    STRAW_DOLL: "straw_doll",
+    CAT_SIDHE: "cat_sidhe",
+    BLACK_CAT: "black_cat",
+    AMANOJAKU: "amanojaku",
+    LONE_WOLF: "lone_wolf",
+    WHITE_WOLF: "white_wolf",
+    TOFU_WOLF: "tofu_wolf",
+    FORGETFUL_WOLF: "forgetful_wolf",
+    MERLIN: "merlin",
+    ASSASSIN: "assassin",
+    WOLF_DREAMER: "wolf_dreamer",
+    WOLF_MARKED: "wolf_marked",
+    BAKER: "baker",
+    STAR: "star",
     // TODO: 拡張役職をここに追加していく（例: BELL_MIKO: "bell_miko" など）
   };
 
   /** 人狼系（人狼判定になる役職）/ 狂人系（人狼陣営だが人狼判定ではない役職） */
-  ONW.WOLF_KIND = [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF];
+  ONW.WOLF_KIND = [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF, ONW.ROLE.LONE_WOLF, ONW.ROLE.WHITE_WOLF, ONW.ROLE.TOFU_WOLF, ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.ASSASSIN];
+  /** 夜に仲間から「人狼」として見える人狼系(一匹狼は誰からも見えない) */
+  ONW.VISIBLE_WOLF = ONW.WOLF_KIND.filter((r) => r !== ONW.ROLE.LONE_WOLF);
+  /** 占い師・狂った占い師がプレイヤーを占ったときに見える役職(白狼は村人、狼憑きは人狼と出る。それ以外は本当の役職) */
+  ONW.seerSees = (role) => (role === ONW.ROLE.WHITE_WOLF ? ONW.ROLE.VILLAGER : role === ONW.ROLE.WOLF_MARKED ? ONW.ROLE.WEREWOLF : role);   // 白狼は村人・狼憑きは人狼と出る。それ以外は本当の役職
+  /** 本人が見る自分の役職(忘却の人狼・狼憑きは村人、狼夢人は人狼だと思い込んでいる。怪盗・墓荒らし・後覚者で手にしたときも同じ) */
+  /** 思い込み系: 本人は別の役職だと思い込んでいる役職。今後増やすときはここに足す(配布の演出で「光の使徒／闇の化身」カードにする判定にも使われる) */
+  ONW.SELF_AS_VILLAGER = [ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.WOLF_MARKED];   // 本人は村人だと思い込む
+  ONW.SELF_AS_WOLF = [ONW.ROLE.WOLF_DREAMER];                                // 本人は人狼だと思い込む(相方のいない一人の人狼)
+  /** 配布の演出で「光の使徒／闇の化身」カードにする条件。闇の化身が配役に入っていて、これらが実際にいるとき、村人自認(villager)・人狼自認(wolf)の人のカードがそうなる */
+  ONW.AMBIG_TRIGGERS = { villager: [ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.WOLF_DREAMER], wolf: [ONW.ROLE.WOLF_DREAMER] };
+  ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : role);
+  /** 「光の使徒」と「闇の化身」の両方が書かれたカード(忘却の人狼が、変化前を推理できないようにするための表示用) */
+  ONW.AMBIG_FROM = "__light_dark";
   /** 占い師・狂った占い師が占える墓地の枚数（設定値と墓地の枚数の小さい方） */
   ONW.seerGraveMax = (g) => Math.max(0, Math.min(Number.isFinite(+g.seerGraveCount) ? +g.seerGraveCount : 2, g.graveCount || g.graveTotal || 0));
   /* =====================================================================================
@@ -112,23 +139,39 @@ window.ONW = window.ONW || {};
     (t[pid] = t[pid] || []).push(g.currentRoles[pid]); (c[i] = c[i] || []).push(mine);
     (cd.trail[pid] = cd.trail[pid] || []).push(cd.at[pid]); (cd.trail[gk] = cd.trail[gk] || []).push(cd.at[gk]);
   };
-  ONW.MAD_KIND = [ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST];
+  ONW.MAD_KIND = [ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST, ONW.ROLE.BLACK_CAT];
 
   // 役職の詳細情報。夜の行動順（wakeOrder）が小さいほど先に起きる。
   // wakeOrder が null の役職は夜に何もしない。
   // name / desc は元データ（state.js の ROLE_NAME / 役職説明）からそのまま転記。
   /** 変化役 → 変化先の候補（このオンライン版で使える役職のうち、同じ陣営のもの） */
   ONW.TRANSFORM_GROUPS = {
-    [ONW.ROLE.LIGHT_APOSTLE]: [ONW.ROLE.VILLAGER, ONW.ROLE.SEER, ONW.ROLE.ROBBER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.INSOMNIAC, ONW.ROLE.MASON],
-    [ONW.ROLE.DARK_AVATAR]: [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF, ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST],
-    [ONW.ROLE.SILVER_SHADOW]: [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.GOD, ONW.ROLE.OPPORTUNIST],
+    [ONW.ROLE.LIGHT_APOSTLE]: [ONW.ROLE.VILLAGER, ONW.ROLE.SEER, ONW.ROLE.ROBBER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.INSOMNIAC, ONW.ROLE.MASON, ONW.ROLE.STRAW_DOLL, ONW.ROLE.CAT_SIDHE, ONW.ROLE.MERLIN, ONW.ROLE.WOLF_DREAMER, ONW.ROLE.WOLF_MARKED, ONW.ROLE.BAKER, ONW.ROLE.STAR],
+    [ONW.ROLE.DARK_AVATAR]: [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF, ONW.ROLE.LONE_WOLF, ONW.ROLE.WHITE_WOLF, ONW.ROLE.TOFU_WOLF, ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.ASSASSIN, ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST, ONW.ROLE.BLACK_CAT],
+    [ONW.ROLE.SILVER_SHADOW]: [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.GOD, ONW.ROLE.OPPORTUNIST, ONW.ROLE.AMANOJAKU],
   };
+
+  /** 道連れ系(めくれたとき別の人を巻き込む役職)。vote.js の resolveChain が参照する */
+  ONW.TOMO_ROLES = [ONW.ROLE.STRAW_DOLL, ONW.ROLE.CAT_SIDHE, ONW.ROLE.BLACK_CAT];
 
   ONW.ROLE_INFO = {
     [ONW.ROLE.WEREWOLF]:     { name: "人狼",         team: ONW.TEAM.WOLF,    wakeOrder: 10, desc: "人狼陣営。他の人狼を確認できます。" },
     [ONW.ROLE.BIG_WOLF]:     { name: "大狼",         team: ONW.TEAM.WOLF,    wakeOrder: 11, desc: "人狼陣営。他の人狼系を確認できます。さらに墓地カードをすべて確認できます。" },
+    [ONW.ROLE.LONE_WOLF]:    { name: "一匹狼",       team: ONW.TEAM.WOLF,    wakeOrder: 12, desc: "人狼陣営。相方が分からず、他の人狼からも見えません。" },
+    [ONW.ROLE.WHITE_WOLF]:   { name: "白狼",         team: ONW.TEAM.WOLF,    wakeOrder: 10, desc: "人狼陣営。占い結果が村人と出る人狼です。相方や狂信者からは人狼として見えます。" },
+    [ONW.ROLE.TOFU_WOLF]:    { name: "豆腐の人狼",   team: ONW.TEAM.WOLF,    wakeOrder: 10, desc: "人狼陣営。1票でも投票されると、処刑される人と同時にめくられ、メンタル崩壊で死亡します。" },
+    [ONW.ROLE.FORGETFUL_WOLF]: { name: "忘却の人狼", team: ONW.TEAM.WOLF,    wakeOrder: null, desc: "人狼陣営。自分のことを村人だと思い込んでいる人狼です。占い結果は人狼です。本人視点では村人として夜を認識します。" },
+    [ONW.ROLE.ASSASSIN]:     { name: "アサシン",     team: ONW.TEAM.WOLF,    wakeOrder: 10, desc: "人狼陣営。他の人狼を確認できます。追放されてめくれたら、その場で自分以外の全員から1人を選びます。選んだ相手がマーリンなら、人狼陣営の逆転勝利です。" },
+    [ONW.ROLE.WOLF_DREAMER]: { name: "狼夢人",       team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。自分のことを人狼だと思い込んでいる村人です。占い結果は狼夢人です。夜は相方のいない一人の人狼として認識します。" },
+    [ONW.ROLE.WOLF_MARKED]:  { name: "狼憑き",       team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。自認はただの村人ですが、占われると人狼結果が出ます。" },
+    [ONW.ROLE.MERLIN]:       { name: "マーリン",     team: ONW.TEAM.VILLAGE, wakeOrder: 25, desc: "村人陣営。墓地以外の人狼を知っています。狂人が人狼に昇格する場合も人狼として見えます。アサシンに選ばれると人狼陣営の逆転勝利になるので、マーリンCOはしてはいけません。" },
+    [ONW.ROLE.BAKER]:        { name: "パン屋",       team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。夜の能力はありません。最終盤面にパン屋がいると、昼のタイマー開始時に「パンが焼けました」と全員に知らされます（誰がパン屋かは分かりません）。" },
+    [ONW.ROLE.STAR]:         { name: "スター",       team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。夜の能力はありません。最終盤面でスターを持っている人のカードは、朝のあとの待機時間に全員の画面で表になり、誰がスターか公開されます。" },
+    [ONW.ROLE.BLACK_CAT]:    { name: "黒猫",         team: ONW.TEAM.WOLF,    wakeOrder: null, desc: "人狼陣営。吊られると誰かを道連れにする狂人です。ご主人を道連れにする可能性もあります。" },
     [ONW.ROLE.CULTIST]:      { name: "狂信者",       team: ONW.TEAM.WOLF,    wakeOrder: 20, desc: "人狼陣営。墓地以外の人狼プレイヤーを知っている狂人です。" },
     [ONW.ROLE.MASON]:        { name: "共有者",       team: ONW.TEAM.VILLAGE, wakeOrder: 30, desc: "村人陣営。他の共有者がいれば確認できます。" },
+    [ONW.ROLE.STRAW_DOLL]:   { name: "わら人形",     team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。夜行動はありません。死んだときに1人選んで道連れにします。" },
+    [ONW.ROLE.CAT_SIDHE]:    { name: "猫又",         team: ONW.TEAM.VILLAGE, wakeOrder: null, desc: "村人陣営。自分が処刑されたらランダムな1人を道連れにします。" },
     [ONW.ROLE.SEER]:         { name: "占い師",       team: ONW.TEAM.VILLAGE, wakeOrder: 40, desc: "村人陣営。プレイヤー1人を見るか、墓地カードを確認できます。" },
     [ONW.ROLE.MAD_SEER]:     { name: "狂った占い師", team: ONW.TEAM.WOLF,    wakeOrder: 41, desc: "人狼陣営。占いの能力を持った狂人です。" },
     [ONW.ROLE.ROBBER]:       { name: "怪盗",         team: ONW.TEAM.VILLAGE, wakeOrder: 55, desc: "村人陣営。自分以外1人と役職を交換し、新しい自分の役職だけ確認できます。" },
@@ -143,6 +186,7 @@ window.ONW = window.ONW || {};
     [ONW.ROLE.TANNER]:       { name: "てるてる坊主", team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "第三陣営。自分が追放されると勝利です。" },
     [ONW.ROLE.LOVE_TANNER]:  { name: "一目惚れしてるてる", team: ONW.TEAM.THIRD, wakeOrder: 5, desc: "第三陣営。夜に1人選び、自分が追放されたらその相手も一緒に追放扱いになり、自分と相手が勝利します。" },
     [ONW.ROLE.GOD]:          { name: "神",           team: ONW.TEAM.THIRD,   wakeOrder: 1, desc: "第三陣営。全員の役職と墓地の役職を知っています。追放されなければ神の勝利です。追放された場合は神の祝福が発生し、神以外の全員が勝利します（オポチュニストは追放されていない場合のみ）。" },
+    [ONW.ROLE.AMANOJAKU]:    { name: "天邪鬼",       team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "第三陣営。村人陣営が勝たなければ追加勝利です。" },
     [ONW.ROLE.OPPORTUNIST]:  { name: "オポチュニスト", team: ONW.TEAM.THIRD, wakeOrder: null, desc: "第三陣営。夜の能力はありません。最後まで追放されなければ、ほかの勝敗に追加で勝利します。" },
   };
 
@@ -183,7 +227,7 @@ window.ONW = window.ONW || {};
       phase: ONW.PHASE.TITLE,
 
       // --- セットアップ内容 ---
-      roleCounts: { werewolf: 2, big_wolf: 0, dark_avatar: 0, madman: 0, mad_seer: 0, cultist: 0, villager: 2, seer: 1, robber: 1, relic_robber: 0, troublemaker: 0, insomniac: 0, mason: 0, light_apostle: 0, tanner: 0, silver_shadow: 0, love_tanner: 0, god: 0, opportunist: 0 },
+      roleCounts: { werewolf: 2, big_wolf: 0, dark_avatar: 0, madman: 0, mad_seer: 0, cultist: 0, villager: 2, seer: 1, robber: 1, relic_robber: 0, troublemaker: 0, insomniac: 0, mason: 0, light_apostle: 0, tanner: 0, silver_shadow: 0, love_tanner: 0, god: 0, opportunist: 0, straw_doll: 0, cat_sidhe: 0, black_cat: 0, amanojaku: 0, lone_wolf: 0, white_wolf: 0, tofu_wolf: 0, forgetful_wolf: 0, merlin: 0, assassin: 0, wolf_dreamer: 0, wolf_marked: 0, baker: 0, star: 0 },
       revealTransforms: true,         // 変化公開（昼開始時に「変化前 → 変化後」を公開）
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）

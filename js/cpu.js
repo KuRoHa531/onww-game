@@ -13,6 +13,8 @@ window.ONW = window.ONW || {};
   const WOLF = () => ONW.WOLF_KIND;
   const isWolf = (r) => WOLF().includes(r);
   const isMad = (r) => ONW.MAD_KIND.includes(r);
+  /** 人外(村人陣営でない役職: 人狼・狂人・てるてる・第三陣営など)。奪った/最終的に手にした役職がこれなら、昼は村人側と偽る */
+  const isNonVillage = (r) => ONW.roles.getInfo(r).team !== "village";
 
   /** CPUの夜行動（占い師系 → 怪盗 → 墓荒らし → いたずらっ子の順）。占いは初期役職を見るので順序に影響されない */
   cpu.runNight = function (g, stage) {   // stage: "init" | "seer" | "relic" | "robber" | "tm"（省略時は全部を起床順に実行）
@@ -23,11 +25,17 @@ window.ONW = window.ONW || {};
     const role = (p) => g.initialRoles[p.id];
     // 人狼系は互いを、狂信者は人狼系を知っている / 大狼は墓地をすべて知っている
     if (all || stage === "init") cpus.forEach((p) => {
-      if (isWolf(role(p))) g.players.forEach((q) => { if (q.id !== p.id && isWolf(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
+      const vis = (r) => ONW.VISIBLE_WOLF.includes(r);   // 一匹狼は誰からも見えない
+      if (vis(role(p)) && role(p) !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== p.id && vis(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
       if (role(p) === "cultist") {
-        g.players.forEach((q) => { if (isWolf(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
+        g.players.forEach((q) => { if (vis(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
         const mid = g.players.some((q) => isWolf(role(q))) ? null : ONW.vote.certainPromotion(g);   // 人狼不在で昇格が確定している狂人 = ご主人
         if (mid && mid !== p.id) infoOf(g, p.id).known[mid] = "werewolf";                           // CPUは人狼側の仲間として扱う（役職は不明）
+      }
+      if (role(p) === "merlin") {   // マーリン: 墓地以外の人狼を知っている（人狼不在なら昇格する狂人）
+        g.players.forEach((q) => { if (q.id !== p.id && isWolf(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
+        const mid = g.players.some((q) => isWolf(role(q))) ? null : ONW.vote.certainPromotion(g);
+        if (mid && mid !== p.id) infoOf(g, p.id).known[mid] = "werewolf";
       }
       if (role(p) === "mason") g.players.forEach((q) => { if (q.id !== p.id && role(q) === "mason") infoOf(g, p.id).known[q.id] = "mason"; });   // 共有者は互いを知っている
       if (role(p) === "big_wolf") g.center0.forEach((c, idx) => infoOf(g, p.id).grave.push({ idx, role: c }));
@@ -54,15 +62,15 @@ window.ONW = window.ONW || {};
         i.grave.forEach((x) => g.nightLogsAll.push(`${label} ${p.name} は 墓地${x.idx + 1} を確認し、${rn(x.role)} でした。`));
       } else {
         const t = fp ? g.players.find((q) => q.id === fp) : pick(g.players.filter((q) => q.id !== p.id));
-        i.mode = "player"; i.target = t.id; i.known[t.id] = rolesNow[t.id];
-        g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${rn(rolesNow[t.id])} でした。`);
+        i.mode = "player"; i.target = t.id; i.known[t.id] = ONW.seerSees(rolesNow[t.id]);
+        g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${rn(ONW.seerSees(rolesNow[t.id]))} でした。`);
       }
     };
     const doRobber = (p, label) => {
       const f = forced(p), i = infoOf(g, p.id);
       const t = validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : pick(g.players.filter((q) => q.id !== p.id));
       ONW.swapPlayers(g, p.id, t.id);
-      i.mode = "robber"; i.target = t.id; i.newRole = g.currentRoles[p.id];
+      i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]);
       i.known[p.id] = i.newRole; i.known[t.id] = "robber";
       g.nightLogsAll.push(`${label} ${p.name} は ${t.name} と役職を交換し、${rn(i.newRole)} になりました。`);
     };
@@ -120,7 +128,7 @@ window.ONW = window.ONW || {};
   /** 夜が全部終わったあと（いたずらっ子の反映後）に、CPUの後覚者が最終役職を知る */
   cpu.afterNight = function (g) {
     g.players.filter((p) => p.isCpu && g.initialRoles[p.id] === "insomniac").forEach((p) => {
-      const i = infoOf(g, p.id), fin = g.currentRoles[p.id];
+      const i = infoOf(g, p.id), fin = ONW.shownRole(g.currentRoles[p.id]);
       i.mode = "insomniac"; i.finalRole = fin; i.known[p.id] = fin;
     });
   };
@@ -172,10 +180,31 @@ window.ONW = window.ONW || {};
     const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleInSetup(g, r));
     return fb.length ? pick(fb) : "villager";
   }
+  /** あり得る村役職 = この試合に実在する村人陣営の役職（変化後の役職・墓地・COの候補）。村人は常に含む */
+  function villageRolesInPlay(g) {
+    const pool = [...new Set([...setupRoles(g), ...(g.coDeck || []).map((x) => x.r)])]
+      .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && r !== "merlin" && !ONW.SELF_AS_VILLAGER.includes(r) && !ONW.SELF_AS_WOLF.includes(r));   // マーリンCOは禁止。思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
+    return pool.includes("villager") ? pool : ["villager", ...pool];
+  }
+  const fakeVillageRole = (g) => pick(villageRolesInPlay(g));
+  /**
+   * 夜のあとに人外(人狼・狂人・てるてる・第三陣営)の役職を手にしていた怪盗・墓荒らし・後覚者のCPUの騙り。
+   *   A) 「村人役を手にした」という嘘（本人の役職COのまま、結果だけ偽る）
+   *   B) そもそも最初から村人役だったと名乗る（あり得る村役職を普通に騙る）
+   */
+  function nonVillageLie(g, p, kind, i, now) {
+    if (Math.random() < 0.5) {
+      const role = fakeVillageRole(g);
+      if (kind === "robber") return { co: "robber", result: { short: `${nameOf(g, i.target)} → ${rn(role)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(role)} になりました。`, claim: { kind: "robber", target: i.target, role } } };
+      if (kind === "relic") return { co: "relic_robber", result: { short: `墓地${i.relic.graveIdx + 1} → ${rn(role)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(role)} になりました。`, claim: { kind: "relic", role } } };
+      return { co: "insomniac", result: { short: `→ ${rn(role)}`, text: `最終的な役職は ${rn(role)} でした。`, claim: { kind: "insomniac", role } } };
+    }
+    return lieClaim(g, p, now, fakeVillageRole(g));
+  }
   /** 騙りの CO と結果開示（本家の mem.fakeRole）。戻り値: { co, result }（resultはnullのこともある） */
-  function lieClaim(g, p, selfRole) {
+  function lieClaim(g, p, selfRole, forceCo) {
     const others = g.players.filter((q) => q.id !== p.id);
-    const co = pickLieRole(g);
+    const co = forceCo || pickLieRole(g);
     if (co === "seer") {
       const t = fakeSeerTarget(g, p);
       if (!t) return { co: "villager", result: null };
@@ -193,7 +222,7 @@ window.ONW = window.ONW || {};
       return { co, result: { short: `${t.name} → ${rn(role)}`, text: `${t.name} の役職を奪って ${rn(role)} になりました。`, claim: { kind: "robber", target: t.id, role } } };
     }
     if (co === "mason") return { co, result: { short: "自分だけ", text: "共有者は 私だけでした。", claim: { kind: "mason" } } };
-    return { co: "villager", result: null };
+    return { co: forceCo && forceCo !== "villager" ? forceCo : "villager", result: null };   // その他の村役職は、結果なしでCOだけする
   }
 
   /**
@@ -204,9 +233,13 @@ window.ONW = window.ONW || {};
   cpu.plan = function (g) {
     const plan = [];
     g.players.filter((p) => p.isCpu).forEach((p) => {
-      const r = g.initialRoles[p.id], i = infoOf(g, p.id);
+      const r = ONW.shownRole(g.initialRoles[p.id]), i = infoOf(g, p.id);   // 忘却の人狼のCPUは自分を村人だと思っている
       const others = g.players.filter((q) => q.id !== p.id);
       let coRole = null, result = null;
+      if (g.currentRoles[p.id] === "star") {                               // スター: 待機時間に全員へ公開済みなので、必ずスターCOする
+        plan.push({ p, text: `${rn("star")}CO`, co: "star", claim: { kind: "villager" }, gap: 3500 });
+        return;
+      }
       if (isWolfSide(r)) {                                                 // 人狼陣営は必ず騙る（本家 liarMode）
         const lie = lieClaim(g, p, r);
         coRole = lie.co; result = lie.result;
@@ -218,25 +251,28 @@ window.ONW = window.ONW || {};
         result = { short: i.grave.map((c) => `墓地${c.idx + 1} → ${rn(c.role)}`).join("、"), text: i.grave.map((c) => `墓地${c.idx + 1} を見て ${rn(c.role)}`).join("、") + " でした。", claim: { kind: "seer-grave" } };
       } else if (r === "robber") {
         coRole = "robber";
-        const shown = isWolf(i.newRole) ? "villager" : i.newRole; // 人狼になったら村人と偽る
-        result = { short: `${nameOf(g, i.target)} → ${rn(shown)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(shown)} になりました。`, claim: { kind: "robber", target: i.target, role: shown } };
+        if (isNonVillage(i.newRole)) { const lie = nonVillageLie(g, p, "robber", i, i.newRole); coRole = lie.co; result = lie.result; }   // 人外を手にした: 村人役を騙る
+        else result = { short: `${nameOf(g, i.target)} → ${rn(i.newRole)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(i.newRole)} になりました。`, claim: { kind: "robber", target: i.target, role: i.newRole } };
       } else if (r === "relic_robber" && i.relic) {                    // 墓荒らし
         coRole = "relic_robber";
-        const shown = isWolf(i.relic.newRole) ? "villager" : i.relic.newRole;
-        result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(shown)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(shown)} になりました。`, claim: { kind: "relic", role: shown } };
+        if (isNonVillage(i.relic.newRole)) { const lie = nonVillageLie(g, p, "relic", i, i.relic.newRole); coRole = lie.co; result = lie.result; }
+        else result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(i.relic.newRole)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(i.relic.newRole)} になりました。`, claim: { kind: "relic", role: i.relic.newRole } };
       } else if (r === "troublemaker" && i.pair) {                     // いたずらっ子
         coRole = "troublemaker";
         result = { short: `${nameOf(g, i.pair[0])} ⇄ ${nameOf(g, i.pair[1])}`, text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました。`, claim: { kind: "troublemaker" } };
       } else if (r === "insomniac" && i.finalRole) {                   // 後覚者
         coRole = "insomniac";
-        const shown = isWolf(i.finalRole) ? "insomniac" : i.finalRole;   // 人狼になっていたら隠す
-        result = { short: `→ ${rn(shown)}`, text: `最終的な役職は ${rn(shown)} でした。`, claim: { kind: "insomniac", role: shown } };
+        if (isNonVillage(i.finalRole)) { const lie = nonVillageLie(g, p, "insomniac", i, i.finalRole); coRole = lie.co; result = lie.result; }
+        else result = { short: `→ ${rn(i.finalRole)}`, text: `最終的な役職は ${rn(i.finalRole)} でした。`, claim: { kind: "insomniac", role: i.finalRole } };
       } else if (r === "mason") {                                       // 共有者: 相方の名前を開示
         coRole = "mason";
         const mates = others.filter((q) => i.known[q.id] === "mason");
         result = { short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした。` : "共有者は 私だけでした。", claim: { kind: "mason" } };
-      } else if (r === "villager") {                                    // 村人: 75%でCO、残りも60%は「COなし寄りだけど村人」と言う（本家）
-        if (Math.random() < 0.75 || Math.random() < 0.6) coRole = "villager";
+      } else if (r === "baker") {                                        // パン屋: パンが焼けたことは全員に知らされるので、必ずパン屋COする
+        coRole = "baker";
+      } else if (r === "villager" || r === "merlin") {   // マーリンはマーリンCO禁止なので、村人として振る舞う
+        // 村人: 75%でCO、残りも60%は「COなし寄りだけど村人」と言う（本家）
+        if (ONW.SELF_AS_VILLAGER.includes(g.initialRoles[p.id]) || Math.random() < 0.75 || Math.random() < 0.6) coRole = "villager";   // 忘却の人狼・狼憑きは自分を村人だと思っているので、必ず村人COする
       } else if (r === "tanner" || r === "love_tanner") {               // てるてる系: 55%村人騙り、残りの半分は占い騙り（本家）
         if (Math.random() < 0.55) coRole = "villager";
         else if (Math.random() < 0.5) {
@@ -257,16 +293,23 @@ window.ONW = window.ONW || {};
     return plan;
   };
 
+  /** アサシンのCPUが暗殺する相手: 仲間と分かっている人は避け、あとはランダム */
+  cpu.assassinPick = function (g, id, cands) {
+    const i = infoOf(g, id);
+    const pool = cands.filter((c) => !isWolf(i.known[c]));
+    return pick(pool.length ? pool : cands);
+  };
+
   const alive = (g, id) => !(g.deadIds || []).includes(id);
   /** 投票先候補（本家 chooseBestVoteTarget: 自分以外・生存・共有者の相方は除く） */
   function voteCandidates(g, p) {
-    const i = infoOf(g, p.id), me = g.currentRoles[p.id];
+    const i = infoOf(g, p.id), me = ONW.shownRole(g.currentRoles[p.id]);
     return g.players.filter((q) => q.id !== p.id && alive(g, q.id) && !(me === "mason" && i.known[q.id] === "mason"));
   }
 
   /** 投票先の評価点（本家 scoreTargetForCpu を、この版にある役職に合わせたもの） */
   function scoreVote(g, p, q) {
-    const i = infoOf(g, p.id), me = g.currentRoles[p.id], ini = g.initialRoles[p.id];
+    const i = infoOf(g, p.id), me = ONW.shownRole(g.currentRoles[p.id]), ini = ONW.shownRole(g.initialRoles[p.id]);
     const wolfSide = isWolfSide(me);
     const k = i.known[q.id];
     const claims = g.cpuClaims || [];

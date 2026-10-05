@@ -816,6 +816,9 @@ body.chat-mode .tb-name .av { display: none; }
 .tb-seat.sel .tb-card { transform: translateY(-9px); animation: none; filter: drop-shadow(0 0 9px rgba(201,70,61,.95)); }
 .tb-seat.sel .tb-back { border-color: var(--blood); }
 .tb-seat.dead .tb-front { border-color: var(--blood); box-shadow: 0 0 16px rgba(201,70,61,.85); }
+.tb-seat.gone .tb-back { background: linear-gradient(150deg, #3a3a3f 0%, #17171a 55%, #060607 100%); border-color: #5a5a60; color: #4a4a50; }
+.tb-seat.gone .tb-card { filter: grayscale(1) brightness(.75); }
+.tb-seat.gone .tb-name { color: #77777e; text-decoration: line-through; }
 .tb-seat.dead .tb-name { color: #e58a83; text-decoration: line-through; }
 
 /* カード右上の札（票数 / 追放 / 投票済み） */
@@ -1132,3 +1135,44 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 #net-banner .btn { padding: 4px 10px; font-size: 12px; }
 .rejoin-box { margin-bottom: 14px; padding: 10px 12px; border: 1px solid var(--gold-dim); border-radius: 10px; text-align: center; }
 .rejoin-box .lede { margin: 0 0 8px; }
+
+/* ---- PC版: 右上の📖ガイドボタンとデバッグボタンを大きく ----
+   スマホの「PC版サイト」表示は画面幅が約980pxになるため、1000pxだと当たらない。900pxから効かせる。
+   ヘッダーのタイトル等は動かさない。ボタンの列は右端にぴったり寄せて、ヘッダーが空けてある右の余白(46px)に収める */
+@media (min-width: 900px) {
+  .wiki-btn, .dbg-fab { width: 46px; height: 46px; border-width: 2px; }
+  .wiki-btn { font-size: 26px; }
+  .dbg-fab { font-size: 24px; }
+  .top-right { right: 0; top: 4px; gap: 6px; }
+}
+@media (min-width: 1000px) {
+  .wiki-btn, .dbg-fab { width: 50px; height: 50px; }
+  .wiki-btn { font-size: 28px; }
+  .dbg-fab { font-size: 26px; }
+  .top-right { right: 4px; }
+}
+
+/* 「光の使徒／闇の化身」のカード: 枠は上半分が緑・下半分が赤、名前も上=光の使徒・下=闇の化身 */
+.dl-face--amb { padding: 0; gap: 0; justify-content: stretch; border: 2px solid transparent;
+  background: linear-gradient(#1b1d2b, #1b1d2b) padding-box, linear-gradient(to bottom, #55ff55 50%, #ff5555 50%) border-box; }
+.dl-face--amb .amb-half { flex: 1 1 50%; display: flex; align-items: center; justify-content: center; width: 100%; }
+.dl-face--amb .amb-half--light { color: #55ff55; }
+.dl-face--amb .amb-half--dark { color: #ff5555; }
+
+/* ---- スター公開（待機時間）: 表になったスターのカードが金色に光り、「★スター」の札が付く ---- */
+.tb-seat.starup .tb-card { filter: drop-shadow(0 0 12px rgba(255,205,70,.95)); }
+.tb-seat.starup .tb-badge { background: #b8860b; border-color: #ffd54a; color: #fff8dc; }
+/* ---- パン屋: 昼タイマー開始時のバナー ---- */
+.bread-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(60,38,12,.94); border: 2px solid #e8b04a; color: #ffe9bf; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
+.bread-banner__icon { font-size: 1.5em; }
+@keyframes bread-in { 0% { opacity: 0; transform: translate(-50%, -14px) scale(.9); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1.04); } 16% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -8px) scale(1); } }
+
+/* ---- ロビー: 名前を押したときの操作メニュー（ホストのみ） ---- */
+#pm-overlay { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
+.pm-card { width: min(320px, 100%); display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #22253a; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.pm-title { color: var(--gold); font-size: 17px; font-weight: 700; text-align: center; overflow-wrap: anywhere; padding-bottom: 4px; }
+.pm-btn { width: 100%; }
+.pm-btn--danger { border-color: var(--blood); color: #ff8a80; }
+.pm-btn--close { margin-top: 4px; }
+.info-sep { border: 0; border-top: 1px solid var(--line); margin: 10px 0 6px; }
+#skip-confirm .sc-abandon { width: 100%; margin-top: 12px; border-color: var(--blood); color: #ff8a80; }

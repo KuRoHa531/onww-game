@@ -82,9 +82,9 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason"],
-    wolf: ["dark_avatar", "werewolf", "big_wolf", "madman", "mad_seer", "cultist"],
-    third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist"],
+    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star"],
+    wolf: ["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "madman", "mad_seer", "cultist", "black_cat"],
+    third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku"],
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 

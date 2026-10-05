@@ -9,7 +9,14 @@ window.ONW = window.ONW || {};
   const ROLES_V2 = ["werewolf", "dark_avatar", "madman", "villager", "seer", "robber", "light_apostle", "tanner", "silver_shadow"];   // 旧コード(ONW2)の並び
   const ROLES_V3 = [...ROLES_V2, "big_wolf", "mad_seer", "cultist", "relic_robber", "troublemaker", "insomniac"];                   // 旧コード(ONW3)の並び
   const ROLES_V4 = [...ROLES_V3, "mason"];                                                                                           // 旧コード(ONW4)の並び
-  const ROLES = [...ROLES_V4, "love_tanner", "god", "opportunist"];                                                                  // 現在(ONW5)。末尾に足していく
+  const ROLES_V5 = [...ROLES_V4, "love_tanner", "god", "opportunist"];                                                                // 旧コード(ONW5)の並び
+  const ROLES_V6 = [...ROLES_V5, "straw_doll", "cat_sidhe", "black_cat"];                                                            // 旧コード(ONW6)の並び
+  const ROLES_V7 = [...ROLES_V6, "amanojaku"];                                                                                      // 旧コード(ONW7)の並び
+  const ROLES_V8 = [...ROLES_V7, "lone_wolf", "white_wolf", "tofu_wolf"];                                                       // 旧コード(ONW8)の並び
+  const ROLES_V9 = [...ROLES_V8, "forgetful_wolf"];                                                                                  // 旧コード(ONW9)の並び
+  const ROLES_V10 = [...ROLES_V9, "merlin", "assassin"];                                                                           // 旧コード(ONW10)の並び
+  const ROLES_V11 = [...ROLES_V10, "wolf_dreamer", "wolf_marked"];                                                                 // 旧コード(ONW11)の並び
+  const ROLES = [...ROLES_V11, "baker", "star"];                                                                                     // 現在(ONW12)。末尾に足していく
   const ROLES_V1 = ["werewolf", "madman", "villager", "robber", "seer"];   // 旧コード(ONW1)の並び
   const clamp = (v, a, b, d) => (Number.isFinite(+v) && v !== null && v !== "" ? Math.max(a, Math.min(b, Math.round(+v))) : d);
   const store = {
@@ -45,14 +52,14 @@ window.ONW = window.ONW || {};
   S.encode = function (rules) {
     const r = S.sanitize(rules), t = r.timers;
     const body = b64.enc(JSON.stringify([ROLES.map((k) => r.roleCounts[k]), r.graveCount, r.cpuCount, r.fake ? 1 : 0, [t.night, t.morning, t.day, t.vote], r.reveal ? 1 : 0, r.cand ? 1 : 0, r.off, r.seerGrave, r.villageSize]));
-    return `ONW5-${body}-${chk(body)}`;
+    return `ONW12-${body}-${chk(body)}`;
   };
   /** 正しいコードならルールを返す。壊れていれば null（旧形式 ONW1 も読める） */
   S.decode = function (code) {
     try {
-      const m = /^(ONW[12345])-([A-Za-z0-9_-]+)-([0-9A-Z]{2})$/.exec(String(code || "").replace(/\s+/g, ""));
+      const m = /^(ONW(?:1[012]|[123456789]))-([A-Za-z0-9_-]+)-([0-9A-Z]{2})$/.exec(String(code || "").replace(/\s+/g, ""));
       if (!m || chk(m[2]) !== m[3]) return null;
-      const v2 = m[1] !== "ONW1", names = m[1] === "ONW5" ? ROLES : m[1] === "ONW4" ? ROLES_V4 : m[1] === "ONW3" ? ROLES_V3 : v2 ? ROLES_V2 : ROLES_V1;
+      const v2 = m[1] !== "ONW1", names = m[1] === "ONW12" ? ROLES : m[1] === "ONW11" ? ROLES_V11 : m[1] === "ONW10" ? ROLES_V10 : m[1] === "ONW9" ? ROLES_V9 : m[1] === "ONW8" ? ROLES_V8 : m[1] === "ONW7" ? ROLES_V7 : m[1] === "ONW6" ? ROLES_V6 : m[1] === "ONW5" ? ROLES_V5 : m[1] === "ONW4" ? ROLES_V4 : m[1] === "ONW3" ? ROLES_V3 : v2 ? ROLES_V2 : ROLES_V1;
       const a = JSON.parse(b64.dec(m[2]));
       if (!Array.isArray(a) || !Array.isArray(a[0]) || a[0].length !== names.length || !Array.isArray(a[4])) return null;
       const rc = {}; names.forEach((k, i) => { rc[k] = a[0][i]; });

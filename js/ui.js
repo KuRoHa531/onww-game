@@ -40,6 +40,7 @@ window.ONW = window.ONW || {};
     if (![ONW.PHASE.ONLINE_DAY, ONW.PHASE.ONLINE_VOTE].includes(game.phase)) ui.closeChat();
     if (game.phase !== ONW.PHASE.ONLINE_DAY) ui.closeInfo();   // 昼以外では情報確認を閉じる   // 昼・投票以外ではチャットの拡大を閉じる
     if (game.phase !== ONW.PHASE.ONLINE_RESULT) ui.closeResultChat();
+    if (game.phase !== ONW.PHASE.LOBBY) ui.closePlayerMenu(); else ui.refreshPlayerMenu();   // ロビーの名前メニュー
     document.body.classList.toggle("is-title", game.phase === ONW.PHASE.TITLE);
     document.getElementById("phase-label").textContent = phaseName(game);
     document.getElementById("day-clock").textContent =
@@ -179,9 +180,9 @@ window.ONW = window.ONW || {};
       <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.toggleGroup('${key}')">
         <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
       </button>`;
-    const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason"];
-    const wolfLike = ["werewolf", "big_wolf"], madLike = ["madman", "mad_seer", "cultist"], dark = ["dark_avatar"];
-    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist"];
+    const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star"];
+    const wolfLike = ["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin"], madLike = ["madman", "mad_seer", "cultist", "black_cat"], dark = ["dark_avatar"];
+    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku"];
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -293,6 +294,13 @@ window.ONW = window.ONW || {};
     // 名前の左にアイコン（画像があれば画像、無ければ頭文字の丸）。画像のある他人には小さな通報ボタン
     const A = ONW.account, myUid = A && A.user ? A.user.id : null;
     const plName = (p) => `<span class="pl">${ONW.profile.link(p.uid, p.name, `${A.avatarHtml(p.name, { uid: p.uid, v: p.av }, "av--sm")}<span>${esc(p.name)}</span>`)}${myUid && p.uid && p.av && p.uid !== myUid ? `<button class="rep-btn" title="アイコンを通報" onclick="ONW.friends.report('${esc(p.uid)}')">⚑</button>` : ""}</span>`;
+    // ロビーの名前: ホストが（自分以外の）人間の名前を押すと操作メニューが重なって出る。ホスト以外は押しても何も出ない（プロフィールも開かない）
+    const lobbyName = (p) => {
+      const idx = all.indexOf(p), inner = `${A.avatarHtml(p.name, { uid: p.uid, v: p.av }, "av--sm")}<span>${esc(p.name)}</span>`;
+      const rep = myUid && p.uid && p.av && p.uid !== myUid ? `<button class="rep-btn" title="アイコンを通報" onclick="ONW.friends.report('${esc(p.uid)}')">⚑</button>` : "";
+      const menu = isHost && idx !== game.meIndex;
+      return `<span class="pl">${menu ? `<span class="pf-link" role="button" tabindex="0" onclick="ONW.ui.openPlayerMenu(${idx})">${inner}</span>` : inner}${rep}</span>`;
+    };
     const canInvite = isHost && !!(A && A.user);
     let hint = "";
     if (isHost) hint = total < size ? `あと${size - total}人必要です（CPUを増やして補えます）。` : have !== need ? `配役の枚数が合っていません（必要${need}枚 / 現在${have}枚）。` : !allReady ? "全員が「準備完了」になると開始できます。" : "開始できます。";
@@ -304,9 +312,9 @@ window.ONW = window.ONW || {};
         <p class="lede">部屋コード（友達に教えてください）</p>
         <div class="night-step__role" style="letter-spacing:.3em;">${ONW.net.code}</div>
         <h2>参加者 ${total}/${size}</h2>
-        ${players.map((p) => `<div class="result-role">${plName(p)}<span>${isHost && p.status !== "host" && p.status !== "offline" ? `<button class="btn tf-chip" onclick="ONW.ui.confirmTransfer(${all.indexOf(p)})">ホスト譲渡</button> ` : ""}${badge(p.status)}</span></div>`).join("")}
+        ${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
         ${Array.from({ length: game.cpuCount || 0 }, (_, i) => `<div class="result-role"><span>${esc((game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`).join("")}
-        ${specs.length ? `<h2>観戦者 ${specs.length}</h2>${specs.map((p) => `<div class="result-role">${plName(p)}<span class="st st-spec">観戦</span></div>`).join("")}` : ""}
+        ${specs.length ? `<h2>観戦者 ${specs.length}</h2>${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint">${hint}</p>
         ${canInvite && game.invOpen ? `<div class="invite-panel"><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
@@ -322,6 +330,66 @@ window.ONW = window.ONW || {};
         ${game.showSettings ? settingsPanel(game, isHost, total) : ""}
       </section>`;
   };
+
+  // ---- ロビー: 名前を押したときの操作メニュー（ホストだけ。#app の外に重ねるので、ロビーが再描画されても閉じない）----
+  let pmName = null;   // メニューを開いている人の名前（人数や並びが変わっても同じ人を指すため、番号ではなく名前で覚える）
+  const pmIndex = () => (ONW.game.lobbyPlayers || []).findIndex((p) => p.name === pmName);
+  ui.openPlayerMenu = function (idx) {
+    const g = ONW.game, p = (g.lobbyPlayers || [])[idx];
+    if (!ONW.net.isHost || g.phase !== ONW.PHASE.LOBBY || !p || idx === g.meIndex) return;
+    pmName = p.name;
+    ui.refreshPlayerMenu();
+  };
+  ui.closePlayerMenu = function () { pmName = null; const w = document.getElementById("pm-overlay"); if (w) w.remove(); };
+  /** 開いているメニューを最新のロビーの状態で描き直す（相手が抜けた / 試合が始まったら閉じる） */
+  ui.refreshPlayerMenu = function () {
+    if (pmName === null) return;
+    const g = ONW.game, idx = pmIndex(), p = (g.lobbyPlayers || [])[idx];
+    if (!ONW.net.isHost || g.phase !== ONW.PHASE.LOBBY || !p || idx === g.meIndex) { ui.closePlayerMenu(); return; }
+    let w = document.getElementById("pm-overlay");
+    if (!w) {
+      w = document.createElement("div");
+      w.id = "pm-overlay";
+      w.onclick = (e) => { if (e.target === w) ui.closePlayerMenu(); };
+      document.body.appendChild(w);
+    }
+    const offline = p.status === "offline", prof = !!(p.uid && ONW.account && ONW.account.user);
+    w.innerHTML = `<div class="pm-card" role="dialog" aria-modal="true">
+      <div class="pm-title">${esc(p.name)}</div>
+      <button class="btn pm-btn" ${offline ? "disabled" : ""} onclick="ONW.ui.pmTransfer()">ホスト譲渡</button>
+      <button class="btn pm-btn" onclick="ONW.ui.pmSpectate()">${p.spec ? "観戦 OFF にする（参加に戻す）" : "観戦 ON にする"}</button>
+      <button class="btn pm-btn pm-btn--danger" onclick="ONW.ui.pmKick()">キック</button>
+      ${prof ? `<button class="btn pm-btn" onclick="ONW.ui.pmProfile()">プロフィールを見る</button>` : ""}
+      <button class="btn pm-btn pm-btn--close" onclick="ONW.ui.closePlayerMenu()">閉じる</button>
+    </div>`;
+  };
+  ui.pmTransfer = function () {
+    const i = pmIndex(); if (i < 0) return;
+    ui.closePlayerMenu();
+    ui.confirmTransfer(i);
+  };
+  ui.pmSpectate = function () {
+    const g = ONW.game, i = pmIndex(), p = (g.lobbyPlayers || [])[i];
+    if (!p || !ONW.net.isHost) return;
+    const total = (g.lobbyPlayers || []).filter((q) => !q.spec).length + (g.cpuCount || 0);
+    if (p.spec && total >= (g.villageSize || 4)) { window.alert("定員に達しているため、参加に戻せません。"); return; }
+    ONW.net.setSpectateOf(i, !p.spec);
+    ui.closePlayerMenu();
+  };
+  ui.pmKick = function () {
+    const i = pmIndex(), p = (ONW.game.lobbyPlayers || [])[i];
+    if (!p || !ONW.net.isHost) return;
+    if (!window.confirm(`「${p.name}」さんをルームからキックしますか？`)) return;
+    ui.closePlayerMenu();
+    ONW.net.kickPlayer(i);
+  };
+  ui.pmProfile = function () {
+    const p = (ONW.game.lobbyPlayers || [])[pmIndex()];
+    if (!p) return;
+    ui.closePlayerMenu();
+    ONW.profile.open(p.uid, p.name);
+  };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") ui.closePlayerMenu(); });
 
   /** 霊界チャット（観戦者・昼中に死亡した人）: 「議論」「霊界」の切り替えと入力欄 */
   /** ロビー: ホスト譲渡（確認ダイアログ → 部屋設定ごと相手へ引き継ぐ） */
@@ -431,10 +499,18 @@ window.ONW = window.ONW || {};
     const wrap = document.createElement("div");
     wrap.id = "skip-confirm";
     wrap.innerHTML = `<div class="sc-box" role="dialog" aria-modal="true"><p class="sc-q">このターンスキップしますか？</p>
-      <div class="sc-btns"><button class="btn btn--primary" onclick="ONW.ui.confirmSkip()">はい</button><button class="btn" onclick="ONW.ui.closeSkip()">いいえ</button></div></div>`;
+      <div class="sc-btns"><button class="btn btn--primary" onclick="ONW.ui.confirmSkip()">はい</button><button class="btn" onclick="ONW.ui.closeSkip()">いいえ</button></div>
+      <button class="btn sc-abandon" onclick="ONW.ui.confirmAbandon()">廃村</button></div>`;
     // 外側タップでは閉じない（ダブルタップ直後のクリックが背景に当たって即消えるため）。「いいえ」を押すまで残る
     document.body.appendChild(wrap);
     ui._skipPhase = g.phase;
+  };
+  /** 廃村: 試合を打ち切って全員をルームへ戻す（押し間違い防止に、もう一度確認する） */
+  ui.confirmAbandon = function () {
+    const g = ONW.game, same = ui._skipPhase === g.phase;
+    if (!window.confirm("廃村にしますか？\nこの試合は結果なしで終わり、全員がルームに戻ります。")) return;
+    ui.closeSkip();
+    if (same && canSkip(g)) ONW.net.abandonGame();
   };
   ui.confirmSkip = function () {
     const g = ONW.game, same = ui._skipPhase === g.phase;
@@ -497,7 +573,9 @@ window.ONW = window.ONW || {};
           ${me
             ? `<div class="dl-card dl-fly dl-big" data-fly style="${D(pStart + pStep * idx)}">
                  <div class="dl-flipper" style="${D(flip1)}">
-                   <div class="dl-face dl-face--a dl-team-${(from || info).team}" style="${from ? D(flip2 - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b></div>
+                   ${game.myFrom === ONW.AMBIG_FROM
+                     ? `<div class="dl-face dl-face--a dl-face--amb" style="${D(flip2 - 0.2)}"><b class="amb-half amb-half--light">光の使徒</b><b class="amb-half amb-half--dark">闇の化身</b></div>`
+                     : `<div class="dl-face dl-face--a dl-team-${(from || info).team}" style="${from ? D(flip2 - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b></div>`}
                    ${from ? `<div class="dl-face dl-face--b dl-team-${info.team}" style="${D(flip2)}">${ui.roleIcon(game.myRole, "role-icon--face")}<b>${esc(info.name)}</b></div>` : ""}
                  </div>
                </div>`
@@ -515,7 +593,7 @@ window.ONW = window.ONW || {};
         <div class="dl-result" style="${D(doneAt)}">
           ${ui.roleIcon(game.myRole, "role-icon--big")}
           <div class="night-step__role t-${info.team}">${info.name}</div>
-          ${from ? `<p class="night-step__hint">${esc(from.name)} → ${esc(info.name)} に変化しました。</p>` : ""}
+          ${from ? `<p class="night-step__hint">${game.myFrom === ONW.AMBIG_FROM ? "光の使徒・闇の化身" : esc(from.name)} → ${esc(info.name)} に変化しました。</p>` : ""}
           <p class="night-step__hint">${info.desc}</p>
         </div>
       </section>`;
@@ -640,6 +718,15 @@ window.ONW = window.ONW || {};
     return lines || `<div class="chat-line chat-empty">まだ発言はありません。</div>`;
   }
   /** ヘッダーのフェーズ名に残り時間を出す */
+  /** パン屋: 昼のタイマーが動き出す瞬間に「パンが焼けました」のバナーを出す（誰がパン屋かは出さない） */
+  ui.showBread = function (n) {
+    document.querySelectorAll(".bread-banner").forEach((e) => e.remove());
+    const el = document.createElement("div");
+    el.className = "bread-banner";
+    el.innerHTML = `<span class="bread-banner__icon">🍞</span><span class="bread-banner__text">${n > 1 ? `パンが${n}個焼けました` : "パンが焼けました"}</span>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
+  };
   ui.updateTimer = function () {
     const g = ONW.game, el = document.getElementById("phase-label");
     if (!el) return;
@@ -795,6 +882,11 @@ window.ONW = window.ONW || {};
     if (document.getElementById("info-overlay")) return;
     const g = ONW.game, logs = g.nightLogs || [];
     const role = g.myRole ? ONW.roles.getInfo(g.myRole) : null;
+    // 全員に公開された情報: スターがいるときだけ誰か、パンが焼けたときだけ「パンが焼けました」を出す（いないとき・焼けていないときは何も出さない）
+    const pubLines = [];
+    if ((g.starNames || []).length) pubLines.push(`スター: ${(g.starNames || []).map((n) => `<strong>${esc(n)}</strong>`).join("、")}`);
+    if (g.breadN > 0) pubLines.push(g.breadN > 1 ? `パンが${g.breadN}個焼けました` : "パンが焼けました");
+    const pub = pubLines.length ? `<hr class="info-sep"><p class="night-step__hint">公開された情報</p>${pubLines.map((t) => `<p class="night-step__hint">${t}</p>`).join("")}` : "";
     const wrap = document.createElement("div");
     wrap.id = "info-overlay";
     wrap.className = "info-overlay";
@@ -804,6 +896,7 @@ window.ONW = window.ONW || {};
       <div class="info-body">
         ${role ? `<p class="night-step__hint">配られた役職: <strong>${esc(role.name)}</strong></p>` : ""}
         ${logs.length ? logs.map((t) => `<p class="night-step__hint">${esc(t)}</p>`).join("") : `<p class="night-step__hint">まだ得た情報はありません。</p>`}
+        ${pub}
       </div></div>`;
     document.body.appendChild(wrap);
     if (!document.getElementById("chat-overlay")) ui.lockPage(true);   // 開いている間、ページ本体は動かさない
@@ -837,6 +930,10 @@ window.ONW = window.ONW || {};
 
   ui.renderOnlineVote = function renderOnlineVote(game) {
     const log = `${ui.chatTabs(game)}<div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>${game.isDead ? ui.ghostInput(game) : ""}`;
+    if (game.strawPick && game.strawKind === "assassin") return `<section class="panel"><h2>アサシン</h2><p class="lede">あなたがめくれました。上のテーブルで、<strong>暗殺する相手のカード</strong>を押してください。自分以外の全員から選べます。</p><p class="night-step__hint">選んだ相手がマーリンなら、人狼陣営の逆転勝利です。時間内に選ばないと、ランダムな1人が選ばれます。</p></section>`;
+    if (game.strawPick) return `<section class="panel"><h2>わら人形</h2><p class="lede">あなたがめくれました。上のテーブルで、<strong>道連れにする相手のカード</strong>を押してください。</p><p class="night-step__hint">時間内に選ばないと、ランダムな1人が道連れになります。</p></section>`;
+    if (game.strawWait != null && game.strawWait !== "" && game.strawWaitKind === "assassin") return `<section class="panel night-step"><p class="lede">アサシン <strong>${esc(game.strawWait)}</strong> が、暗殺する相手を選んでいます…</p>${log}</section>`;
+    if (game.strawWait != null && game.strawWait !== "") return `<section class="panel night-step"><p class="lede">わら人形 <strong>${esc(game.strawWait)}</strong> が、道連れにする相手を選んでいます…</p>${log}</section>`;
     if (game.isDead) return `<section class="panel night-step"><p class="lede">あなたは死亡しているため、投票できません。結果を待っています…</p>${log}</section>`;
     if (game.voted) return `<section class="panel night-step"><p class="lede">あなたの投票先は固定されています。結果を待っています…</p>${log}</section>`;
     const sel = (game.others || []).find((p) => p.id === game.voteSel);

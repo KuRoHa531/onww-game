@@ -22,6 +22,7 @@ window.ONW = window.ONW || {};
   let deathMarks = [];                 // 「死亡」の札を付けた席（結果では外す）
   let up = {}, dead = {}, badge = {}, glow = {}; // 表向きの役職 / 追放された席 / 票数などの札 / 光らせる札(大狼の目)
   const NIGHT_ACT = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker", "love_tanner"];   // 夜にカードを押して行動する役職
+  let starKeys = [];                   // スター公開で札を付けた席
   let shin = {};                       // 無理心中で道連れになった席（死因の演出用）
   const WOLF_MARK = "__wolf";
   let nightKeys = [];                  // 夜の始まりに開いたカード（神・大狼）。夜時間が終わるまで裏に戻さない
@@ -75,12 +76,14 @@ window.ONW = window.ONW || {};
     if (busy || g.isSpectator || g.isDead || hostWatching(g)) return null;
     if (g.phase === ONW.PHASE.ONLINE_NIGHT && !g.nightDone && NIGHT_ACT.includes(g.actRole)) return { type: "night", role: g.actRole };
     if (g.phase === ONW.PHASE.ONLINE_MORNING && g.morningChain && g.morningChainReady && !g.morningChainDone) return { type: "morning", role: g.morningChain };   // 墓荒らしが交換した後の役職の能力を朝に使う
+    if (g.phase === ONW.PHASE.ONLINE_VOTE && g.strawPick) return { type: "straw" };   // わら人形: めくれた瞬間に、道連れにする相手を選ぶ
     if (g.phase === ONW.PHASE.ONLINE_VOTE && !g.voted) return { type: "vote" };
     return null;
   }
   function pickable(k, m, g) {
     if (!m) return false;
     const me = ONW.net.myId(), isP = k.startsWith("p:");
+    if (m.type === "straw") return isP && g.strawPick.some((c) => c.id === k.slice(2));   // 選べるのは、まだめくれていない人だけ
     if (isP && dead[k]) return false;   // 死亡した人には投票できない
     if (isP) return k.slice(2) !== me && m.role !== "relic_robber";   // 墓荒らしが選べるのは墓地だけ
     if (m.type === "vote") return false;
@@ -98,8 +101,9 @@ window.ONW = window.ONW || {};
   }
   function paint(g) {
     const el = $t(), m = mode(g), me = ONW.net.myId();
+    const hideOthers = !!(g.strawPick && g.strawKind === "assassin");   // アサシンが暗殺先を選ぶまで、自分以外のカード（死亡者を含む）は表にしない（マーリンと見えてしまわないように）
     el.querySelectorAll(".tb-seat[data-k]").forEach((s) => {
-      const k = s.dataset.k, role = up[k], isP = k.startsWith("p:");
+      const k = s.dataset.k, isP = k.startsWith("p:"), role = (hideOthers && isP && k !== `p:${me}`) ? undefined : up[k];
       if (role && s.dataset.role !== role) {
         s.dataset.role = role;
         const f = s.querySelector(".tb-front");
@@ -111,7 +115,9 @@ window.ONW = window.ONW || {};
       s.classList.toggle("pick", pickable(k, m, g));
       s.classList.toggle("sel", !!sel);
       s.classList.toggle("dead", !!dead[k]);
+      s.classList.toggle("gone", !!(m && m.type === "straw" && isP && !g.strawPick.some((c) => c.id === k.slice(2))));   // わら人形の選択中: すでにめくれた人（選べない人）のカードは黒と灰色
       s.classList.toggle("glow", !!glow[k]);
+      s.classList.toggle("starup", starKeys.includes(k));   // スター公開中の金色の光と札
       s.classList.toggle("shinju", !!shin[k]);
       const b = s.querySelector(".tb-badge");
       const text = badge[k] || (g.voted && g.myVote && k === `p:${g.myVote}` && g.phase === ONW.PHASE.ONLINE_VOTE ? "投票" : "");
@@ -174,12 +180,12 @@ window.ONW = window.ONW || {};
     if (!el) return;
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; starKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; nightKeys = []; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; starKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
     if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
@@ -202,6 +208,12 @@ window.ONW = window.ONW || {};
     }
     // 朝が終わった直後の待機時間: 後覚者の最終役職がここで表になる
     if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settleInsom && !g.settleShown && !g.isSpectator) { g.settleShown = true; show(`p:${ONW.net.myId()}`, g.settleInsom); }
+    // スター公開: 待機時間に、最終盤面でスターを持っている人のカードが全員の画面で同時に表になる（後覚者の確認とは別に「スター」の札が付く）
+    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settling && g.settleStars && g.settleStars.length && !g.settleStarShown && !g.isSpectator && !hostWatching(g)) {
+      g.settleStarShown = true;
+      later(() => { g.settleStars.forEach((id, i) => later(() => { const k = `p:${id}`; show(k, "star"); badge[k] = "★スター"; starKeys.push(k); paint(G()); }, i * 380)); }, 300);
+    }
+    if (g.phase !== ONW.PHASE.ONLINE_MORNING && starKeys.length) { starKeys.forEach((k) => { delete badge[k]; }); starKeys = []; paint(G()); }   // 昼になったら札を外す（カードは下の行で伏せる）
     if (g.phase !== ONW.PHASE.ONLINE_MORNING && g.morningUp && g.morningUp.length) { g.morningUp.forEach((k) => delete up[k]); g.morningUp = []; paint(G()); }   // 占い結果などは朝時間の間ずっと表のまま。昼になったら伏せる
     if (g.phase !== ONW.PHASE.ONLINE_NIGHT && nightKeys.length) { nightKeys.forEach((k) => { delete up[k]; delete glow[k]; }); nightKeys = []; paint(G()); }   // 神・大狼のカードは夜時間が終わったら伏せる   // 昼になったら伏せる
     if (g.godReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.godReveal; g.godReveal = null; later(() => godPeek(r), 700); }   // 神: 夜の始まりに全員と墓地のカードが開く
@@ -220,6 +232,7 @@ window.ONW = window.ONW || {};
     const m = mode(g);
     if (!pickable(k, m, g)) return;
     const id = k.slice(2);
+    if (m.type === "straw") { ONW.net.strawPick(id); ONW.stage.sync(g); ONW.ui.render(g); return; }
     if (m.type === "night" || m.type === "morning") {
       // 夜: 朝になるまで何度でも選び直せる（同じカードをもう一度押すと解除）。朝: 選んで「能力を使う」で確定
       const sel = g.nightSel = g.nightSel || { players: [], graves: [] }, isP = k.startsWith("p:");
@@ -367,18 +380,28 @@ window.ONW = window.ONW || {};
     res.counts.forEach((c, i) => later(() => { badge[P(c.id)] = `${c.c}票`; paint(G()); }, t + i * 350));
     t += res.counts.length * 350 + 1000;
     later(() => {
-      exec.forEach((h) => { up[P(h.id)] = h.role; dead[P(h.id)] = true; badge[P(h.id)] = "追放"; });
-      setCap(exec.length ? `<div class="res-cap__t t-wolf">追放</div><div>${exec.map((h) => esc(h.name)).join("、")}</div>` : `<div class="res-cap__t">誰も追放されませんでした</div>`);
+      exec.forEach((h) => { up[P(h.id)] = h.role; dead[P(h.id)] = true; badge[P(h.id)] = h.mental ? "メンタル崩壊" : "追放"; });
+      const execN = exec.filter((h) => !h.mental), mentalN = exec.filter((h) => h.mental);
+      setCap(exec.length ? `${execN.length ? `<div class="res-cap__t t-wolf">追放</div><div>${execN.map((h) => esc(h.name)).join("、")}</div>` : ""}${mentalN.length ? `<div class="res-cap__t t-wolf">メンタル崩壊</div><div>${mentalN.map((h) => esc(h.name)).join("、")}</div>` : ""}` : `<div class="res-cap__t">誰も追放されませんでした</div>`);
       paint(G());
     }, t);
     t += exec.length ? 3200 : 1500;
     // 一目惚れしてるてるが先にめくれ、そのあとで道連れにされた人が1人ずつ無理心中でめくれる
+    // わら人形・猫又・黒猫が追放された場合も同じ演出で、めくれた順(連鎖の順)に1人ずつ「道連れ」でめくれる
     chain.forEach((h) => {
+      const lab = h.kind === "tomo" ? "道連れ" : "無理心中";
       later(() => {
-        setCap(`<div class="res-cap__t t-wolf">無理心中</div><div>${esc(h.name)}</div>`);
-        shin[P(h.id)] = true; dead[P(h.id)] = true; badge[P(h.id)] = "無理心中"; paint(G());
+        setCap(`<div class="res-cap__t t-wolf">${lab}</div><div>${h.kind === "tomo" && h.by ? `${esc(h.by)} → ` : ""}${esc(h.name)}</div>`);
+        shin[P(h.id)] = true; dead[P(h.id)] = true; badge[P(h.id)] = lab; paint(G());
       }, t);
       later(() => { up[P(h.id)] = h.role; paint(G()); }, t + 1300);   // 演出のあとでカードが表に
+      t += 3400;
+    });
+    // アサシン: 選んだ相手のカードがめくれ、マーリンだったかが分かる
+    (res.assassin || []).forEach((a) => {
+      const head = `<div class="res-cap__t t-wolf">アサシン</div><div>${esc(a.by)} → ${esc(a.target)}</div>`;
+      later(() => { setCap(head); glow[P(a.targetId)] = true; paint(G()); }, t);
+      later(() => { up[P(a.targetId)] = a.role; setCap(`${head}<div class="${a.hit ? "t-wolf" : "rs-dim"}">${a.hit ? "マーリンでした！ 暗殺成功" : "マーリンではありませんでした"}</div>`); paint(G()); }, t + 1300);
       t += 3400;
     });
     later(() => setCap(`<div class="res-cap__t">結果発表</div>`), t);
@@ -396,7 +419,7 @@ window.ONW = window.ONW || {};
     const g = G(), res = g.result;
     if (!res) return;
     clearAll();
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.cause === "chain" ? "無理心中" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : "無理心中") : h.mental ? "メンタル崩壊" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     res.counts.forEach((c) => { if (!badge[`p:${c.id}`]) badge[`p:${c.id}`] = `${c.c}票`; });
     toSheet();

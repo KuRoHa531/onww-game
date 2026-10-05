@@ -22,3 +22,13 @@ relic_robber.png   墓荒らし
 love_tanner.png    一目惚れしてるてる
 god.png            神
 opportunist.png    オポチュニスト
+straw_doll.png     わら人形
+cat_sidhe.png      猫又
+black_cat.png      黒猫
+amanojaku.png     天邪鬼
+lone_wolf.png      一匹狼
+white_wolf.png     白狼
+tofu_wolf.png      豆腐の人狼
+forgetful_wolf.png 忘却の人狼
+baker.png          パン屋
+star.png           スター

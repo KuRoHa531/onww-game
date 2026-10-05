@@ -94,32 +94,87 @@ window.ONW = window.ONW || {};
   vote.resolveElimination = function resolveElimination(game) {
     const counts = vote.tally(game);
     const maxVotes = Math.max(0, ...Object.values(counts));
+    game.mentalIds = [];
     if (maxVotes === 0) {
       game.eliminated = [];
       return game.eliminated;
     }
     game.eliminated = Object.keys(counts).filter((id) => counts[id] === maxVotes);
+    // 豆腐の人狼: 1票でも入ったら、つられている人と同時にめくられてメンタル崩壊（道連れ能力などは発動しない）
+    const gone0 = new Set(game.deadIds || []);
+    game.mentalIds = game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.TOFU_WOLF && counts[id] > 0 && !gone0.has(id));
+    game.mentalIds.forEach((id) => { if (!game.eliminated.includes(id)) game.eliminated.push(id); });
     return game.eliminated;
   };
 
   /**
-   * 追放の連鎖を解決する。
-   * 一目惚れしてるてる(最終役職)が追放されたら、夜に選んだ相手も一緒に追放扱いになる（連鎖もする）。
-   * 夜の選択は「役職の持ち主」単位で保存（game.loveTargets[持ち主ID] = 選んだ相手）。
+   * 追放の連鎖を解決する。「めくれた順」に待ち行列で処理するので、連鎖の連鎖（猫又が黒猫をめくる等）も起きる。
+   *   ・一目惚れしてるてる(最終役職)が追放されたら、夜に選んだ相手も一緒に追放扱いになる（kind: "love" / 死因: 無理心中）
+   *   ・猫又・黒猫がめくれたら、まだめくれていない人からランダムに1人を道連れにする（kind: "tomo"）
+   *   ・わら人形がめくれたら、わら人形本人がまだめくれていない人から1人を選んで道連れにする（kind: "tomo"）
+   *   ・無理心中(一目惚れしてるてるの相手)で死んだわら人形・猫又・黒猫は、道連れ能力が発動しない（道連れで死んだ場合は発動する）
+   *   ・同時に追放された人（同数最多）は、全員が同時にめくれる扱い（道連れ候補に入らない）
+   *   ・昼中にすでに死亡した人(game.deadIds)は道連れの候補に入らない
+   * 一目惚れしてるてるの夜の選択は「役職の持ち主」単位で保存（game.loveTargets[持ち主ID] = 選んだ相手）。
    * 役職が移動したら選択も移動先の持ち主へ移る（ONW.swapPlayers / swapGrave が自動で移す）。選ばれた相手はプレイヤー単位のまま。
    * 【必読】役職に紐づく状態を増やす役職は state.js の「役職の移動と role-bound state」メモのルールに必ず従うこと。
+   *   （猫又・黒猫・わら人形の選択は「めくれた瞬間に決まる試合ごとの結果」なので role-bound ではなく
+   *    game.catPicks / game.strawTargets に持つ。試合開始時に net.js 側で空に戻す）
+   * わら人形の選択が必要になったら game.strawPending = { id, cands } を立てて null を返す（net.js が本人に選ばせて再実行）。
+   * auto=true のときは選択待ちにせず、候補からランダムに選ぶ（determineWinners の保険）。
    * 戻り値: 追放されたプレイヤーID全員（投票で追放された人 + 巻き込まれた人）
+   *   game.chainIds: 巻き込まれた順 / game.chainBy[巻き込まれた人] = めくれた人 / game.chainKind[巻き込まれた人] = "love" | "tomo"
    */
-  vote.resolveChain = function resolveChain(game) {
-    const done = new Set(game.eliminated), queue = [...game.eliminated];
-    game.chainIds = []; game.chainBy = {};
+  vote.resolveChain = function resolveChain(game, auto) {
+    const R = ONW.ROLE, pick = ONW.utils.randomChoice;
+    const done = new Set(game.eliminated), queue = [...game.eliminated], gone = new Set(game.deadIds || []);
+    game.chainIds = []; game.chainBy = {}; game.chainKind = {}; game.strawPending = null;
+    game.catPicks = game.catPicks || {}; game.strawTargets = game.strawTargets || {};
+    game.assassinTargets = game.assassinTargets || {}; game.assassinList = [];   // アサシン: めくれた順に { id, target }（選んだ相手）
+    const pool = (self) => game.players.map((p) => p.id).filter((id) => id !== self && !done.has(id) && !gone.has(id));
+    const take = (t, by, kind) => { done.add(t); queue.push(t); game.chainIds.push(t); game.chainBy[t] = by; game.chainKind[t] = kind; };
     while (queue.length) {
-      const id = queue.shift();
-      if (game.currentRoles[id] !== ONW.ROLE.LOVE_TANNER) continue;
-      const t = (game.loveTargets || {})[id];
-      if (t && !done.has(t) && game.players.some((p) => p.id === t)) { done.add(t); queue.push(t); game.chainIds.push(t); game.chainBy[t] = id; }
+      const id = queue.shift(), role = game.currentRoles[id];
+      if (game.chainKind[id] === "love" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN)) continue;   // 無理心中で死んだ人は、道連れ能力（わら人形・猫又・黒猫）・アサシンの暗殺が発動しない
+      if (role === R.LOVE_TANNER) {
+        const t = (game.loveTargets || {})[id];
+        if (t && !done.has(t) && game.players.some((p) => p.id === t)) take(t, id, "love");
+      } else if (role === R.CAT_SIDHE || role === R.BLACK_CAT) {
+        const c = pool(id);
+        if (!c.length) continue;
+        let t = game.catPicks[id];
+        if (!t || !c.includes(t)) t = game.catPicks[id] = pick(c);   // 再計算しても同じ相手になるよう、決めた相手は覚えておく
+        take(t, id, "tomo");
+      } else if (role === R.STRAW_DOLL) {
+        const c = pool(id);
+        if (!c.length) continue;
+        let t = game.strawTargets[id];
+        if (!t || !c.includes(t)) {
+          delete game.strawTargets[id];
+          if (!auto) { game.strawPending = { id, cands: c, kind: "straw" }; return null; }
+          t = game.strawTargets[id] = pick(c);
+        }
+        take(t, id, "tomo");
+      } else if (role === R.ASSASSIN) {
+        // アサシン: めくれたその場で、自分を除く全プレイヤー（すでにめくれた人も含む）から1人を選ぶ。選んだ相手は死なない（マーリンかどうかだけが勝敗に関わる）
+        const c = game.players.map((p) => p.id).filter((x) => x !== id);
+        if (!c.length) continue;
+        let t = game.assassinTargets[id];
+        if (!t || !c.includes(t)) {
+          delete game.assassinTargets[id];
+          if (!auto) { game.strawPending = { id, cands: c, kind: "assassin" }; return null; }
+          t = game.assassinTargets[id] = pick(c);
+        }
+        game.assassinList.push({ id, target: t });
+      }
     }
     return [...done];
+  };
+
+  /** わら人形の選択待ちがあれば { id, cands } を返す（なければ null）。net.js が結果を出す前に、選び終えるまで繰り返し呼ぶ */
+  vote.strawNeed = function strawNeed(game) {
+    ONW.vote.resolveChain(game, false);
+    return game.strawPending || null;
   };
 
   /**
@@ -129,6 +184,7 @@ window.ONW = window.ONW || {};
    *   3. 神が追放されていない   → 神降臨: 神の単独勝利
    *   4. それ以外              → 村人陣営 / 人狼陣営の基本勝敗
    *   ・オポチュニストは、どの結果でも「追放されていなければ」追加で勝利
+   * 道連れ(猫又・黒猫・わら人形)・無理心中で死んだ人も、マイクラ版どおり「追放された人」として数える。
    * 結果は game.winners（陣営キー）/ winnerIds / winTitle / winTeams / winDetail / executed に入れる。
    */
   vote.determineWinners = function determineWinners(game) {
@@ -136,12 +192,15 @@ window.ONW = window.ONW || {};
     const R = ONW.ROLE, ids = game.players.map((p) => p.id);
     const role = (id) => game.currentRoles[id];
     const nm = (list) => list.map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、");
-    const executed = ONW.vote.resolveChain(game);
+    const executed = ONW.vote.resolveChain(game, true);
     game.executed = executed;
+    game.assassinResult = (game.assassinList || []).map((a) => ({ by: a.id, target: a.target, hit: game.currentRoles[a.target] === R.MERLIN }));   // 結果の演出用
     const dead = new Set([...executed, ...(game.deadIds || [])]);   // 追放された人 + 昼中に死亡した人
     const gods = ids.filter((id) => role(id) === R.GOD);
-    const tanners = executed.filter((id) => role(id) === R.TANNER);
-    const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER);
+    // 無理心中で巻き込まれたてるてる系は、自分のてるてる勝利は発動しない（相手の一目惚れしてるてると「一緒に勝った」扱いになるだけ）
+    const byLove = (id) => (game.chainKind || {})[id] === "love";
+    const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id));
+    const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id));
     const opportunists = ids.filter((id) => role(id) === R.OPPORTUNIST && !dead.has(id));
 
     const set = (title, teams, winners, detail, winnerTeams) => {
@@ -149,15 +208,21 @@ window.ONW = window.ONW || {};
       const w = new Set(winners);
       opportunists.forEach((id) => w.add(id));                       // オポチュニスト: 追放されていなければ追加勝利
       if (opportunists.length && !teams.includes("オポチュニスト")) teams.push("オポチュニスト");
+      // 天邪鬼: 村人陣営が勝たなかった（神の祝福でもない）ときだけ、どの結果でも追加で勝利（死亡・追放は関係なし）
+      if (!teams.includes("神の祝福") && !teams.includes("村人陣営")) {
+        const am = ids.filter((id) => role(id) === R.AMANOJAKU);
+        am.forEach((id) => w.add(id));
+        if (am.length && !teams.includes("天邪鬼")) teams.push("天邪鬼");
+      }
       game.winnerIds = [...w];
       return game.winners;
     };
 
     // 1. 神の祝福
     if (gods.some((id) => executed.includes(id))) {
-      const win = ids.filter((id) => role(id) !== R.GOD && !(role(id) === R.OPPORTUNIST && dead.has(id)));
+      const win = ids.filter((id) => role(id) !== R.GOD && role(id) !== R.AMANOJAKU && !(role(id) === R.OPPORTUNIST && dead.has(id)));   // 天邪鬼は祝福に逆らえず敗北
       return set("神の祝福を受けました", ["神の祝福"], win,
-        `神 ${nm(gods.filter((id) => executed.includes(id)))} が追放されたため、神以外の全員が勝利です。追放されたオポチュニストは勝利できません。`, [ONW.TEAM.THIRD]);
+        `神 ${nm(gods.filter((id) => executed.includes(id)))} が追放されたため、神以外の全員が勝利です。追放されたオポチュニストと天邪鬼は勝利できません。`, [ONW.TEAM.THIRD]);
     }
     // 2. てるてる系の勝利
     if (tanners.length || loveTanners.length) {
@@ -179,12 +244,20 @@ window.ONW = window.ONW || {};
     //  ・人狼判定の者が最終盤面に1人もいない → 村人陣営の勝ち
     const wolves = ONW.vote.wolfJudgeIds(game);
     const wolfDied = executed.some((id) => wolves.includes(id));
-    const side = (wolves.length === 0 || wolfDied) ? ONW.TEAM.VILLAGE : ONW.TEAM.WOLF;
+    // 人狼判定の者が全員死亡していれば、死因（追放・道連れ・昼中の死亡など）を問わず村人陣営の勝ち
+    const allWolvesDead = wolves.length > 0 && wolves.every((id) => dead.has(id));
+    let side = (wolves.length === 0 || wolfDied || allWolvesDead) ? ONW.TEAM.VILLAGE : ONW.TEAM.WOLF;
+    // アサシンがマーリンを当てたら、村人陣営の勝ちは人狼陣営の逆転勝利になる
+    const assHits = (game.assassinResult || []).filter((a) => a.hit);
+    const reversed = side === ONW.TEAM.VILLAGE && assHits.length > 0;
+    if (reversed) side = ONW.TEAM.WOLF;
     const fake = !!game.fakeWolfWhenNoWolf;
     let detail;
     if (wolves.length === 0) detail = fake ? "最終盤面に本物の人狼も人狼判定の狂人もいませんでした。" : "最終盤面に本物の人狼がいませんでした。";
+    else if (!wolfDied && allWolvesDead) detail = `${fake ? "人狼判定" : "人狼"}の者が全員死亡しました。`;
     else if (wolfDied) detail = `追放された${fake ? "人狼判定" : "人狼"}: ${nm(executed.filter((id) => wolves.includes(id)))}`;
     else detail = fake ? "人狼判定の者が追放されませんでした。" : "本物の人狼が追放されませんでした。";
+    if (reversed) detail = `アサシン ${nm(assHits.map((a) => a.by))} が マーリン ${nm(assHits.map((a) => a.target))} を暗殺しました。人狼陣営の逆転勝利です。（${detail}）`;
     const win = ids.filter((id) => ONW.roles.getInfo(role(id)).team === side);
     return set(side === ONW.TEAM.VILLAGE ? "村人陣営勝利" : "人狼陣営勝利", [side === ONW.TEAM.VILLAGE ? "村人陣営" : "人狼陣営"], win, detail, [side]);
   };

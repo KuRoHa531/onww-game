@@ -2,82 +2,83 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>全役職 | ワンナイト人狼ガイド 〜混沌に潜みし狼達〜</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual">
+<title>ワンナイト人狼 〜混沌に潜みし狼達〜</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/wiki.css">
 </head>
 <body>
 
   <div class="moon-glow" aria-hidden="true"></div>
+  <button id="fs-btn" class="fs-btn" aria-label="全画面" title="全画面" onclick="ONW.ui.toggleFullscreen()">□</button>
 
   <header class="onw-header">
+    <div class="onw-header__phase" id="phase-label"></div>
     <h1 class="onw-header__title">
-      <span class="onw-header__title-sub">ONE NIGHT WEREWOLF GUIDE</span>
-      全役職
+      <span class="onw-header__title-sub">ONE NIGHT WEREWOLF</span>
+      混沌に潜みし狼達
     </h1>
-    <div class="onw-header__day" id="role-count">―件</div>
+    <div class="onw-header__day" id="day-clock">――</div>
   </header>
 
-  <main class="onw-app">
-    <section class="panel wiki-controls">
-      <input
-        id="search-input"
-        class="wiki-search"
-        type="search"
-        placeholder="キーワードで検索（例: 人狼、占い、てるてる坊主 …）"
-        autocomplete="off"
-      >
-      <div class="wiki-sort-row wiki-scope-row">
-        <span class="wiki-sort-label">検索対象:</span>
-        <div class="wiki-filter-row" id="search-scope"></div>
-      </div>
-      <div class="wiki-controls-toggle-row">
-        <button
-          id="sort-panel-toggle"
-          class="wiki-controls-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="sort-panel"
-        >並び替え ▼</button>
-        <button
-          id="filter-panel-toggle"
-          class="wiki-controls-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="filter-panel"
-        >絞り込み ▼</button>
-      </div>
+  <!-- 右上: 📖（ワンナイト人狼ガイド）・アカウント表示・🛠（デバッグ、ホストでONの時だけ）を縦に並べる（js/account-ui.js の acct-fixed / js/debug.js の dbg-fab もここに入る） -->
+  <div id="top-right" class="top-right">
+  <button type="button" class="wiki-btn" onclick="ONW.wikiView.open()" aria-label="ワンナイト人狼ガイドを見る" title="ワンナイト人狼ガイド">📖</button>
+  </div>
 
-      <div id="sort-panel" hidden>
-        <div class="wiki-sort-row">
-          <span class="wiki-sort-label">並び順:</span>
-          <div class="wiki-filter-row" id="sort-toggle"></div>
-        </div>
-      </div>
-      <div id="filter-panel" hidden>
-        <div class="wiki-sort-row">
-          <span class="wiki-sort-label">対象:</span>
-          <div class="wiki-filter-row" id="web-filter"></div>
-        </div>
-        <p class="wiki-filter-note" id="web-filter-note"></p>
-        <div class="wiki-filter-row" id="team-filters"></div>
-      </div>
-    </section>
+  <!-- ゲーム中ずっと出ているカードのテーブル（js/stage.js が管理。#app の再描画では消えない） -->
+  <div id="stage-col" class="stage-col">
+    <!-- PC版のみ表示: 左側の大きなタイマー（js/ui.js の updateTimer が更新） -->
+    <div id="big-timer" class="big-timer" aria-hidden="true"><span class="big-timer__phase"></span><span class="big-timer__time"></span></div>
+    <div id="table" class="tb-wrap" aria-label="カードのテーブル"></div>
+  </div>
 
-    <section id="wiki-list" class="wiki-list"></section>
-    <p id="empty-state" class="wiki-empty" hidden>該当する役職が見つかりませんでした。</p>
+  <main id="app" class="onw-app">
+    <!-- 各フェーズの画面は js/ui.js が動的に描画する -->
+    <p class="onw-loading">読み込み中…</p>
   </main>
 
   <footer class="onw-footer">
-    <span>元データ: アップロードされた Minecraft アドオン(scripts/state.js) より転記</span>
+    <span id="footer-note">v0.2 オンライン対応(β)</span>
   </footer>
 
-  <script src="js/wiki-data.js"></script>
-  <script src="js/web-roles.js"></script>
-  <script src="js/wiki.js"></script>
+  <!-- 依存順に読み込み（モジュールは使わず、ONW名前空間に集約） -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- アカウント機能（Supabase）。js/config.js が空ならゲストプレイだけが動く -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/state.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/account.js"></script>
+  <script src="js/friends.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/png.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/cpu.js"></script>
+  <script src="js/night.js"></script>
+  <script src="js/vote.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/stage.js"></script>
+  <script src="js/account-ui.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/co.js"></script>
+  <script src="js/debug.js"></script>
+  <script src="js/wikiview.js"></script>
+  <script>
+    /* スマホのキーボードで画面の高さが縮んでも、レイアウトをずらさない: --app-h に「キーボードが無い時の高さ」を保持する */
+    (function () {
+      let w = window.innerWidth, h = window.innerHeight;
+      const set = () => document.documentElement.style.setProperty("--app-h", h + "px");
+      set();
+      window.addEventListener("resize", function () {
+        if (window.innerWidth !== w || window.innerHeight > h) { w = window.innerWidth; h = window.innerHeight; set(); }   // 向きの変更・キーボードが閉じた時だけ更新
+      });
+    })();
+  </script>
+  <script src="js/main.js"></script>
 </body>
 </html>
