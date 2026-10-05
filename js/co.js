@@ -108,7 +108,7 @@ window.ONW = window.ONW || {};
   // ---- 描画 ----
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
-  const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x));
+  const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin");   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）
   const roleBtns = (fn, extra = "") => deckList().map((x) => btn(esc(rn(x.r)) + (x.cand ? " (変化候補)" : ""), `ONW.co.${fn}('${x.r}')`)).join("") + extra;
 
   co.render = function () {

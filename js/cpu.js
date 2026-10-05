@@ -173,20 +173,32 @@ window.ONW = window.ONW || {};
     }
     return Math.random() < 0.5 ? wolfLikeResult(g) : villageLikeResult(g);         // 非人狼の騙り（てるてる系）
   }
-  /** 騙りで名乗る役職の抽選（本家 makeClaimPlan の人狼陣営の分）。山札に無い役職は名乗らない */
+  /** 騙りで名乗る役職の抽選（本家 makeClaimPlan の人狼陣営の分）。山札に無い役職は名乗らない。マーリンは騙り禁止 */
   function pickLieRole(g) {
-    const chosen = weighted([["seer", 40], ["villager", 18], ["troublemaker", 12], ["robber", 12], ["mason", 9], ["merlin", 9]]);
-    if (chosen === "villager" || roleInSetup(g, chosen)) return chosen;
+    const chosen = weighted([["seer", 40], ["villager", 18], ["troublemaker", 12], ["robber", 12], ["mason", 9]]);
+    if (roleInSetup(g, chosen)) return chosen;   // 村人も、配役にいるときだけ名乗る
     const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleInSetup(g, r));
     return fb.length ? pick(fb) : "villager";
   }
-  /** あり得る村役職 = この試合に実在する村人陣営の役職（変化後の役職・墓地・COの候補）。村人は常に含む */
+  /** あり得る村役職 = この試合に実在する村人陣営の役職（変化後の役職・墓地・COの候補）。村人も、配役に入っているときだけ含む */
   function villageRolesInPlay(g) {
     const pool = [...new Set([...setupRoles(g), ...(g.coDeck || []).map((x) => x.r)])]
       .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && r !== "merlin" && !ONW.SELF_AS_VILLAGER.includes(r) && !ONW.SELF_AS_WOLF.includes(r));   // マーリンCOは禁止。思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
-    return pool.includes("villager") ? pool : ["villager", ...pool];
+    return pool.length ? pool : ["villager"];   // 村人が配役にいないときは名乗らない（最終手段としてだけ村人）
   }
   const fakeVillageRole = (g) => pick(villageRolesInPlay(g));
+  /** 村人が配役にいないのに「村人CO」をすると嘘がバレるので、村人COの代わりに名乗れる役職を返す（結果なしのCOだけ） */
+  function bareCo(g, pref) {
+    if (roleInSetup(g, "villager")) return "villager";
+    if (pref && pref !== "villager" && pref !== "merlin") return pref;
+    return ["seer", "troublemaker", "robber", "mason", "insomniac"].find((r) => roleInSetup(g, r)) || "villager";
+  }
+  /** 「ただの村人のふり」をしたいときのCO。村人がいなければ、いる村役職の騙り（占い師なら偽結果つき）にする */
+  function plainLie(g, p, selfRole) {
+    if (roleInSetup(g, "villager")) return { co: "villager", result: null };
+    const pool = ["seer", "troublemaker", "robber", "mason"].filter((r) => roleInSetup(g, r));
+    return pool.length ? lieClaim(g, p, selfRole, pick(pool)) : { co: bareCo(g), result: null };
+  }
   /**
    * 夜のあとに人外(人狼・狂人・てるてる・第三陣営)の役職を手にしていた怪盗・墓荒らし・後覚者のCPUの騙り。
    *   A) 「村人役を手にした」という嘘（本人の役職COのまま、結果だけ偽る）
@@ -201,13 +213,33 @@ window.ONW = window.ONW || {};
     }
     return lieClaim(g, p, now, fakeVillageRole(g));
   }
+  /**
+   * マーリンのCPUの騙り。マーリン自身はCO禁止（アサシンに狙われる）なので、別の村役職を名乗る。
+   * 人狼が見えているので、占い師を騙るときは「見えている人狼を人狼と告発する / 村人側を村人と言う」
+   * （人狼陣営の騙りと違って、本物の人狼を庇わない）。
+   */
+  function merlinLie(g, p, i) {
+    const opts = [["seer", 45], ["villager", 25], ["troublemaker", 10], ["robber", 10], ["mason", 10]].filter(([r]) => roleInSetup(g, r));
+    const co = opts.length ? weighted(opts) : bareCo(g);
+    if (co === "seer") {
+      const others = g.players.filter((q) => q.id !== p.id);
+      const wolves = others.filter((q) => isWolf(i.known[q.id])), safe = others.filter((q) => !wolves.includes(q));
+      const accuse = wolves.length && (!safe.length || Math.random() < 0.7);   // 見えている人狼を告発する
+      const t = accuse ? pick(wolves) : pick(safe.length ? safe : others);
+      if (!t) return { co: bareCo(g, co), result: null };
+      const real = g.initialRoles[t.id];
+      const role = accuse ? (WOLF_LIKE().includes(real) ? real : wolfLikeResult(g)) : villageLikeResult(g);
+      return { co, result: { short: `${t.name} → ${rn(role)}`, text: `${t.name} を占って ${rn(role)} でした。`, claim: { kind: "seer", target: t.id, role } } };
+    }
+    return lieClaim(g, p, "merlin", co);
+  }
   /** 騙りの CO と結果開示（本家の mem.fakeRole）。戻り値: { co, result }（resultはnullのこともある） */
   function lieClaim(g, p, selfRole, forceCo) {
     const others = g.players.filter((q) => q.id !== p.id);
     const co = forceCo || pickLieRole(g);
     if (co === "seer") {
       const t = fakeSeerTarget(g, p);
-      if (!t) return { co: "villager", result: null };
+      if (!t) return { co: bareCo(g, co), result: null };
       const role = fakeSeerResult(g, p, t, selfRole);
       return { co, result: { short: `${t.name} → ${rn(role)}`, text: `${t.name} を占って ${rn(role)} でした。`, claim: { kind: "seer", target: t.id, role } } };
     }
@@ -217,12 +249,12 @@ window.ONW = window.ONW || {};
     }
     if (co === "robber") {
       const t = fakeSeerTarget(g, p);
-      const pool = ["villager", "mason", "insomniac", "troublemaker"].filter((r) => r === "villager" || roleInSetup(g, r));
-      const role = pick(pool);
+      const pool = ["villager", "mason", "insomniac", "troublemaker"].filter((r) => roleInSetup(g, r));   // 村人がいない配役で「村人を奪った」とは言わない
+      const role = pool.length ? pick(pool) : villageLikeResult(g);
       return { co, result: { short: `${t.name} → ${rn(role)}`, text: `${t.name} の役職を奪って ${rn(role)} になりました。`, claim: { kind: "robber", target: t.id, role } } };
     }
     if (co === "mason") return { co, result: { short: "自分だけ", text: "共有者は 私だけでした。", claim: { kind: "mason" } } };
-    return { co: forceCo && forceCo !== "villager" ? forceCo : "villager", result: null };   // その他の村役職は、結果なしでCOだけする
+    return { co: forceCo && forceCo !== "villager" ? forceCo : bareCo(g, co), result: null };   // その他の村役職は、結果なしでCOだけする（村人がいなければ村人COはしない）
   }
 
   /**
@@ -253,14 +285,20 @@ window.ONW = window.ONW || {};
         coRole = "robber";
         if (isNonVillage(i.newRole)) { const lie = nonVillageLie(g, p, "robber", i, i.newRole); coRole = lie.co; result = lie.result; }   // 人外を手にした: 村人役を騙る
         else result = { short: `${nameOf(g, i.target)} → ${rn(i.newRole)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(i.newRole)} になりました。`, claim: { kind: "robber", target: i.target, role: i.newRole } };
-      } else if (r === "relic_robber" && i.relic) {                    // 墓荒らし
+      } else if (r === "relic_robber" && !i.relic) {                   // 墓荒らし（交換情報なし）: COだけする
+        coRole = "relic_robber";
+      } else if (r === "relic_robber") {                               // 墓荒らし
         coRole = "relic_robber";
         if (isNonVillage(i.relic.newRole)) { const lie = nonVillageLie(g, p, "relic", i, i.relic.newRole); coRole = lie.co; result = lie.result; }
         else result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(i.relic.newRole)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(i.relic.newRole)} になりました。`, claim: { kind: "relic", role: i.relic.newRole } };
-      } else if (r === "troublemaker" && i.pair) {                     // いたずらっ子
+      } else if (r === "troublemaker" && !i.pair) {                    // いたずらっ子（入れ替え情報なし）: COだけする
+        coRole = "troublemaker";
+      } else if (r === "troublemaker") {                               // いたずらっ子
         coRole = "troublemaker";
         result = { short: `${nameOf(g, i.pair[0])} ⇄ ${nameOf(g, i.pair[1])}`, text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました。`, claim: { kind: "troublemaker" } };
-      } else if (r === "insomniac" && i.finalRole) {                   // 後覚者
+      } else if (r === "insomniac" && !i.finalRole) {                  // 後覚者（情報なし）: COだけする
+        coRole = "insomniac";
+      } else if (r === "insomniac") {                                  // 後覚者
         coRole = "insomniac";
         if (isNonVillage(i.finalRole)) { const lie = nonVillageLie(g, p, "insomniac", i, i.finalRole); coRole = lie.co; result = lie.result; }
         else result = { short: `→ ${rn(i.finalRole)}`, text: `最終的な役職は ${rn(i.finalRole)} でした。`, claim: { kind: "insomniac", role: i.finalRole } };
@@ -270,12 +308,14 @@ window.ONW = window.ONW || {};
         result = { short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした。` : "共有者は 私だけでした。", claim: { kind: "mason" } };
       } else if (r === "baker") {                                        // パン屋: パンが焼けたことは全員に知らされるので、必ずパン屋COする
         coRole = "baker";
-      } else if (r === "villager" || r === "merlin") {   // マーリンはマーリンCO禁止なので、村人として振る舞う
-        // 村人: 75%でCO、残りも60%は「COなし寄りだけど村人」と言う（本家）
-        if (ONW.SELF_AS_VILLAGER.includes(g.initialRoles[p.id]) || Math.random() < 0.75 || Math.random() < 0.6) coRole = "villager";   // 忘却の人狼・狼憑きは自分を村人だと思っているので、必ず村人COする
-      } else if (r === "tanner" || r === "love_tanner") {               // てるてる系: 55%村人騙り、残りの半分は占い騙り（本家）
-        if (Math.random() < 0.55) coRole = "villager";
-        else if (Math.random() < 0.5) {
+      } else if (r === "merlin") {                                      // マーリン: 人狼が見えているので、別の村役職を騙る（マーリンCOは禁止）
+        const lie = merlinLie(g, p, i);
+        coRole = lie.co; result = lie.result;
+      } else if (r === "villager") {
+        coRole = "villager";   // 村人は必ずCOする（以前は約1割がCOしなかった）
+      } else if (r === "tanner" || r === "love_tanner") {               // てるてる系: 55%村人騙り、残りの半分は占い騙り（本家）。どれでも必ず何かをCOする
+        { const pl = plainLie(g, p, r); coRole = pl.co; result = pl.result; }   // 村人がいなければ別の村役職を騙る
+        if (Math.random() >= 0.55 && Math.random() < 0.5) {
           const t = fakeSeerTarget(g, p);
           if (t) {
             const role = fakeSeerResult(g, p, t, r);
@@ -283,8 +323,10 @@ window.ONW = window.ONW || {};
             result = { short: `${t.name} → ${rn(role)}`, text: `${t.name} を占って ${rn(role)} でした。`, claim: { kind: "seer", target: t.id, role } };
           }
         }
-      } else if (ONW.roles.getInfo(r).team === "village" && Math.random() < 0.45) {   // その他の村人陣営: 45%で自分の役職をCO（本家）
+      } else if (ONW.roles.getInfo(r).team === "village") {              // その他の村人陣営（わら人形・猫又など）: 必ず自分の役職をCO
         coRole = r;
+      } else {                                                           // 神・天邪鬼・オポチュニストなど（人狼でもてるてる系でもない第三陣営）: 村人を騙る（村人がいなければ別の村役職）
+        const pl = plainLie(g, p, r); coRole = pl.co; result = pl.result;
       }
       if (!coRole) return;                                              // COしない
       plan.push({ p, text: `${rn(coRole)}CO`, co: coRole, claim: result ? null : { kind: "villager" }, gap: result ? 1200 : 3500 });
