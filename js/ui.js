@@ -184,7 +184,7 @@ window.ONW = window.ONW || {};
       </button>`;
     const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor"];
     const wolfLike = ["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin"], madLike = ["madman", "mad_seer", "cultist", "black_cat"], dark = ["dark_avatar"];
-    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "executioner", "gremlin"];
+    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin"];
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -732,9 +732,9 @@ window.ONW = window.ONW || {};
   ui.useAbility = function (kind) {   // kind: "day" | "night"。夜能力: 酔いが覚めたあとの最終役職の夜能力（押すとカードを選べて、確定/キャンセルが出る。もう一度押すと閉じる）
     const g = ONW.game, flash = (t) => { g.abilityMsg = t; ui.render(g); setTimeout(() => { if (g.abilityMsg === t) { g.abilityMsg = ""; ui.render(g); } }, 4000); };
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.isDead || g.isSpectator) return;
-    if (kind !== "night") return flash("今使える昼能力はありません。");
-    if (g.morningChainDone) return flash("夜能力は使用済みです。");
-    if (!g.morningChain || !g.morningChainReady || !g.soberRole) return flash("今使える夜能力はありません。（酔いが覚めると、最終的な役職の夜能力を使えます）");
+    if (kind !== "night") return;   // 使えない人は押しても何も出ない
+    if (g.morningChainDone) return;
+    if (!g.morningChain || !g.morningChainReady || !g.soberRole) return;
     g.abilityOpen = !g.abilityOpen;
     if (!g.abilityOpen) g.nightSel = { players: [], graves: [] };
     ONW.stage.sync(g); ui.render(g);

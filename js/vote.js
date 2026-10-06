@@ -268,6 +268,48 @@ window.ONW = window.ONW || {};
     return [...done];
   };
 
+  /**
+   * シュレディンガーの猫（本家 assignSchrodingerSources / resolveSchrodingerAffiliation と同じ考え方）。
+   * 最終盤面でシュレディンガーの猫を持っている人それぞれについて、自分に投票した人の中からランダムに1人（= 参照先）を選び、その人の陣営になる。
+   *   ・参照先の最終役職が村人陣営 → "village" / 人狼陣営（昇格した狂人も、役職の陣営どおり）→ "wolf" / 第三陣営 → "third"（参照先の役職名が final に入る）
+   *   ・参照先が別のシュレディンガーの猫なら、その猫の陣営を引き継ぐ（猫同士の相互参照で堂々巡りになったら "loop" = どの陣営にもなれない）
+   *   ・1票も入っていなければ "none"（どの陣営にもなれない）
+   *   ・恋人（重複役職）になっている猫は恋人陣営として扱うので "lover"（この能力は働かない）
+   * 参照先は一度決めたら game.catSources[猫の持ち主ID] に覚え、勝敗判定を何度呼び直しても同じ人になる（その人がまだ投票者に入っているかぎり）。試合開始時に net.js 側で空に戻す。
+   * 結果は game.catInfo[猫の持ち主ID] = { team, direct: 参照先, final: 最終的な参照先（猫をたどった先）, via: 猫を経由したか, votes: 得票数, voters: 投票した人たち } に入れる。
+   * 戻り値: game.catInfo
+   */
+  vote.resolveCats = function resolveCats(game) {
+    const R = ONW.ROLE, ids = game.players.map((p) => p.id), role = (id) => game.currentRoles[id];
+    const cats = ids.filter((id) => role(id) === R.SCHRODINGER_CAT);
+    game.catSources = game.catSources || {};
+    Object.keys(game.catSources).forEach((k) => { if (!cats.includes(k)) delete game.catSources[k]; });   // 猫でなくなった人の記録は消す
+    const votersOf = (id) => ids.filter((v) => (game.votes || {})[v] === id);
+    cats.forEach((id) => {
+      const vs = votersOf(id);
+      if (!vs.length) { delete game.catSources[id]; return; }
+      if (!vs.includes(game.catSources[id])) game.catSources[id] = ONW.utils.randomChoice(vs);   // 自分に投票した人からランダムに1人
+    });
+    const info = {}, done = {};
+    const teamOfRole = (r) => ONW.roles.getInfo(r).team;
+    const resolve = (id, trail) => {
+      if (done[id]) return done[id];
+      const src = game.catSources[id];
+      let r;
+      if (!src) r = { team: "none", direct: null, final: null, via: false };
+      else if (trail.includes(id)) r = { team: "loop", direct: src, final: null, via: true };
+      else if (role(src) === R.SCHRODINGER_CAT) { const nx = resolve(src, [...trail, id]); r = { team: nx.team, direct: src, final: nx.final, via: true }; }
+      else r = { team: teamOfRole(role(src)), direct: src, final: src, via: false };
+      return (done[id] = r);
+    };
+    cats.forEach((id) => {
+      const r = resolve(id, []), vs = votersOf(id);
+      info[id] = { ...r, team: ONW.loverMate(game, id) ? "lover" : r.team, votes: vs.length, voters: vs };
+    });
+    game.catInfo = info;
+    return info;
+  };
+
   /** わら人形・アサシンの選択待ちがあれば [{ id, cands, kind }, ...] を返す（なければ null）。net.js が結果を出す前に、選び終えるまで繰り返し呼ぶ */
   vote.strawNeed = function strawNeed(game) {
     ONW.vote.resolveChain(game, false);
@@ -291,6 +333,7 @@ window.ONW = window.ONW || {};
     const nm = (list) => list.map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、");
     const executed = ONW.vote.resolveChain(game, true);
     game.executed = executed;
+    ONW.vote.resolveCats(game);   // シュレディンガーの猫: 自分に投票した人からランダムに1人選び、その人の陣営になる
     game.assassinResult = (game.assassinList || []).map((a) => ({ by: a.id, target: a.target, hit: game.currentRoles[a.target] === R.MERLIN }));   // 結果の演出用
     const dead = new Set([...executed, ...(game.deadIds || [])]);   // 追放された人 + 昼中に死亡した人
     const gods = ids.filter((id) => role(id) === R.GOD);
@@ -346,10 +389,21 @@ window.ONW = window.ONW || {};
       const freeters = ids.filter((id) => role(id) === R.FREETER);
       const servants = ONW.servantPairs(game).filter(([s, m]) => s !== m);
       const gremlins = ONW.gremlinPairs(game);   // グレムリン: 選んだ2人（コピー元・コピー先）のどちらかが勝利していれば追加で勝利
-      if (freeters.length || servants.length || gremlins.length) {
-        let changed = true, added = false, addedServant = false, addedGremlin = false;
+      // シュレディンガーの猫: 参照先の陣営が勝利していれば追加で勝利（村人陣営・人狼陣営は勝利陣営かどうか / 第三陣営の役職の人が参照先なら、その人が勝利しているか）。無所属・堂々巡り・恋人の猫は勝てない
+      const cats = ids.filter((id) => role(id) === R.SCHRODINGER_CAT && !lostLover(id) && !isLover(id));
+      const catWins = (id) => {
+        const c = (game.catInfo || {})[id];
+        if (!c) return false;
+        if (c.team === "village") return teams.includes("村人陣営");
+        if (c.team === "wolf") return teams.includes("人狼陣営");
+        if (c.team === "third") return !!c.final && w.has(c.final);
+        return false;
+      };
+      if (freeters.length || servants.length || gremlins.length || cats.length) {
+        let changed = true, added = false, addedServant = false, addedGremlin = false, addedCat = false;
         while (changed) {
           changed = false;
+          cats.forEach((id) => { if (!w.has(id) && catWins(id)) { w.add(id); changed = true; addedCat = true; } });
           freeters.forEach((id) => {
             const t = ONW.getRoleBound(game, "freeterTargets", id);
             if (t && w.has(t) && !w.has(id) && !lostLover(id)) { w.add(id); changed = true; added = true; }
@@ -364,6 +418,7 @@ window.ONW = window.ONW || {};
         if (added && !teams.includes("フリーター")) teams.push("フリーター");
         if (addedServant && !teams.includes("従者")) teams.push("従者");
         if (addedGremlin && !teams.includes("グレムリン")) teams.push("グレムリン");
+        if (addedCat && !teams.includes("シュレディンガーの猫")) teams.push("シュレディンガーの猫");
       }
       loserRoleIds.forEach((id) => w.delete(id));
       execLoseIds.forEach((id) => w.delete(id));

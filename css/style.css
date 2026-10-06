@@ -1307,6 +1307,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* 最終結果の役職履歴: 本家どおり (+恋人1) はピンク、(+酔っ払い) は金色 */
 .result-sheet .rs-tag-love { color: #ff77dd; }
 .result-sheet .rs-tag-drunk { color: #ffaa00; }
+.result-sheet .rs-tag-cat { color: #aaaaaa; }   /* シュレディンガーの猫: 参照先が第三陣営の役職のときの「(+役職名)」 */
+.tb-front b .tb-catsfx { color: #aaaaaa; font-weight: 700; }   /* 「(+オポチュニスト)」は同じ行に灰色で続ける */
 
 /* ---- 処刑人: ターゲットの印（夜のはじめ・朝にターゲットのカードがめくれる） ---- */
 .tb-front.tb-team-target { border-color: #ff8a3d; }

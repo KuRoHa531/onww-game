@@ -34,7 +34,7 @@ window.ONW = window.ONW || {};
     (res.servantSubs || []).forEach((x) => add(T("従者: ", C.info), T(`${x.servant} が ${x.master} の身代わりになりました。`)));
     res.history.forEach((h) => {
       const segs = [T(h.name + " ")];
-      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : "#ffaa00"))); });
+      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : t.k === "cat" ? C.third : "#ffaa00"))); });
       segs.push(T(" " + h.status, h.dead ? C.dead : C.alive));
       add(...segs);
     });

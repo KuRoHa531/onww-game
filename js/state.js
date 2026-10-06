@@ -71,6 +71,7 @@ window.ONW = window.ONW || {};
     GREMLIN: "gremlin",   // グレムリン: 夜に2人（コピー元 → コピー先）を選び、その時点のコピー元の役職をコピー先にコピーする（コピー元は変化しない）。選んだ2人のどちらかが勝利すれば追加勝利（選択は役職の持ち主に記録: gremlinPicks）
     EXECUTIONER: "executioner",   // 処刑人: 試合開始時にランダムなターゲット(他の参加者)が決まる。ターゲットが追放されたら勝利（ターゲットはカードについていく: 役職に紐づく状態 execTargets）
     DOPPELGANGER: "doppelganger",   // ドッペルゲンガー: 夜に1人選び、その人の初期役職をコピーする（選ばれた側の役職は動かない）
+    SCHRODINGER_CAT: "schrodinger_cat",   // シュレディンガーの猫: 夜の能力なし。投票後、自分に投票した人からランダムに1人が選ばれ、その人の陣営になる（その陣営が勝てば追加勝利）。1票も入らなければ無所属。結果の演出では、めくれたあと1票以上入っていればもう一度裏返り、決まった陣営の色（村人=緑 / 人狼=赤）の文字になる
     VISITOR: "visitor",   // 訪問者: 村人陣営。夜に1人を訪問する（相手の役職は分からない）。訪問先は役職の持ち主に紐づく(visitorTargets)ので、入れ替わると「誰が訪問してきたか」も入れ替わる。朝のあとの待機時間に、訪問された人の画面で訪問者のカードが表になる
     MAYOR: "mayor",   // メイヤー: 村人陣営。夜の能力はなく、昼の投票で「メイヤーの投票数」（ルーム設定・2〜10票）ぶんの票を持つ。最終盤面でメイヤーを持っている人の投票が重くなる
     LOVER: "lover",   // 重複役職（恋人）: 配役の枚数には数えず、2人1組でランダムな参加者に重なる。g.loverOf[id] = 相方のid（役職の移動には関係なく、人についている）
@@ -257,7 +258,7 @@ window.ONW = window.ONW || {};
   ONW.TRANSFORM_GROUPS = {
     [ONW.ROLE.LIGHT_APOSTLE]: [ONW.ROLE.VILLAGER, ONW.ROLE.SEER, ONW.ROLE.ROBBER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.INSOMNIAC, ONW.ROLE.MASON, ONW.ROLE.STRAW_DOLL, ONW.ROLE.CAT_SIDHE, ONW.ROLE.MERLIN, ONW.ROLE.WOLF_DREAMER, ONW.ROLE.WOLF_MARKED, ONW.ROLE.BAKER, ONW.ROLE.STAR, ONW.ROLE.CHICKEN, ONW.ROLE.NEWSPAPER, ONW.ROLE.MAYOR, ONW.ROLE.VISITOR],
     [ONW.ROLE.DARK_AVATAR]: [ONW.ROLE.WEREWOLF, ONW.ROLE.BIG_WOLF, ONW.ROLE.LONE_WOLF, ONW.ROLE.WHITE_WOLF, ONW.ROLE.TOFU_WOLF, ONW.ROLE.FORGETFUL_WOLF, ONW.ROLE.ASSASSIN, ONW.ROLE.MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.CULTIST, ONW.ROLE.BLACK_CAT],
-    [ONW.ROLE.SILVER_SHADOW]: [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.GOD, ONW.ROLE.OPPORTUNIST, ONW.ROLE.AMANOJAKU, ONW.ROLE.FREETER, ONW.ROLE.SERVANT, ONW.ROLE.WINNER, ONW.ROLE.LOSER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.EXECUTIONER, ONW.ROLE.GREMLIN],
+    [ONW.ROLE.SILVER_SHADOW]: [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.GOD, ONW.ROLE.OPPORTUNIST, ONW.ROLE.AMANOJAKU, ONW.ROLE.FREETER, ONW.ROLE.SERVANT, ONW.ROLE.WINNER, ONW.ROLE.LOSER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SCHRODINGER_CAT, ONW.ROLE.EXECUTIONER, ONW.ROLE.GREMLIN],
   };
 
   /** 新聞配達員の新聞に載せない役職（変化役は試合開始時に別の役職になるので、そもそも夜に能力を使わない） */
@@ -325,6 +326,7 @@ window.ONW = window.ONW || {};
     [ONW.ROLE.AMANOJAKU]:    { name: "天邪鬼",       team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "第三陣営。村人陣営が勝たなければ追加勝利です。" },
     [ONW.ROLE.OPPORTUNIST]:  { name: "オポチュニスト", team: ONW.TEAM.THIRD, wakeOrder: null, desc: "第三陣営。夜の能力はありません。最後まで追放されなければ、ほかの勝敗に追加で勝利します。" },
     [ONW.ROLE.DOPPELGANGER]: { name: "ドッペルゲンガー", team: ONW.TEAM.THIRD, wakeOrder: 52, desc: "第三陣営（コピーするまでは無陣営）。夜に1人を選び、朝の処理でその人の「その時点の役職」をコピーして、その役職になります（選ばれた人の役職は変わりません）。ドッペルゲンガーをコピーした場合は村人になります。コピーした役職に夜の能力があれば朝のうちに使え、マーリン・共有者などの夜の情報も朝に分かります。コピーした後の陣営・勝利条件はコピーした役職に従い、誰もコピーできなかったときは勝利できません。" },
+    [ONW.ROLE.SCHRODINGER_CAT]: { name: "シュレディンガーの猫", team: ONW.TEAM.THIRD, wakeOrder: null, desc: "第三陣営。夜の能力はありません。投票のあと、自分に投票していた人の中からランダムに1人が選ばれ、その人の陣営になります（村人陣営・人狼陣営・第三陣営のどれか）。その陣営が勝利していれば追加で勝利します。1票も入らなかったときは、どの陣営にもなれず勝利できません。結果発表でカードがめくれたとき、1票以上入っていればもう一度裏返り、村人陣営なら緑、人狼陣営なら赤の文字の「シュレディンガーの猫」になります（第三陣営の役職の人が選ばれたときは灰色のまま、その役職名が付きます）。選ばれた人が別のシュレディンガーの猫なら、その猫の陣営を引き継ぎます（猫同士で選び合って堂々巡りになると、どの陣営にもなれません）。恋人になっている人は恋人陣営として扱われ、この能力は働きません。" },
     [ONW.ROLE.DRUNK]:        { name: "酔っ払い",     team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "重複役職。議論時間の半分が過ぎるまで、自分の役職も夜の情報も分かりません。覚めると最終的な役職を知り、能力があれば1回使えます。" },
     [ONW.ROLE.LOVER]:        { name: "恋人",         team: ONW.TEAM.THIRD,   wakeOrder: null, desc: "重複役職。配役の枚数には数えず、2人1組でランダムな参加者（CPU含む）に重なります。夜に相方のカードが❤️でめくれて、お互いが分かります。相方が追放・道連れ・無理心中になると、自分も心中で死亡します。恋人の二人とも死ななければ恋人陣営の勝利で、恋人以外は敗北です（死亡した恋人は、元の陣営が勝っても敗北します）。投票結果でめくれるとき、恋人のカードの右上に丸いハートが付きます。" },
   };
@@ -366,7 +368,7 @@ window.ONW = window.ONW || {};
       phase: ONW.PHASE.TITLE,
 
       // --- セットアップ内容 ---
-      roleCounts: { werewolf: 2, big_wolf: 0, dark_avatar: 0, madman: 0, mad_seer: 0, cultist: 0, villager: 2, seer: 1, robber: 1, relic_robber: 0, troublemaker: 0, insomniac: 0, mason: 0, light_apostle: 0, tanner: 0, silver_shadow: 0, love_tanner: 0, god: 0, opportunist: 0, straw_doll: 0, cat_sidhe: 0, black_cat: 0, amanojaku: 0, lone_wolf: 0, white_wolf: 0, tofu_wolf: 0, forgetful_wolf: 0, merlin: 0, assassin: 0, wolf_dreamer: 0, wolf_marked: 0, baker: 0, star: 0, freeter: 0, servant: 0, winner: 0, loser: 0, doppelganger: 0, executioner: 0, gremlin: 0, chicken: 0, newspaper: 0, mayor: 0, visitor: 0 },
+      roleCounts: { werewolf: 2, big_wolf: 0, dark_avatar: 0, madman: 0, mad_seer: 0, cultist: 0, villager: 2, seer: 1, robber: 1, relic_robber: 0, troublemaker: 0, insomniac: 0, mason: 0, light_apostle: 0, tanner: 0, silver_shadow: 0, love_tanner: 0, god: 0, opportunist: 0, straw_doll: 0, cat_sidhe: 0, black_cat: 0, amanojaku: 0, lone_wolf: 0, white_wolf: 0, tofu_wolf: 0, forgetful_wolf: 0, merlin: 0, assassin: 0, wolf_dreamer: 0, wolf_marked: 0, baker: 0, star: 0, freeter: 0, servant: 0, winner: 0, loser: 0, doppelganger: 0, schrodinger_cat: 0, executioner: 0, gremlin: 0, chicken: 0, newspaper: 0, mayor: 0, visitor: 0 },
       revealTransforms: true,         // 変化公開（昼開始時に「変化前 → 変化後」を公開）
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）

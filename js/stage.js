@@ -30,6 +30,8 @@ window.ONW = window.ONW || {};
   let alm = {};                        // 従者の身代わり: ご主人のカードが「めくれそうになる」席（絶対に表にならない）
   let shin = {};                       // 無理心中で道連れになった席（死因の演出用）
   let gx = {};                         // 神の演出: 席 → "descend"（神降臨）/ "spark"（祝福: 神のキラキラ）/ "blow"（吹き飛ばされる）/ "win"（祝福で勝つ人）
+  let catv = {};                       // シュレディンガーの猫: 2回目に裏返ったあとの面（席 → { team: village / wolf / third / none / loop, sfx: "(+役職名)" }）。あれば、猫のカードがその陣営の色の文字になる
+  const CAT = "schrodinger_cat";   // シュレディンガーの猫
   const WOLF_MARK = "__wolf";
   const LOVE_MARK = "__love";   // 恋人の相方に見える「❤️」の印（役職名は出さない）
   const SELF_LOVE = "__selflove";   // 酔いが覚めた恋人本人のカードが「恋人」へめくれた面
@@ -128,6 +130,10 @@ window.ONW = window.ONW || {};
     if (role === MASTER_MARK) return `<div class="tb-wolfmark tb-master"><span>👑</span><small>ご主人</small></div>`;
     if (role === DUO_MARK) return `<div class="tb-wolfmark tb-duo"><span>🐺</span><span>❤️</span></div>`;
     if (role === WOLF_MARK) return `<div class="tb-wolfmark">🐺</div>`;   // 狂信者に見える「人狼」の印（役職名は出さない）
+    if (String(role).startsWith(CAT + "@")) {   // 2回目に裏返ったシュレディンガーの猫: 陣営の色の文字（第三陣営の役職が参照先なら、灰色のまま「(+役職名)」が付く）
+      const [, team, sfx] = String(role).split("@");
+      return `${ONW.ui.roleIcon(CAT, "role-icon--face")}<b>${esc(ONW.roles.getInfo(CAT).name)}${sfx ? `<span class="tb-catsfx">${esc(sfx)}</span>` : ""}</b>`;
+    }
     const info = ONW.roles.getInfo(role);
     return `${ONW.ui.roleIcon(role, "role-icon--face")}<b>${esc(info.name)}</b>`;
   }
@@ -162,13 +168,14 @@ window.ONW = window.ONW || {};
       const flipped = hideOthers && isP && (g.strawFlipped || []).includes(k.slice(2));
       const mine = hideOthers && isP && k.slice(2) === me;   // 選んでいるアサシン本人のカードだけは、自分の役職で表に見える
       const h = hold && isP ? hold[k] : null;
-      const role = mine ? ONW.ROLE.ASSASSIN : hideOthers && isP ? (flipped ? UNK_MARK : undefined) : (up[k] || (h && h.role));
+      let role = mine ? ONW.ROLE.ASSASSIN : hideOthers && isP ? (flipped ? UNK_MARK : undefined) : (up[k] || (h && h.role));
+      if (role === CAT && catv[k]) role = `${CAT}@${catv[k].team}${catv[k].sfx ? "@" + catv[k].sfx : ""}`;   // 2回目の面（陣営の色）
       if (hideOthers && isP && role) rec[k] = { role, dead: !!flipped };
       if (role && s.dataset.role !== role) {
         s.dataset.role = role;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role);
-        f.className = `tb-front tb-team-${role === UNK_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK ? "love" : role === TARGET_MARK ? "target" : role === MASTER_MARK || role === SELF_LOVE ? "master" : ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK ? "love" : role === TARGET_MARK ? "target" : role === MASTER_MARK || role === SELF_LOVE ? "master" : ONW.roles.getInfo(role).team}`;
       }
       const sel = (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
@@ -188,7 +195,8 @@ window.ONW = window.ONW || {};
       { const lv = s.querySelector(".tb-lov"); if (lv) { const t = typeof lov[k] === "number" ? `<span>❤</span><span>${lov[k]}</span>` : "<span>❤</span>"; if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }   // 結果発表: 丸の中にハートと恋人番号
       s.classList.toggle("almost", !!alm[k]);
       ["descend", "spark", "blow", "win", "chicken"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
-      if (gx[k] === "blow" && role && ONW.roles.getInfo(role)) s.dataset.ghost = ONW.roles.getInfo(role).name; else delete s.dataset.ghost;   // 吹き飛んだあとの点線のカードに書く役職名   // 従者の身代わり: ご主人のカードがめくれそうになって戻る
+      const baseRole = role && String(role).startsWith(CAT + "@") ? CAT : role;
+      if (gx[k] === "blow" && baseRole && ONW.roles.getInfo(baseRole)) s.dataset.ghost = ONW.roles.getInfo(baseRole).name; else delete s.dataset.ghost;   // 吹き飛んだあとの点線のカードに書く役職名   // 従者の身代わり: ご主人のカードがめくれそうになって戻る
       ["by", "aim", "slash", "hit", "miss"].forEach((c) => s.classList.toggle("asn-" + c, asn[k] === c));   // アサシンの演出
       const b = s.querySelector(".tb-badge");
       const text = badge[k] || (g.voted && g.myVote && k === `p:${g.myVote}` && g.phase === ONW.PHASE.ONLINE_VOTE ? "投票" : "");
@@ -253,12 +261,12 @@ window.ONW = window.ONW || {};
     if (!el) return;
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; starKeys = []; flashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; starKeys = []; flashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
     if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
@@ -604,6 +612,20 @@ window.ONW = window.ONW || {};
     const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; };   // 結果でめくれる恋人のカードは、右上に丸いハート
     const rest = [...res.history.filter((h) => !h.dead).map((h) => [P(h.id), h.role, h.id]), ...res.grave.map((c, i) => [`g:${i}`, c.role])];
     const god = res.god || {}, godSpark = (id) => god.mode === "bless" && (god.ids || []).includes(id);   // 神の祝福: 追放・道連れで死んだ神だけ、めくれたときにキラキラ
+    // シュレディンガーの猫: めくれたあと、1票以上入っていれば、もう一度裏返って陣営の色の文字になる（村人陣営=緑 / 人狼陣営=赤 / 第三陣営の役職が参照先=灰色のまま「(+役職名)」/ どの陣営にもなれなければ灰色）
+    const catOf = new Map((res.cats || []).map((c) => [c.id, c]));
+    const catFlips = (id) => { const c = catOf.get(id); return !!c && c.votes >= 1 && c.team !== "lover"; };   // 2回目に裏返る猫か（恋人の猫は恋人陣営なので裏返らない）
+    const catFace = (c) => ({ team: c.team, sfx: c.team === "third" && c.finalRole ? `(+${ONW.roles.getInfo(c.finalRole).name})` : "" });
+    const catLine = (c) => c.team === "village" ? `<span class="t-village">村人陣営</span>になりました` : c.team === "wolf" ? `<span class="t-wolf">人狼陣営</span>になりました` : c.team === "third" ? `<span class="t-third">第三陣営（${esc(ONW.roles.getInfo(c.finalRole || "villager").name)}）</span>になりました` : "どの陣営にもなれませんでした";
+    const CAT_UP2 = 1300, CAT_EXTRA = 2300;   // 1回目にめくれてから裏に戻るまで / 裏に戻ってからもう一度めくれるまで（ここが 0.75秒のフリップより長ければ、ちゃんと裏返って見える）
+    /** めくれた猫のカード id を at の時刻に裏へ戻し、少しあとでもう一度めくる。noFlip: 演出が重なる（処刑人のギロチンなど）ので、裏返さずに最初から陣営の色で見せる */
+    function catFlip2(id, at, noFlip) {
+      const c = catOf.get(id), k = P(id);
+      if (!c) return;
+      if (noFlip) { catv[k] = catFace(c); return; }
+      later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} に ${c.votes}票 入っていました…</div>`); delete up[k]; paint(G()); }, at);
+      later(() => { catv[k] = catFace(c); up[k] = CAT; setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} は ${catLine(c)}</div>`); paint(G()); }, at + CAT_EXTRA - 600);
+    }
     let t = 600;
     setCap(`<div class="res-cap__t">投票の結果</div>`);
     res.counts.forEach((c, i) => later(() => { badge[P(c.id)] = `${c.c}票`; paint(G()); }, t + i * 350));
@@ -631,7 +653,10 @@ window.ONW = window.ONW || {};
     const glWin = (res.execs || []).filter((x) => x.win && x.execId !== x.targetId);   // ターゲットが追放された処刑人
     const glExec = glWin.filter((x) => exec.some((h) => h.id === x.targetId));
     glExec.forEach((x) => glSeq(x, t));
-    t += exec.length ? 3200 + (glExec.length ? GL_DUR : 0) : subs.length ? 300 : 1500;
+    const glExecIds = new Set(glExec.map((x) => x.targetId));
+    const execCats = exec.filter((h) => h.role === CAT && catFlips(h.id));
+    execCats.forEach((h) => catFlip2(h.id, t + CAT_UP2 + 200, glExecIds.has(h.id)));   // ギロチンで割れるカードは裏返さない（最初から陣営の色）
+    t += (exec.length ? 3200 + (glExec.length ? GL_DUR : 0) : subs.length ? 300 : 1500) + (execCats.some((h) => !glExecIds.has(h.id)) ? CAT_EXTRA : 0);
     // 一目惚れしてるてるが先にめくれ、そのあとで道連れにされた人が1人ずつ無理心中でめくれる
     // わら人形・猫又・黒猫が追放された場合も同じ演出で、めくれた順(連鎖の順)に1人ずつ「道連れ」でめくれる
     chain.forEach((h) => {
@@ -643,7 +668,9 @@ window.ONW = window.ONW || {};
       later(() => { if (godSpark(h.id)) { gx[P(h.id)] = "spark"; gxStars(); } up[P(h.id)] = h.role; lovOn(h.id); paint(G()); }, t + 1300);   // 演出のあとでカードが表に（神の祝福なら、めくれたときからキラキラ）
       const glC = glWin.filter((x) => x.targetId === h.id);   // 道連れ・心中で死んだターゲットも、追放された人として数える
       glC.forEach((x) => glSeq(x, t + 1300));
-      t += 3400 + (glC.length ? GL_DUR : 0);
+      const catC = h.role === CAT && catFlips(h.id);   // 道連れ・心中でめくれた猫も、1票以上入っていれば裏返る
+      if (catC) catFlip2(h.id, t + 1300 + CAT_UP2 + 200, glC.length > 0);
+      t += 3400 + (glC.length ? GL_DUR : 0) + (catC && !glC.length ? CAT_EXTRA : 0);
     });
     // アサシン: 暗殺者のカードが光り、狙われた相手に照準 → 斬撃 → カードが表になってマーリンかどうかが分かる
     // （選ばれた相手は死なない。当たりは赤い閃光で「暗殺」、外れは静かに「無事」）
@@ -670,7 +697,14 @@ window.ONW = window.ONW || {};
       }
       paint(G());
     }, t + 500 + i * 320));
-    t += 500 + rest.length * 320 + 700;
+    let restEnd = t + 500 + rest.length * 320 + 700;
+    rest.forEach(([k, r, hid], i) => {   // めくられずに残っていた猫（追放されなかった猫）も、1票以上入っていれば、めくれたあとにもう一度裏返る
+      if (r !== CAT || !hid || !catFlips(hid)) return;
+      const at = t + 500 + i * 320;
+      catFlip2(hid, at + CAT_UP2 + 200, false);
+      restEnd = Math.max(restEnd, at + CAT_UP2 + 200 + CAT_EXTRA + 400);
+    });
+    t = restEnd;
     if (god.mode === "descend") t += 1800;
     if (god.mode === "bless") {   // 全員のカードがめくれたあと: 死んだオポ・天邪鬼・負け組が吹き飛ばされ、残りの人が祝福で勝つ
       const gods = new Set(god.ids || []), blown = new Set(res.history.filter((h) => !h.win).map((h) => h.id));   // 負けた人（神も含む）のカードが吹き飛ぶ
@@ -749,6 +783,7 @@ window.ONW = window.ONW || {};
     clearAll(); alm = {}; glClear();   // 身代わりの「めくれそう」演出・処刑人の演出も止める
     res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNo || true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = (res.servantSubs || []).some((x) => x.servantId === h.id) ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
+    (res.cats || []).forEach((c) => { if (c.votes >= 1 && c.team !== "lover") catv[`p:${c.id}`] = { team: c.team, sfx: c.team === "third" && c.finalRole ? `(+${ONW.roles.getInfo(c.finalRole).name})` : "" }; });   // シュレディンガーの猫: 1票以上入っていれば、2回目の面（陣営の色）で見せる
     if (res.god && res.god.mode === "bless") {   // 神の祝福: 神はキラキラ・吹き飛ばされた人は消え・勝つ人は金色
       const gd = new Set(res.god.ids || []);
       res.history.forEach((h) => { gx[`p:${h.id}`] = gd.has(h.id) ? "spark" : h.win ? "win" : undefined; });

@@ -122,9 +122,18 @@ window.ONW = window.ONW || {};
 
   co.history = () => set({ step: "history" });
 
-  // ---- 訪問された ----（誰が訪問してきたかを開示する。待機時間に出た「訪問してきました」の通知を、全員に伝える。CPUの発言と同じ文言）
+  // ---- 情報開示 ----（本家の「〜ていたことを伝える」系。訪問された / フリーターに就職されている / 従者がいる。CPUの発言と同じ文言）
+  co.info = () => set({ step: "info" });
+  co.infoBack = () => set({ step: "info" });
   co.visited = () => set({ step: "visited" });
   co.pickVisitor = (id) => done(`${nameOf(id)} が訪問してきました。`, { kind: "visited", from: id }, null, "disclose", `${nameOf(id)} が訪問`);
+  // フリーターに就職されている（本家と同じ: 「誰がフリーターか」も伝えるかを選ぶ）
+  co.freeterInfo = () => set({ step: "fjob" });
+  co.freeterNoName = () => done("フリーターに就職されています。", { kind: "employed" }, null, "disclose", "フリーターに就職された");
+  co.freeterWho = () => set({ step: "fwho" });
+  co.pickFreeter = (id) => done(`フリーターに就職されています。フリーターは${nameOf(id)}です。`, { kind: "employed", freeter: id }, null, "disclose", `フリーター: ${nameOf(id)}`);
+  // 従者がいる（本家: 「自分の従者がいます。」）
+  co.servantInfo = () => done("自分の従者がいます。", { kind: "has_servant" }, null, "disclose", "従者がいる");
 
   // ---- 描画 ----
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
@@ -139,7 +148,7 @@ window.ONW = window.ONW || {};
     if (!s) { el.innerHTML = ""; return; }
     const back = btn("戻る", "ONW.co.back()"), close = btn("閉じる", "ONW.co.close()");
     let title = "COボタン", body = "";
-    if (s.step === "menu") body = btn("役職CO", "ONW.co.roleMenu()") + btn("結果開示", "ONW.co.result()") + btn("訪問された", "ONW.co.visited()") + btn("CO履歴", "ONW.co.history()") + close;
+    if (s.step === "menu") body = btn("役職CO", "ONW.co.roleMenu()") + btn("結果開示", "ONW.co.result()") + btn("情報開示", "ONW.co.info()") + btn("CO履歴", "ONW.co.history()") + close;
     else if (s.step === "role") {
       title = "役職CO";
       body = roleBtns("roleCo") + ["village", "wolf", "third"].map((t) => btn({ village: "村人陣営CO", wolf: "人狼陣営CO", third: "第三陣営CO" }[t], `ONW.co.teamCo('${t}')`)).join("") + back;
@@ -177,9 +186,18 @@ window.ONW = window.ONW || {};
     } else if (s.step === "love") {
       title = "結果開示";
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
+    } else if (s.step === "info") {
+      title = "情報開示";
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + back;
     } else if (s.step === "visited") {
       title = "訪問された";
-      body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("") + back;
+      body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("") + btn("戻る", "ONW.co.infoBack()");
+    } else if (s.step === "fjob") {
+      title = "フリーター情報";
+      body = `<p class="night-step__hint">誰がフリーターかも伝えますか？</p>` + btn("はい（フリーターも伝える）", "ONW.co.freeterWho()") + btn("いいえ（就職されたことだけ）", "ONW.co.freeterNoName()") + btn("戻る", "ONW.co.infoBack()");
+    } else if (s.step === "fwho") {
+      title = "フリーター情報";
+      body = `<p class="night-step__hint">誰がフリーターですか？</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickFreeter('${p.id}')`)).join("") + btn("戻る", "ONW.co.freeterInfo()");
     } else if (s.step === "ikind") {
       title = "後覚者";
       body = `<p class="night-step__hint">結果の種類を選んでください。</p>` + btn("自身が後覚者である", "ONW.co.insomKind('self')") + btn("後覚者から変わっていた", "ONW.co.insomKind('changed')") + back;

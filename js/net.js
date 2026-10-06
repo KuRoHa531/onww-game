@@ -298,7 +298,7 @@ window.ONW = window.ONW || {};
     "roleCounts", "villageSize", "graveCount", "seerGraveCount", "mayorVoteCount", "cpuCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "transformCandidates", "transformOff", "cpuNames", "debugOn", "dbg", "dbgWarn",
     "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "playerCount", "selectedRoles",
     "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds", "ghostLog", "nightResolved", "dbgVotes", "nightResults",
-    "coBoard", "tfLines", "tfPairs", "chatLog", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets", "executed", "chainIds", "chainBy", "chainKind", "mentalIds", "shockIds", "chickenReverse", "catPicks", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult",
+    "coBoard", "tfLines", "tfPairs", "chatLog", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets", "executed", "chainIds", "chainBy", "chainKind", "mentalIds", "shockIds", "chickenReverse", "catPicks", "catSources", "catInfo", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult",
     "masterPick", "masterCard", "cpuVotePlan", "cpuRealVote", "cpuInfo", "announced", "holdUntil", "remain", "settling", "promotedWolfIds", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "dealStart", "resultObj", "drunkCount", "drunkChance", "drunkOverlay", "drunkRevealed", "drunkSober", "soberLines", "loverCount", "loverChance", "loverOf", "servantMasters", "servantSubs", "servantNotified", "execTargets", "gremlinPicks", "newsRoles", "newsLines", "newsAnnounced",
   ];
   /** 参加者としての画面にも同じ意味で入っている項目。ホストを引き継ぐ人は、自分が見ていた最新の値を優先する */
@@ -307,7 +307,7 @@ window.ONW = window.ONW || {};
   const HOST_ONLY_KEYS = [
     "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds",
     "nightResolved", "dbgVotes", "nightResults", "coBoard", "tfLines", "tfPairs", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets",
-    "executed", "chainIds", "chainBy", "chainKind", "mentalIds", "shockIds", "chickenReverse", "catPicks", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult", "masterPick", "masterCard", "cpuVotePlan", "cpuRealVote", "cpuInfo", "announced", "holdUntil", "promotedWolfIds", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "resultObj", "dbg", "dbgWarn", "loverOf", "servantMasters", "servantSubs", "servantNotified", "execTargets", "gremlinPicks", "newsRoles", "newsLines", "newsAnnounced",
+    "executed", "chainIds", "chainBy", "chainKind", "mentalIds", "shockIds", "chickenReverse", "catPicks", "catSources", "catInfo", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult", "masterPick", "masterCard", "cpuVotePlan", "cpuRealVote", "cpuInfo", "announced", "holdUntil", "promotedWolfIds", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "resultObj", "dbg", "dbgWarn", "loverOf", "servantMasters", "servantSubs", "servantNotified", "execTargets", "gremlinPicks", "newsRoles", "newsLines", "newsAnnounced",
   ];
 
   // ---- 画面上部の通知（再接続中・ホスト交代中など）----
@@ -2072,7 +2072,7 @@ window.ONW = window.ONW || {};
     if (chainAsking()) return;   // わら人形・アサシンが選んでいる間は、勝手に終わらせない
     clearTimers();
     ONW.vote.resolveElimination(g);
-    g.catPicks = {}; g.strawTargets = {}; g.assassinTargets = {}; g.assassinList = []; g.strawAsk = {};   // 猫又・黒猫・わら人形・アサシンの選択は、この結果ごとに決め直す
+    g.catPicks = {}; g.catSources = {}; g.catInfo = {}; g.strawTargets = {}; g.assassinTargets = {}; g.assassinList = []; g.strawAsk = {};   // 猫又・黒猫・わら人形・アサシンの選択と、シュレディンガーの猫の参照先は、この結果ごとに決め直す
     proceedChain();
   }
 
@@ -2174,6 +2174,14 @@ window.ONW = window.ONW || {};
       ONW.loverPairs(g).forEach(([a, b], k) => { if (a === p.id || b === p.id) loveTags.push({ t: `(+恋人${k + 1})`, k: "love" }); });
       if (loveTags.length) segs.forEach((sg) => { sg.tags = [...loveTags]; });
       if (g.drunkOverlay && g.drunkOverlay[p.id]) segs.forEach((sg) => { sg.tags = [{ t: "(+酔っ払い)", k: "drunk" }, ...(sg.tags || [])]; });   // 酔っ払いは「人」についているので、変化の途中のカードすべてに付ける: 闇の化身(+酔っ払い)→人狼(+酔っ払い)
+      // シュレディンガーの猫: 最終役職の文字色が、参照先の陣営の色になる（村人=緑 / 人狼=赤 / 第三陣営の役職=灰色のまま「(+その役職名)」/ 無所属・堂々巡り・恋人=灰色）
+      const catI = fin === ONW.ROLE.SCHRODINGER_CAT ? (g.catInfo || {})[p.id] : null;
+      if (catI && catI.votes >= 1 && catI.team !== "lover") {   // 本家と同じ: 1票以上入っていれば「シュレディンガーの猫(灰色) → シュレディンガーの猫(陣営の色)」と、もう一度裏返った分を続ける
+        const last = segs[segs.length - 1];
+        const nx = { name: last.name, team: catI.team === "village" || catI.team === "wolf" ? catI.team : "third", tags: [...(last.tags || [])] };
+        if (catI.team === "third" && catI.final) nx.tags.push({ t: `(+${rn(g.currentRoles[catI.final])})`, k: "cat" });
+        segs.push(nx);
+      }
       const execTg = !(g.chainIds || []).includes(p.id) && (g.eliminated || []).includes(p.id) && !(g.mentalIds || []).includes(p.id) && ONW.execPairs(g).some(([e, t]) => t === p.id && e !== t);   // 処刑人のターゲットが投票で追放された（死因: 処刑）
       const isChain = (g.chainIds || []).includes(p.id);   // 巻き込まれた人（死因: 無理心中 = 一目惚れしてるてる / 道連れ = わら人形・猫又・黒猫）
       const kind = isChain ? (g.chainKind || {})[p.id] || "love" : null;
@@ -2200,6 +2208,7 @@ window.ONW = window.ONW || {};
       execs: ONW.execPairs(g).map(([a, b]) => ({ execId: a, targetId: b, exec: nm(a), target: nm(b), win: (g.eliminated || []).includes(b), dead: (g.executed || []).includes(b) || (g.deadIds || []).includes(b) })),   // 処刑人情報（最終盤面の処刑人の持ち主とターゲット / ターゲットが追放されたか）
       servants: ONW.servantPairs(g).map(([a, b]) => [nm(a), nm(b)]),   // 従者情報（最終盤面の従者の持ち主とご主人）
       servantSubs: (g.servantSubs || []).map((x) => ({ servantId: x.servant, masterId: x.master, servant: nm(x.servant), master: nm(x.master) })),   // 身代わり（起きた順）
+      cats: Object.entries(g.catInfo || {}).map(([id, c]) => ({ id, name: nm(id), team: c.team, votes: c.votes, direct: c.direct ? nm(c.direct) : null, final: c.final ? nm(c.final) : null, finalRole: c.final ? g.currentRoles[c.final] : null, via: !!c.via, win: winIds.includes(id) })),   // シュレディンガーの猫（最終盤面の持ち主ごと）: team = village / wolf / third / none / loop / lover。votes = 得票数（1票以上で結果の演出でもう一度裏返る）
       assassin: (g.assassinResult || []).map((a) => ({ by: nm(a.by), byId: a.by, target: nm(a.target), targetId: a.target, role: g.currentRoles[a.target], hit: a.hit })),
       grave: g.center.map((r, i) => {
         const gSfx = (card) => (card && g.promotedWolfIds.some((id) => ONW.cardAt(g, id) === card) ? "(+人狼)" : "");
