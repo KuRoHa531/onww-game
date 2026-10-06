@@ -405,6 +405,7 @@ body {
 .t-village { color: var(--village); }
 .t-wolf { color: var(--wolf); }
 .t-third { color: var(--gold); }
+.t-dup { color: #f5c518; }   /* 重複役職（酔っ払いの黄色） */
 
 /* ルーム */
 .st { font-size: 13px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); }
@@ -854,8 +855,8 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 @keyframes tfp-in { from { opacity: 0; transform: rotate(-4deg) translateY(30px) scale(.92); } to { opacity: 1; transform: rotate(-1.5deg); } }
 .tfp-title { font-size: 22px; font-weight: 800; letter-spacing: .3em; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid rgba(60, 34, 12, .45); color: #4a2a0e; }
 .tfp-line { font-size: var(--tfp-fs, 26px); font-weight: 700; margin: 16px 0; min-height: 1.4em; white-space: nowrap; }   /* 役名が長くても改行しない（文字の大きさは stage.js の fitPaper が画面幅に合わせる） */
-.tfp-title span, .tfp-line span { display: inline-block; clip-path: inset(-6px 100% -6px -2px); text-shadow: 0 0 1px rgba(45, 26, 11, .7), .6px .6px 0 rgba(45, 26, 11, .35); animation: tfp-write var(--dur) steps(var(--n)) var(--d) forwards; }
-@keyframes tfp-write { to { clip-path: inset(-6px -4px -6px -2px); } }
+.tfp-title span, .tfp-line span { display: inline-block; padding-right: .12em; clip-path: inset(-6px 100% -6px -2px); text-shadow: 0 0 1px rgba(45, 26, 11, .7), .6px .6px 0 rgba(45, 26, 11, .35); animation: tfp-write var(--dur) steps(var(--n)) var(--d) forwards; }
+@keyframes tfp-write { to { clip-path: inset(-12px -80px -12px -12px); } }   /* 書き終わりは箱の外まで広く開ける（フォントの太字・入れ替わりで字が箱からはみ出しても、最後の字が途切れないように） */
 .tfp-hint { margin-top: 18px; font-family: var(--font-body); font-size: 11px; color: rgba(60, 34, 12, .55); }
 
 /* 固定欄に収まった変化公開（古紙の見た目のまま小さくなる） */
@@ -865,6 +866,38 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .cb-tf--paper .cb-tf-item { color: #2d1a0b; background: transparent; border-color: rgba(60, 34, 12, .5); font-weight: 700; }
 .cb-tf.tf-hide { visibility: hidden; animation: none; }
 @keyframes res-appear { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- 新聞配達員: 新聞紙の紙（変化公開のあとに出る） ---- */
+.nwp-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: default; }
+.nwp-dim { position: absolute; inset: 0; background: rgba(5, 6, 12, .8); transition: opacity .9s ease; animation: tfp-dim-in .2s ease both; }
+.nwp-paper {
+  position: relative; width: min(88vw, 430px); padding: 22px 24px 26px; text-align: center; color: #1b1a17;
+  font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif;
+  transform: rotate(1deg); transform-origin: center;
+  background:
+    radial-gradient(ellipse at 15% 10%, rgba(255, 255, 250, .8), transparent 55%),
+    radial-gradient(ellipse at 90% 95%, rgba(90, 84, 70, .28), transparent 55%),
+    radial-gradient(circle, rgba(40, 38, 32, .09) .6px, transparent .9px) 0 0 / 5px 5px,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .28 0 0 0 0 .22 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(170deg, #ece8da, #d9d4c1);
+  box-shadow: inset 0 0 38px rgba(70, 62, 44, .45), 0 10px 34px rgba(0, 0, 0, .55);
+  clip-path: polygon(0% 1%, 6% 0%, 14% .8%, 24% 0%, 36% .9%, 48% 0%, 60% .8%, 72% 0%, 84% .9%, 94% 0%, 100% 1%, 99.4% 20%, 100% 40%, 99.3% 62%, 100% 82%, 99.2% 100%, 90% 99.2%, 76% 100%, 62% 99.1%, 48% 100%, 34% 99.2%, 20% 100%, 8% 99.2%, 0% 100%, .6% 78%, 0% 58%, .7% 36%, 0% 16%);
+  animation: nwp-in .3s cubic-bezier(.2, .8, .3, 1) both;
+}
+@keyframes nwp-in { from { opacity: 0; transform: rotate(4deg) translateY(36px) scale(.92); } to { opacity: 1; transform: rotate(1deg); } }
+.nwp-masthead { font-size: 34px; font-weight: 900; letter-spacing: .22em; padding: 4px 0 8px; border-top: 4px double #1b1a17; border-bottom: 1px solid #1b1a17; }
+.nwp-edition { font-size: 11px; letter-spacing: .3em; padding: 5px 0; margin-bottom: 14px; border-bottom: 3px double #1b1a17; color: #3a362c; }
+.nwp-line { font-size: var(--nwp-fs, 24px); font-weight: 800; margin: 12px 0; min-height: 1.4em; white-space: nowrap; }
+.nwp-line--head { font-size: calc(var(--nwp-fs, 24px) * .8); letter-spacing: .08em; padding-bottom: 8px; margin-bottom: 16px; border-bottom: 1px solid rgba(27, 26, 23, .55); }
+.nwp-masthead span, .nwp-line span { display: inline-block; padding-right: .12em; clip-path: inset(-6px 100% -6px -2px); animation: tfp-write var(--dur) steps(var(--n)) var(--d) forwards; }
+.nwp-hint { margin-top: 16px; font-family: var(--font-body); font-size: 11px; color: rgba(27, 26, 23, .55); }
+
+/* 情報確認に載る新聞 */
+.info-news { margin-top: 8px; padding: 10px 14px 8px; background: linear-gradient(170deg, #ece8da, #d9d4c1); color: #1b1a17; border-radius: 3px; box-shadow: inset 0 0 14px rgba(70, 62, 44, .4); font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif; }
+.info-news__title { font-size: 17px; font-weight: 900; letter-spacing: .2em; text-align: center; padding-bottom: 4px; margin-bottom: 6px; border-top: 3px double #1b1a17; border-bottom: 1px solid #1b1a17; padding-top: 2px; }
+.info-news__head { margin: 6px 0 4px; font-size: 13px; color: #3a362c; }
+.info-news__item { margin: 0; padding: 3px 0; font-size: 15px; font-weight: 800; border-bottom: 1px dotted rgba(27, 26, 23, .45); }
+.info-news__item:last-child { border-bottom: 0; }
 
 .res-cap__t.t-wolf { color: var(--blood); }
 
@@ -1155,6 +1188,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* ---- スター公開（待機時間）: 表になったスターのカードが金色に光り、「★スター」の札が付く ---- */
 .tb-seat.starup .tb-card { filter: drop-shadow(0 0 12px rgba(255,205,70,.95)); }
 .tb-seat.starup .tb-badge { background: #b8860b; border-color: #ffd54a; color: #fff8dc; }
+.tb-seat.jobup .tb-card { filter: drop-shadow(0 0 12px rgba(90,170,255,.95)); }
+.tb-seat.jobup .tb-badge { background: #1f5f99; border-color: #7cc4ff; color: #eaf6ff; }
 /* ---- パン屋: 昼タイマー開始時のバナー ---- */
 .bread-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(60,38,12,.94); border: 2px solid #e8b04a; color: #ffe9bf; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
 .bread-banner__icon { font-size: 1.5em; }
@@ -1169,3 +1204,168 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .pm-btn--close { margin-top: 4px; }
 .info-sep { border: 0; border-top: 1px solid var(--line); margin: 10px 0 6px; }
 #skip-confirm .sc-abandon { width: 100%; margin-top: 12px; border-color: var(--blood); color: #ff8a80; }
+
+
+/* ---- アサシンの演出: 暗殺者が紫に脈打ち、狙われた相手に照準 → 斬撃 → 当たりは赤い閃光 / 外れは静かに ---- */
+.tb-seat.asn-by .tb-card { animation: asn-by 1s ease-in-out infinite; }
+@keyframes asn-by {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(150,70,210,.6)); }
+  50% { filter: drop-shadow(0 0 16px rgba(190,90,240,1)); }
+}
+.tb-seat.asn-aim .tb-card::before, .tb-seat.asn-slash .tb-card::before, .tb-seat.asn-hit .tb-card::before {
+  content: ""; position: absolute; inset: -9px; z-index: 4; pointer-events: none; border-radius: 50%;
+  border: 2px solid rgba(220,60,60,.95);
+  background:
+    linear-gradient(rgba(220,60,60,.95), rgba(220,60,60,.95)) center / 2px 120% no-repeat,
+    linear-gradient(rgba(220,60,60,.95), rgba(220,60,60,.95)) center / 120% 2px no-repeat;
+}
+.tb-seat.asn-aim .tb-card::before { animation: asn-aim 1.1s ease-out both; }
+.tb-seat.asn-slash .tb-card::before, .tb-seat.asn-hit .tb-card::before { opacity: 0; }
+@keyframes asn-aim { 0% { transform: scale(2.4); opacity: 0; } 55% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.tb-seat.asn-aim .tb-card { animation: asn-tremble .22s linear infinite; }
+@keyframes asn-tremble { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+.tb-seat.asn-slash .tb-card { animation: asn-hitstop .8s ease-out both; }
+@keyframes asn-hitstop { 0% { transform: translate(0,0); } 12% { transform: translate(-6px,3px) rotate(-3deg); } 30% { transform: translate(5px,-2px) rotate(2deg); } 100% { transform: translate(0,0); } }
+.tb-seat.asn-slash .tb-card::after, .tb-seat.asn-hit .tb-card::after {
+  content: ""; position: absolute; z-index: 5; pointer-events: none; left: -20%; top: 46%; width: 140%; height: 3px;
+  background: linear-gradient(90deg, transparent, #fff 25%, #ff6a5e 60%, transparent);
+  box-shadow: 0 0 10px rgba(255,255,255,.9), 0 0 18px rgba(255,80,70,.9);
+  transform: rotate(-38deg) scaleX(0); transform-origin: left center;
+}
+.tb-seat.asn-slash .tb-card::after { animation: asn-slash .45s cubic-bezier(.2,.8,.2,1) both; }
+.tb-seat.asn-hit .tb-card::after { transform: rotate(-38deg) scaleX(1); opacity: 0; transition: opacity .8s ease .2s; }
+@keyframes asn-slash { 0% { transform: rotate(-38deg) scaleX(0); opacity: 1; } 70% { transform: rotate(-38deg) scaleX(1); opacity: 1; } 100% { transform: rotate(-38deg) scaleX(1); opacity: .2; } }
+/* 当たり: 赤い閃光 → 赤く光り続ける */
+.tb-seat.asn-hit .tb-card { animation: asn-hit 1.4s ease-out both; }
+.tb-seat.asn-hit .tb-front { border-color: var(--blood); box-shadow: 0 0 20px rgba(220,60,60,.95); }
+.tb-seat.asn-hit .tb-badge { background: var(--blood); border-color: #ff8a80; }
+@keyframes asn-hit {
+  0% { filter: brightness(2.2) drop-shadow(0 0 26px rgba(255,90,80,1)); transform: scale(1.12); }
+  40% { filter: brightness(1.3) drop-shadow(0 0 18px rgba(255,90,80,1)); transform: scale(1.04); }
+  100% { filter: drop-shadow(0 0 10px rgba(220,60,60,.9)); transform: scale(1); }
+}
+/* 外れ: 死なないので静かに。青白く一瞬光って、そのまま表になる */
+.tb-seat.asn-miss .tb-card { animation: asn-miss 1.2s ease-out both; }
+.tb-seat.asn-miss .tb-badge { background: #3d5a73; border-color: #8fb4d1; }
+@keyframes asn-miss { 0% { filter: drop-shadow(0 0 14px rgba(140,190,230,.95)); } 100% { filter: drop-shadow(0 0 0 rgba(140,190,230,0)); } }
+
+/* アサシンが選んでいる間に、めくれた人のカードへ出す「？」 */
+.tb-front .tb-wolfmark.tb-unk { color: #cfcfd6; font-weight: 700; filter: drop-shadow(0 0 6px rgba(201,70,61,.8)); }
+
+/* 道連れ・暗殺を選んでいる間、そのカードが揺れ続ける */
+.tb-seat.choosing .tb-card { animation: tb-choosing .16s linear infinite; }
+@keyframes tb-choosing { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-3px, 1px) rotate(-2deg); } 50% { transform: translate(0, -1px) rotate(0deg); } 75% { transform: translate(3px, 1px) rotate(2deg); } }
+
+/* ---- 酔っ払い（未覚醒）: 本人の画面だけ。自分のカードが黄×白のしま（裏面の色違い）になり、🍺と「酔いが覚めるまで」の秒数が出る ---- */
+.tb-seat.drunk .tb-back { background: repeating-linear-gradient(45deg, #f5c518 0 4px, #ffffff 4px 8px); border-color: #e0a800; }
+.tb-seat.drunk .tb-back::after { content: ""; }
+.tb-drunk { display: none; position: absolute; inset: 0; z-index: 2; flex-direction: column; align-items: center; justify-content: space-evenly; pointer-events: none; }
+.tb-seat.drunk:not(.up) .tb-drunk { display: flex; }
+.tb-beer { font-size: calc(var(--cw) * .42); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.tb-drunk-n { font-size: calc(var(--cw) * .5); line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: #e5232b; -webkit-text-stroke: calc(var(--cw) * .07) #000; paint-order: stroke fill; text-shadow: 0 0 1px #000, 0 1px 0 #000; }
+
+/* ---- 恋人（重複役職） ---- */
+.t-lover { color: #ff7eb6; }
+.tb-front.tb-team-love { border-color: #ff7eb6; }
+.tb-front .tb-wolfmark.tb-love { filter: drop-shadow(0 0 7px rgba(255,126,182,.95)); }
+.tb-front .tb-wolfmark.tb-duo { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); }
+.tb-front .tb-wolfmark.tb-duo span:first-child { filter: drop-shadow(0 0 6px rgba(255,85,85,.9)); }
+.tb-front .tb-wolfmark.tb-duo span:last-child { filter: drop-shadow(0 0 6px rgba(255,126,182,.95)); }
+/* 従者: ご主人のカード（夜のはじめ・墓荒らしで従者を引いた朝・酔いが覚めたとき） */
+.tb-front.tb-team-master { border-color: #c58bff; }
+.tb-front .tb-wolfmark.tb-master { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(197,139,255,.95)); }
+.tb-front .tb-wolfmark.tb-master small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #d9b8ff; line-height: 1.1; letter-spacing: -.02em; }
+.tb-front .tb-wolfmark.tb-master.tb-love { filter: drop-shadow(0 0 7px rgba(255,126,182,.95)); }
+.tb-front .tb-wolfmark.tb-master.tb-love small { color: #ffb3d4; }
+.tb-seat.glow.glow-master .tb-card { filter: drop-shadow(0 0 10px rgba(197,139,255,.95)); }
+/* 結果でめくれた恋人のカード: 左上の丸いハート（右上の票数などの札と重ならないよう左端へ） */
+.tb-lov { display: none; position: absolute; top: -5px; left: -5px; z-index: 4; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); min-width: 22px; min-height: 22px; border-radius: 50%; background: #fff; border: 2px solid #e0558f; color: #e0558f; font-size: max(calc(var(--cw) * .14), 9px); font-weight: 800; line-height: 1; flex-direction: row; gap: 1px; align-items: center; justify-content: center; pointer-events: none; box-shadow: 0 0 6px rgba(224,85,143,.8); }
+.tb-seat.lov.up .tb-lov { display: flex; }
+.result-sheet .t-lover { color: #ff7eb6; }
+
+/* 従者の身代わり: ご主人のカードがめくれそうになる（途中の70°前後まで回って揺れ、また裏のまま戻る。絶対に表にならない） */
+.tb-seat.almost .tb-inner { animation: tb-almost 1.8s ease-in-out both; }
+.tb-seat.almost .tb-card { filter: drop-shadow(0 0 12px rgba(197,139,255,.95)); }
+@keyframes tb-almost {
+  0%   { transform: rotateY(0deg); }
+  30%  { transform: rotateY(70deg); }
+  40%  { transform: rotateY(60deg); }
+  50%  { transform: rotateY(72deg); }
+  60%  { transform: rotateY(62deg); }
+  70%  { transform: rotateY(70deg); }
+  100% { transform: rotateY(0deg); }
+}
+.tb-seat.almost .tb-badge { background: #6c3fa8; border-color: #c58bff; }
+
+/* 配役演出: 役職のカードのあと（光の使徒 → パン屋 → 恋人 のように）恋人へめくれる */
+.dl-face--love { border-color: #ff77dd !important; }
+.dl-face--love b, .dl-face--love .dl-love-mark { color: #ff77dd !important; }   /* 最終結果の「(+恋人)」と同じピンク */
+.dl-face--drunk { border-color: #ffaa00 !important; }
+.dl-face--drunk b { color: #ffaa00 !important; }   /* 最終結果の「(+酔っ払い)」と同じ金色 */
+.dl-love-mark { font-size: 1.6em; line-height: 1; }
+
+/* 最終結果の役職履歴: 本家どおり (+恋人1) はピンク、(+酔っ払い) は金色 */
+.result-sheet .rs-tag-love { color: #ff77dd; }
+.result-sheet .rs-tag-drunk { color: #ffaa00; }
+
+/* ---- 処刑人: ターゲットの印（夜のはじめ・朝にターゲットのカードがめくれる） ---- */
+.tb-front.tb-team-target { border-color: #ff8a3d; }
+.tb-front .tb-wolfmark.tb-target { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,138,61,.95)); }
+.tb-front .tb-wolfmark.tb-target small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffc08f; line-height: 1.1; letter-spacing: -.02em; }
+
+/* ---- 処刑人: ターゲットが追放されたとき、揺れる → ギロチンの刃 → カードが真っ二つ ---- */
+.tb-seat.gl-shake .tb-card { animation: gl-shake .9s linear both; }
+@keyframes gl-shake {
+  0% { transform: translate(0,0) rotate(0); } 10% { transform: translate(-1px,0) rotate(-1deg); } 20% { transform: translate(1px,1px) rotate(1deg); }
+  30% { transform: translate(-2px,0) rotate(-1.5deg); } 40% { transform: translate(2px,-1px) rotate(1.5deg); } 50% { transform: translate(-3px,1px) rotate(-2.5deg); }
+  60% { transform: translate(3px,0) rotate(2.5deg); } 70% { transform: translate(-4px,-1px) rotate(-3.5deg); } 80% { transform: translate(4px,1px) rotate(3.5deg); }
+  90% { transform: translate(-5px,0) rotate(-4.5deg); } 100% { transform: translate(5px,0) rotate(4.5deg); }
+}
+.gl-half { position: absolute; inset: 0; pointer-events: none; z-index: 7; transition: transform .75s cubic-bezier(.3,.7,.3,1), opacity .75s ease .1s; }
+.gl-half .gl-face { transform: none !important; backface-visibility: visible; -webkit-backface-visibility: visible; }
+.gl-top { clip-path: polygon(0 0, 100% 0, 100% 56%, 0 44%); transform-origin: 0 44%; }
+.gl-bot { clip-path: polygon(0 44%, 100% 56%, 100% 100%, 0 100%); transform-origin: 100% 56%; }
+.gl-top.split { transform: translate(-16%, -14%) rotate(-12deg); opacity: .92; }
+.gl-bot.split { transform: translate(16%, 16%) rotate(11deg); opacity: .92; }
+.gl-blade { position: absolute; left: -26%; width: 152%; height: 44%; top: -60%; z-index: 9; pointer-events: none;
+  background: linear-gradient(180deg, #5d6573 0%, #c9d0da 40%, #f4f7fb 78%, #ffffff 100%); clip-path: polygon(0 0, 100% 0, 100% 78%, 0 100%);
+  filter: drop-shadow(0 0 6px rgba(255,255,255,.8)); animation: gl-drop .32s cubic-bezier(.6,0,.9,.5) both; }
+@keyframes gl-drop { from { transform: translateY(0); } to { transform: translateY(300%); } }
+
+/* ---- 神の演出（結果発表）---- */
+/* 神降臨: 生存している神がめくれると、ファーンと光が広がる */
+.tb-seat.gx-descend { z-index: 8; }
+.tb-seat.gx-descend::before { content: ""; position: absolute; left: 50%; top: 40%; width: calc(var(--cw) * 1.2); height: calc(var(--cw) * 1.2); margin: calc(var(--cw) * -.6) 0 0 calc(var(--cw) * -.6); border-radius: 50%; pointer-events: none; z-index: 9;
+  background: radial-gradient(circle, rgba(255,250,220,.95) 0%, rgba(255,226,140,.65) 35%, rgba(255,214,102,0) 70%); animation: gx-descend 2.2s ease-out both; }
+.tb-seat.gx-descend .tb-card { animation: gx-halo 2.2s ease-out both; }
+@keyframes gx-descend { 0% { transform: scale(.1); opacity: 0; } 18% { opacity: 1; } 100% { transform: scale(4.2); opacity: 0; } }
+@keyframes gx-halo { 0% { filter: brightness(2.2) drop-shadow(0 0 4px rgba(255,240,180,1)); } 100% { filter: brightness(1) drop-shadow(0 0 14px rgba(255,214,102,.9)); } }
+/* 神の祝福: 死んだ神のカードがキラキラ光り続ける */
+.tb-seat.gx-spark .tb-card { animation: gx-glint 1.4s ease-in-out infinite; }
+@keyframes gx-glint { 0%, 100% { filter: drop-shadow(0 0 6px rgba(255,214,102,.8)); } 50% { filter: drop-shadow(0 0 16px rgba(255,244,190,1)) brightness(1.25); } }
+/* 画面全体に降る星形のキラキラ */
+.gx-screen { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden; }
+.gx-star { position: absolute; opacity: 0; line-height: 1; text-shadow: 0 0 6px rgba(255,226,138,.95), 0 0 14px rgba(255,214,102,.7); animation: gx-star var(--d, 2s) ease-in-out infinite; }
+@keyframes gx-star { 0% { opacity: 0; transform: translateY(8px) scale(0) rotate(0deg); } 45% { opacity: 1; transform: translateY(-6px) scale(1.15) rotate(calc(var(--r) * .5)); } 100% { opacity: 0; transform: translateY(-22px) scale(.2) rotate(var(--r)); } }
+/* 吹き飛ばされるカード（死んだオポチュニスト・天邪鬼・負け組） */
+.tb-seat.gx-blow { z-index: 8; pointer-events: none; }
+.tb-seat.gx-blow .tb-card { animation: gx-blow 1.2s cubic-bezier(.5,0,.9,.4) forwards; }
+.tb-seat.gx-blow:nth-child(even) .tb-card { animation-name: gx-blow2; }
+/* カードがあった場所には、点々でカードの形だけ残す（プレイヤー名・札はそのまま） */
+.tb-seat.gx-blow::before { content: attr(data-ghost); position: absolute; top: 0; left: 50%; width: var(--cw); height: var(--ch); transform: translateX(-50%); box-sizing: border-box; border: 2px dotted rgba(217,196,143,.75); border-radius: 6px; pointer-events: none; display: flex; align-items: center; justify-content: center; text-align: center; padding: 3px; font-size: calc(var(--cw) * .2); line-height: 1.2; color: rgba(217,196,143,.8); }   /* カードの真下に最初から置き、カードが飛んだらそのまま見える（一度何もない状態にならない） */
+@keyframes gx-blow { 0% { transform: none; opacity: 1; } 100% { transform: translate(140%, -190%) rotate(520deg) scale(.3); opacity: 0; } }
+@keyframes gx-blow2 { 0% { transform: none; opacity: 1; } 100% { transform: translate(-140%, -190%) rotate(-520deg) scale(.3); opacity: 0; } }
+/* 祝福で勝つ人のカードは金色に光る */
+.tb-seat.gx-win .tb-card { animation: gx-win 1.6s ease-in-out infinite; }
+@keyframes gx-win { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255,214,102,.7)); } 50% { filter: drop-shadow(0 0 13px rgba(255,236,160,1)); } }
+
+/* チキン逆転演出: にわとりが飛び出してカードが跳ねる */
+.tb-seat.gx-chicken { z-index: 8; }
+.tb-seat.gx-chicken::before { content: "\1F414"; position: absolute; left: 50%; top: 8%; font-size: calc(var(--cw) * .9); line-height: 1; transform: translateX(-50%); z-index: 9; pointer-events: none; animation: gx-chicken-pop 2.6s ease-out both; }
+.tb-seat.gx-chicken .tb-card { animation: gx-chicken-hop .45s ease-in-out 5 alternate; filter: drop-shadow(0 0 12px rgba(255,214,102,.95)); }
+@keyframes gx-chicken-pop { 0% { transform: translate(-50%, 120%) scale(.2); opacity: 0; } 25% { transform: translate(-50%, -40%) scale(1.3); opacity: 1; } 45% { transform: translate(-50%, -10%) scale(1); } 85% { transform: translate(-50%, -10%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -30%) scale(1); opacity: 0; } }
+@keyframes gx-chicken-hop { from { transform: translateY(0); } to { transform: translateY(-14%); } }
+
+/* チキン逆転演出: ぎざぎざの枠にびっくりマーク */
+.rv-burst { display: block; margin: 0 auto; filter: drop-shadow(0 0 10px rgba(255,225,77,.8)); animation: rv-burst-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes rv-burst-pop { 0% { transform: scale(.1) rotate(-25deg); opacity: 0; } 60% { transform: scale(1.25) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }

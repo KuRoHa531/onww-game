@@ -16,7 +16,17 @@ window.ONW = window.ONW || {};
   const ROLES_V9 = [...ROLES_V8, "forgetful_wolf"];                                                                                  // 旧コード(ONW9)の並び
   const ROLES_V10 = [...ROLES_V9, "merlin", "assassin"];                                                                           // 旧コード(ONW10)の並び
   const ROLES_V11 = [...ROLES_V10, "wolf_dreamer", "wolf_marked"];                                                                 // 旧コード(ONW11)の並び
-  const ROLES = [...ROLES_V11, "baker", "star"];                                                                                     // 現在(ONW12)。末尾に足していく
+  const ROLES_V12 = [...ROLES_V11, "baker", "star"];                                                                               // 旧コード(ONW12)の並び
+  const ROLES_V13 = [...ROLES_V12, "freeter"];                                                                                 // 旧コード(ONW13)の並び
+  const ROLES_V14 = [...ROLES_V13, "servant"];                                                                                 // 旧コード(ONW14)の並び
+  const ROLES_V15 = [...ROLES_V14, "winner", "loser"];                                                                         // 旧コード(ONW15)の並び
+  const ROLES_V16 = [...ROLES_V15, "doppelganger"];                                                                            // 旧コード(ONW16)の並び
+  const ROLES_V17 = [...ROLES_V16, "executioner"];                                                                             // 旧コード(ONW17)の並び
+  const ROLES_V18 = [...ROLES_V17, "gremlin"];
+  const ROLES_V19 = [...ROLES_V18, "chicken"];                                                                                 // 旧コード(ONW19)の並び
+  const ROLES_V20 = [...ROLES_V19, "newspaper"];                                                                              // 旧コード(ONW20)の並び
+  const ROLES_V21 = [...ROLES_V20, "mayor"];                                                                                    // 旧コード(ONW21)の並び
+  const ROLES = [...ROLES_V21, "visitor"];                                                                                      // 現在(ONW22)。末尾に足していく
   const ROLES_V1 = ["werewolf", "madman", "villager", "robber", "seer"];   // 旧コード(ONW1)の並び
   const clamp = (v, a, b, d) => (Number.isFinite(+v) && v !== null && v !== "" ? Math.max(a, Math.min(b, Math.round(+v))) : d);
   const store = {
@@ -26,7 +36,7 @@ window.ONW = window.ONW || {};
   const S = {};
 
   S.ROLES = ROLES;
-  S.snapshot = (g) => ({ roleCounts: { ...g.roleCounts }, villageSize: g.villageSize, graveCount: g.graveCount, seerGrave: g.seerGraveCount, cpuCount: g.cpuCount, timers: { ...g.timers }, fake: !!g.fakeWolfWhenNoWolf, reveal: g.revealTransforms !== false, cand: g.transformCandidates !== false, off: [...(g.transformOff || [])], cpuNames: [...(g.cpuNames || [])] });
+  S.snapshot = (g) => ({ roleCounts: { ...g.roleCounts }, villageSize: g.villageSize, graveCount: g.graveCount, seerGrave: g.seerGraveCount, mayorVote: g.mayorVoteCount ?? 2, drunk: g.drunkCount || 0, drunkp: g.drunkChance ?? 100, lover: g.loverCount || 0, loverp: g.loverChance ?? 100, cpuCount: g.cpuCount, timers: { ...g.timers }, fake: !!g.fakeWolfWhenNoWolf, reveal: g.revealTransforms !== false, cand: g.transformCandidates !== false, off: [...(g.transformOff || [])], cpuNames: [...(g.cpuNames || [])] });
 
   /** 壊れた/古いデータでも安全な値に直す */
   S.sanitize = function (raw) {
@@ -34,7 +44,7 @@ window.ONW = window.ONW || {};
     const rc = {}, t = raw.timers || {};
     ROLES.forEach((r) => { rc[r] = clamp(raw.roleCounts && raw.roleCounts[r], 0, 10, 0); });
     return {
-      roleCounts: rc, villageSize: clamp(raw.villageSize ?? (Object.values(rc).reduce((a, b) => a + b, 0) - clamp(raw.graveCount, 0, 10, 2)), 3, 10, 4), graveCount: clamp(raw.graveCount, 0, 10, 2), seerGrave: clamp(raw.seerGrave, 0, 10, 2), cpuCount: clamp(raw.cpuCount, 0, 10, 0), fake: raw.fake !== false, reveal: raw.reveal !== false, cand: raw.cand !== false,
+      roleCounts: rc, villageSize: clamp(raw.villageSize ?? (Object.values(rc).reduce((a, b) => a + b, 0) - clamp(raw.graveCount, 0, 10, 2)), 3, 10, 4), graveCount: clamp(raw.graveCount, 0, 10, 2), seerGrave: clamp(raw.seerGrave, 0, 10, 2), mayorVote: clamp(raw.mayorVote, 2, 10, 2), drunk: clamp(raw.drunk, 0, 10, 0), drunkp: clamp(raw.drunkp, 0, 100, 100), lover: clamp(raw.lover, 0, 5, 0), loverp: clamp(raw.loverp, 0, 100, 100), cpuCount: clamp(raw.cpuCount, 0, 10, 0), fake: raw.fake !== false, reveal: raw.reveal !== false, cand: raw.cand !== false,
       cpuNames: (Array.isArray(raw.cpuNames) ? raw.cpuNames : []).slice(0, 10).map((n) => (typeof n === "string" ? n.trim().slice(0, 12) : "")),
       off: (Array.isArray(raw.off) ? raw.off : []).filter((k) => typeof k === "string" && Object.keys(ONW.TRANSFORM_GROUPS).some((b) => (ONW.TRANSFORM_GROUPS[b] || []).some((t) => k === `${b}:${t}`))),
       timers: { night: clamp(t.night, 5, 600, 45), morning: clamp(t.morning, 5, 600, 10), day: clamp(t.day, 5, 600, 120), vote: clamp(t.vote, 5, 600, 30) },
@@ -42,7 +52,7 @@ window.ONW = window.ONW || {};
   };
 
   S.apply = function (g, x) {
-    g.roleCounts = { ...x.roleCounts }; g.villageSize = x.villageSize; g.graveCount = x.graveCount; g.seerGraveCount = x.seerGrave; g.cpuCount = x.cpuCount;
+    g.roleCounts = { ...x.roleCounts }; g.villageSize = x.villageSize; g.graveCount = x.graveCount; g.seerGraveCount = x.seerGrave; g.mayorVoteCount = x.mayorVote ?? 2; g.drunkCount = x.drunk || 0; g.drunkChance = x.drunkp ?? 100; g.loverCount = x.lover || 0; g.loverChance = x.loverp ?? 100; g.cpuCount = x.cpuCount;
     g.timers = { ...x.timers }; g.fakeWolfWhenNoWolf = x.fake; g.revealTransforms = x.reveal; g.transformCandidates = x.cand; g.transformOff = [...(x.off || [])]; g.cpuNames = [...(x.cpuNames || [])];
   };
 
@@ -51,19 +61,19 @@ window.ONW = window.ONW || {};
   const chk = (s) => { let n = 0; for (const c of s) n = (n * 31 + c.charCodeAt(0)) % 1296; return n.toString(36).toUpperCase().padStart(2, "0"); };
   S.encode = function (rules) {
     const r = S.sanitize(rules), t = r.timers;
-    const body = b64.enc(JSON.stringify([ROLES.map((k) => r.roleCounts[k]), r.graveCount, r.cpuCount, r.fake ? 1 : 0, [t.night, t.morning, t.day, t.vote], r.reveal ? 1 : 0, r.cand ? 1 : 0, r.off, r.seerGrave, r.villageSize]));
-    return `ONW12-${body}-${chk(body)}`;
+    const body = b64.enc(JSON.stringify([ROLES.map((k) => r.roleCounts[k]), r.graveCount, r.cpuCount, r.fake ? 1 : 0, [t.night, t.morning, t.day, t.vote], r.reveal ? 1 : 0, r.cand ? 1 : 0, r.off, r.seerGrave, r.villageSize, r.drunk, r.drunkp, r.lover, r.loverp, r.mayorVote]));
+    return `ONW22-${body}-${chk(body)}`;
   };
   /** 正しいコードならルールを返す。壊れていれば null（旧形式 ONW1 も読める） */
   S.decode = function (code) {
     try {
-      const m = /^(ONW(?:1[012]|[123456789]))-([A-Za-z0-9_-]+)-([0-9A-Z]{2})$/.exec(String(code || "").replace(/\s+/g, ""));
+      const m = /^(ONW(?:2[012]|1[0123456789]|[123456789]))-([A-Za-z0-9_-]+)-([0-9A-Z]{2})$/.exec(String(code || "").replace(/\s+/g, ""));
       if (!m || chk(m[2]) !== m[3]) return null;
-      const v2 = m[1] !== "ONW1", names = m[1] === "ONW12" ? ROLES : m[1] === "ONW11" ? ROLES_V11 : m[1] === "ONW10" ? ROLES_V10 : m[1] === "ONW9" ? ROLES_V9 : m[1] === "ONW8" ? ROLES_V8 : m[1] === "ONW7" ? ROLES_V7 : m[1] === "ONW6" ? ROLES_V6 : m[1] === "ONW5" ? ROLES_V5 : m[1] === "ONW4" ? ROLES_V4 : m[1] === "ONW3" ? ROLES_V3 : v2 ? ROLES_V2 : ROLES_V1;
+      const v2 = m[1] !== "ONW1", names = m[1] === "ONW22" ? ROLES : m[1] === "ONW21" ? ROLES_V21 : m[1] === "ONW20" ? ROLES_V20 : m[1] === "ONW19" ? ROLES_V19 : m[1] === "ONW18" ? ROLES_V18 : m[1] === "ONW17" ? ROLES_V17 : m[1] === "ONW16" ? ROLES_V16 : m[1] === "ONW15" ? ROLES_V15 : m[1] === "ONW14" ? ROLES_V14 : m[1] === "ONW13" ? ROLES_V13 : m[1] === "ONW12" ? ROLES_V12 : m[1] === "ONW11" ? ROLES_V11 : m[1] === "ONW10" ? ROLES_V10 : m[1] === "ONW9" ? ROLES_V9 : m[1] === "ONW8" ? ROLES_V8 : m[1] === "ONW7" ? ROLES_V7 : m[1] === "ONW6" ? ROLES_V6 : m[1] === "ONW5" ? ROLES_V5 : m[1] === "ONW4" ? ROLES_V4 : m[1] === "ONW3" ? ROLES_V3 : v2 ? ROLES_V2 : ROLES_V1;
       const a = JSON.parse(b64.dec(m[2]));
       if (!Array.isArray(a) || !Array.isArray(a[0]) || a[0].length !== names.length || !Array.isArray(a[4])) return null;
       const rc = {}; names.forEach((k, i) => { rc[k] = a[0][i]; });
-      return S.sanitize({ roleCounts: rc, graveCount: a[1], cpuCount: a[2], fake: a[3] === 1, timers: { night: a[4][0], morning: a[4][1], day: a[4][2], vote: a[4][3] }, reveal: v2 ? a[5] === 1 : true, cand: v2 ? a[6] === 1 : true, off: v2 && Array.isArray(a[7]) ? a[7] : [], seerGrave: a[8], villageSize: a[9] });
+      return S.sanitize({ roleCounts: rc, graveCount: a[1], cpuCount: a[2], fake: a[3] === 1, timers: { night: a[4][0], morning: a[4][1], day: a[4][2], vote: a[4][3] }, reveal: v2 ? a[5] === 1 : true, cand: v2 ? a[6] === 1 : true, off: v2 && Array.isArray(a[7]) ? a[7] : [], seerGrave: a[8], villageSize: a[9], drunk: a[10], drunkp: a[11], lover: a[12], loverp: a[13], mayorVote: a[14] });
     } catch (e) { return null; }
   };
 

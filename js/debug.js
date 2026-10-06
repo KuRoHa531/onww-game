@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null };
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); return (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -44,6 +44,28 @@ window.ONW = window.ONW || {};
     const t = (game.dbg.tf || {})[key];
     if (!t || (game.dbg.roles || {})[key] !== before) return null;
     return (ONW.TRANSFORM_GROUPS[before] || []).includes(t) ? t : null;
+  };
+  /** 従者のご主人の指定（持ち主のID → ご主人のID）。従者を配られた人にだけ使われる。指定した人が参加していなければ無視（呼び出し側で確認） */
+  debug.servantMaster = function (game, id) {
+    if (!game.debugOn || !game.dbg) return null;
+    return (game.dbg.master || {})[id] || null;
+  };
+  /** ランダムに決まる対象の指定（全プレイヤー対象）。kind: "cat"=猫又・黒猫の道連れ先 / "freeter"=就職先を選べなかったフリーターの就職先 / "straw"=わら人形の自動選択。
+   *  持ち主のID → 対象のID（指定なしなら null。対象が使えない状況なら、呼び出し側でランダムに戻す） */
+  debug.randTarget = function (game, kind, id) {
+    if (!game.debugOn || !game.dbg || !game.dbg.rand) return null;
+    return ((game.dbg.rand[kind] || {})[id]) || null;
+  };
+  /** 酔っ払いにする人のID一覧（指定なしなら空）。呼び出し側で、指定した人を先に酔わせ、残りの枠はこれまで通りランダム */
+  debug.drunkIds = function (game) {
+    if (!game.debugOn || !game.dbg || !game.dbg.rand) return [];
+    return (game.dbg.rand.drunk || []).filter((id) => game.players.some((p) => p.id === id));
+  };
+  /** 恋人にする組 [[a,b],...]（2人とも参加している組だけ）。呼び出し側で、指定した組を先に作り、残りの組はこれまで通りランダム */
+  debug.loverPairs = function (game) {
+    if (!game.debugOn || !game.dbg || !game.dbg.rand) return [];
+    const ok = (id) => game.players.some((p) => p.id === id);
+    return (game.dbg.rand.lover || []).filter((pr) => Array.isArray(pr) && pr.length === 2 && pr[0] !== pr[1] && ok(pr[0]) && ok(pr[1]));
   };
   /** CPUの夜の能力先指定 { player?, graves? } */
   debug.cpuTarget = function (game, id) {
@@ -127,30 +149,37 @@ window.ONW = window.ONW || {};
     if (!inLobby()) return hint("固定役はルーム（ロビー）で設定します。次の試合に反映されます。");
     const { players, graves } = slots();
     const valid = new Set([...players, ...graves].map((s) => s.key));
+    const nmOf = (k) => (players.find((s) => s.key === k) || {}).name || "?";
     const deckRoles = Object.keys(ONW.ROLE_INFO).filter((r) => (g.roleCounts[r] || 0) > 0);
     const slotRow = (s) => {
       const role = d.roles[s.key];
-      const lab = role ? esc(rn(role)) + (d.tf[s.key] ? ` → ${esc(rn(d.tf[s.key]))}` : "") : "固定なし";
+      const isGrave = s.key.startsWith("center:");
+      const myLv = isGrave ? -1 : (d.rand.lover || []).findIndex((pr) => (pr || []).includes(s.key));
+      const mateNm = myLv >= 0 ? ((d.rand.lover[myLv] || []).filter((x) => x !== s.key && valid.has(x)).map(nmOf)[0]) : "";
+      const dupLab = (!isGrave && (d.rand.drunk || []).includes(s.key) ? "(+酔っ払い)" : "") + (myLv >= 0 ? `(+恋人${myLv + 1})` : "");
+      const lab = (role ? esc(rn(role)) + (d.tf[s.key] ? `→${esc(rn(d.tf[s.key]))}` : "") : "固定なし") + dupLab;   // 例: 闇の化身→人狼(+恋人1) / 村人(+酔っ払い)(+恋人2)
       let h = row(esc(s.name) + (s.cpu ? cpuBadge : ""), `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["l:" + s.key])}`);
       if (ui.pick === "l:" + s.key) {
         const used = (r) => Object.entries(d.roles).filter(([k, v]) => v === r && k !== s.key && valid.has(k)).length;
         const rb = deckRoles.map((r) => b(esc(rn(r)), "lockSet", [s.key, r], role === r ? "dbg-on" : "", used(r) >= (g.roleCounts[r] || 0))).join("");
         const tg = role && ONW.TRANSFORM_GROUPS[role]
           ? `<div class="dbg-sub">変化後</div>${b("ランダム", "tfSet", [s.key, ""], !d.tf[s.key] ? "dbg-on" : "")}${ONW.TRANSFORM_GROUPS[role].map((t) => b(esc(rn(t)), "tfSet", [s.key, t], d.tf[s.key] === t ? "dbg-on" : "")).join("")}` : "";
-        h += `<div class="dbg-pick">${rb}${b("固定なし", "lockSet", [s.key, ""], "dbg-clear")}${tg}${b("閉じる", "pick", ["l:" + s.key])}</div>`;
+        const maxPairs = Math.min(5, Math.floor(players.length / 2));
+        const dup = isGrave ? "" : `<div class="dbg-sub">重複役職（役職とは別に重ねて指定）</div>${b("酔っ払い", "randToggle", ["drunk", s.key], (d.rand.drunk || []).includes(s.key) ? "dbg-on" : "")}${Array.from({ length: maxPairs }, (_, i) => b(`恋人${i + 1}`, "randLover", [String(i), s.key], ((d.rand.lover || [])[i] || []).includes(s.key) ? "dbg-on" : "")).join("")}`;
+        h += `<div class="dbg-pick">${rb}${b("固定なし", "lockSet", [s.key, ""], "dbg-clear")}${tg}${dup}${b("閉じる", "pick", ["l:" + s.key])}</div>`;
       }
       return h;
     };
     const warn = (g.dbgWarn || []).length ? `<div class="dbg-warn">前回の開始時の警告:${g.dbgWarn.map((w) => `<div>・${esc(w)}</div>`).join("")}</div>` : "";
-    return hint("選んだ役職を、次の試合のその人・その墓地に配ります（配役に入っている役職から選べます）。固定は「一斉解除」するまで残ります。") + warn +
+    return hint("選んだ役職を、次の試合のその人・その墓地に配ります（配役に入っている役職から選べます）。固定は「一斉解除」するまで残ります。酔っ払い・恋人は、役職とは別にその人のパネルで重ねて指定できます（恋人は同じ番号を2人に付けると組になります）。") + warn +
       `<div class="dbg-h">参加者</div>${players.map(slotRow).join("") || hint("参加者がいません。")}` +
       `<div class="dbg-h">墓地</div>${graves.map(slotRow).join("") || hint("墓地がありません。")}` +
-      `<div class="dbg-actions">${b("一斉解除（固定役・CPU能力先）", "lockClear", [], "dbg-clear")}</div>`;
+      `<div class="dbg-actions">${b("一斉解除（固定役・能力先・ランダム対象）", "lockClear", [], "dbg-clear")}</div>`;
   }
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", troublemaker: "tm", relic_robber: "rel" };
+  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", gremlin: "gr" };
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
@@ -159,44 +188,67 @@ window.ONW = window.ONW || {};
     return [r];
   }
   function cpuKinds(key) {
-    const rs = cpuRoles(key), k = { seer: false, rob: false, tm: false, rel: false };
-    if (!rs) { k.seer = k.rob = k.tm = k.rel = true; return k; }   // 固定なし: どの役職になるか分からないので全部出す
+    const rs = cpuRoles(key), k = { seer: false, rob: false, tm: false, rel: false, gr: false };
+    if (!rs) return k;   // 固定なし: 能力先は指定できない
     rs.forEach((r) => { if (ABILITY[r]) k[ABILITY[r]] = true; });
     return k;
   }
-  function tabCpu() {
+  function cpuPart() {
     const g = G(), d = data();
-    if (!inLobby()) return hint("CPUの能力先はルーム（ロビー）で設定します。次の試合に反映されます。");
-    const { players } = slots(), cpus = players.filter((s) => s.cpu);
-    if (!cpus.length) return hint("CPU人数を1人以上にすると設定できます。");
+    const { players } = slots();
     const nameOfKey = (k) => (players.find((s) => s.key === k) || {}).name || "?";
-    const rows = cpus.map((s) => {
+    const valid = new Set(players.map((x) => x.key));
+    const rows = players.map((s) => {
       const t = d.cpu[s.key] || {}, role = d.roles[s.key], k = cpuKinds(s.key), rs = cpuRoles(s.key);
+      const rk = rs ? RAND_KINDS.filter((x) => x.roles.some((r) => rs.includes(r))) : [];   // 従者のご主人など（人間もCPUも）
+      if (!rs) return "";   // 固定役がない人は出さない
+      if (!rk.length && (!s.cpu || !Object.values(k).some(Boolean))) return "";   // 指定できるものがない人も出さない
       const parts = [];
       if (t.player) parts.push(esc(nameOfKey(t.player)));
-      if ((t.players || []).length) parts.push(t.players.map((id) => esc(nameOfKey(id))).join(" と "));
+      if ((t.players || []).length) parts.push(t.players.map((id) => esc(nameOfKey(id))).join(k.gr && !k.tm ? " → " : " と "));
       if ((t.graves || []).length) parts.push(t.graves.map((i) => `墓地${i + 1}`).join("・"));
+      rk.forEach((x) => { const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null; if (cur) parts.push(`${esc(x.label)}: ${esc(nameOfKey(cur))}`); });
       const lab = parts.length ? parts.join(" / ") : "指定なし";
       const fixed = role ? ` <small class="dbg-dim">(${esc(rn(role))}${d.tf[s.key] ? " → " + esc(rn(d.tf[s.key])) : ""}固定)</small>` : "";
-      let h = row(esc(s.name) + cpuBadge + fixed, `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["c:" + s.key])}`);
+      let h = row(esc(s.name) + (s.cpu ? cpuBadge : "") + fixed, `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["c:" + s.key])}`);
       if (ui.pick === "c:" + s.key) {
         const others = players.filter((o) => o.key !== s.key);
-        const maxG = k.seer ? ONW.seerGraveMax(g) : 1;
+        const maxG = k.seer ? ONW.seerGraveMax(g) : 1;   // eslint-disable-line
         const sec = (title, inner) => `<div class="dbg-sub">${title}</div>${inner}`;
         const pb = (fn, sel) => others.map((o) => b(esc(o.name), fn, [s.key, o.key], sel(o.key) ? "dbg-on" : "")).join("");
         const gb = Array.from({ length: g.graveCount || 0 }, (_, i) => b(`墓地${i + 1}`, "cpuGrave", [s.key, String(i)], (t.graves || []).includes(i) ? "dbg-on" : "")).join("");
         let body = "";
-        if (rs && !Object.values(k).some(Boolean)) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
-        else {
+        if (!s.cpu) body = "";
+        else if (rs && !Object.values(k).some(Boolean) && !rk.length) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
+        else if (s.cpu) {
           if (k.seer || k.rob) body += sec(k.seer && k.rob ? "プレイヤー（占う相手 / 交換・一目惚れの相手）" : k.seer ? "プレイヤー（占う相手）" : "プレイヤー（交換・一目惚れの相手）", pb("cpuPlayer", (id) => t.player === id));
           if (k.tm) body += sec("プレイヤー2人（入れ替える2人）", pb("cpuPlayers", (id) => (t.players || []).includes(id)));
+          if (k.gr) body += sec("プレイヤー2人（コピー元 → コピー先の順に押す）", others.map((o) => { const ix = (t.players || []).indexOf(o.key); return b((ix >= 0 ? (ix === 0 ? "①元 " : "②先 ") : "") + esc(o.name), "cpuPlayers", [s.key, o.key], ix >= 0 ? "dbg-on" : ""); }).join(""));
           if (k.seer || k.rel) body += sec(k.seer ? `墓地（${ONW.seerGraveMax(g)}枚まで）` : "墓地（交換する1枚）", gb);
         }
-        h += `<div class="dbg-pick">${rs && rs.length > 1 ? hint(`変化後がランダムなので、候補（${esc(rs.map(rn).join("・"))}）の指定がすべて出ています。`) : ""}${body}${b("指定なし", "cpuClear", [s.key], "dbg-clear")}${b("閉じる", "pick", ["c:" + s.key])}</div>`;
+        rk.forEach((x) => {   // 固定した役職（変化後も含む）が従者などなら、同じパネルで対象（ご主人など）を指定できる
+          const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null;
+          body += sec(esc(x.label), players.filter((o) => o.key !== s.key).map((o) => b(esc(o.name) + (o.cpu ? cpuBadge : ""), "randSet", [x.kind, s.key, o.key], cur === o.key ? "dbg-on" : "")).join("") + b("指定なし", "randSet", [x.kind, s.key, ""], "dbg-clear"));
+        });
+        h += `<div class="dbg-pick">${rs && rs.length > 1 ? hint(`変化後がランダムなので、候補（${esc(rs.map(rn).join("・"))}）の指定がすべて出ています。`) : ""}${body}${s.cpu ? b("能力先を全て解除", "cpuClear", [s.key], "dbg-clear") : ""}${b("閉じる", "pick", ["c:" + s.key])}</div>`;
       }
       return h;
     }).join("");
-    return hint("固定した役職（光の使徒などは変化後の指定まで）から、そのCPUが使える能力先だけを出します。占い師=プレイヤーか墓地(設定した枚数まで)、怪盗・一目惚れしてるてる=プレイヤー1人、いたずらっ子=プレイヤー2人、墓荒らし=墓地1枚。固定なしのときは全部出ます。一部だけ指定すると、残りはランダムです。") + rows;
+    return hint("役職を固定した人だけが出ます（固定なしの人は出ません。光の使徒などは変化後の指定まで見ます）。CPUは、占い師=プレイヤーか墓地(設定した枚数まで)、怪盗・一目惚れしてるてる・フリーター・訪問者=プレイヤー1人、いたずらっ子=プレイヤー2人、グレムリン=コピー元→コピー先の2人、墓荒らし=墓地1枚。一部だけ指定すると、残りはランダムです。従者・処刑人・フリーター・訪問者・猫又・黒猫・わら人形を固定すると、ご主人・ターゲット・就職先・訪問先・道連れ先も指定できます（人間もCPUも、対象は人間もCPUも選べます）。") + (rows || hint("役職を固定した人がいると、ここに出ます。"));
+  }
+
+  // ---- ランダムに決まる対象の指定（固定した役職が従者・黒猫などの人だけ。人間もCPUも） ----
+  const RAND_KINDS = [   // 役職 → 指定できる対象の種類
+    { kind: "master", roles: ["servant"], label: "ご主人" },
+    { kind: "freeter", roles: ["freeter"], label: "就職先（自動で決まるとき）" },
+    { kind: "visitor", roles: ["visitor"], label: "訪問先（自動で決まるとき）" },
+    { kind: "cat", roles: ["cat_sidhe", "black_cat"], label: "道連れ先" },
+    { kind: "straw", roles: ["straw_doll"], label: "道連れ先（自動で選ぶとき）" },
+    { kind: "exec", roles: ["executioner"], label: "ターゲット" },
+  ];
+  function tabCpu() {
+    if (!inLobby()) return hint("能力先・ランダム対象はルーム（ロビー）で設定します。次の試合に反映されます。");
+    return `<div class="dbg-h">夜の能力先・ランダムに決まる対象</div>` + cpuPart();
   }
 
   // ---- その他（CPU議論発言 / 夜ログ）----
@@ -211,7 +263,7 @@ window.ONW = window.ONW || {};
       hint("OFFにすると、昼のCPUのCO・結果開示・投票表明の発言をしません。") + `<div class="dbg-h">昼中に死亡させる（霊界チャットの確認用）</div>${kill}<div class="dbg-h">夜ログ（GM用）</div>${logs}`;
   }
 
-  const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "CPU能力先", tabCpu], ["misc", "その他", tabMisc]];
+  const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "能力先", tabCpu], ["misc", "その他", tabMisc]];
 
   /** 🛠ボタンは右上の縦並び(アカウント・📖ガイドと同じ列)に置く。重ならないよう、固定位置ではなく列の中に入れる */
   function placeFab(show) {
@@ -269,8 +321,28 @@ window.ONW = window.ONW || {};
     }
     refresh();
   };
+  debug.masterSet = (key, t) => { const d = data(); if (t) d.master[key] = t; else delete d.master[key]; ui.pick = null; refresh(); };
+  debug.randSet = (kind, key, t) => {   // kind: master / freeter / cat / straw（持ち主ごとに1人）
+    const d = data(), store = kind === "master" ? d.master : d.rand[kind];
+    if (!store) return;
+    if (t) store[key] = t; else delete store[key];
+    ui.pick = null; refresh();
+  };
+  debug.randToggle = (kind, key) => {   // 酔っ払いにする人（複数）
+    const d = data();
+    d.rand.drunk = key ? (d.rand.drunk.includes(key) ? d.rand.drunk.filter((x) => x !== key) : [...d.rand.drunk, key]) : [];
+    refresh();
+  };
+  debug.randLover = (idx, key) => {   // 恋人の組idx（2人まで。押し直しで解除・3人目で古い方が外れる）
+    const d = data(), i = Number(idx), cur = d.rand.lover[i] || [];
+    const next = !key ? [] : cur.includes(key) ? cur.filter((x) => x !== key) : [...cur, key].slice(-2);
+    // 同じ人が別の組に入っていたら、そちらから外す
+    d.rand.lover = d.rand.lover.map((pr, j) => (j === i ? pr : (pr || []).filter((x) => !next.includes(x))));
+    d.rand.lover[i] = next;
+    refresh();
+  };
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; refresh(); };
-  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; G().dbgWarn = []; ui.pick = null; refresh(); };
+  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
 
   // 指定を書き換える（空になったら項目ごと消す）
   const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };

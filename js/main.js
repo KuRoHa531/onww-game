@@ -34,6 +34,7 @@ window.ONW = window.ONW || {};
 
   /** タイトル画面の「ルームに戻る」 */
   main.rejoin = () => ONW.net.rejoin(fail);
+  main.resumeHost = () => ONW.net.resumeHost(fail);   // この端末に保存した状態でホストに戻る
 
   function readInputs() {
     const name = (document.getElementById("in-name")?.value || "").trim();

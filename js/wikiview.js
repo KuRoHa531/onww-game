@@ -50,6 +50,8 @@ window.ONW = window.ONW || {};
   const line = (label, value) => `<div class="gd-row"><span class="gd-l">${label}</span><span class="gd-r">${value}</span></div>`;
   const sec = (title, inner) => `<section class="gd-sec"><h3 class="gd-h">${title}</h3>${inner}</section>`;
 
+  /** 重複役職の設定表示: 「2人（確率100%）」/ 0なら「なし」 */
+  const dupText = (n, unit, chance) => (n > 0 ? `${n}${unit}（${unit === "組" ? "恋人になる" : "酔っ払いになる"}確率 ${chance ?? 100}%）` : "なし");
   function roomHtml() {
     const g = ONW.game, P = ONW.PHASE;
     const cpu = g.cpuCount || 0;
@@ -71,6 +73,7 @@ window.ONW = window.ONW || {};
       <p class="gd-note">${g.phase === P.LOBBY ? "設定の変更はホストが、ロビーの「ルーム設定」から行います。" : "試合中は設定を変更できません(確認のみ)。"}</p>
       ${sec("人数設定", line("参加人数", `${total}人${cpu ? `（CPU ${cpu}人を含む）` : ""}`) + line("墓地の枚数", `${g.graveCount ?? 0}枚`) + line("CPU人数", `${cpu}人`))}
       ${sec("タイマー設定", line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
+      ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", g.drunkChance)) + line("恋人", dupText(g.loverCount, "組", g.loverChance)))}
       ${sec("詳細設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("変化公開", onoff(g.revealTransforms)) + line("デバッグモード", onoff(g.debugOn)))}
       ${sec("変化先の有無", tf)}`;
   }
@@ -82,9 +85,9 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star"],
+    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor"],
     wolf: ["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "madman", "mad_seer", "cultist", "black_cat"],
-    third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku"],
+    third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "executioner", "gremlin"],
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
@@ -104,6 +107,8 @@ window.ONW = window.ONW || {};
   function deckHtml() {
     const g = ONW.game, counts = deckCounts();
     const totalRoles = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (g.drunkCount > 0) counts.drunk = g.drunkCount;
+    if (g.loverCount > 0) counts.lover = g.loverCount;   // 重複役職（配役の枚数には数えないが、構成には出す）
     const grave = Math.max(0, Number(g.graveCount) || 0);
     if (totalRoles <= 0) return `<p class="gd-empty">現在配役されている役職はありません。</p>`;
 
@@ -120,11 +125,11 @@ window.ONW = window.ONW || {};
       const i = info(r);
       return `<details class="gd-role" ${openRoles.has(r) ? "open" : ""} ontoggle="ONW.wikiView._tg('${r}',this.open)">
         <summary><span class="gd-name t-${i.team}">${esc(i.name)}</span>${tagHtml}</summary>
-        <div class="gd-desc">${esc(i.desc || "説明はありません。")}</div></details>`;
+        <div class="gd-desc">${esc(ONW.roleDesc(r, g) || i.desc || "説明はありません。")}</div></details>`;
     };
     const teamBlock = (team) => {
       const list = [...ORDER[team]];
-      Object.keys(ONW.ROLE_INFO).forEach((r) => { if (info(r).team === team && !list.includes(r)) list.push(r); });
+      Object.keys(ONW.ROLE_INFO).forEach((r) => { if (info(r).team === team && r !== "drunk" && r !== "lover" && !list.includes(r)) list.push(r); });   // 酔っ払いは重複役職として別枠
       const have = list.filter((r) => counts[r] > 0);
       const cand = list.filter((r) => cands.includes(r));
       if (!have.length && !cand.length) return "";
@@ -132,10 +137,13 @@ window.ONW = window.ONW || {};
         ${have.map((r) => rowOf(r, `<span class="gd-n">×${counts[r]}</span>`)).join("")}
         ${cand.map((r) => rowOf(r, `<span class="gd-n gd-n--cand">変化候補</span>`)).join("")}</section>`;
     };
+    // 重複役職（第三陣営の外に、独立したグループとして出す）
+    const dupBlock = () => (counts.drunk > 0 || counts.lover > 0) ? `<section class="gd-team t-dup"><h3 class="gd-h">重複役職</h3>
+        ${counts.drunk > 0 ? rowOf("drunk", `<span class="gd-n">×${counts.drunk}人</span><span class="gd-n gd-n--cand">確率${g.drunkChance ?? 100}%</span>`) : ""}${counts.lover > 0 ? rowOf("lover", `<span class="gd-n">×${counts.lover}組</span><span class="gd-n gd-n--cand">確率${g.loverChance ?? 100}%</span>`) : ""}</section>` : "";
     return `
       <p class="gd-summary">現在の配役設定 <b>${Math.max(0, totalRoles - grave)}人村 / 墓地${grave}枚 / 役職${totalRoles}枚</b></p>
       <p class="gd-note">現在の配役に含まれる役職です。役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? "変化公開がONなので、変化後の役職は昼の開始時に反映されます。" : ""}</p>
-      ${["village", "wolf", "third"].map(teamBlock).join("")}`;
+      ${["village", "wolf", "third"].map(teamBlock).join("")}${dupBlock()}`;
   }
 
   // ---------------------------------------------------------

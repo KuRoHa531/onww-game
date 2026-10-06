@@ -150,7 +150,7 @@
     query: "",
     filter: "all",
     webOnly: true,   // 「ウェブ版」絞り込み(初期状態でON = ウェブ版にある役職だけ表示)
-    sort: "kana",
+    sort: "impl",
     sortPanelOpen: false,
     filterPanelOpen: false,
     openKeys: new Set(),

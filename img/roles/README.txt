@@ -32,3 +32,4 @@ tofu_wolf.png      豆腐の人狼
 forgetful_wolf.png 忘却の人狼
 baker.png          パン屋
 star.png           スター
+visitor.png       訪問者

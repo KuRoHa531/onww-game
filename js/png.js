@@ -16,7 +16,7 @@ window.ONW = window.ONW || {};
     const head = (t) => L.push({ segs: [{ t, c: C.head, b: true }] });
     const sep = () => L.push({ sep: true });
     head("投票結果");
-    res.votes.forEach((v) => add(T(v.from), T(" → ", C.dim), v.to ? T(v.to, C.vote) : T("未投票", C.dim)));
+    res.votes.forEach((v) => add(T(v.from), T(" → ", C.dim), v.to ? T(v.to, C.vote) : T("未投票", C.dim), ...(v.to ? [T(`(${v.w || 1})`, C.dim)] : [])));
     sep(); head("得票数");
     if (res.counts.length) res.counts.forEach((c) => add(T(c.name), T(" : ", C.dim), T(`${c.c}票`, C.vote)));
     else add(T("得票はありません。", C.dim));
@@ -28,9 +28,13 @@ window.ONW = window.ONW || {};
     add(T("勝者: ", C.good), T(res.winners.join("、") || "なし"));
     add(T("敗者: ", C.dead), T(res.losers.join("、") || "なし"));
     sep(); head("役職履歴");
+    // 画面の最終結果と同じく、役職履歴の上に恋人・従者の身代わりの行を並べる
+    (res.gremlins || []).forEach((x) => add(T("グレムリン: ", C.info), T(`${x.gremlin} は ${x.from} → ${x.to} を選んでいました。`)));
+    (res.execs || []).forEach((x) => add(T("処刑人: ", C.info), T(`${x.exec} のターゲットは ${x.target} でした。${x.win ? "追放されたので処刑人の勝利です。" : "追放されませんでした。"}`)));
+    (res.servantSubs || []).forEach((x) => add(T("従者: ", C.info), T(`${x.servant} が ${x.master} の身代わりになりました。`)));
     res.history.forEach((h) => {
       const segs = [T(h.name + " ")];
-      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); });
+      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : "#ffaa00"))); });
       segs.push(T(" " + h.status, h.dead ? C.dead : C.alive));
       add(...segs);
     });
