@@ -76,7 +76,6 @@ window.ONW = window.ONW || {};
       <div class="btn-row" style="justify-content:center;margin-top:14px;">
         ${mine ? `<button class="btn" onclick="ONW.profile.edit()">プロフィールを編集</button>` : ""}
         ${!mine && prof.avatar_updated_at ? `<button class="btn" onclick="ONW.friends.report('${esc(prof.id)}')">アイコンを通報</button>` : ""}
-        <button class="btn btn--primary" onclick="ONW.profile.close()">閉じる</button>
       </div>`);
   };
 

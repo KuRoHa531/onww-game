@@ -62,9 +62,17 @@ window.ONW = window.ONW || {};
     const t = g.timers || {};
     const off = g.transformOff || [];
     const TG = ONW.TRANSFORM_GROUPS;
-    const tf = ["light_apostle", "dark_avatar", "silver_shadow"].map((b) => `
-      <div class="gd-tf"><div class="gd-tf__name t-${info(b).team}">${esc(info(b).name)}の変化先</div>
-        <div class="gd-tf__chips">${TG[b].map((r) => {
+    // 闇の化身の変化先は、人狼系と狂人系に分けて並べる（ルーム設定画面の「変化先の有無」と同じ）
+    const MAD = ONW.MAD_KIND || [];
+    const tfBlocks = [
+      { b: "light_apostle", label: "", list: TG.light_apostle },
+      { b: "dark_avatar", label: "（人狼系）", list: TG.dark_avatar.filter((r) => !MAD.includes(r)) },
+      { b: "dark_avatar", label: "（狂人系）", list: TG.dark_avatar.filter((r) => MAD.includes(r)) },
+      { b: "silver_shadow", label: "", list: TG.silver_shadow },
+    ].filter((x) => x.list && x.list.length);
+    const tf = tfBlocks.map(({ b, label, list }) => `
+      <div class="gd-tf"><div class="gd-tf__name t-${info(b).team}">${esc(info(b).name)}の変化先${label}</div>
+        <div class="gd-tf__chips">${list.map((r) => {
           const on = !off.includes(`${b}:${r}`);
           return `<span class="gd-chip ${on ? "gd-chip--on" : "gd-chip--off"}">${esc(info(r).name)} ${on ? "ON" : "OFF"}</span>`;
         }).join("")}</div></div>`).join("");
@@ -85,8 +93,8 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor"],
-    wolf: ["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "madman", "mad_seer", "cultist", "black_cat"],
+    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy"],
+    wolf: ["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat"],
     third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin"],
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };

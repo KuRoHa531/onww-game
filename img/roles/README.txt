@@ -33,3 +33,4 @@ forgetful_wolf.png 忘却の人狼
 baker.png          パン屋
 star.png           スター
 visitor.png       訪問者
+queen.png          女王

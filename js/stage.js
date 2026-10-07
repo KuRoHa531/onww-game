@@ -22,9 +22,13 @@ window.ONW = window.ONW || {};
   let deathMarks = [];                 // 「死亡」の札を付けた席（結果では外す）
   let dayKeys = [];
   let up = {}, dead = {}, badge = {}, glow = {}; // 表向きの役職 / 追放された席 / 票数などの札 / 光らせる札(大狼の目)
-  const NIGHT_ACT = ["seer", "mad_seer", "robber", "relic_robber", "doppelganger", "gremlin", "troublemaker", "love_tanner", "freeter", "visitor"];   // 夜にカードを押して行動する役職
+  const pickOf = (role) => { const d = ONW.roleDef(role); return d && d.stagePick ? d.stagePick : null; };   // 夜にカードを押して行動する役職の「選び方」(各役職ファイルの stagePick。なければ押して行動しない役職)
   let starKeys = [];                   // スター公開で札を付けた席
   let flashKeys = [];                  // 昼に酔いが覚めたスターを一時的に表にしている席
+  let queenKeys = [];                  // 女王公開（待機時間）で札を付けた席
+  let kingKeys = [];                   // 人狼王公開で札を付けた席
+  let kingFlashKeys = [];              // 昼に新しく人狼王になった人を一時的に表にしている席
+  let queenFlashKeys = [];             // 昼に新しく分かった女王を一時的に表にしている席
   let jobKeys = [];                    // 就職先の画面で、フリーターのカードに札を付けた席
   let asn = {};                        // アサシンの演出: by(暗殺者) / aim(狙う) / slash(斬る) / hit(マーリン) / miss(外れ)
   let alm = {};                        // 従者の身代わり: ご主人のカードが「めくれそうになる」席（絶対に表にならない）
@@ -37,6 +41,7 @@ window.ONW = window.ONW || {};
   const SELF_LOVE = "__selflove";   // 酔いが覚めた恋人本人のカードが「恋人」へめくれた面
   const DUO_MARK = "__duo";     // 人狼の🐺と恋人の❤️の両方が付く人（上に🐺、下に❤️）
   const TARGET_MARK = "__target";   // 処刑人に見えるターゲットの「🎯ターゲット」の印（役職名は出さない）
+  const MUTE_MARK = "__mute";   // 口封じの狂人に見える、口封じされた人の「🤐」の印（役職名は出さない）
   const MASTER_MARK = "__master";   // 従者に見えるご主人の「👑ご主人」の印（役職名は出さない）
   let lov = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）
   let loveMate = null;                // 夜: 自分の恋人の相方 { id, mode }
@@ -94,7 +99,15 @@ window.ONW = window.ONW || {};
       </div>
       <div class="tb-row tb-players">${players}</div>
     </div>`;
-    el.onclick = (e) => { const s = e.target.closest(".tb-seat[data-k]"); if (s) stage.click(s.dataset.k); };
+    let dtK = null, dtAt = 0;   // デバッグ: ホストが酔っ払い(未覚醒)のカードをダブルタップすると、その人の酔いが即座に覚める
+    el.onclick = (e) => {
+      const s = e.target.closest(".tb-seat[data-k]"); if (!s) return;
+      const k = s.dataset.k, now = Date.now(), g = G();
+      if (k.startsWith("p:") && ONW.net.isHost && g.debugOn && g.phase === ONW.PHASE.ONLINE_DAY) {
+        if (dtK === k && now - dtAt < 450) { dtK = null; if (ONW.net.debugSober(k.slice(2))) return; } else { dtK = k; dtAt = now; }
+      }
+      stage.click(k);
+    };
   }
 
   // ---------------------------------------------------------
@@ -102,7 +115,7 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   function mode(g) {
     if (busy || g.isSpectator || g.isDead || hostWatching(g)) return null;
-    if (g.phase === ONW.PHASE.ONLINE_NIGHT && !g.nightDone && NIGHT_ACT.includes(g.actRole)) return { type: "night", role: g.actRole };
+    if (g.phase === ONW.PHASE.ONLINE_NIGHT && !g.nightDone && !!pickOf(g.actRole)) return { type: "night", role: g.actRole };
     if ((g.phase === ONW.PHASE.ONLINE_MORNING || (g.phase === ONW.PHASE.ONLINE_DAY && g.abilityOpen)) && g.morningChain && g.morningChainReady && !g.morningChainDone) return { type: "morning", role: g.morningChain };   // 墓荒らしが交換した後の役職の能力を朝に使う
     if (g.phase === ONW.PHASE.ONLINE_VOTE && g.strawPick) return { type: "straw" };   // わら人形: めくれた瞬間に、道連れにする相手を選ぶ
     if (g.phase === ONW.PHASE.ONLINE_VOTE && !g.voted) return { type: "vote" };
@@ -113,10 +126,11 @@ window.ONW = window.ONW || {};
     const me = ONW.net.myId(), isP = k.startsWith("p:");
     if (m.type === "straw") return isP && g.strawPick.some((c) => c.id === k.slice(2));   // 選べるのは、まだめくれていない人だけ
     if (isP && dead[k]) return false;   // 死亡した人には投票できない
-    if (isP) return k.slice(2) !== me && m.role !== "relic_robber";   // 墓荒らしが選べるのは墓地だけ
+    const pk = pickOf(m.role);
+    if (isP) return k.slice(2) !== me && !(pk && pk.players === false);   // 墓荒らしが選べるのは墓地だけ(stagePick.players === false)
     if (m.type === "vote") return false;
-    // 墓地: 占い師・狂った占い師(設定枚数まで) / 墓荒らし(1枚)
-    return m.role === "seer" || m.role === "mad_seer" || m.role === "relic_robber";
+    // 墓地: 占い師・狂った占い師(設定枚数まで) / 墓荒らし(1枚) = stagePick.graves
+    return !!(pk && pk.graves);
   }
 
   // ---------------------------------------------------------
@@ -127,6 +141,7 @@ window.ONW = window.ONW || {};
     if (role === LOVE_MARK) return `<div class="tb-wolfmark tb-love">❤️</div>`;
     if (role === SELF_LOVE) return `<div class="tb-wolfmark tb-master tb-love"><span>❤️</span><small>恋人</small></div>`;
     if (role === TARGET_MARK) return `<div class="tb-wolfmark tb-target"><span>🎯</span><small>ターゲット</small></div>`;
+    if (role === MUTE_MARK) return `<div class="tb-wolfmark tb-mute"><span>🤐</span><small>口封じ</small></div>`;
     if (role === MASTER_MARK) return `<div class="tb-wolfmark tb-master"><span>👑</span><small>ご主人</small></div>`;
     if (role === DUO_MARK) return `<div class="tb-wolfmark tb-duo"><span>🐺</span><span>❤️</span></div>`;
     if (role === WOLF_MARK) return `<div class="tb-wolfmark">🐺</div>`;   // 狂信者に見える「人狼」の印（役職名は出さない）
@@ -175,7 +190,7 @@ window.ONW = window.ONW || {};
         s.dataset.role = role;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role);
-        f.className = `tb-front tb-team-${String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK ? "love" : role === TARGET_MARK ? "target" : role === MASTER_MARK || role === SELF_LOVE ? "master" : ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK ? "love" : role === TARGET_MARK ? "target" : role === MUTE_MARK ? "mute" : role === MASTER_MARK || role === SELF_LOVE ? "master" : ONW.roles.getInfo(role).team}`;
       }
       const sel = (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
@@ -190,11 +205,13 @@ window.ONW = window.ONW || {};
       s.classList.toggle("drunk", isP && k.slice(2) === me && drunkLeft(g) !== null);   // 酔っ払い（未覚醒）本人の画面だけ: 自分のカードが黄×白のしまになり、🍺と「酔いが覚めるまで」の秒数が出る
       s.classList.toggle("jobup", jobKeys.includes(k));   // 就職先の画面でめくれたフリーターの青い光と札
       s.classList.toggle("starup", starKeys.includes(k) || flashKeys.includes(k));   // スター公開中の金色の光と札
+      s.classList.toggle("kingup", kingKeys.includes(k) || kingFlashKeys.includes(k));   // 人狼王公開中の赤い光と札
+      s.classList.toggle("queenup", queenKeys.includes(k) || queenFlashKeys.includes(k));   // 女王公開中の紫の光と札
       s.classList.toggle("shinju", !!shin[k]);
       s.classList.toggle("lov", !!lov[k]);
       { const lv = s.querySelector(".tb-lov"); if (lv) { const t = typeof lov[k] === "number" ? `<span>❤</span><span>${lov[k]}</span>` : "<span>❤</span>"; if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }   // 結果発表: 丸の中にハートと恋人番号
       s.classList.toggle("almost", !!alm[k]);
-      ["descend", "spark", "blow", "win", "chicken"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
+      ["descend", "spark", "blow", "win", "chicken", "toughclang", "toughrecv", "kingguard"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
       const baseRole = role && String(role).startsWith(CAT + "@") ? CAT : role;
       if (gx[k] === "blow" && baseRole && ONW.roles.getInfo(baseRole)) s.dataset.ghost = ONW.roles.getInfo(baseRole).name; else delete s.dataset.ghost;   // 吹き飛んだあとの点線のカードに書く役職名   // 従者の身代わり: ご主人のカードがめくれそうになって戻る
       ["by", "aim", "slash", "hit", "miss"].forEach((c) => s.classList.toggle("asn-" + c, asn[k] === c));   // アサシンの演出
@@ -261,12 +278,12 @@ window.ONW = window.ONW || {};
     if (!el) return;
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
     if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
@@ -289,20 +306,11 @@ window.ONW = window.ONW || {};
     }
     // 朝が終わった直後の待機時間: 後覚者の最終役職がここで表になる
     if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settleInsom && !g.settleShown && !g.isSpectator) { g.settleShown = true; show(`p:${ONW.net.myId()}`, g.settleInsom); }
-    // スター公開: 待機時間に、最終盤面でスターを持っている人のカードが全員の画面で同時に表になる（後覚者の確認とは別に「スター」の札が付く）
-    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settling && g.settleStars && g.settleStars.length && !g.settleStarShown && !g.isSpectator && !hostWatching(g)) {
-      g.settleStarShown = true;
-      later(() => { g.settleStars.forEach((id, i) => later(() => { const k = `p:${id}`; show(k, "star"); badge[k] = "★スター"; starKeys.push(k); paint(G()); }, i * 380)); }, 300);
-    }
-    // フリーター: 待機時間に、就職先になった人の画面で、就職してきたフリーターのカードが表になる（就職先本人だけ。昼になったら札を外して伏せる）
-    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settling && g.settleFreeters && g.settleFreeters.length && !g.settleFreeterShown && !g.isSpectator && !hostWatching(g)) {
-      g.settleFreeterShown = true;
-      later(() => { g.settleFreeters.forEach((id) => { show(`p:${id}`, "freeter"); }); paint(G()); }, 900);
-    }
-    // 訪問者: 待機時間に、訪問された人の画面で、訪問してきた訪問者のカードが表になる（訪問された本人だけ。昼になったら伏せる）。入れ替わりで訪問者のカードが動いていれば、いまの持ち主のカードが表になる
-    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settling && g.settleVisitors && g.settleVisitors.length && !g.settleVisitorShown && !g.isSpectator && !hostWatching(g)) {
-      g.settleVisitorShown = true;
-      later(() => { g.settleVisitors.forEach((id) => { show(`p:${id}`, "visitor"); }); paint(G()); }, 900);
+    // 朝が終わった直後の待機時間の公開演出(スター・女王・フリーター・訪問者): 各役職ファイルの stageSettle(order 順)。g[field] が届いていたら、1回だけ run を呼ぶ
+    //   スター: 最終盤面でスターを持っている人のカードが全員の画面で同時に表になる / 女王: 女王を知らされる人の画面で女王のカードが表になる
+    //   フリーター: 就職先本人の画面で就職してきたフリーターのカードが表になる / 訪問者: 訪問された本人の画面で訪問者のカードが表になる（いずれも昼になったら札を外して伏せる）
+    if (g.phase === ONW.PHASE.ONLINE_MORNING && g.settling && !g.isSpectator && !hostWatching(g)) {
+      ONW.roleHooksIn("stageSettle", "run").forEach((h) => { const o = h.def.stageSettle; if (g[o.field] && g[o.field].length && !g[o.shown]) { g[o.shown] = true; h.fn(g[o.field], stage.kit); } });
     }
     if (g.phase !== ONW.PHASE.ONLINE_MORNING && jobKeys.length) { jobKeys.forEach((k) => { delete badge[k]; }); jobKeys = []; paint(G()); }
     // 昼に酔いが覚めた本人: 自分のカードが、変化前の役職を経由せず、最終的な役職として直接めくれる（しばらくして裏に戻る）
@@ -319,55 +327,44 @@ window.ONW = window.ONW || {};
         } else later(() => { delete up[k]; paint(G()); }, 4300);
       }
     }
-    // 昼にフリーターが就職してきた就職先: そのときのフリーターのカードが表になり、数秒後に閉じる
-    if (g.jobFlash && g.jobFlash.length) {
-      const list = g.jobFlash; g.jobFlash = [];
-      if (!g.isSpectator && !hostWatching(g)) {
-        later(() => { list.forEach((x) => { up[`p:${x.id}`] = x.role; }); paint(G()); }, 200);
-        later(() => { list.forEach((x) => { delete up[`p:${x.id}`]; }); paint(G()); }, 3700);
-      }
-    } else if (g.jobFlash) g.jobFlash = [];
+    // 昼の公開演出(フリーター・スター・女王): 各役職ファイルの stageFlash。g[field] が届いていたら、受け取って run を呼ぶ（観戦者には出さない）。when:"early" は酔い覚めの演出より先、それ以外はあと
+    const flashes = (when) => ONW.roleHooksIn("stageFlash", "run").filter((h) => (h.def.stageFlash.when || "late") === when).forEach((h) => {
+      const f = h.def.stageFlash.field;
+      if (g[f] && g[f].length) { const ids = g[f]; g[f] = []; if (!g.isSpectator && !hostWatching(g)) h.fn(ids, stage.kit); } else if (g[f]) g[f] = [];
+    });
+    flashes("early");
     // 昼に酔いが覚めた本人: 夜と同じように、見える人のカード（人狼なら🐺・共有者・墓地・神は全員）がめくれ、しばらくして裏に戻る
     if (g.soberPeek) {
       const sp = g.soberPeek; g.soberPeek = null;
       if (!g.isSpectator && !hostWatching(g)) {
         const list = [];
+        const fx = [];   // めくれ方を足すフック { up(k, role), down(k) }（役職ファイルの stageSober が足す。女王の札など）
         (sp.wolves || []).forEach((id) => list.push([`p:${id}`, WOLF_MARK, true]));
-        (sp.masons || []).forEach((id) => list.push([`p:${id}`, "mason", true]));
-        if (sp.target) list.push([`p:${sp.target}`, TARGET_MARK, true]);   // 酔いが覚めた処刑人: ターゲットのカードがめくれる
-        if (sp.master) list.push([`p:${sp.master}`, MASTER_MARK, true]);   // 酔いが覚めた従者: ご主人のカードがめくれる
+        ONW.roleHooksIn("stageSober", "list").forEach((h) => h.fn(sp, list, stage.kit, fx));   // 共有者 / 処刑人のターゲット / 従者のご主人 / 女王 のカード（この順にめくれる）
         let mateK = null, mateWolf = false;
         if (sp.love) {   // 酔いが覚めた恋人: 自分が「恋人」にめくれるのと同時に、相方のカードがハートでめくれる（人狼の🐺と重なるときは🐺と❤️）
           mateK = `p:${sp.love}`; mateWolf = list.some((x) => x[0] === mateK && x[1] === WOLF_MARK);
         }
         (sp.graves || []).forEach((c, i) => list.push([`g:${i}`, c, true]));
-        if (sp.god) { Object.keys(sp.god.players).forEach((id) => list.push([`p:${id}`, sp.god.players[id], true])); sp.god.graves.forEach((c, i) => list.push([`g:${i}`, c, true])); }
+        ONW.roleHooksIn("stageSober", "listLate").forEach((h) => h.fn(sp, list, stage.kit, fx));   // 神: 全員と墓地のカード
         const me = `p:${ONW.net.myId()}`;
-        list.forEach(([k, role], i) => later(() => { if (k === me) return; up[k] = role; glow[k] = true; paint(G()); }, 300 + i * 380));
+        list.forEach(([k, role], i) => later(() => { if (k === me) return; up[k] = role; glow[k] = true; fx.forEach((f) => f.up && f.up(k, role)); paint(G()); }, 300 + i * 380));
         if (mateK && mateK !== me) {
           const inList = list.some((x) => x[0] === mateK);
           if (inList) later(() => { delete up[mateK]; paint(G()); }, 1900);   // すでに開いている相方（🐺など）もいったん裏返す
           later(() => { if (mateWolf) up[mateK] = DUO_MARK; else if (inList) { up[mateK] = list.find((x) => x[0] === mateK)[1]; lov[mateK] = true; } else up[mateK] = LOVE_MARK; glow[mateK] = true; paint(G()); }, 2700);
           later(() => { delete up[mateK]; delete glow[mateK]; delete lov[mateK]; paint(G()); }, 5600);
         }
-        later(() => { list.forEach(([k]) => { if (k === me || k === mateK) return; delete up[k]; delete glow[k]; delete lov[k]; }); paint(G()); }, 300 + list.length * 380 + 3500);
+        later(() => { list.forEach(([k]) => { if (k === me || k === mateK) return; delete up[k]; delete glow[k]; delete lov[k]; fx.forEach((f) => f.down && f.down(k)); }); paint(G()); }, 300 + list.length * 380 + 3500);
       }
     }
-    // 昼に酔いが覚めたスター: 全員の画面でカードがめくれ、しばらくして裏に戻る
-    if (g.starFlash && g.starFlash.length && !g.isSpectator && !hostWatching(g)) {
-      const ids = g.starFlash; g.starFlash = [];
-      ids.forEach((id, i) => later(() => { const k = `p:${id}`; up[k] = "star"; badge[k] = "★スター"; flashKeys.push(k); paint(G()); }, 200 + i * 380));
-      later(() => { ids.forEach((id) => { const k = `p:${id}`; delete up[k]; delete badge[k]; flashKeys = flashKeys.filter((x) => x !== k); }); paint(G()); }, 200 + ids.length * 380 + 3000);
-    } else if (g.starFlash) g.starFlash = [];
-    if (g.phase !== ONW.PHASE.ONLINE_MORNING && starKeys.length) { starKeys.forEach((k) => { delete badge[k]; }); starKeys = []; paint(G()); }   // 昼になったら札を外す（カードは下の行で伏せる）
+    flashes("late");   // 昼に酔いが覚めたスター / 昼に新しく女王が分かった村人陣営の人: カードがめくれ、しばらくして裏に戻る
+    if (g.phase !== ONW.PHASE.ONLINE_MORNING) ONW.roleHooksIn("stageSettle", "end").forEach((h) => h.fn(stage.kit));   // 昼になったら、待機時間の札を外す（カードは下の行で伏せる）
     if (g.phase !== ONW.PHASE.ONLINE_MORNING && g.morningUp && g.morningUp.length) { g.morningUp.forEach((k) => { delete up[k]; delete glow[k]; }); g.morningUp = []; paint(G()); }   // 占い結果などは朝時間の間ずっと表のまま。昼になったら伏せる
     if (g.phase !== ONW.PHASE.ONLINE_NIGHT && nightKeys.length) { nightKeys.forEach((k) => { delete up[k]; delete glow[k]; delete lov[k]; }); nightKeys = []; loveMate = null; paint(G()); }   // 神・大狼のカードは夜時間が終わったら伏せる   // 昼になったら伏せる
     if (g.loveReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.loveReveal; g.loveReveal = null; loveMate = r; if (r.mode === "solo") later(() => lovePeek(r), 700); }   // 恋人: 夜の始まりに相方のカードが❤️でめくれる（人狼の🐺・共有者・神と重なるときは、それぞれの演出の中で出す）
-    if (g.masterReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.masterReveal; g.masterReveal = null; later(() => masterPeek(r), 700); }   // 従者: 夜の始まりにご主人のカードが「ご主人」の印でめくれる
-    if (g.godReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.godReveal; g.godReveal = null; later(() => godPeek(r), 700); }   // 神: 夜の始まりに全員と墓地のカードが開く
-    if (g.cultReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.cultReveal; g.cultReveal = null; later(() => cultPeek(r), 700); }   // 狂信者: 夜の始まりに人狼のカードが表になって🐺が出る
-    if (g.masonReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.masonReveal; g.masonReveal = null; later(() => masonPeek(r), 700); }   // 共有者: 夜の始まりに仲間の共有者のカードが表になる
-    if (g.bigReveal && g.phase === ONW.PHASE.ONLINE_NIGHT) { const r = g.bigReveal; g.bigReveal = null; later(() => bigPeek(r), 700); }   // 大狼: 夜の始まりに墓地が全部開く
+    // 夜の始まりの演出(従者・神・狂信者・共有者・大狼): 各役職ファイルの stageNight(order 順)。g.<field> が届いていたら、受け取って 700ms 後に開く
+    if (g.phase === ONW.PHASE.ONLINE_NIGHT) ONW.roleHooks("stageNight").forEach((h) => { const f = h.def.stageNight.field; if (g[f]) { const r = g[f]; g[f] = null; later(() => h.fn(r, stage.kit), 700); } });
     if (g.phase === ONW.PHASE.ONLINE_RESULT && g.result && g.resultStage !== "sheet" && !seq) startResult(g);
   };
 
@@ -383,14 +380,14 @@ window.ONW = window.ONW || {};
     if (m.type === "straw") { ONW.net.strawPick(id); ONW.stage.sync(g); ONW.ui.render(g); return; }
     if (m.type === "night" || m.type === "morning") {
       // 夜: 朝になるまで何度でも選び直せる（同じカードをもう一度押すと解除）。朝: 選んで「能力を使う」で確定
-      const sel = g.nightSel = g.nightSel || { players: [], graves: [] }, isP = k.startsWith("p:");
+      const sel = g.nightSel = g.nightSel || { players: [], graves: [] }, isP = k.startsWith("p:"), pk = pickOf(m.role);
       const toggle = (arr, v, max) => { const at = arr.indexOf(v); if (at >= 0) arr.splice(at, 1); else { if (arr.length >= max) arr.shift(); arr.push(v); } };
       if (isP) {
-        const max = m.role === "troublemaker" || m.role === "gremlin" ? 2 : 1;
+        const max = (pk && pk.players) || 1;     // いたずらっ子・グレムリンは2人(stagePick.players)
         toggle(sel.players, id, max);
-        if (m.role === "seer" || m.role === "mad_seer") sel.graves = [];     // 墓地とプレイヤーは同時に占えない
+        if (pk && pk.exclusive) sel.graves = [];     // 墓地とプレイヤーは同時に占えない(占い師・狂った占い師)
       } else {
-        const max = (m.role === "seer" || m.role === "mad_seer") ? ONW.seerGraveMax(g) : 1;
+        const max = pk && pk.graveMax ? pk.graveMax(g) : 1;
         if (max <= 0) return;
         toggle(sel.graves, +id, max);
         sel.players = [];
@@ -408,6 +405,9 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   stage.onAck = function (d) {      // 朝に使った能力は、結果が返った瞬間に演出する
     busy = false;
+    if (d.chain && G().phase === ONW.PHASE.ONLINE_MORNING) {   // 朝: 取った役職の能力へ続く。交換・コピーの演出が終わってから使えるようにする
+      later(() => { const g = G(); if (g.morningChain === d.chain && !g.morningChainDone) { g.morningChainReady = true; ONW.ui.render(g); } }, (d.reveal ? morningDur(d.reveal) : 0) + 500);
+    }
     if (d.reveal) {
       playMorning(d.reveal);
       if (G().phase === ONW.PHASE.ONLINE_DAY) {
@@ -422,23 +422,18 @@ window.ONW = window.ONW || {};
     if (g.phase === ONW.PHASE.ONLINE_DAY) dayKeys.push(k); else (g.morningUp = g.morningUp || []).push(k);   // 昼に使った能力: 朝のように出しっぱなしにせず、数秒後に閉じる
     paint(g);
   }
+  const morningHook = (kind) => { for (const id of ONW.roleIds()) { const d = ONW.roleDef(id); if (d && d.stageMorning && d.stageMorning.kind === kind) return d.stageMorning; } return null; };   // 朝の演出を持つ役職(各役職ファイルの stageMorning)
   function morningDur(r) {   // 朝の演出（playMorning）が終わるまでのおおよその時間(ms)
     if (r.kind === "peek") return (r.items.length - 1) * 450 + 1000;
-    if (r.kind === "swap") return 1050 + 700;
-    if (r.kind === "relic") return 540 + 1050 + 700;
-    if (r.kind === "tm") return 1250 + 500;
-    if (r.kind === "doppel") return 900 + 950 + 200 + 750;
-    if (r.kind === "gremlin") return 900 + 950 + 200 + 750;
-    return 1000;
+    const h = morningHook(r.kind);
+    return h ? h.dur(r) : 1000;
   }
   function playMorning(r) {
     if (r.kind === "peek") r.items.forEach((it, i) => later(() => show(it.k, it.role), i * 450));
-    else if (r.kind === "swap") swap(r);
-    else if (r.kind === "relic") relic(r);
-    else if (r.kind === "tm") tmSwap(r);
-    else if (r.kind === "doppel") doppel(r);
-    else if (r.kind === "gremlin") gremlin(r);
+    else { const h = morningHook(r.kind); if (h) h.play(r, stage.kit); }
     // 墓荒らしで人狼系・狂信者・共有者を取ったとき: 交換の演出のあと、相方のカードが表になる（昼になるまで）
+    // 墓荒らし・ドッペルゲンガーで口封じの狂人を手にしたとき: 交換・コピーの演出のあと（取ったと分かったあと）、ターゲットのカードが裏返ってミュートマークが出る（昼になるまで）
+    if (r.muzzle) later(() => show(`p:${r.muzzle}`, MUTE_MARK, true), morningDur(r) + 700);
     if (r.mates) later(() => r.mates.ids.forEach((id, i) => later(() => show(`p:${id}`, r.mates.role), i * 380)), morningDur(r) + 200);
     // 墓荒らしで神・人狼系を取ったとき（見える系の共通形）: 交換のあと、夜の始まりに見えるはずの初期役職のカードが順に表になって光る（昼になるまで）
     if (r.peek) later(() => r.peek.forEach((it, i) => later(() => show(it.k, it.role, true), i * (r.gap || 340))), morningDur(r) + 200);
@@ -469,123 +464,27 @@ window.ONW = window.ONW || {};
     }, 1050);
   }
 
-  // ---- 墓荒らし: 墓地のカードがガタッと掘り起こされ、自分のカードと入れ替わる → 新しい自分のカードが表に ----
-  function relic(r, temp) {
-    const el = $t(), grave = el.querySelector(`[data-k="g:${r.target}"] .tb-card`);
-    if (!grave || !grave.animate) { swap(r, temp); return; }
-    const w = grave.animate(
-      [{ transform: "translate(0,0) rotate(0)" }, { transform: "translate(-3px,-12px) rotate(-7deg)" }, { transform: "translate(3px,-8px) rotate(6deg)" }, { transform: "translate(-2px,-14px) rotate(-4deg)" }, { transform: "translate(0,-6px) rotate(0)" }],
-      { duration: 520, easing: "ease-in-out" });
-    later(() => { w.cancel(); swap(r, temp); }, 540);     // 揺れ終わったら、自分のカードと弧を描いて入れ替わる
-  }
+  // ---------------------------------------------------------
+  // 役職ファイルの演出(stageNight / stageMorning)に渡す道具。up / glow などは試合ごとに作り直されるので、getter で「今の値」を返す
+  // ---------------------------------------------------------
+  stage.kit = {
+    get up() { return up; }, get glow() { return glow; }, get lov() { return lov; },
+    get loveMate() { return loveMate; }, get nightKeys() { return nightKeys; },
+    // 結果発表・昼の公開演出(stageResult / stageSettle / stageFlash / stageSober)用
+    get dead() { return dead; }, get badge() { return badge; }, get shin() { return shin; }, get gx() { return gx; },
+    get asn() { return asn; }, get alm() { return alm; }, get catv() { return catv; },
+    get starKeys() { return starKeys; }, get queenKeys() { return queenKeys; }, get flashKeys() { return flashKeys; }, get queenFlashKeys() { return queenFlashKeys; }, get kingKeys() { return kingKeys; }, get kingFlashKeys() { return kingFlashKeys; },
+    WOLF_MARK, DUO_MARK, MASTER_MARK, TARGET_MARK, MUTE_MARK,
+    later, paint, show, swap, G, $t, esc, setCap, gxStars,
+    /** 札を付けた席の一覧(starKeys など)から、席 k を取り除く(その場で書き換える) */
+    pull(arr, k) { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] === k) arr.splice(i, 1); },
+  };
 
-  // ---- ドッペルゲンガー: 選んだ人のカードがめくれる → そのコピーが自分の席へ飛ぶ → 自分のカードが新しい役職で表になる（選んだ人のカードは動かない） ----
-  function doppel(r) {
-    const mine = `p:${ONW.net.myId()}`, theirs = `p:${r.target}`, el = $t();
-    const a = el.querySelector(`[data-k="${theirs}"] .tb-card`), b = el.querySelector(`[data-k="${mine}"] .tb-card`);
-    if (!a || !b || !a.animate) { show(mine, r.role); return; }
-    show(theirs, r.seen);                                    // 選ばれた人のカードがめくれる
-    later(() => {
-      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-      const ghost = document.createElement("div");           // めくれたカードのコピー（表向き）
-      ghost.className = "tb-seat up";
-      ghost.style.cssText = `position:fixed;left:${ra.left}px;top:${ra.top}px;width:${ra.width}px;height:${ra.height}px;margin:0;padding:0;pointer-events:none;z-index:60;`;
-      const c = a.cloneNode(true);
-      c.style.cssText = `width:${ra.width}px;height:${ra.height}px;`;
-      c.classList.remove("pick", "sel");
-      ghost.appendChild(c);
-      document.body.appendChild(ghost);
-      const dx = rb.left - ra.left, dy = rb.top - ra.top;
-      const A = ghost.animate([
-        { transform: "translate(0,0) scale(1)", opacity: 0.55 },
-        { transform: `translate(${dx / 2}px,${dy / 2 - 26}px) scale(1.22)`, opacity: 0.9, offset: 0.5 },
-        { transform: `translate(${dx}px,${dy}px) scale(1)`, opacity: 0.8 },
-      ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
-      later(() => {
-        A.cancel(); ghost.remove();
-        delete up[theirs]; delete glow[theirs];              // 選ばれた人のカードは伏せて元のまま
-        show(mine, r.role);                                  // 自分のカードが、コピーした役職で表になる
-      }, 950);
-    }, 900);
-  }
-
-  // ---- グレムリン: コピー元のカードが表になる → そのコピーがコピー先へ飛んでいく → コピー先のカードが表になる（コピー元は動かない。どちらも朝のあいだ表のまま） ----
-  function gremlin(r) {
-    const from = `p:${r.from}`, to = `p:${r.to}`, el = $t();
-    const a = el.querySelector(`[data-k="${from}"] .tb-card`), b = el.querySelector(`[data-k="${to}"] .tb-card`);
-    const landed = () => { show(to, r.copied || r.role); };   // コピー先が、コピーされた役職で表になる
-    if (!a || !b || !a.animate) { show(from, r.role); landed(); return; }
-    show(from, r.role);                                      // コピー元のカードがめくれる
-    later(() => {
-      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-      const ghost = document.createElement("div");           // めくれたカードのコピー（表向き）
-      ghost.className = "tb-seat up";
-      ghost.style.cssText = `position:fixed;left:${ra.left}px;top:${ra.top}px;width:${ra.width}px;height:${ra.height}px;margin:0;padding:0;pointer-events:none;z-index:60;`;
-      const c = a.cloneNode(true);
-      c.style.cssText = `width:${ra.width}px;height:${ra.height}px;`;
-      c.classList.remove("pick", "sel");
-      ghost.appendChild(c);
-      document.body.appendChild(ghost);
-      const dx = rb.left - ra.left, dy = rb.top - ra.top;
-      const A = ghost.animate([
-        { transform: "translate(0,0) scale(1) rotate(0deg)", opacity: 0.6 },
-        { transform: `translate(${dx / 2}px,${dy / 2 - 30}px) scale(1.25) rotate(-6deg)`, opacity: 0.95, offset: 0.5 },
-        { transform: `translate(${dx}px,${dy}px) scale(1) rotate(0deg)`, opacity: 0.85 },
-      ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
-      later(() => { A.cancel(); ghost.remove(); landed(); }, 950);
-    }, 900);
-  }
-
-  // ---- いたずらっ子: 選んだ2人のカードが（裏向きのまま）空中で交差して入れ替わる ----
-  function tmSwap(r) {
-    const el = $t(), a = el.querySelector(`[data-k="p:${r.a}"] .tb-card`), b = el.querySelector(`[data-k="p:${r.b}"] .tb-card`);
-    if (!a || !b || !a.animate) return;
-    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-    const dx = rb.left - ra.left, dy = rb.top - ra.top;
-    const path = (x, y, lift, tilt) => [
-      { transform: "translate(0,0) scale(1) rotate(0deg)" },
-      { transform: `translate(${x * 0.3}px,${y * 0.3 + lift}px) scale(1.18) rotate(${tilt}deg)`, offset: 0.3 },
-      { transform: `translate(${x * 0.7}px,${y * 0.7 + lift}px) scale(1.18) rotate(${-tilt}deg)`, offset: 0.7 },
-      { transform: `translate(${x}px,${y}px) scale(1) rotate(0deg)` },
-    ];
-    a.style.zIndex = 6; b.style.zIndex = 5;
-    const opt = { duration: 1200, easing: "ease-in-out", fill: "forwards" };
-    const A = a.animate(path(dx, dy, -26, -8), opt), B = b.animate(path(-dx, -dy, 26, 8), opt);
-    later(() => { A.cancel(); B.cancel(); a.style.zIndex = b.style.zIndex = ""; }, 1250);   // 裏面は同じなので、元の席に戻すと入れ替わったまま見える
-  }
-
-  // ---- 神: 夜の始まりに全員と墓地のカードが順に開き、金色に光る → 夜時間の間ずっと開いたまま ----
-  function godPeek(r) {
-    const keys = [...Object.keys(r.players).map((id) => [`p:${id}`, r.players[id]]), ...r.graves.map((c, i) => [`g:${i}`, c])];
-    keys.forEach(([k, role], i) => later(() => { if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = role; glow[k] = true; if (loveMate && k === `p:${loveMate.id}`) lov[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 300));
-  }   // 閉じるのは夜時間が終わったとき（sync）
-
-  // ---- 狂信者: 夜の始まりに人狼プレイヤーのカードが順に表になり、🐺が出る → 夜時間の間ずっと開いたまま ----
-  function cultPeek(ids) {
-    ids.forEach((id, i) => later(() => { const k = `p:${id}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = loveMate && loveMate.id === id ? DUO_MARK : WOLF_MARK; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 380));
-  }
   // ---- 恋人: 夜の始まりに相方のカードが❤️でめくれる → 夜時間の間ずっと開いたまま ----
   function lovePeek(r) {
     const k = `p:${r.id}`;
     if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return;
     up[k] = LOVE_MARK; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G());
-  }
-
-  // ---- 従者: 夜の始まりにご主人のカードが「👑ご主人」でめくれる → 夜時間の間ずっと開いたまま（ご主人が恋人の相方でもあるときは、右上に丸いハート） ----
-  function masterPeek(r) {
-    const k = `p:${r.id}`;
-    if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return;
-    up[k] = r.mark || MASTER_MARK; glow[k] = true; if (loveMate && loveMate.id === r.id) lov[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G());
-  }
-
-  // ---- 共有者: 夜の始まりに仲間の共有者のカードが順に表になる → 夜時間の間ずっと開いたまま ----
-  function masonPeek(ids) {
-    ids.forEach((id, i) => later(() => { const k = `p:${id}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = "mason"; glow[k] = true; if (loveMate && id === loveMate.id) lov[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 380));
-  }
-
-  // ---- 大狼: 夜の始まりに墓地のカードが順に全部開き、赤く光る → 夜時間の間ずっと開いたまま ----
-  function bigPeek(roles) {
-    roles.forEach((role, i) => later(() => { const k = `g:${i}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; up[k] = role; glow[k] = true; if (!nightKeys.includes(k)) nightKeys.push(k); paint(G()); }, i * 380));
   }
 
   // ---------------------------------------------------------
@@ -600,177 +499,69 @@ window.ONW = window.ONW || {};
     const team = res.title.startsWith("村人") ? "village" : res.title.startsWith("人狼") ? "wolf" : res.title.startsWith("恋人") ? "lover" : "third";
     return `<div class="rs-win t-${team}">${esc(res.title)}</div><div class="rs-dim">${esc(res.detail || "")}</div>`;
   }
+  /** 結果発表の骨組み。役職ごとの演出は各役職ファイルの stageResult(下の hk(...) で呼ぶ)。R.t = 演出の現在時刻(ms)で、フックが進める */
   function startResult(g) {
     seq = true;
     const res = g.result, P = (id) => `p:${id}`;
     const order = res.chainOrder || [];
-    const subs = res.servantSubs || [];                       // 従者の身代わり（起きた順）
-    const subIds = new Set(subs.map((x) => x.servantId));     // 身代わりになった従者は、通常の追放フリップから除く（二重にめくらない）
-    const exec = res.history.filter((h) => h.dead && h.cause !== "chain" && !subIds.has(h.id));
-    const chain = res.history.filter((h) => h.cause === "chain").sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    const HK = {}, hk = (key) => HK[key] || (HK[key] = ONW.roleHooksIn("stageResult", key));
+    const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));   // 通常の追放フリップから除く人（身代わりになった従者: 二重にめくらない）
+    const exec = res.history.filter((h) => h.dead && h.cause !== "chain" && !skipIds.has(h.id));
+    const chain = res.history.filter((h) => h.cause === "chain" && h.kind !== "queen" && !h.late).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    const lateDeaths = res.history.filter((h) => h.cause === "chain" && h.kind !== "queen" && h.late).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));   // 王国滅亡のあとで死んだ人（心中など）
+    const kingdom = res.history.filter((h) => h.cause === "chain" && h.kind === "queen");   // 王国滅亡: 女王が倒れて、一斉にめくれる村人陣営
     const loverNo = {}; res.history.forEach((h) => { if (h.lover) loverNo[h.id] = h.loverNo || true; });
     const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; };   // 結果でめくれる恋人のカードは、右上に丸いハート
     const rest = [...res.history.filter((h) => !h.dead).map((h) => [P(h.id), h.role, h.id]), ...res.grave.map((c, i) => [`g:${i}`, c.role])];
-    const god = res.god || {}, godSpark = (id) => god.mode === "bless" && (god.ids || []).includes(id);   // 神の祝福: 追放・道連れで死んだ神だけ、めくれたときにキラキラ
-    // シュレディンガーの猫: めくれたあと、1票以上入っていれば、もう一度裏返って陣営の色の文字になる（村人陣営=緑 / 人狼陣営=赤 / 第三陣営の役職が参照先=灰色のまま「(+役職名)」/ どの陣営にもなれなければ灰色）
-    const catOf = new Map((res.cats || []).map((c) => [c.id, c]));
-    const catFlips = (id) => { const c = catOf.get(id); return !!c && c.votes >= 1 && c.team !== "lover"; };   // 2回目に裏返る猫か（恋人の猫は恋人陣営なので裏返らない）
-    const catFace = (c) => ({ team: c.team, sfx: c.team === "third" && c.finalRole ? `(+${ONW.roles.getInfo(c.finalRole).name})` : "" });
-    const catLine = (c) => c.team === "village" ? `<span class="t-village">村人陣営</span>になりました` : c.team === "wolf" ? `<span class="t-wolf">人狼陣営</span>になりました` : c.team === "third" ? `<span class="t-third">第三陣営（${esc(ONW.roles.getInfo(c.finalRole || "villager").name)}）</span>になりました` : "どの陣営にもなれませんでした";
-    const CAT_UP2 = 1300, CAT_EXTRA = 2300;   // 1回目にめくれてから裏に戻るまで / 裏に戻ってからもう一度めくれるまで（ここが 0.75秒のフリップより長ければ、ちゃんと裏返って見える）
-    /** めくれた猫のカード id を at の時刻に裏へ戻し、少しあとでもう一度めくる。noFlip: 演出が重なる（処刑人のギロチンなど）ので、裏返さずに最初から陣営の色で見せる */
-    function catFlip2(id, at, noFlip) {
-      const c = catOf.get(id), k = P(id);
-      if (!c) return;
-      if (noFlip) { catv[k] = catFace(c); return; }
-      later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} に ${c.votes}票 入っていました…</div>`); delete up[k]; paint(G()); }, at);
-      later(() => { catv[k] = catFace(c); up[k] = CAT; setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} は ${catLine(c)}</div>`); paint(G()); }, at + CAT_EXTRA - 600);
-    }
-    let t = 600;
+    // 役職ファイルに渡す道具箱(stage.kit に、この結果の情報を足したもの)
+    //   t = 演出の現在時刻 / subN = 身代わりの数 / noFlip = ほかの演出が重なるので2回目の裏返しをしない席(flipped フックが書く) / restEnd = 全員めくれ終わる時刻 / noBlow = 負けた人のカードを吹き飛ばさない
+    const R = Object.create(stage.kit);
+    Object.assign(R, { g, res, P, exec, chain, lateDeaths, kingdom, rest, lovOn, t: 600, subN: 0, guardN: 0, noFlip: new Set(), restEnd: 0, noBlow: false });
+    const flipped = (hs, at, kind) => { R.noFlip = new Set(); return hk("flipped").reduce((n, h) => n + (h.fn(R, hs, at, kind) || 0), 0); };   // 追放・道連れでめくれた人に重なる演出(処刑人のギロチン・猫の裏返し)。返り値 = 足す待ち時間
     setCap(`<div class="res-cap__t">投票の結果</div>`);
-    res.counts.forEach((c, i) => later(() => { badge[P(c.id)] = `${c.c}票`; paint(G()); }, t + i * 350));
-    t += res.counts.length * 350 + 1000;
-    // 従者の身代わり: ご主人のカードがめくれそうになる（途中まで回って揺れ、また裏のまま戻る）→ 従者のカードが表になる。複数あれば1組ずつ順に
-    subs.forEach((x) => {
-      const mk = P(x.masterId), sk = P(x.servantId), sh = res.history.find((h) => h.id === x.servantId);
-      later(() => { setCap(`<div class="res-cap__t t-wolf">従者の身代わり</div><div>${esc(x.master)} が追放されそうになりました…</div>`); alm[mk] = true; paint(G()); }, t);
-      later(() => {
-        delete alm[mk];
-        up[sk] = (sh && sh.role) || "servant"; lovOn(x.servantId); dead[sk] = true; badge[sk] = "身代わり";
-        setCap(`<div class="res-cap__t t-wolf">従者の身代わり</div><div>${esc(x.servant)} が ${esc(x.master)} の身代わりになりました</div>`);
-        paint(G());
-      }, t + 1900);
-      t += 4300;
-    });
-    if (subs.length && !exec.length) t -= 600;   // 通常の追放がなければ、すぐ次へ
+    res.counts.forEach((c, i) => later(() => { badge[P(c.id)] = `${c.c}票`; paint(G()); }, R.t + i * 350));
+    R.t += res.counts.length * 350 + 1000;
+    hk("intro").forEach((h) => h.fn(R));   // 従者の身代わり: ご主人のカードがめくれそうになる → 従者のカードが表になる
     later(() => {
-      if (subs.length && !exec.length) return;   // 追放されたのが身代わりの従者だけなら、字幕はそのまま（「誰も追放されませんでした」にしない）
-      exec.forEach((h) => { if (godSpark(h.id)) { gx[P(h.id)] = "spark"; gxStars(); } up[P(h.id)] = h.role; lovOn(h.id); dead[P(h.id)] = true; badge[P(h.id)] = h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : "追放"; });
+      if ((R.subN || R.guardN) && !exec.length) return;   // 追放されたのが身代わりの従者だけなら、字幕はそのまま（「誰も追放されませんでした」にしない）
+      exec.forEach((h) => { hk("flipUp").forEach((x) => x.fn(R, h)); up[P(h.id)] = h.role; lovOn(h.id); dead[P(h.id)] = true; badge[P(h.id)] = h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : "追放"; });
       const execN = exec.filter((h) => !h.mental && !h.shock), mentalN = exec.filter((h) => h.mental), shockN = exec.filter((h) => h.shock);
       setCap(exec.length ? `${execN.length ? `<div class="res-cap__t t-wolf">追放</div><div>${execN.map((h) => esc(h.name)).join("、")}</div>` : ""}${mentalN.length ? `<div class="res-cap__t t-wolf">メンタル崩壊</div><div>${mentalN.map((h) => esc(h.name)).join("、")}</div>` : ""}${shockN.length ? `<div class="res-cap__t t-wolf">ショック死</div><div>${shockN.map((h) => esc(h.name)).join("、")}</div>` : ""}` : `<div class="res-cap__t">誰も追放されませんでした</div>`);
       paint(G());
-    }, t);
-    const glWin = (res.execs || []).filter((x) => x.win && x.execId !== x.targetId);   // ターゲットが追放された処刑人
-    const glExec = glWin.filter((x) => exec.some((h) => h.id === x.targetId));
-    glExec.forEach((x) => glSeq(x, t));
-    const glExecIds = new Set(glExec.map((x) => x.targetId));
-    const execCats = exec.filter((h) => h.role === CAT && catFlips(h.id));
-    execCats.forEach((h) => catFlip2(h.id, t + CAT_UP2 + 200, glExecIds.has(h.id)));   // ギロチンで割れるカードは裏返さない（最初から陣営の色）
-    t += (exec.length ? 3200 + (glExec.length ? GL_DUR : 0) : subs.length ? 300 : 1500) + (execCats.some((h) => !glExecIds.has(h.id)) ? CAT_EXTRA : 0);
+    }, R.t);
+    const exFx = flipped(exec, R.t, "exec");
+    R.t += (exec.length ? 3200 : R.subN || R.guardN ? 300 : 1500) + exFx;
     // 一目惚れしてるてるが先にめくれ、そのあとで道連れにされた人が1人ずつ無理心中でめくれる
-    // わら人形・猫又・黒猫が追放された場合も同じ演出で、めくれた順(連鎖の順)に1人ずつ「道連れ」でめくれる
-    chain.forEach((h) => {
-      const lab = h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : "無理心中";
+    // わら人形・猫又・黒猫・ネコカボチャが追放された場合も同じ演出で、めくれた順(連鎖の順)に1人ずつ「道連れ」でめくれる
+    const flipChain = (h) => {
+      const lab = h.sub ? "身代わり" : h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "follow" ? "後追い" : "無理心中";
       later(() => {
-        setCap(`<div class="res-cap__t t-wolf">${lab}</div><div>${h.kind === "tomo" && h.by ? `${esc(h.by)} → ` : h.kind === "lovers" && h.by ? `${esc(h.by)} ❤ ` : ""}${esc(h.name)}</div>`);
+        setCap(`<div class="res-cap__t t-wolf">${lab}</div><div>${h.sub ? `${esc(h.by)} → ${esc(h.sub)} の身代わり: ` : (h.kind === "tomo" || h.kind === "follow") && h.by ? `${esc(h.by)} → ` : h.kind === "lovers" && h.by ? `${esc(h.by)} ❤ ` : ""}${esc(h.name)}</div>`);
         shin[P(h.id)] = true; dead[P(h.id)] = true; badge[P(h.id)] = lab; paint(G());
-      }, t);
-      later(() => { if (godSpark(h.id)) { gx[P(h.id)] = "spark"; gxStars(); } up[P(h.id)] = h.role; lovOn(h.id); paint(G()); }, t + 1300);   // 演出のあとでカードが表に（神の祝福なら、めくれたときからキラキラ）
-      const glC = glWin.filter((x) => x.targetId === h.id);   // 道連れ・心中で死んだターゲットも、追放された人として数える
-      glC.forEach((x) => glSeq(x, t + 1300));
-      const catC = h.role === CAT && catFlips(h.id);   // 道連れ・心中でめくれた猫も、1票以上入っていれば裏返る
-      if (catC) catFlip2(h.id, t + 1300 + CAT_UP2 + 200, glC.length > 0);
-      t += 3400 + (glC.length ? GL_DUR : 0) + (catC && !glC.length ? CAT_EXTRA : 0);
-    });
-    // アサシン: 暗殺者のカードが光り、狙われた相手に照準 → 斬撃 → カードが表になってマーリンかどうかが分かる
-    // （選ばれた相手は死なない。当たりは赤い閃光で「暗殺」、外れは静かに「無事」）
-    (res.assassin || []).forEach((a) => {
-      const head = `<div class="res-cap__t t-wolf">アサシン</div><div>${esc(a.by)} → ${esc(a.target)}</div>`;
-      const tk = P(a.targetId), bk = P(a.byId);
-      later(() => { setCap(`<div class="res-cap__t t-wolf">アサシン</div><div>${esc(a.by)} が暗殺する相手を選びました…</div>`); asn[bk] = "by"; paint(G()); }, t);
-      later(() => { setCap(head); asn[tk] = "aim"; paint(G()); }, t + 1300);                    // 照準
-      later(() => { asn[tk] = "slash"; paint(G()); }, t + 2400);                                // 斬撃
-      later(() => {                                                                            // カードが表に → 結果
-        up[tk] = a.role; asn[tk] = a.hit ? "hit" : "miss"; delete asn[bk];
-        badge[tk] = a.hit ? "暗殺" : "無事";
-        setCap(`${head}<div class="${a.hit ? "t-wolf" : "rs-dim"}">${a.hit ? "マーリンでした！ 暗殺成功" : "マーリンではありませんでした（暗殺失敗）"}</div>`);
-        paint(G());
-      }, t + 3200);
-      t += 5200;
-    });
-    later(() => setCap(`<div class="res-cap__t">結果発表</div>`), t);
+      }, R.t);
+      later(() => { hk("flipUp").forEach((x) => x.fn(R, h)); up[P(h.id)] = h.role; lovOn(h.id); paint(G()); }, R.t + 1300);   // 演出のあとでカードが表に（神の祝福なら、めくれたときからキラキラ）
+      const fx = flipped([h], R.t + 1300, "chain");   // 道連れ・心中で死んだターゲット(処刑人)・めくれた猫も、追放された人と同じ扱い
+      R.t += 3400 + fx;
+    };
+    chain.forEach(flipChain);
+    hk("kingdom").forEach((h) => h.fn(R));   // 王国滅亡: 女王が追放・道連れで倒れたあと、他の村人陣営のカードが全員同時にめくれる
+    lateDeaths.forEach(flipChain);   // 王国滅亡で倒れた人の相方など、王国滅亡のあとで死んだ人（心中）
+    hk("assassin").forEach((h) => h.fn(R));   // アサシン: 暗殺者のカードが光り、狙われた相手に照準 → 斬撃 → カードが表になってマーリンかどうかが分かる
+    later(() => setCap(`<div class="res-cap__t">結果発表</div>`), R.t);
     rest.forEach(([k, r, hid], i) => later(() => {
       up[k] = r; if (hid) lovOn(hid);
-      if (god.mode === "descend" && hid && (god.ids || []).includes(hid)) {   // 生存している神がめくれると、ファーンと神が降臨する
-        gx[k] = "descend"; setCap(`<div class="res-cap__t t-third">神降臨</div><div>${esc((res.history.find((h) => h.id === hid) || {}).name || "")}</div>`);
-        later(() => { if (gx[k] === "descend") { delete gx[k]; paint(G()); } }, 2400);
-      }
+      hk("restUp").forEach((x) => x.fn(R, k, hid));   // 生存している神がめくれると、ファーンと神が降臨する
       paint(G());
-    }, t + 500 + i * 320));
-    let restEnd = t + 500 + rest.length * 320 + 700;
-    rest.forEach(([k, r, hid], i) => {   // めくられずに残っていた猫（追放されなかった猫）も、1票以上入っていれば、めくれたあとにもう一度裏返る
-      if (r !== CAT || !hid || !catFlips(hid)) return;
-      const at = t + 500 + i * 320;
-      catFlip2(hid, at + CAT_UP2 + 200, false);
-      restEnd = Math.max(restEnd, at + CAT_UP2 + 200 + CAT_EXTRA + 400);
-    });
-    t = restEnd;
-    if (god.mode === "descend") t += 1800;
-    if (god.mode === "bless") {   // 全員のカードがめくれたあと: 死んだオポ・天邪鬼・負け組が吹き飛ばされ、残りの人が祝福で勝つ
-      const gods = new Set(god.ids || []), blown = new Set(res.history.filter((h) => !h.win).map((h) => h.id));   // 負けた人（神も含む）のカードが吹き飛ぶ
-      later(() => {
-        setCap(`<div class="res-cap__t t-third">神の祝福</div><div>神の光が降りそそぎます…</div>`);
-        blown.forEach((id) => { gx[P(id)] = "blow"; });
-        paint(G());
-      }, t);
-      later(() => {
-        res.history.forEach((h) => { if (!blown.has(h.id) && !gods.has(h.id) && h.win) gx[P(h.id)] = "win"; });
-        setCap(`<div class="res-cap__t t-third">神の祝福</div><div>${blown.size ? "負けた人のカードは吹き飛ばされ、" : ""}ほかの全員が勝利します</div>`);
-        paint(G());
-      }, t + 1500);
-      t += 3600;
-    }
-    const rv = res.reverse;   // チキンの逆転演出: 逆転前の勝敗を先に発表 → チキンが飛び出して覆す
-    if (rv && (rv.ids || []).length) {
-      later(() => setCap(`<div class="rs-win t-${rv.fromTitle.startsWith("村人") ? "village" : rv.fromTitle.startsWith("人狼") ? "wolf" : "third"}">${esc(rv.fromTitle)}</div>`), t);
-      t += 1000;
-      later(() => setCap(`<svg class="rv-burst" viewBox="0 0 100 100" width="150" height="150"><polygon points="50.0,2.0 56.7,20.8 70.8,6.8 68.7,26.5 87.5,20.1 77.0,37.0 96.8,39.3 80.0,50.0 96.8,60.7 77.0,63.0 87.5,79.9 68.7,73.5 70.8,93.2 56.7,79.2 50.0,98.0 43.3,79.2 29.2,93.2 31.3,73.5 12.5,79.9 23.0,63.0 3.2,60.7 20.0,50.0 3.2,39.3 23.0,37.0 12.5,20.1 31.3,26.5 29.2,6.8 43.3,20.8" fill="#ffe14d" stroke="#222" stroke-width="3" stroke-linejoin="miter"/><text x="50" y="68" text-anchor="middle" font-size="58" font-weight="900" fill="#e02020" stroke="#222" stroke-width="1.5">!</text></svg>`), t);
-      t += 1500;
-      later(() => {
-        rv.ids.forEach((id) => { gx[P(id)] = "chicken"; });
-        setCap("");
-        paint(G());
-      }, t);
-      t += 2800;
-      later(() => { rv.ids.forEach((id) => { delete gx[P(id)]; }); setCap(`<div class="res-cap__t t-village">チキンが勝利を逆転させた！</div>`); paint(G()); }, t);
-      t += 1800;
-    }
-    later(() => setCap(winHtml(res)), t);
-    const losersN = god.mode === "bless" ? [] : res.history.filter((h) => !h.win);   // 神の祝福以外: 結果の字幕のあと、負けた人のカードが吹き飛ぶ
-    if (losersN.length) later(() => { losersN.forEach((h) => { gx[P(h.id)] = "blow"; }); paint(G()); }, t + 1300);
-    later(toSheet, t + (losersN.length ? 3800 : 2800));
-  }
-  // ---- 処刑人: ターゲットが追放されたとき、めくれたカードが揺れ始め → ギロチンの刃が落ちて → カードが真っ二つに割れる ----
-  function glHalves(k) {
-    const seat = $t().querySelector(`[data-k="${k}"]`), card = seat && seat.querySelector(".tb-card"), front = seat && seat.querySelector(".tb-front");
-    if (!card || !front) return null;
-    let hs = card.querySelectorAll(".gl-half");
-    if (hs.length) return [...hs];
-    hs = ["gl-top", "gl-bot"].map((c) => {
-      const h = document.createElement("div"); h.className = `gl-half ${c}`;
-      const f = front.cloneNode(true); f.classList.add("gl-face"); h.appendChild(f); card.appendChild(h); return h;
-    });
-    const inner = card.querySelector(".tb-inner"); if (inner) inner.style.visibility = "hidden";   // 元のカードは隠し、同じ見た目の2枚(上下)に置き換える
-    return hs;
-  }
-  function glFinal(k) { const hs = glHalves(k); if (hs) hs.forEach((h) => h.classList.add("split")); }   // スキップ時: 最初から割れた状態
-  function glClear() {
-    const el = $t(); if (!el) return;
-    el.querySelectorAll(".gl-half,.gl-blade").forEach((n) => n.remove());
-    el.querySelectorAll(".tb-inner").forEach((n) => { n.style.visibility = ""; });
-    el.querySelectorAll(".gl-shake").forEach((n) => n.classList.remove("gl-shake"));
-  }
-  const GL_DUR = 3300;   // めくれてから処刑人勝利の字幕まで
-  function glSeq(x, at) {   // x: res.execs の1件（ターゲットが追放された処刑人）。at: ターゲットのカードがめくれる時刻
-    const k = `p:${x.targetId}`;
-    later(() => { const s = $t().querySelector(`[data-k="${k}"]`); if (s) s.classList.add("gl-shake"); }, at + 800);   // めくれ終わったら揺れ始める
-    later(() => {                                                                                                   // 刃が落ちる
-      const card = $t().querySelector(`[data-k="${k}"] .tb-card`); if (!card) return;
-      const b = document.createElement("div"); b.className = "gl-blade"; card.appendChild(b);
-      later(() => b.remove(), 600);
-    }, at + 1900);
-    later(() => { const s = $t().querySelector(`[data-k="${k}"]`); if (s) s.classList.remove("gl-shake"); const hs = glHalves(k); if (hs) requestAnimationFrame(() => hs.forEach((h) => h.classList.add("split"))); }, at + 2150);   // 刃が通り抜けた瞬間に真っ二つ
-    later(() => setCap(`<div class="res-cap__t t-third">処刑人勝利</div><div>${esc(x.exec)} のターゲット ${esc(x.target)} が追放されました</div>`), at + 3000);
+    }, R.t + 500 + i * 320));
+    R.restEnd = R.t + 500 + rest.length * 320 + 700;
+    hk("rest").forEach((h) => h.fn(R));   // めくられずに残っていた猫（追放されなかった猫）も、1票以上入っていれば、めくれたあとにもう一度裏返る
+    R.t = R.restEnd;
+    hk("afterRest").forEach((h) => h.fn(R));   // 神降臨の余韻 / 神の祝福（全員めくれたあと、負けた人が吹き飛ばされ、残りの人が祝福で勝つ）
+    hk("reverse").forEach((h) => h.fn(R));   // チキンの逆転演出: 逆転前の勝敗を先に発表 → チキンが飛び出して覆す
+    later(() => setCap(winHtml(res)), R.t);
+    const losersN = R.noBlow ? [] : res.history.filter((h) => !h.win);   // 神の祝福以外: 結果の字幕のあと、負けた人のカードが吹き飛ぶ
+    if (losersN.length) later(() => { losersN.forEach((h) => { gx[P(h.id)] = "blow"; }); paint(G()); }, R.t + 1300);
+    later(toSheet, R.t + (losersN.length ? 3800 : 2800));
   }
   function toSheet() {
     const g = G(); clearAll(); g.asnHold = null;
@@ -780,16 +571,13 @@ window.ONW = window.ONW || {};
   stage.skipResult = function () {
     const g = G(), res = g.result;
     if (!res) return;
-    clearAll(); alm = {}; glClear();   // 身代わりの「めくれそう」演出・処刑人の演出も止める
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNo || true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = (res.servantSubs || []).some((x) => x.servantId === h.id) ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
+    const hk = (key) => ONW.roleHooksIn("stageResult", key);
+    clearAll(); alm = {}; hk("clear").forEach((h) => h.fn(stage.kit));   // 身代わりの「めくれそう」演出・処刑人の演出も止める
+    const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNo || true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = skipIds.has(h.id) || h.sub ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
-    (res.cats || []).forEach((c) => { if (c.votes >= 1 && c.team !== "lover") catv[`p:${c.id}`] = { team: c.team, sfx: c.team === "third" && c.finalRole ? `(+${ONW.roles.getInfo(c.finalRole).name})` : "" }; });   // シュレディンガーの猫: 1票以上入っていれば、2回目の面（陣営の色）で見せる
-    if (res.god && res.god.mode === "bless") {   // 神の祝福: 神はキラキラ・吹き飛ばされた人は消え・勝つ人は金色
-      const gd = new Set(res.god.ids || []);
-      res.history.forEach((h) => { gx[`p:${h.id}`] = gd.has(h.id) ? "spark" : h.win ? "win" : undefined; });
-    }
-    (res.execs || []).forEach((x) => { if (x.win && x.execId !== x.targetId) glFinal(`p:${x.targetId}`); });   // 処刑人のターゲット: 割れた状態で見せる
-    (res.assassin || []).forEach((x) => { badge[`p:${x.targetId}`] = x.hit ? "暗殺" : "無事"; });   // アサシンに選ばれた人（死なない）
+    const R = Object.create(stage.kit); R.res = res;
+    hk("skip").forEach((h) => h.fn(R));   // 猫(2回目の面)・神の祝福・処刑人のターゲット(割れた状態)・アサシンに選ばれた人 を、演出なしの最終形で見せる
     res.counts.forEach((c) => { if (!badge[`p:${c.id}`]) badge[`p:${c.id}`] = `${c.c}票`; });
     toSheet();
   };
@@ -803,6 +591,7 @@ window.ONW = window.ONW || {};
     const g = G(); g.tfIntro = false;
     ONW.ui.updateBoard();
     runNews();   // 新聞配達員がいれば、変化公開の紙のあとに新聞の紙が出る
+    runMapo();   // 麻婆豆腐の演出は新聞のあと（新聞が出ているときはまだ待つ）
   }
   function fly(wrap) {
     if (wrap.dataset.flying) return;
@@ -836,6 +625,10 @@ window.ONW = window.ONW || {};
   stage.skipPaper = function () {
     const g = G();
     g.newsSkip = true;   // ホストのスキップは、このあとに出る新聞の紙も飛ばす（新聞は情報確認から見られる）
+    g.mapoSkip = true;   // 麻婆豆腐の演出も同じく飛ばす（完成は情報確認から見られる）
+    g.exposeSkip = true;   // 暴露の紙も同じく飛ばす（暴露された役職は情報確認から見られる）
+    const ex = document.querySelector(".exp-wrap"); if (ex) finishExpose(ex);
+    const mp = document.querySelector(".mpo-wrap"); if (mp) finishMapo(mp);
     const nw = document.querySelector(".nwp-wrap");
     if (nw) flyNews(nw);
     const w = document.querySelector(".tfp-wrap");
@@ -903,6 +696,7 @@ window.ONW = window.ONW || {};
   function finishNews(wrap) {
     newsTimers.forEach(clearTimeout); newsTimers = [];
     if (wrap && wrap.parentNode) wrap.remove();
+    runMapo();   // 新聞が終わったら、麻婆豆腐の演出へ
   }
   function flyNews(wrap) {
     if (wrap.dataset.flying) return;
@@ -986,6 +780,205 @@ window.ONW = window.ONW || {};
     newsTimers.push(setTimeout(() => { const gg = G(); if (gg.newsPending && !document.querySelector(".tfp-wrap")) { gg.newsForce = true; runNews(); } }, 3000));   // 変化公開の紙が何かの都合で出ないときの保険
     runNews();
   };
+
+  // ---------------------------------------------------------
+  // 暴露狂人: 昼の始まりに「暴露された人の最終役職」の紙が出る（誰が暴露されたかは出さない。カードはめくれない）
+  // 順番: 変化公開の紙 → 新聞 → 暴露の紙 → 麻婆豆腐の演出 → 昼のタイマー開始(パン屋)。暴露の内容は「情報確認」からいつでも見返せる
+  // ---------------------------------------------------------
+  let exposeTimers = [], exposePoll = null;
+  /** 暴露の紙が出始めてから消えるまでの時間(ms)。昼のタイマー・CPUの発言はこの後に始める（1件ごとに少し延びる） */
+  stage.exposeMs = function (rows) { return 3200 + Math.max(0, ((rows && rows.length) || 1) - 1) * 1300; };
+  const exposeText = (r) => (r.extras && r.extras.length ? `であり、${r.extras.join("であり、")}でした。` : "");
+  function finishExpose(wrap) {
+    exposeTimers.forEach(clearTimeout); exposeTimers = [];
+    if (wrap && wrap.parentNode) wrap.remove();
+  }
+  function drawExpose(rows, late) {
+    document.querySelectorAll(".exp-wrap").forEach((w) => w.remove());
+    exposeTimers.forEach(clearTimeout); exposeTimers = [];
+    const wrap = document.createElement("div");
+    wrap.className = "exp-wrap" + (late ? " exp-wrap--late" : "");   // late = 昼の途中に出た（操作は止めない）
+    const canSkip = !!(ONW.net && ONW.net.isHost) && !late;   // スキップできるのはホストだけ。変化公開・新聞と同じダブルタップで、全員ぶん飛ばす
+    const total = stage.exposeMs(rows);
+    wrap.innerHTML = `<div class="exp-dim"></div>
+      <div class="exp-paper">
+        <div class="exp-title">🔎 暴露通知</div>
+        ${rows.map((r, i) => `<div class="exp-item" style="--i:${i}">
+          <div class="exp-lead">暴露狂人に暴露された人の最終役職は</div>
+          <div class="exp-role">${esc(r.role)}</div>
+          ${exposeText(r) ? `<div class="exp-extra">${esc(exposeText(r))}</div>` : `<div class="exp-extra">です。</div>`}
+        </div>`).join("")}
+        ${canSkip ? `<div class="exp-hint">ダブルタップでスキップ</div>` : ""}
+      </div>`;
+    wrap.style.setProperty("--exp-total", (total - 150) / 1000 + "s");
+    document.body.appendChild(wrap);
+    if (canSkip) {
+      let last = 0, lx = 0, ly = 0;
+      wrap.addEventListener("pointerup", (e) => {
+        const now = Date.now();
+        if (now - last < 400 && Math.abs(e.clientX - lx) < 40 && Math.abs(e.clientY - ly) < 40) { last = 0; ONW.net.skipPaper(); }
+        else { last = now; lx = e.clientX; ly = e.clientY; }
+      });
+    }
+    exposeTimers.push(setTimeout(() => { finishExpose(wrap); runMapo(); }, total - 150));
+  }
+  /** 待っている暴露の紙を、出せるなら出す（変化公開の紙・新聞が終わるのを待つ。最大15秒でやめる） */
+  function runExpose() {
+    const g = G();
+    if (!g.exposePending) return;
+    if (!g.exposeForce && !g.exposeSkip && (tfBusy(g) || g.newsPending || document.querySelector(".tfp-wrap, .nwp-wrap")) && Date.now() < (g.exposeWaitUntil || 0)) {
+      if (!exposePoll) exposePoll = setTimeout(() => { exposePoll = null; runExpose(); }, 250);
+      return;
+    }
+    g.exposePending = false;
+    const rows = g.exposeShow || []; g.exposeShow = [];
+    if (g.exposeSkip || g.isSpectator || !rows.length) { runMapo(); return; }   // ホストがスキップした / 観戦中: 紙は出さない（情報確認には載る）
+    drawExpose(rows, !!g.exposeLate);
+  }
+  /** 暴露が届いた: 変化公開の紙・新聞が終わっていれば今すぐ、終わっていなければその後に出す。late = 昼の途中に出たとき（すぐ出す） */
+  stage.expose = function (rows, late) {
+    const g = G();
+    g.exposeShow = [...(g.exposePending ? g.exposeShow || [] : []), ...(rows || [])];
+    g.exposePending = true; g.exposeForce = !!late; g.exposeLate = !!late; g.exposeWaitUntil = Date.now() + 15000;
+    if (late) g.exposeSkip = false;
+    runExpose();
+  };
+
+  // ---------------------------------------------------------
+  // 麻婆の人狼: 麻婆の人狼と豆腐の人狼が両方いるとき、昼の始まりに「麻婆豆腐 完成！」の演出が出る
+  // 順番: 変化公開の紙 → 新聞 → 麻婆豆腐の演出 → 昼のタイマー開始(パン屋)。完成は「情報確認」からいつでも確認できる
+  // ---------------------------------------------------------
+  const MAPO_MS = 3800;   // 演出が出始めてから消えるまでの時間(ms)。昼のタイマー・CPUの発言はこの後に始める
+  let mapoTimers = [], mapoPoll = null;
+  stage.mapoMs = function () { return MAPO_MS; };
+  function finishMapo(wrap) {
+    mapoTimers.forEach(clearTimeout); mapoTimers = [];
+    if (wrap && wrap.parentNode) wrap.remove();
+  }
+  function drawMapo(late) {
+    document.querySelectorAll(".mpo-wrap").forEach((w) => w.remove());
+    mapoTimers.forEach(clearTimeout); mapoTimers = [];
+    const wrap = document.createElement("div");
+    wrap.className = "mpo-wrap" + (late ? " mpo-wrap--late" : "");   // late = 昼の途中に完成した（操作は止めない）
+    const canSkip = !!(ONW.net && ONW.net.isHost) && !late;   // スキップできるのはホストだけ。変化公開・新聞と同じダブルタップで、全員ぶん飛ばす
+    wrap.innerHTML = `<div class="mpo-dim"></div>
+      <div class="mpo-stage">
+        <div class="mpo-item mpo-chili"><em>🌶️</em><span>麻婆の人狼</span></div>
+        <div class="mpo-item mpo-tofu"><i class="mpo-cube"></i><span>豆腐の人狼</span></div>
+        <div class="mpo-flash"></div>
+        <div class="mpo-pot">🍲</div>
+        <div class="mpo-steam"><b></b><b></b><b></b></div>
+        <div class="mpo-title">麻婆豆腐 完成！</div>
+        ${canSkip ? `<div class="mpo-hint">ダブルタップでスキップ</div>` : ""}
+      </div>`;
+    document.body.appendChild(wrap);
+    if (canSkip) {
+      let last = 0, lx = 0, ly = 0;
+      wrap.addEventListener("pointerup", (e) => {
+        const now = Date.now();
+        if (now - last < 400 && Math.abs(e.clientX - lx) < 40 && Math.abs(e.clientY - ly) < 40) { last = 0; ONW.net.skipPaper(); }
+        else { last = now; lx = e.clientX; ly = e.clientY; }
+      });
+    }
+    mapoTimers.push(setTimeout(() => finishMapo(wrap), MAPO_MS - 150));
+  }
+  /** 変化公開の紙・新聞が出ている(出る)最中か。麻婆豆腐の演出はその後に出す */
+  function mapoBusy(g) { return tfBusy(g) || g.newsPending || g.exposePending || !!document.querySelector(".tfp-wrap, .nwp-wrap, .exp-wrap"); }
+  /** パンのバナーは、変化公開・新聞・暴露・麻婆豆腐がすべて終わってから */
+  function breadBusy(g) { return mapoBusy(g) || g.mapoPending || !!document.querySelector(".mpo-wrap"); }
+  /** 待っている麻婆豆腐の演出を、出せるなら出す（変化公開の紙・新聞が終わったとき・ホストのスキップのときにも呼ばれる） */
+  function runMapo() {
+    const g = G();
+    if (!g.mapoPending) return;
+    if (!g.mapoForce && !g.mapoSkip && mapoBusy(g) && Date.now() < (g.mapoWaitUntil || 0)) {   // 紙と新聞が終わるのを待つ（念のため最大15秒でやめる）
+      if (!mapoPoll) mapoPoll = setTimeout(() => { mapoPoll = null; runMapo(); }, 250);
+      return;
+    }
+    g.mapoPending = false;
+    if (g.mapoSkip || g.isSpectator) return;   // ホストがスキップした / 観戦中: 演出は出さない（情報確認には載る）
+    drawMapo(!!g.mapoLate);
+  }
+  /** 麻婆豆腐の完成が届いた: 紙と新聞が終わっていれば今すぐ、終わっていなければその後に出す。late = 昼の途中に完成したとき（すぐ出す） */
+  stage.mapo = function (late) {
+    const g = G();
+    g.mapoPending = true; g.mapoForce = !!late; g.mapoLate = !!late; g.mapoWaitUntil = Date.now() + 15000;
+    if (late) g.mapoSkip = false;
+    runMapo();
+  };
+
+  // ---------------------------------------------------------
+  // パン屋: 昼の始まりの最後（変化公開 → 新聞 → 暴露 → 麻婆豆腐 のあと）、昼のタイマーが始まる前に「パンが焼けました」のバナーが出る
+  // ---------------------------------------------------------
+  const BREAD_MS = 3600;   // バナーが出てから消えるまでの時間(ms)。昼のタイマー・CPUの発言はこの後に始める
+  let breadPoll = null;
+  stage.breadMs = function () { return BREAD_MS; };
+  function runBread() {
+    const g = G();
+    if (!g.breadPending) return;
+    if (breadBusy(g) && Date.now() < (g.breadWaitUntil || 0)) {   // 紙・暴露・麻婆豆腐が終わるのを待つ（念のため最大25秒でやめる）
+      if (!breadPoll) breadPoll = setTimeout(() => { breadPoll = null; runBread(); }, 250);
+      return;
+    }
+    g.breadPending = false;
+    if (ONW.ui && ONW.ui.showBread) ONW.ui.showBread(g.breadShowN || 1);
+  }
+  stage.bread = function (n) {
+    const g = G();
+    g.breadPending = true; g.breadShowN = n || 1; g.breadWaitUntil = Date.now() + 25000;
+    runBread();
+  };
+
+  // ---------------------------------------------------------
+  // 観測の人狼: 待機時間に、自分のカードが「観測の人狼」でめくれたあと、観測結果が飛び出す（本人の画面だけ）
+  // 結果は「情報確認」の文章にも載るので、見逃してもあとから見返せる。待機時間(5秒)の中で収まる長さにしてある
+  // ---------------------------------------------------------
+  let obsTimers = [];
+  const OBS_MS = 3000;   // 飛び出してから閉じ始めるまで(ms)
+  function closeObserve(wrap) {
+    obsTimers.forEach(clearTimeout); obsTimers = [];
+    if (!wrap || !wrap.parentNode) return;
+    wrap.classList.add("obs-out");
+    setTimeout(() => { if (wrap.parentNode) wrap.remove(); }, 450);
+  }
+  stage.observe = function (lines) {
+    const g = G();
+    if (g.isSpectator || hostWatching(g)) return;
+    document.querySelectorAll(".obs-wrap").forEach((w) => w.remove());
+    obsTimers.forEach(clearTimeout); obsTimers = [];
+    const rows = (lines && lines.length ? lines : ["観測できる夜能力はありませんでした。"]).slice(0, 8);
+    const wrap = document.createElement("div");
+    wrap.className = "obs-wrap";
+    wrap.innerHTML = `<div class="obs-pop"><div class="obs-title">🔭 観測通知</div>${rows.map((t, i) => `<div class="obs-line" style="--i:${i}">${esc(t)}</div>`).join("")}</div>`;
+    wrap.addEventListener("pointerup", () => closeObserve(wrap));   // タップですぐ閉じる
+    document.body.appendChild(wrap);
+    obsTimers.push(setTimeout(() => closeObserve(wrap), OBS_MS + Math.min(rows.length, 5) * 150));
+  };
+  stage.observeMs = function () { return OBS_MS; };
+
+  // ---------------------------------------------------------
+  // 口封じされた人の画面: 待機時間に、でかいミュートマーク🤐と「あなたは口封じされました。」が出る（タップで閉じる。昼になったら消える）
+  // ---------------------------------------------------------
+  const MUTE_MS = 4200;
+  let muteTimers = [];
+  function closeMuzzle(wrap) {
+    if (!wrap || !wrap.parentNode) return;
+    wrap.classList.add("mute-out");
+    setTimeout(() => wrap.remove(), 450);
+  }
+  stage.muzzled = function () {
+    const g = G();
+    if (g.isSpectator || hostWatching(g)) return;
+    document.querySelectorAll(".mute-wrap").forEach((w) => w.remove());
+    muteTimers.forEach(clearTimeout); muteTimers = [];
+    const wrap = document.createElement("div");
+    wrap.className = "mute-wrap";
+    wrap.innerHTML = `<div class="mute-dim"></div><div class="mute-body"><div class="mute-icon">🤐</div><div class="mute-text">あなたは口封じされました。</div><div class="mute-sub">昼のチャットとCOボタンは使えません</div></div>`;
+    wrap.addEventListener("pointerup", () => closeMuzzle(wrap));
+    document.body.appendChild(wrap);
+    muteTimers.push(setTimeout(() => closeMuzzle(wrap), MUTE_MS));
+  };
+  stage.muzzledEnd = function () { muteTimers.forEach(clearTimeout); muteTimers = []; document.querySelectorAll(".mute-wrap").forEach((w) => w.remove()); };
+  stage.muzzledMs = function () { return MUTE_MS; };
 
   ONW.stage = stage;
 })(window.ONW);

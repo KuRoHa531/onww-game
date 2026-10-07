@@ -36,10 +36,10 @@ window.ONW = window.ONW || {};
       const segs = [T(h.name + " ")];
       h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : t.k === "cat" ? C.third : "#ffaa00"))); });
       segs.push(T(" " + h.status, h.dead ? C.dead : C.alive));
-      add(...segs);
+      L.push({ segs, fit: true });   // 1人ぶんの役職履歴は、長くても1行に収める（画像の横幅を広げる）
     });
     sep();
-    res.grave.forEach((c) => { const segs = [T(c.label + " ")]; c.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); }); add(...segs); });
+    res.grave.forEach((c) => { const segs = [T(c.label + " ")]; c.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); }); L.push({ segs, fit: true }); });
     add(T("欠け: なし", C.dim));
     sep(); head("夜行動結果");
     if (res.nightLogs.length) res.nightLogs.forEach((t) => add(T(t))); else add(T("夜行動ログはありません。", C.dim));
@@ -65,11 +65,18 @@ window.ONW = window.ONW || {};
   }
 
   png.render = function (res) {
-    const W = 720, PAD = 28, LH = 32, SC = 2;
+    const W0 = 720, PAD = 28, LH = 32, SC = 2, W_MAX = 2400;   // W0: 基本の幅 / 1人ぶんの行が長いときは、画像の横幅を広げて1行に収める(上限 W_MAX)
     const fontFor = (s, big) => `${s.b || big ? "700 " : ""}${big ? 28 : 20}px ${FONT}`;
     const lines = png.buildLines(res);
     const probe = document.createElement("canvas").getContext("2d");
     const rows = [];                                  // 描画する行: { segs, center, big } / { sep }
+    // 1人ぶんの役職履歴・墓地の行（fit）が1行に収まるよう、いちばん長い行に合わせて画像の横幅を決める（文字の大きさは変えない）
+    let W = W0;
+    lines.forEach((ln) => {
+      if (!ln.fit) return;
+      let tw = 0; ln.segs.forEach((sg) => { probe.font = fontFor(sg, ln.big); tw += probe.measureText(sg.t).width; });
+      W = Math.max(W, Math.min(W_MAX, Math.ceil(tw + PAD * 2 + 4)));
+    });
     lines.forEach((ln) => {
       if (ln.sep) return rows.push({ sep: true, h: 18 });
       wrap(probe, ln.segs, W - PAD * 2, (s) => fontFor(s, ln.big)).forEach((segs) => rows.push({ segs, center: ln.center, big: ln.big, h: ln.big ? 44 : LH }));

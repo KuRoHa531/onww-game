@@ -55,6 +55,68 @@
   <script src="js/friends.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/png.js"></script>
+  <!-- 役職ファイル（1役職1ファイル）。役職を足すときは js/roles/<village|wolf/wolf|wolf/mad|neutral>/<役職ID>.js を作って、下の該当する陣営の並びに1行足すだけ(村人陣営=village / 人狼陣営=wolf / 第三陣営=neutral)。
+       _base.js(登録の仕組み)と _wolf.js(人狼系の共有部品)は必ず先頭。役職ファイル同士の順番は関係ない。net.js より前に読み込む -->
+  <script src="js/roles/_base.js"></script>
+  <script src="js/roles/_wolf.js"></script>
+  <!-- 村人陣営 -->
+  <script src="js/roles/village/baker.js"></script>
+  <script src="js/roles/village/cat_sidhe.js"></script>
+  <script src="js/roles/village/chicken.js"></script>
+  <script src="js/roles/village/insomniac.js"></script>
+  <script src="js/roles/village/light_apostle.js"></script>
+  <script src="js/roles/village/mason.js"></script>
+  <script src="js/roles/village/mayor.js"></script>
+  <script src="js/roles/village/merlin.js"></script>
+  <script src="js/roles/village/newspaper.js"></script>
+  <script src="js/roles/village/queen.js"></script>
+  <script src="js/roles/village/relic_robber.js"></script>
+  <script src="js/roles/village/robber.js"></script>
+  <script src="js/roles/village/seer.js"></script>
+  <script src="js/roles/village/star.js"></script>
+  <script src="js/roles/village/straw_doll.js"></script>
+  <script src="js/roles/village/tough_guy.js"></script>
+  <script src="js/roles/village/troublemaker.js"></script>
+  <script src="js/roles/village/villager.js"></script>
+  <script src="js/roles/village/visitor.js"></script>
+  <script src="js/roles/village/wolf_dreamer.js"></script>
+  <script src="js/roles/village/wolf_marked.js"></script>
+  <!-- 人狼陣営 -->
+  <!-- 　人狼系 -->
+  <script src="js/roles/wolf/wolf/assassin.js"></script>
+  <script src="js/roles/wolf/wolf/big_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/dark_avatar.js"></script>
+  <script src="js/roles/wolf/wolf/forgetful_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/lone_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/mapo_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/observer_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/tofu_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/werewolf.js"></script>
+  <script src="js/roles/wolf/wolf/wolf_king.js"></script>
+  <script src="js/roles/wolf/wolf/white_wolf.js"></script>
+  <!-- 　狂人系 -->
+  <script src="js/roles/wolf/mad/black_cat.js"></script>
+  <script src="js/roles/wolf/wolf/cat_pumpkin.js"></script>
+  <script src="js/roles/wolf/mad/cultist.js"></script>
+  <script src="js/roles/wolf/mad/exposed_madman.js"></script>
+  <script src="js/roles/wolf/mad/muzzle_madman.js"></script>
+  <script src="js/roles/wolf/mad/mad_seer.js"></script>
+  <script src="js/roles/wolf/mad/madman.js"></script>
+  <!-- 第三陣営 -->
+  <script src="js/roles/neutral/amanojaku.js"></script>
+  <script src="js/roles/neutral/doppelganger.js"></script>
+  <script src="js/roles/neutral/executioner.js"></script>
+  <script src="js/roles/neutral/freeter.js"></script>
+  <script src="js/roles/neutral/god.js"></script>
+  <script src="js/roles/neutral/gremlin.js"></script>
+  <script src="js/roles/neutral/loser.js"></script>
+  <script src="js/roles/neutral/love_tanner.js"></script>
+  <script src="js/roles/neutral/opportunist.js"></script>
+  <script src="js/roles/neutral/schrodinger_cat.js"></script>
+  <script src="js/roles/neutral/servant.js"></script>
+  <script src="js/roles/neutral/silver_shadow.js"></script>
+  <script src="js/roles/neutral/tanner.js"></script>
+  <script src="js/roles/neutral/winner.js"></script>
   <script src="js/net.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/cpu.js"></script>
