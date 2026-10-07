@@ -108,7 +108,13 @@ window.ONW = window.ONW || {};
     const d = new Date(), p2 = (n) => String(n).padStart(2, "0");
     const name = `onw-result-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}.png`;
     cv.toBlob((blob) => {
-      if (!blob) { window.open(cv.toDataURL("image/png")); return; }
+      if (!blob) {
+        const a = document.createElement("a");
+        a.href = cv.toDataURL("image/png");
+        a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        return;
+      }
       const url = URL.createObjectURL(blob), a = document.createElement("a");
       a.href = url; a.download = name;
       document.body.appendChild(a); a.click(); a.remove();

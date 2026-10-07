@@ -1,5 +1,5 @@
 /**
- * roles/_base.js  ── 役職ファイルの「登録の仕組み」(役職ではありません)
+ * roles/base.js  ── 役職ファイルの「登録の仕組み」(役職ではありません)
  * ------------------------------------------------------------
  * 役職を追加するとき:
  *   1) js/roles/<village|wolf/wolf|wolf/mad|neutral>/<役職ID>.js を1つ作り(村人陣営=village / 人狼陣営の人狼系=wolf/wolf・狂人系=wolf/mad / 第三陣営=neutral)、ONW.defineRole("<役職ID>", { ... }) で登録する

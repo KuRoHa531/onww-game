@@ -1,0 +1,14 @@
+{
+  "name": "onww-game",
+  "version": "1.0.0",
+  "description": "ブラウザで手軽に遊べるオンライン・オフライン対応ワンナイト人狼ゲーム",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build completed')\""
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

@@ -26,7 +26,7 @@ window.ONW = window.ONW || {};
     THIRD: "third",
   };
 
-  // 役職ID一覧。役職ファイル(js/roles/<役職>.js)の defineRole("<ID>") で ONW.ROLE.<ID大文字> が自動で増える(roles/_base.js)。
+  // 役職ID一覧。役職ファイル(js/roles/<役職>.js)の defineRole("<ID>") で ONW.ROLE.<ID大文字> が自動で増える(roles/base.js)。
   // ここに書くのは、役職ファイルを作らない「重複役職」だけ。
   ONW.ROLE = {
     DRUNK: "drunk",   // 重複役職（配役の枚数には数えず、誰か1人に重なる。表示用の役職で、initialRoles/currentRoles には入らない）
@@ -35,10 +35,10 @@ window.ONW = window.ONW || {};
 
   /** 人狼系（人狼判定になる役職）/ 狂人系（人狼陣営だが人狼判定ではない役職） */
   // 役職グループ(人狼系・狂人系・道連れ系・思い込み系・変化先など)の入れ物。中身は各役職ファイル(js/roles/<役職>.js)の groups から
-  // roles/_base.js が同じ入れ物のまま集めて作る(新しい役職はファイルに groups を書くだけ。ここは触らない)。
+  // roles/base.js が同じ入れ物のまま集めて作る(新しい役職はファイルに groups を書くだけ。ここは触らない)。
   ONW.WOLF_KIND = [];       // 人狼系(人狼判定になる役職)。groups.wolf
   ONW.VISIBLE_WOLF = [];    // 夜に仲間から「人狼」として見える人狼系(一匹狼は誰からも見えない: hiddenWolf)
-  // 占い師が占ったときに見える役職 ONW.seerSees は roles/_base.js(役職ファイルの seerSees: "<見える役職>" から)
+  // 占い師が占ったときに見える役職 ONW.seerSees は roles/base.js(役職ファイルの seerSees: "<見える役職>" から)
   /** 本人が見る自分の役職(忘却の人狼・狼憑きは村人、狼夢人は人狼だと思い込んでいる。怪盗・墓荒らし・後覚者で手にしたときも同じ) */
   /** 思い込み系: 本人は別の役職だと思い込んでいる役職。今後増やすときはここに足す(配布の演出で、変化前を本人の自認の陣営の変化役に見せる判定にも使われる) */
   ONW.SELF_AS_VILLAGER = [];   // 本人は村人だと思い込む(groups.selfAsVillager: 忘却の人狼・狼憑き)
@@ -199,7 +199,7 @@ window.ONW = window.ONW || {};
 
 
   // 役職の名前・陣営・夜の順番・説明文は、各役職ファイル(js/roles/<役職>.js)の info に書く。
-  // ONW.ROLE_INFO は入れ物だけをここで作り、roles/_base.js が役職ファイルの読み込みのたびに(同じ入れ物のまま)作り直す。
+  // ONW.ROLE_INFO は入れ物だけをここで作り、roles/base.js が役職ファイルの読み込みのたびに(同じ入れ物のまま)作り直す。
   ONW.ROLE_INFO = {};
   // 役職ファイルを作らない「重複役職」(酔っ払い・恋人)の情報。ROLE_INFO の最後(sort が大きい順)に並ぶ。
   ONW.COMMON_ROLE_INFO = {
@@ -245,7 +245,7 @@ window.ONW = window.ONW || {};
       phase: ONW.PHASE.TITLE,
 
       // --- セットアップ内容 ---
-      roleCounts: ONW.defaultRoleCounts ? ONW.defaultRoleCounts() : {},   // 初期枚数・並びは各役職ファイルの info.deck / info.count(roles/_base.js)
+      roleCounts: ONW.defaultRoleCounts ? ONW.defaultRoleCounts() : {},   // 初期枚数・並びは各役職ファイルの info.deck / info.count(roles/base.js)
       revealTransforms: true,         // 変化公開（昼開始時に「変化前 → 変化後」を公開）
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）

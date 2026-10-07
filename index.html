@@ -4,6 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual">
 <title>ワンナイト人狼 〜混沌に潜みし狼達〜</title>
+<meta name="description" content="ブラウザで手軽に遊べるオンライン・オフライン対応ワンナイト人狼ゲーム">
+<meta property="og:title" content="ワンナイト人狼 〜混沌に潜みし狼達〜">
+<meta property="og:description" content="ブラウザで手軽に遊べるオンライン・オフライン対応ワンナイト人狼ゲーム">
+<script>
+  // Safe alert polyfill for iframe environments
+  (function() {
+    var rawAlert = window.alert;
+    window.alert = function(msg) {
+      try {
+        if (typeof rawAlert === 'function') {
+          rawAlert(msg);
+          return;
+        }
+      } catch (e) {
+        // Ignored if blocked in iframe
+      }
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(20,20,30,0.95);color:#fff;padding:12px 20px;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.6);z-index:999999;font-size:14px;max-width:90vw;text-align:center;border:1px solid rgba(255,255,255,0.2);backdrop-filter:blur(8px);';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(function() {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 4000);
+    };
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -56,9 +82,9 @@
   <script src="js/settings.js"></script>
   <script src="js/png.js"></script>
   <!-- 役職ファイル（1役職1ファイル）。役職を足すときは js/roles/<village|wolf/wolf|wolf/mad|neutral>/<役職ID>.js を作って、下の該当する陣営の並びに1行足すだけ(村人陣営=village / 人狼陣営=wolf / 第三陣営=neutral)。
-       _base.js(登録の仕組み)と _wolf.js(人狼系の共有部品)は必ず先頭。役職ファイル同士の順番は関係ない。net.js より前に読み込む -->
-  <script src="js/roles/_base.js"></script>
-  <script src="js/roles/_wolf.js"></script>
+       base.js(登録の仕組み)と wolf_base.js(人狼系の共有部品)は必ず先頭。役職ファイル同士の順番は関係ない。net.js より前に読み込む -->
+  <script src="js/roles/base.js"></script>
+  <script src="js/roles/wolf_base.js"></script>
   <!-- 村人陣営 -->
   <script src="js/roles/village/baker.js"></script>
   <script src="js/roles/village/cat_sidhe.js"></script>
