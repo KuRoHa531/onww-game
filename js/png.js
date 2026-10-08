@@ -23,7 +23,6 @@ window.ONW = window.ONW || {};
     sep();
     const wt = res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
     L.push({ segs: [{ t: res.title, c: wt, b: true }], big: true });
-    add(T(res.detail, C.dim));
     add(T("勝利陣営: ", C.info), T(res.teams.join("＆") || "なし"));
     add(T("勝者: ", C.good), T(res.winners.join("、") || "なし"));
     add(T("敗者: ", C.dead), T(res.losers.join("、") || "なし"));

@@ -79,8 +79,12 @@ window.ONW = window.ONW || {};
     // 設定の＋／−などで再描画しても、画面のスクロール位置がずれないようにする（同じ画面の再描画のときだけ）
     const keepY = ui._lastPhase === game.phase ? (window.scrollY || 0) : 0;
     const mp = document.querySelector(".settings-panel--modal"), keepM = mp ? mp.scrollTop : 0;   // 設定ウィンドウの中のスクロール位置も保つ
-    $app().innerHTML = html;
-    if (keepY) window.scrollTo(0, keepY);
+    // 結果発表: 中身が前回と全く同じなら作り直さない（通信などで再描画が走っても、画面・カードがちらつかない）
+    const sameResult = game.phase === P.ONLINE_RESULT && !specDeal && ui._lastPhase === game.phase && ui._lastHtml === html && !!$app().firstElementChild;
+    document.body.classList.toggle("res-compact", game.phase === P.ONLINE_RESULT);   // 結果発表のあいだもヘッダーを小さいまま（ヘッダーの高さが変わってカードがジャンプしない）
+    if (!sameResult) $app().innerHTML = html;
+    ui._lastHtml = html;
+    if (keepY && !sameResult) window.scrollTo(0, keepY);
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
     if (game.phase === ONW.PHASE.ONLINE_ROLE || ui.isSpecDeal(game)) ui.setupDeal();
@@ -130,7 +134,7 @@ window.ONW = window.ONW || {};
     const ri = ONW.net && ONW.net.rejoinInfo;
     const rejoinBox = ri ? `<div class="rejoin-box"><p class="lede">参加中のルームがあります（コード ${esc(ri.code)}）</p><button class="btn btn--primary btn--wide" onclick="ONW.main.rejoin()">ルームに戻る</button></div>` : "";
     const hr = ONW.net && ONW.net.hostResume;
-    const hostBox = hr && !ri ? `<div class="rejoin-box"><p class="lede">前回のルームを再開できます（コード ${esc(hr.code)}）。CPU・固定役・進行を引き継ぎます。</p><button class="btn btn--primary btn--wide" onclick="ONW.main.resumeHost()">前回のルームを再開</button></div>` : "";
+    const hostBox = hr && !ri && ONW.account && ONW.account.user ? `<div class="rejoin-box"><p class="lede">前回のルームを再開できます（コード ${esc(hr.code)}）。CPU・固定役・進行を引き継ぎます。</p><button class="btn btn--primary btn--wide" onclick="ONW.main.resumeHost()">前回のルームを再開</button></div>` : "";
     return `
       ${ONW.accountUi ? ONW.accountUi.bar() : ""}
       <section class="panel title-menu">
@@ -188,8 +192,8 @@ window.ONW = window.ONW || {};
         <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
       </button>`;
     const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy"];
-    const wolfLike = ["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "cat_pumpkin"], madLike = ["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"], dark = ["dark_avatar"];
-    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin"];
+    const wolfLike = ["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf"], madLike = ["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"], dark = ["dark_avatar"];
+    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler"];
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -590,7 +594,7 @@ window.ONW = window.ONW || {};
         <div class="dl-icon">${ONW.account.avatarHtml(name, null, "av--fill")}</div>
         <div class="dl-slot">
           ${me
-            ? `<div class="dl-card dl-fly dl-big" data-fly style="${D(pStart + pStep * idx)}">
+            ? `<div class="dl-card dl-fly dl-big dl-hasflip" data-fly style="${D(pStart + pStep * idx)}">
                  <div class="dl-flipper" style="${D(flip1)}">
                    <div class="dl-face dl-face--a dl-team-${(from || info).team}${(from ? game.myFrom : game.myRole) === "drunk" ? " dl-face--drunk" : ""}" style="${from ? D(flip2 - 0.2) : lover ? D(flipL - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b></div>
                    ${from ? `<div class="dl-face dl-face--b dl-team-${info.team}${game.myRole === "drunk" ? " dl-face--drunk" : ""}" style="${lover ? `animation:dl-in .25s ease-out both,dl-out .25s ease-in forwards;animation-delay:${(flip2 - elapsed).toFixed(2)}s,${(flipL - 0.2 - elapsed).toFixed(2)}s;` : D(flip2)}">${ui.roleIcon(game.myRole, "role-icon--face")}<b>${esc(info.name)}</b></div>` : ""}
@@ -638,7 +642,7 @@ window.ONW = window.ONW || {};
       if (!o || !o.ini) return `<div class="dl-card dl-fly" data-fly style="${D(fly)}"></div>`;
       const a = o.from || o.ini, ia = ONW.roles.getInfo(a), ib = ONW.roles.getInfo(o.ini);
       const flipL = o.from ? flip2 + 1.6 : flip2;   // 恋人にめくれる時刻（役職のカードのあと）
-      return `<div class="dl-card dl-fly" data-fly style="${D(fly)}"><div class="dl-flipper" style="${D(flip1)}">
+      return `<div class="dl-card dl-fly dl-hasflip" data-fly style="${D(fly)}"><div class="dl-flipper" style="${D(flip1)}">
         <div class="dl-face dl-face--a dl-team-${ia.team}${a === "drunk" ? " dl-face--drunk" : ""}" style="${o.from ? D(flip2 - 0.2) : o.lover ? D(flipL - 0.2) : ""}"><b>${esc(ia.name)}</b></div>
         ${o.from ? `<div class="dl-face dl-face--b dl-team-${ib.team}${o.ini === "drunk" ? " dl-face--drunk" : ""}" style="${o.lover ? `animation:dl-in .25s ease-out both,dl-out .25s ease-in forwards;animation-delay:${(flip2 - elapsed).toFixed(2)}s,${(flipL - 0.2 - elapsed).toFixed(2)}s;` : D(flip2)}"><b>${esc(ib.name)}</b></div>` : ""}
         ${o.lover ? `<div class="dl-face dl-face--b dl-face--love dl-team-third" style="${D(flipL)}"><b>❤恋人</b></div>` : ""}
@@ -687,7 +691,8 @@ window.ONW = window.ONW || {};
 
   ui.renderOnlineNight = function renderOnlineNight(game) {
     const info = ONW.roles.getInfo(game.myRole);
-    const logs = [...(game.nightLogs || []), ...(game.nightAck || [])].map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
+    const held = ui.logsHeld(game);   // 夜の始まりのカードがめくれ終わるまで、文章は出さない
+    const logs = (held ? [] : [...(game.nightLogs || []), ...(game.nightAck || [])]).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
     let action = "";
     const ar = game.actRole, canAct = !game.nightDone && ar;
     const nm = (id) => ((game.others || []).find((p) => p.id === id) || {}).name || "?";
@@ -705,6 +710,8 @@ window.ONW = window.ONW || {};
       action = nu.action(X);
     } else if (idleText != null) {
       action = idleText;
+    } else if (held) {
+      action = "";
     } else if (!logs) {
       action = `<p class="night-step__hint">あなたに夜の行動はありません。朝を待ちましょう。</p>`;
     } else {
@@ -907,15 +914,28 @@ window.ONW = window.ONW || {};
     return chain;
   };
 
+  /** 結果の文章の出し待ち: カードがめくれ終わるまで「あなたは〇〇になりました」などの文章を出さない。
+   *  g.logHold = 文章を出してよい時刻(ms)。ui.holdLogs で延ばし、時刻が来たら自動で再描画する（観戦者は演出を見ないので待たない）。 */
+  ui.logsHeld = function (g) { return !!g && !g.isSpectator && Date.now() < (g.logHold || 0); };
+  ui.holdLogs = function (g, ms) {
+    if (!g || g.isSpectator) return;
+    const until = Math.max(Date.now() + ms, g.logHold || 0);   // すでにもっと長い待ちがあればそちらを優先
+    g.logHold = until;
+    clearTimeout(ui._holdT);
+    ui._holdT = setTimeout(() => { const cur = ONW.game; if (cur && Date.now() >= (cur.logHold || 0) - 30) { cur.logHold = 0; ui.render(cur); } }, until - Date.now() + 40);
+  };
+  ui.releaseLogs = function (g) { if (!g) return; g.logHold = 0; clearTimeout(ui._holdT); };
+
   ui.renderOnlineMorning = function renderOnlineMorning(game) {
-    const logs = (game.nightLogs || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
+    const held = ui.logsHeld(game);   // カードがめくれ終わるまで、結果の文章は出さない
+    const logs = (held ? [] : game.nightLogs || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
     // 墓荒らしが交換した後の役職の能力（朝に選んで、その場で結果が分かる）
     const ar = game.morningChain, chain = ui.chainBlock(game, false);
     return `
       <section class="panel night-step">
         <h2>朝になりました</h2>
         <p class="lede">夜の結果</p>
-        ${logs || `<p class="night-step__hint">あなたに夜の情報はありません。</p>`}
+        ${held ? `<p class="night-step__hint">…</p>` : logs || `<p class="night-step__hint">あなたに夜の情報はありません。</p>`}
         ${chain}
         <p class="night-step__hint">${ar && !game.morningChainDone && !game.settleShown ? "能力を使い終えると、昼の議論が始まります。" : "まもなく昼の議論が始まります。"}</p>
       </section>`;
@@ -925,7 +945,7 @@ window.ONW = window.ONW || {};
   /** 「情報確認」: 夜や朝・昼に得た情報を、画面の上に重ねて表示する（下の画面は動かさない） */
   ui.openInfo = function () {
     if (document.getElementById("info-overlay")) return;
-    const g = ONW.game, logs = g.nightLogs || [];
+    const g = ONW.game, logs = ui.logsHeld(g) ? [] : g.nightLogs || [];   // 演出中は文章を出さない
     const role = g.myRole ? ONW.roles.getInfo(g.myRole) : null;
     // 全員に公開された情報: スターがいるときだけ誰か、パンが焼けたときだけ「パンが焼けました」を出す（いないとき・焼けていないときは何も出さない）
     const pubLines = [];
@@ -952,13 +972,17 @@ window.ONW = window.ONW || {};
         ${news ? `<hr class="info-sep">${news}` : ""}
       </div></div>`;
     document.body.appendChild(wrap);
-    if (!document.getElementById("chat-overlay")) ui.lockPage(true);   // 開いている間、ページ本体は動かさない
+    document.body.classList.add("info-open");   // スマホ: 情報確認は上側に出し、下側の CO ボタンはそのまま押せる
+    ui._infoLocked = ui.isPc() && !document.getElementById("chat-overlay");   // スマホは画面を固定しない（下の CO ボタン・CO パネルを操作できるように）
+    if (ui._infoLocked) ui.lockPage(true);   // 開いている間、ページ本体は動かさない
   };
   ui.closeInfo = function () {
     const w = document.getElementById("info-overlay");
     if (!w) return;
     w.remove();
-    if (!document.getElementById("chat-overlay")) ui.lockPage(false);
+    document.body.classList.remove("info-open");
+    if (ui._infoLocked && !document.getElementById("chat-overlay")) ui.lockPage(false);
+    ui._infoLocked = false;
   };
 
   ui.toggleNightInfo = function (btn) {
@@ -978,7 +1002,7 @@ window.ONW = window.ONW || {};
         <p class="lede">${game.isDead ? "あなたは死亡しました。発言は霊界チャットになり、死亡者と観戦者にだけ届きます。" : "誰が人狼か話し合いましょう。"}</p>
         ${sober}
         ${game.abilityMsg ? `<p class="night-step__hint"><strong>${esc(game.abilityMsg)}</strong></p>` : ""}
-        ${(game.dayLines || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("")}
+        ${(ui.logsHeld(game) ? [] : game.dayLines || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("")}
         ${ui.chatTabs(game)}
         <div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>
         ${game.isDead ? ui.ghostInput(game) : `<div class="chat-input">
@@ -1062,7 +1086,6 @@ window.ONW = window.ONW || {};
         ${res.counts.length ? res.counts.map((c) => L(`${esc(c.name)} <span class="rs-dim">:</span> <span class="rs-vote">${c.c}票</span>`)).join("") : none("得票はありません。")}
         ${sep}
         <div class="rs-win t-${winTeam}">${esc(res.title)}</div>
-        ${L(`<span class="rs-dim">${esc(res.detail)}</span>`)}
         ${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}
         ${L(`<span class="rs-good">勝者:</span> ${res.winners.map(esc).join("、") || "なし"}`)}
         ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map(esc).join("、") || "なし"}`)}
@@ -1070,8 +1093,6 @@ window.ONW = window.ONW || {};
         ${(res.gremlins || []).map((x) => L(`<span class="rs-info">グレムリン:</span> ${esc(x.gremlin)} は ${esc(x.from)} → ${esc(x.to)} を選んでいました。`)).join("")}
         ${(res.execs || []).map((x) => L(`<span class="rs-info">処刑人:</span> ${esc(x.exec)} のターゲットは ${esc(x.target)} でした。${x.win ? "ターゲットが追放（処刑）されたので処刑人の勝利です。" : x.dead ? "ターゲットが追放以外で死亡したので処刑人は敗北です。" : "ターゲットは追放されませんでした。"}`)).join("")}
         ${(res.servantSubs || []).map((x) => L(`<span class="rs-info">従者:</span> ${esc(x.servant)} が ${esc(x.master)} の身代わりになりました。`)).join("")}
-        ${(res.toughs || []).map((x) => L(`<span class="rs-info">タフガイ:</span> ${esc(x.name)} がはじき返しました${x.toNames.length ? `（とばっちり: ${x.toNames.map(esc).join("、")}）` : "（とばっちりを受ける人はいませんでした）"}。`)).join("")}
-        ${(res.toughBlocks || []).map((x) => L(`<span class="rs-info">タフガイ:</span> ${esc(x.name)} は ${esc(x.byName)} の${x.kind === "love" ? "無理心中" : "道連れ"}を受けませんでした。`)).join("")}
         ${(res.chainSubs || []).map((x) => L(`<span class="rs-info">従者:</span> ${esc(x.servant)} が ${esc(x.master)} の道連れの身代わりになりました。`)).join("")}
         ${res.history.map((h) => L(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
         ${sep}

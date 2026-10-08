@@ -200,7 +200,7 @@ window.ONW = window.ONW || {};
       ONW.servantPairs(game).forEach(([s, m]) => {
         if (s === m) return;                                        // 自分がご主人: 何も起きない
         if (!game.eliminated.includes(m) || game.eliminated.includes(s)) return;
-        if (ONW.loverMate(game, s)) return;                         // 従者自身が恋人（恋人陣営）なら身代わりにならない
+        if (ONW.isLover(game, s)) return;                         // 従者自身が恋人（恋人陣営）なら身代わりにならない
         if (gone.has(s)) return;                                    // すでに死んでいる従者は身代わりになれない
         if (blocked.includes(game.currentRoles[m])) return;         // 従者の連鎖・てるてる系は身代わりにしない
         game.eliminated = game.eliminated.filter((x) => x !== m);
@@ -239,6 +239,7 @@ window.ONW = window.ONW || {};
    */
   vote.resolveChain = function resolveChain(game, auto) {
     const R = ONW.ROLE, pick = ONW.utils.randomChoice;
+    if (ONW.pureLover) ONW.pureLover.sync(game);   // 純愛者: 恋人の組を、投票時点の最終盤面から確定し直す（昼のうちの役職の移動・酔い覚めを反映）
     const done = new Set(game.eliminated), gone = new Set(game.deadIds || []);
     let queue = [...game.eliminated];
     game.chainIds = []; game.chainBy = {}; game.chainKind = {}; game.chainSub = {}; game.strawPending = null; game.toughBlocks = [];
@@ -262,6 +263,7 @@ window.ONW = window.ONW || {};
     // 道連れ(tomo)だけを受け付けない役職（タフガイ。心中・無理心中ははじき返さない）。酔いが覚めていない酔っ払いは効果なし。受けた攻撃は game.toughBlocks に記録（めくれる演出用）
     const immune = (t) => { const d = ONW.roleDef(game.currentRoles[t]); return !!(d && d.chainImmune) && !ONW.hiddenDrunk(game, t); };
     let tomoBuf = [], tomoSimul = new Set();   // 同じ時点でめくれた人たちの道連れは、まとめて決める（flushTomo）。tomoSimul: 同時に道連れにされる人
+    const cupidFollowers = (t) => (ONW.cupid ? ONW.cupid.pairs(game) : []).filter(([a, b, h]) => (a === t || b === t) && h !== t).map(([, , h]) => h).filter((h, i, arr) => arr.indexOf(h) === i);   // t が選ばれた2人の一方であるキューピッドの持ち主
     const kill = (t, by, kind, chain = true) => {
       if (done.has(t) || gone.has(t) || !game.players.some((p) => p.id === t)) return false;
       if (kind === "tomo" && immune(t)) { if (!game.toughBlocks.some((b) => b.id === t && b.by === by)) game.toughBlocks.push({ id: t, by, kind }); return false; }   // 空振り
@@ -269,17 +271,19 @@ window.ONW = window.ONW || {};
       //   従者がまだ死んでいない / 従者が恋人でない / ご主人の最終役職が 従者・てるてる坊主・一目惚れしてるてる でない。従者が複数いれば先に見つかった1人
       if (kind === "tomo") {
         const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER];
-        const sub = blocked.includes(game.currentRoles[t]) ? null : ONW.servantPairs(game).find(([s, m]) => m === t && s !== t && !done.has(s) && !gone.has(s) && !tomoSimul.has(s) && !ONW.loverMate(game, s));   // 従者が同時に（同じ波で）道連れにされるときも、先に死んでいるときも、身代わりにならない
+        const sub = blocked.includes(game.currentRoles[t]) ? null : ONW.servantPairs(game).find(([s, m]) => m === t && s !== t && !done.has(s) && !gone.has(s) && !tomoSimul.has(s) && !ONW.isLover(game, s));   // 従者が同時に（同じ波で）道連れにされるときも、先に死んでいるときも、身代わりにならない
         if (sub) { game.chainSub[sub[0]] = t; return kill(sub[0], by, "tomo", chain); }
       }
       done.add(t); if (chain) queue.push(t); game.chainIds.push(t); game.chainBy[t] = by; game.chainKind[t] = kind; if (late) game.chainLate[t] = true;
-      const mate = (game.loverOf || {})[t];   // 恋人: 相方も同時に心中（相方の死でさらに相方の相方…と続くことはない。組は2人だけ）
-      if (mate && mate !== t) kill(mate, t, "lovers", chain);
+      ONW.loverMates(game, t).forEach((mate) => { if (mate !== t) kill(mate, t, "lovers", chain); });   // 恋人: 相方も同時に心中（純愛者などで恋人が複数いれば全員。相方の相方も続けて心中する）
       // 従者の後追い: ご主人が 王国滅亡(queen) / 心中(lovers) / 無理心中(love) で死んだら、身代わりはできないので、従者も同時に「後追い」で死ぬ（kind: "follow"）。
       //   ご主人が従者の従者…と続く場合も後追いが連鎖する（follow も対象）。後追いで死んだ人は、ほかの人を巻き込まない（chain=false）
       if (["queen", "lovers", "love", "follow"].includes(kind)) {
         ONW.servantPairs(game).filter(([s, m]) => m === t && s !== t).forEach(([s]) => kill(s, t, "follow", false));
       }
+      // キューピッドの後追い（マイクラ版 cupidFollowIdsForDeadSet）: 選んだ2人のどちらかが（死因を問わず）死んだら、キューピッドも「作った恋人の後を追い」死亡する（kind: "follow"。従者の後追いと同じ扱い）。
+      //   後追いで死んだ人は、ほかの人を巻き込まない（chain=false）。酔いが覚めていないキューピッドの組は成立していないので対象外（ONW.cupid.pairs）
+      cupidFollowers(t).forEach((h) => kill(h, t, "follow", false));
       return true;
     };
     const take = (t, by, kind) => { if (kind === "tomo") tomoBuf.push({ t, by }); else kill(t, by, kind, true); };
@@ -311,8 +315,8 @@ window.ONW = window.ONW || {};
     const loveDead = (id, role) => (game.chainKind[id] === "love" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN)) || (game.chainKind[id] === "lovers" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.LOVE_TANNER));   // 無理心中で死んだ人は道連れ能力（わら人形・猫又・黒猫）・アサシンの暗殺が発動しない / 心中で死んだ人は、さらに一目惚れの連鎖も発動しない
     // 始めの心中: 追放・メンタル崩壊・ショック死・昼中の死亡など、resolveChain の前にすでに死んでいる人の相方も、ここで一緒に死ぬ
     [...game.eliminated, ...gone].forEach((id) => {
-      const mate = (game.loverOf || {})[id];
-      if (mate) kill(mate, id, "lovers");
+      cupidFollowers(id).forEach((h) => kill(h, id, "follow", false));   // キューピッド: 選んだ2人の一方がすでに死んでいる（追放・昼中の死亡）なら、後を追う
+      ONW.loverMates(game, id).forEach((mate) => kill(mate, id, "lovers"));
     });
     // 「めくれた順」の波で処理する。同じ波（同時にめくれた人たち）のわら人形・アサシンは、同じ時点の候補から同時に選ぶ
     while (queue.length) {
@@ -433,7 +437,7 @@ window.ONW = window.ONW || {};
     };
     cats.forEach((id) => {
       const r = resolve(id, []), vs = votersOf(id);
-      info[id] = { ...r, team: ONW.loverMate(game, id) ? "lover" : r.team, votes: vs.length, voters: vs };
+      info[id] = { ...r, team: ONW.isLover(game, id) ? "lover" : r.team, votes: vs.length, voters: vs };
     });
     game.catInfo = info;
     return info;
@@ -467,7 +471,7 @@ window.ONW = window.ONW || {};
     return new Set([...(game.executed || []), ...(game.deadIds || [])]);
   };
 
-  vote.determineWinnersCore = function determineWinnersCore(game) {
+  vote.determineWinnersCoreBase = function determineWinnersCoreBase(game) {
     ONW.vote.updatePromotion(game);
     const R = ONW.ROLE, ids = game.players.map((p) => p.id);
     const role = (id) => game.currentRoles[id];
@@ -482,14 +486,14 @@ window.ONW = window.ONW || {};
     // 無理心中で巻き込まれたてるてる系は、自分のてるてる勝利は発動しない（相手の一目惚れしてるてると「一緒に勝った」扱いになるだけ）
     const byLove = (id) => ["love", "lovers"].includes((game.chainKind || {})[id]);   // 無理心中・心中で死んだてるてる系も同じ扱い
     // 恋人(重複役職)は、恋人のてるてる系が追放されても、てるてるとしては勝利しない（恋人でないてるてる系が優先 / 恋人のてるてる系だけなら神が勝利）
-    const isLover = (id) => !!ONW.loverMate(game, id);
+    const isLover = (id) => ONW.isLover(game, id);
     // タフガイのとばっちりで追放された人は、てるてる・一目惚れしてるてる・処刑人のターゲットとしての「追放」には数えない（追放されても、その勝利条件は満たさない）
     const bounced = new Set((game.toughBounces || []).flatMap((b) => b.to || []));
     const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id));
     const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id));
     const opportunists = ids.filter((id) => role(id) === R.OPPORTUNIST && !dead.has(id));
     // 恋人: 二人とも死んでいない組が勝利（死因は問わない: dead = 追放・連鎖死(道連れ/心中等)・昼中の死亡。今後死因が増えたら、dead に足すだけでここは変わらない）。勝てなかった恋人は、元の陣営が勝っても敗北（マイクラ版の恋人陣営）
-    const loverSurvive = ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b));
+    const loverSurvive = ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).map(([a, b]) => [a, b]);   // キューピッドの組は3つ目に持ち主が付く（番号付け用）。勝者に入れるのは恋人の2人だけ（キューピッド本人は下の追加勝利で判定）
     const loverWinSet = new Set(loverSurvive.flat());
     const lostLover = (id) => isLover(id) && !loverWinSet.has(id);
     // 勝ち組・負け組: 最終盤面でこの役職の人。恋人かどうか・神の祝福・どの陣営が勝っても、勝ち組は必ず勝ち、負け組は必ず負ける（途中で入れ替わって別の役職になっていれば、通常どおり）
@@ -513,16 +517,25 @@ window.ONW = window.ONW || {};
     if (!godBless.length && godAlive.length) { game.godMode = "descend"; game.godIds = godAlive.slice(); }   // 生存している神は、結果発表でめくれるときに降臨の演出（どの勝敗でも）
 
     const set = (title, teams, winners, detail, winnerTeams) => {
+      // シャッフラーの乗っ取り勝利（determineWinnersCore が、1回目の結果を見て成立したときだけ game.shufflerTake を付けてもう一度ここへ来る）: 勝者はシャッフラーと変化させた人だけ。追加勝利の役職などは下で通常どおり足す
+      if (game.shufflerTake) { title = "シャッフラー勝利"; teams = ["シャッフラー"]; winners = game.shufflerTake.ids.slice(); detail = ONW.shuffler.takeoverText(game, game.shufflerTake, game.shufflerBase); winnerTeams = [ONW.TEAM.THIRD]; }
       game.winTitle = title; game.winTeams = teams; game.winDetail = detail; game.winners = winnerTeams;
       const w = new Set(winners);
       [...(game.kingdomIds || []), ...(game.queenFallen || [])].forEach((id) => w.delete(id));   // 王国滅亡: 倒れた女王と、巻き込まれた村人陣営は勝利できない
       ids.forEach((id) => { if (lostLover(id) && role(id) !== R.WINNER) w.delete(id); });     // 勝てなかった恋人は、元の陣営が勝っても敗北（ただし勝ち組は恋人でも勝つ）
+      // シャッフラー（マイクラ版の失敗条件）: 追放・死亡しないと勝てない役職以外に変化させたのに対象が死亡 / 村人・人狼陣営の役職に変化させたのにシャッフラーが死亡 → シャッフラーと対象は勝てない（元の陣営が勝っていても敗北）
+      const shBan = ONW.shuffler && ONW.shuffler.failed ? ONW.shuffler.failed(game, w, dead) : new Set();
+      shBan.forEach((id) => w.delete(id));
       winnerRoleIds.forEach((id) => w.add(id));                                                // 勝ち組: 追加勝利
       if (winnerRoleIds.length && !teams.includes("勝ち組")) teams.push("勝ち組");
       loserRoleIds.forEach((id) => w.delete(id));                                              // 負け組: 敗北（ご主人・就職先が負け組なら、従者・フリーターも勝てない）
       execLoseIds.forEach((id) => w.delete(id));                                               // 処刑人: ターゲットが追放以外で死んだら敗北
       opportunists.forEach((id) => { if (!lostLover(id)) w.add(id); });   // オポチュニスト: 追放されていなければ追加勝利
       if (opportunists.length && !teams.includes("オポチュニスト")) teams.push("オポチュニスト");
+      // 破局師（マイクラ版の追加勝利）: 破局に成功した（恋人関係を1つでも壊した）カードを最終盤面で持っている人は、どの結果でも追加で勝利（死亡・追放は関係なし）。勝てなかった恋人（本人が恋人）は追加勝利しない
+      const breakers = ids.filter((id) => role(id) === R.HEARTBREAKER && ONW.heartbreaker && ONW.heartbreaker.succeeded(game, id) && !lostLover(id));
+      breakers.forEach((id) => w.add(id));
+      if (breakers.length && !teams.includes("破局師")) teams.push("破局師");
       // 天邪鬼: 村人陣営が勝たなかった（神の祝福でもない）ときだけ、どの結果でも追加で勝利（死亡・追放は関係なし）
       if (!teams.includes("神の祝福") && !teams.includes("村人陣営")) {
         const am = ids.filter((id) => role(id) === R.AMANOJAKU && !lostLover(id));
@@ -545,10 +558,13 @@ window.ONW = window.ONW || {};
         if (c.team === "third") return !!c.final && w.has(c.final);
         return false;
       };
-      if (freeters.length || servants.length || gremlins.length || cats.length) {
-        let changed = true, added = false, addedServant = false, addedGremlin = false, addedCat = false;
+      // キューピッド（マイクラ版の追加勝利）: 選んだ2人がどちらも死んでおらず（吊られておらず）、2人とも勝利していれば、キューピッド本人が吊られていても・後追いで死んでいても追加で勝利する。勝てなかった恋人（本人が恋人）は追加勝利しない
+      const cupids = ONW.cupid ? ONW.cupid.pairs(game).filter(([a, b, h]) => a !== h && b !== h) : [];
+      if (freeters.length || servants.length || gremlins.length || cats.length || cupids.length) {
+        let changed = true, added = false, addedServant = false, addedGremlin = false, addedCat = false, addedCupid = false;
         while (changed) {
           changed = false;
+          cupids.forEach(([a, b, h]) => { if (!w.has(h) && w.has(a) && w.has(b) && !dead.has(a) && !dead.has(b) && !lostLover(h)) { w.add(h); changed = true; addedCupid = true; } });
           cats.forEach((id) => { if (!w.has(id) && catWins(id)) { w.add(id); changed = true; addedCat = true; } });
           freeters.forEach((id) => {
             const t = ONW.getRoleBound(game, "freeterTargets", id);
@@ -565,6 +581,7 @@ window.ONW = window.ONW || {};
         if (addedServant && !teams.includes("従者")) teams.push("従者");
         if (addedGremlin && !teams.includes("グレムリン")) teams.push("グレムリン");
         if (addedCat && !teams.includes("シュレディンガーの猫")) teams.push("シュレディンガーの猫");
+        if (addedCupid && !teams.includes("キューピッド")) teams.push("キューピッド");
       }
       loserRoleIds.forEach((id) => w.delete(id));
       execLoseIds.forEach((id) => w.delete(id));
@@ -574,6 +591,10 @@ window.ONW = window.ONW || {};
         game.winTitle = `${extra.length ? extra.join("＆") : "追加勝利"}勝利`;
         game.winDetail = `${String(detail).replace("ため勝者なしです。", "ため、村人陣営にも人狼陣営にも勝者はいません。")} 追加勝利: ${[...w].map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、")}`;
       }
+      // シャッフラー: 失敗した人は追加勝利（天邪鬼・フリーターなど）でも勝てない / 勝ち組に変化させた組は、失敗していなければシャッフラーも追加で勝利
+      shBan.forEach((id) => w.delete(id));
+      if (ONW.shuffler && ONW.shuffler.addWinnerPairs && ONW.shuffler.addWinnerPairs(game, w).length && !teams.includes("シャッフラー")) teams.push("シャッフラー");
+      if (shBan.size && ONW.shuffler) game.winDetail = `${game.winDetail}\n${ONW.shuffler.failText(game, [...shBan])}`;
       game.winnerIds = [...w];
       return game.winners;
     };
@@ -644,6 +665,18 @@ window.ONW = window.ONW || {};
     return set(side === ONW.TEAM.VILLAGE ? "村人陣営勝利" : "人狼陣営勝利", [side === ONW.TEAM.VILLAGE ? "村人陣営" : "人狼陣営"], win, detail, [side]);
   };
 
+  /** 勝敗の判定（シャッフラーの乗っ取り勝利つき）: まず通常どおり判定し、シャッフラーの組が成立していたら（失敗条件を除いた対象が勝者に入っているとき）、勝者をシャッフラーと対象だけにして判定し直す。
+   *  神の祝福・チキンの逆転（chickenForce）・恋人が絡む組では乗っ取らない（ONW.shuffler.takeover）。 */
+  vote.determineWinnersCore = function determineWinnersCore(game) {
+    game.shufflerTake = null; game.shufflerBan = [];
+    ONW.vote.determineWinnersCoreBase(game);
+    if (ONW.shuffler && ONW.shuffler.takeover && !game.chickenForce && !(game.winTeams || []).includes("神の祝福")) {
+      const tk = ONW.shuffler.takeover(game);
+      if (tk) { game.shufflerBase = game.winTitle; game.shufflerTake = tk; ONW.vote.determineWinnersCoreBase(game); game.shufflerTake = null; }
+    }
+    return game.winners;
+  };
+
   /**
    * 勝敗を判定する（チキンの逆転つき）。
    * まず通常どおり判定し、村人陣営が勝っていない（他陣営・第三陣営・恋人・神などが勝った）のに、
@@ -656,7 +689,7 @@ window.ONW = window.ONW || {};
     if ((game.winTeams || []).includes("村人陣営")) return game.winners;
     const dead = ONW.vote.deadSet(game);   // 死亡判定は deadSet に一本化（チキンも、どの死因で死んでも生存扱いにならない）
     const chickens = game.players.map((p) => p.id).filter((id) =>
-      game.currentRoles[id] === ONW.ROLE.CHICKEN && !dead.has(id) && !ONW.loverMate(game, id) && !ONW.hiddenDrunk(game, id));
+      game.currentRoles[id] === ONW.ROLE.CHICKEN && !dead.has(id) && !ONW.isLover(game, id) && !ONW.hiddenDrunk(game, id));
     if (!chickens.length) return game.winners;
     const from = { title: game.winTitle, teams: [...(game.winTeams || [])] };
     game.chickenForce = true;

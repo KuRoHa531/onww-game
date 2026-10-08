@@ -8,7 +8,7 @@ window.ONW = window.ONW || {};
   const G = () => ONW.game;
   const rn = (r) => ONW.roles.getInfo(r).name;
   const esc = (s) => ONW.utils.esc(s);
-  const nameOf = (id) => ((G().others || []).find((p) => p.id === id) || {}).name || "?";
+  const nameOf = (id) => (id && id === ONW.net.myId() ? "自分" : ((G().others || []).find((p) => p.id === id) || {}).name || "?");   // 自分を選べる結果開示（シャッフラー）では「自分」
   const graveNeed = () => ONW.seerGraveMax(G());
 
   // 役職COのあとに結果開示が必要な役職 → 結果開示の種類。各役職ファイルの coResult.kind(狂った占い師は like で占い師と同じ形)
@@ -54,7 +54,7 @@ window.ONW = window.ONW || {};
   /** 結果開示の最初の画面（種類ごと）。seer/robber: 相手を選ぶ / relic: 墓地を選ぶ / tm: 2人選ぶ / insom: 最終役職を選ぶ */
   function startResult(kind, chain) {
     if (kind === "relic") return set({ step: "rgrave", kind, chain });
-    if (kind === "tm" || kind === "gremlin") return set({ step: "tm", kind, chain, sel: [] });
+    if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid") return set({ step: "tm", kind, chain, sel: [] });
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
     if (kind === "love") return set({ step: "love", kind, chain });
@@ -68,7 +68,7 @@ window.ONW = window.ONW || {};
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
-    done(...(hookOfKind(s.kind === "gremlin" ? "gremlin" : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先
+    done(...(hookOfKind(s.kind === "gremlin" || s.kind === "evil_woman" || s.kind === "cupid" ? s.kind : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先 / 悪女: 1人目が本命、2人目がキープ / キューピッド: 恋人にした2人
   };
   co.pickMason = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
@@ -122,6 +122,20 @@ window.ONW = window.ONW || {};
   // 従者がいる（本家: 「自分の従者がいます。」）
   co.servantInfo = () => done(...hookOfKind("servant").infoHas());
 
+  // 役職が変わっていることを伝える（本家 openChangedRoleInfoCoMenu のうち、Web版にある役職の分。文言は本家のまま）
+  const CHANGED_LINES = [
+    ["robber", "怪盗に交換されていそうです。", "怪盗に交換された"],
+    ["troublemaker", "いたずらっ子に交換されていそうです。", "いたずらっ子に交換された"],
+    ["shuffler", "シャッフラーに変えられていそうです。", "シャッフラーに変えられた"],
+    ["gremlin", "グレムリンに上書きされていそうです。", "グレムリンに上書きされた"],
+  ];
+  co.changedInfo = () => set({ step: "chg" });
+  co.pickChanged = (i) => { const x = CHANGED_LINES[i]; if (x) done(x[1], null, null, "disclose", x[2]); };
+
+  // 情報開示のページは、戻るボタンを上（見出しの横）に置く。下まで押し下げてスクロールしなくても戻れる
+  const INFO_BACK = { info: "back", visited: "info", fjob: "info", fwho: "freeterInfo", chg: "info" };
+  const infoBackFn = (step) => ({ back: "ONW.co.back()", info: "ONW.co.info()", freeterInfo: "ONW.co.freeterInfo()" }[INFO_BACK[step]]);
+
   // ---- 描画 ----
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
@@ -143,6 +157,7 @@ window.ONW = window.ONW || {};
     else if (s.step === "target") {
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).targetLabel || "奪った相手"}を選んでください。</p>` +
+        ((hookOfKind(s.kind) || {}).self ? btn("自分", `ONW.co.pickPlayer('${ONW.net.myId()}')`) : "") +   // 自分も選べる結果開示（シャッフラー）
         (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickPlayer('${p.id}')`)).join("") +
         ((hookOfKind(s.kind) || {}).graves ? Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`)).join("") : "") + back;
     } else if (s.step === "gpick") {
@@ -151,7 +166,7 @@ window.ONW = window.ONW || {};
         Array.from({ length: G().graveCount || 0 }, (_, i) => (s.sel.includes(i) ? "" : btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`))).join("") + back;
     } else if (s.step === "prole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">${esc(nameOf(s.target))} ${(hookOfKind(s.kind) || {}).roleHint || "の結果役職"}を選んでください。</p>` + roleBtns("pickRole", btn("伏せる", "ONW.co.pickRole('hide')")) + back;
+      body = `<p class="night-step__hint">${esc(nameOf(s.target))} ${(hookOfKind(s.kind) || {}).roleHint || "の結果役職"}を選んでください。</p>` + (((hookOfKind(s.kind) || {}).roleList) ? hookOfKind(s.kind).roleList().map((r) => btn(esc(rn(r)), `ONW.co.pickRole('${r}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : roleBtns("pickRole", btn("伏せる", "ONW.co.pickRole('hide')"))) + back;   // roleList: 配役ではなく、その役職固有の一覧から選ぶ結果開示（シャッフラーの山札）
     } else if (s.step === "grole") {
       title = "結果開示";
       body = `<p class="night-step__hint">墓地${s.sel[s.k] + 1} の役職を選んでください。</p>` + roleBtns("graveRole") + back;
@@ -175,16 +190,19 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + back;
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()");
     } else if (s.step === "visited") {
       title = "訪問された";
-      body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("") + btn("戻る", "ONW.co.infoBack()");
+      body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("");
     } else if (s.step === "fjob") {
       title = "フリーター情報";
-      body = `<p class="night-step__hint">誰がフリーターかも伝えますか？</p>` + btn("はい（フリーターも伝える）", "ONW.co.freeterWho()") + btn("いいえ（就職されたことだけ）", "ONW.co.freeterNoName()") + btn("戻る", "ONW.co.infoBack()");
+      body = `<p class="night-step__hint">誰がフリーターかも伝えますか？</p>` + btn("はい（フリーターも伝える）", "ONW.co.freeterWho()") + btn("いいえ（就職されたことだけ）", "ONW.co.freeterNoName()");
     } else if (s.step === "fwho") {
       title = "フリーター情報";
-      body = `<p class="night-step__hint">誰がフリーターですか？</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickFreeter('${p.id}')`)).join("") + btn("戻る", "ONW.co.freeterInfo()");
+      body = `<p class="night-step__hint">誰がフリーターですか？</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickFreeter('${p.id}')`)).join("");
+    } else if (s.step === "chg") {
+      title = "役職が変わっている";
+      body = `<p class="night-step__hint">誰に変えられたと思いますか？（伝える内容を選んでください）</p>` + CHANGED_LINES.map((x, i) => btn(esc(x[2]), `ONW.co.pickChanged(${i})`)).join("");
     } else if (s.step === "ikind") {
       title = "後覚者";
       body = `<p class="night-step__hint">結果の種類を選んでください。</p>` + btn("自身が後覚者である", "ONW.co.insomKind('self')") + btn("後覚者から変わっていた", "ONW.co.insomKind('changed')") + back;
@@ -201,7 +219,9 @@ window.ONW = window.ONW || {};
       title = "CO履歴";
       body = `<div class="co-hist">${ONW.ui.coTable()}</div>` + back;
     }
-    el.innerHTML = `<div class="co-panel"><div class="co-title"><span>${title}</span><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.co.close()">✕</button></div><div class="co-grid">${body}</div></div>`;
+    const isInfo = !!INFO_BACK[s.step];
+    const backBtn = isInfo ? `<button class="co-back" type="button" onclick="${infoBackFn(s.step)}">← 戻る</button>` : "";
+    el.innerHTML = `<div class="co-panel"><div class="co-title">${backBtn}<span class="co-title__t">${title}</span><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.co.close()">✕</button></div><div class="co-grid${isInfo ? " co-grid--2" : ""}">${body}</div></div>`;
   };
 
   ONW.co = co;

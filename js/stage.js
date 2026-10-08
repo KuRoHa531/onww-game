@@ -37,13 +37,16 @@ window.ONW = window.ONW || {};
   let catv = {};                       // シュレディンガーの猫: 2回目に裏返ったあとの面（席 → { team: village / wolf / third / none / loop, sfx: "(+役職名)" }）。あれば、猫のカードがその陣営の色の文字になる
   const CAT = "schrodinger_cat";   // シュレディンガーの猫
   const WOLF_MARK = "__wolf";
+  const CUPID_MARK = "__cupid";   // キューピッドの演出に出る「💘」の印（役職名は出さない）
   const LOVE_MARK = "__love";   // 恋人の相方に見える「❤️」の印（役職名は出さない）
+  const BREAK_MARK = "__break";   // 破局師に見える「💔」の印（壊した恋人のペアのカード。役職名は出さない）
+  const KEEP_MARK = "__keep";   // 悪女に見えるキープの「♡」の印（役職名は出さない。恋人ではない）
   const SELF_LOVE = "__selflove";   // 酔いが覚めた恋人本人のカードが「恋人」へめくれた面
   const DUO_MARK = "__duo";     // 人狼の🐺と恋人の❤️の両方が付く人（上に🐺、下に❤️）
   const TARGET_MARK = "__target";   // 処刑人に見えるターゲットの「🎯ターゲット」の印（役職名は出さない）
   const MUTE_MARK = "__mute";   // 口封じの狂人に見える、口封じされた人の「🤐」の印（役職名は出さない）
   const MASTER_MARK = "__master";   // 従者に見えるご主人の「👑ご主人」の印（役職名は出さない）
-  let lov = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）
+  let lov = {}, shuf = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）
   let loveMate = null;                // 夜: 自分の恋人の相方 { id, mode }
   const UNK_MARK = "__unk";   // アサシンが選んでいる間、めくれた人のカードに出す「？」（役職は見せない）
   let nightKeys = [];                  // 夜の始まりに開いたカード（神・大狼）。夜時間が終わるまで裏に戻さない
@@ -84,7 +87,7 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   const seatHtml = (k, label, cls) => `
     <div class="tb-seat ${cls || ""}" data-k="${k}">
-      <div class="tb-card"><div class="tb-inner"><div class="tb-back"></div><div class="tb-front"></div></div><div class="tb-drunk"><span class="tb-beer">🍺</span><span class="tb-drunk-n"></span></div><div class="tb-lov">❤</div></div>
+      <div class="tb-card"><div class="tb-inner"><div class="tb-back"></div><div class="tb-front"></div></div><div class="tb-drunk"><span class="tb-beer">🍺</span><span class="tb-drunk-n"></span></div><div class="tb-lov">❤</div><div class="tb-shuf">🔀</div></div>
       <div class="tb-name">${label}</div><div class="tb-badge"></div>
     </div>`;
   function build(g, list) {
@@ -127,7 +130,7 @@ window.ONW = window.ONW || {};
     if (m.type === "straw") return isP && g.strawPick.some((c) => c.id === k.slice(2));   // 選べるのは、まだめくれていない人だけ
     if (isP && dead[k]) return false;   // 死亡した人には投票できない
     const pk = pickOf(m.role);
-    if (isP) return k.slice(2) !== me && !(pk && pk.players === false);   // 墓荒らしが選べるのは墓地だけ(stagePick.players === false)
+    if (isP) return (k.slice(2) !== me || !!(pk && pk.self)) && !(pk && pk.players === false);   // シャッフラーだけは自分のカードも選べる(stagePick.self)   // 墓荒らしが選べるのは墓地だけ(stagePick.players === false)
     if (m.type === "vote") return false;
     // 墓地: 占い師・狂った占い師(設定枚数まで) / 墓荒らし(1枚) = stagePick.graves
     return !!(pk && pk.graves);
@@ -138,7 +141,10 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   function faceHtml(role) {
     if (role === UNK_MARK) return `<div class="tb-wolfmark tb-unk">？</div>`;
+    if (role === BREAK_MARK) return `<div class="tb-wolfmark tb-love tb-break">💔</div>`;
     if (role === LOVE_MARK) return `<div class="tb-wolfmark tb-love">❤️</div>`;
+    if (role === CUPID_MARK) return `<div class="tb-wolfmark tb-love">💘</div>`;
+    if (role === KEEP_MARK) return `<div class="tb-wolfmark tb-love tb-keep">♡</div>`;
     if (role === SELF_LOVE) return `<div class="tb-wolfmark tb-master tb-love"><span>❤️</span><small>恋人</small></div>`;
     if (role === TARGET_MARK) return `<div class="tb-wolfmark tb-target"><span>🎯</span><small>ターゲット</small></div>`;
     if (role === MUTE_MARK) return `<div class="tb-wolfmark tb-mute"><span>🤐</span><small>口封じ</small></div>`;
@@ -190,7 +196,7 @@ window.ONW = window.ONW || {};
         s.dataset.role = role;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role);
-        f.className = `tb-front tb-team-${String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK ? "love" : role === TARGET_MARK ? "target" : role === MUTE_MARK ? "mute" : role === MASTER_MARK || role === SELF_LOVE ? "master" : ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK || role === CUPID_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === TARGET_MARK ? "target" : role === MUTE_MARK ? "mute" : role === MASTER_MARK || role === SELF_LOVE ? "master" : ONW.roles.getInfo(role).team}`;
       }
       const sel = (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
@@ -208,7 +214,7 @@ window.ONW = window.ONW || {};
       s.classList.toggle("kingup", kingKeys.includes(k) || kingFlashKeys.includes(k));   // 人狼王公開中の赤い光と札
       s.classList.toggle("queenup", queenKeys.includes(k) || queenFlashKeys.includes(k));   // 女王公開中の紫の光と札
       s.classList.toggle("shinju", !!shin[k]);
-      s.classList.toggle("lov", !!lov[k]);
+      s.classList.toggle("lov", !!lov[k]); s.classList.toggle("shuf", !!shuf[k]);   // 結果発表: シャッフラーつきのカードの左上に🔀
       { const lv = s.querySelector(".tb-lov"); if (lv) { const t = typeof lov[k] === "number" ? `<span>❤</span><span>${lov[k]}</span>` : "<span>❤</span>"; if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }   // 結果発表: 丸の中にハートと恋人番号
       s.classList.toggle("almost", !!alm[k]);
       ["descend", "spark", "blow", "win", "chicken", "toughclang", "toughrecv", "kingguard"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
@@ -278,12 +284,12 @@ window.ONW = window.ONW || {};
     if (!el) return;
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; shuf = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; shuf = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
     if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
@@ -298,6 +304,7 @@ window.ONW = window.ONW || {};
     // 朝になったら、夜の選択が実行される演出（占い=表に / 怪盗・墓荒らし=入れ替わって表に / いたずらっ子=入れ替わる）
     if (g.phase === ONW.PHASE.ONLINE_MORNING && (g.morningReveal || g.morningInsom) && !g.morningShown && !g.isSpectator) {
       g.morningShown = true; const r = g.morningReveal, ins = g.morningInsom;
+      ONW.ui.releaseLogs(g); ONW.ui.holdLogs(g, morningTextDelay(r, ins));   // 演出が終わってから「あなたは〇〇になりました」などの文章を出す
       if (r) later(() => playMorning(r), 700);
       // 墓荒らしが交換した後の役職の能力は、朝の演出が終わってから使える
       if (g.morningChain) later(() => { g.morningChainReady = true; ONW.ui.render(G()); }, (r ? 700 + morningDur(r) : 300) + 300);
@@ -403,6 +410,8 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   // 朝: 夜の選択が実行され、入れ替わる演出 → 自分のカードが表に（昼になるまで見える）
   // ---------------------------------------------------------
+  /** 朝・昼に使った能力の演出(playMorning)が終わって、結果の文章を出してよくなるまでの時間(ms) */
+  stage.ackDelay = function (r) { return r ? Math.max(0, morningTextDelay(r, null) - 700) : 0; };
   stage.onAck = function (d) {      // 朝に使った能力は、結果が返った瞬間に演出する
     busy = false;
     if (d.chain && G().phase === ONW.PHASE.ONLINE_MORNING) {   // 朝: 取った役職の能力へ続く。交換・コピーの演出が終わってから使えるようにする
@@ -427,6 +436,19 @@ window.ONW = window.ONW || {};
     if (r.kind === "peek") return (r.items.length - 1) * 450 + 1000;
     const h = morningHook(r.kind);
     return h ? h.dur(r) : 1000;
+  }
+  /** 朝の演出(playMorning と 後覚者の表)が終わって、結果の文章を出してよくなるまでの時間(ms) */
+  function morningTextDelay(r, ins) {
+    let end = 0;
+    if (r) {
+      const d = 700 + morningDur(r);
+      end = d;
+      if (r.muzzle) end = Math.max(end, d + 700 + 700);
+      if (r.mates) end = Math.max(end, d + 200 + r.mates.ids.length * 380 + 500);
+      if (r.peek) end = Math.max(end, d + 200 + r.peek.length * (r.gap || 340) + 500);
+    }
+    if (ins) end = Math.max(end, (r ? 700 + morningDur(r) : 300) + 700);
+    return end + 500;   // めくれ終わって少し間をあけてから
   }
   function playMorning(r) {
     if (r.kind === "peek") r.items.forEach((it, i) => later(() => show(it.k, it.role), i * 450));
@@ -474,8 +496,8 @@ window.ONW = window.ONW || {};
     get dead() { return dead; }, get badge() { return badge; }, get shin() { return shin; }, get gx() { return gx; },
     get asn() { return asn; }, get alm() { return alm; }, get catv() { return catv; },
     get starKeys() { return starKeys; }, get queenKeys() { return queenKeys; }, get flashKeys() { return flashKeys; }, get queenFlashKeys() { return queenFlashKeys; }, get kingKeys() { return kingKeys; }, get kingFlashKeys() { return kingFlashKeys; },
-    WOLF_MARK, DUO_MARK, MASTER_MARK, TARGET_MARK, MUTE_MARK,
-    later, paint, show, swap, G, $t, esc, setCap, gxStars,
+    WOLF_MARK, DUO_MARK, MASTER_MARK, TARGET_MARK, MUTE_MARK, LOVE_MARK, CUPID_MARK, BREAK_MARK, KEEP_MARK,
+    later, paint, show, swap, G, $t, esc, setCap, gxStars, face: faceHtml,
     /** 札を付けた席の一覧(starKeys など)から、席 k を取り除く(その場で書き換える) */
     pull(arr, k) { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] === k) arr.splice(i, 1); },
   };
@@ -497,7 +519,7 @@ window.ONW = window.ONW || {};
   }
   function winHtml(res) {
     const team = res.title.startsWith("村人") ? "village" : res.title.startsWith("人狼") ? "wolf" : res.title.startsWith("恋人") ? "lover" : "third";
-    return `<div class="rs-win t-${team}">${esc(res.title)}</div><div class="rs-dim">${esc(res.detail || "")}</div>`;
+    return `<div class="rs-win t-${team}">${esc(res.title)}</div>`;
   }
   /** 結果発表の骨組み。役職ごとの演出は各役職ファイルの stageResult(下の hk(...) で呼ぶ)。R.t = 演出の現在時刻(ms)で、フックが進める */
   function startResult(g) {
@@ -511,7 +533,8 @@ window.ONW = window.ONW || {};
     const lateDeaths = res.history.filter((h) => h.cause === "chain" && h.kind !== "queen" && h.late).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));   // 王国滅亡のあとで死んだ人（心中など）
     const kingdom = res.history.filter((h) => h.cause === "chain" && h.kind === "queen");   // 王国滅亡: 女王が倒れて、一斉にめくれる村人陣営
     const loverNo = {}; res.history.forEach((h) => { if (h.lover) loverNo[h.id] = h.loverNo || true; });
-    const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; };   // 結果でめくれる恋人のカードは、右上に丸いハート
+    const shufNo = {}; res.history.forEach((h) => { if (h.shuf) shufNo[h.id] = true; });
+    const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; if (shufNo[id]) shuf[P(id)] = true; };   // 結果でめくれる恋人のカードは、右上に丸いハート
     const rest = [...res.history.filter((h) => !h.dead).map((h) => [P(h.id), h.role, h.id]), ...res.grave.map((c, i) => [`g:${i}`, c.role])];
     // 役職ファイルに渡す道具箱(stage.kit に、この結果の情報を足したもの)
     //   t = 演出の現在時刻 / subN = 身代わりの数 / noFlip = ほかの演出が重なるので2回目の裏返しをしない席(flipped フックが書く) / restEnd = 全員めくれ終わる時刻 / noBlow = 負けた人のカードを吹き飛ばさない
@@ -574,7 +597,7 @@ window.ONW = window.ONW || {};
     const hk = (key) => ONW.roleHooksIn("stageResult", key);
     clearAll(); alm = {}; hk("clear").forEach((h) => h.fn(stage.kit));   // 身代わりの「めくれそう」演出・処刑人の演出も止める
     const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNo || true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = skipIds.has(h.id) || h.sub ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = skipIds.has(h.id) || h.sub ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     const R = Object.create(stage.kit); R.res = res;
     hk("skip").forEach((h) => h.fn(R));   // 猫(2回目の面)・神の祝福・処刑人のターゲット(割れた状態)・アサシンに選ばれた人 を、演出なしの最終形で見せる

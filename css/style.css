@@ -388,6 +388,12 @@ body {
 .co-panel { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-top: 10px; background: var(--bg-panel-raised); }
 .co-title { color: var(--gold); font-weight: 700; margin-bottom: 8px; }
 .co-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 情報開示: 2列のタイルにして、スクロールしなくても選べるようにする（戻るは見出しの横） */
+.co-grid--2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.co-grid--2 .co-btn { width: 100%; min-height: 46px; padding: 8px 6px; margin: 0; line-height: 1.3; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+.co-grid--2 .night-step__hint { grid-column: 1 / -1; margin: 0; }
+.co-back { flex: 0 0 auto; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel); color: var(--ink); font-size: 13px; cursor: pointer; }
+.co-title__t { flex: 1 1 auto; min-width: 0; }
 
 /* 最終結果（マイクラ版風） */
 .result-sheet { text-align: left; line-height: 1.7; }
@@ -588,10 +594,15 @@ body {
   to   { opacity: 1; width: 96px; height: 134px; font-size: 34px; transform: none; z-index: 2000; }
 }
 /* 自分のカード: 裏面 → 表(変化前) → 表(変化後) */
-.dl-flipper { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 2; pointer-events: none; }
+.dl-flipper { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 2; pointer-events: none; will-change: transform; }
+/* （:has() に頼らず、クラス dl-hasflip を直接付ける。:has 非対応の環境で本体の裏面が下に残るのを防ぐ） */
+/* 裏面はカード本体ではなくフリッパーの裏側の面として持つ（めくっている間に本体の裏面が透けて見えない・ちらつかない） */
+.dl-card.dl-hasflip { background: transparent; border-color: transparent; box-shadow: none; }
+.dl-card.dl-hasflip::after { display: none; }
+.dl-flipper::before { content: "☾"; position: absolute; inset: 0; border-radius: 6px; border: 1px solid var(--gold-dim); background: var(--card-back); box-shadow: 0 2px 6px rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; color: var(--gold-dim); font-size: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .go .dl-flipper { animation: dl-flip .7s ease-in-out both; transform: rotateY(0deg); }
 @keyframes dl-flip { from { transform: rotateY(0deg); } to { transform: rotateY(180deg); } }
-.dl-face { position: absolute; inset: 0; border-radius: 6px; border: 1px solid var(--gold); background: #1b1d2b; display: flex; align-items: center; justify-content: center; text-align: center; padding: 4px; font-size: 14px; color: var(--ink); backface-visibility: hidden; transform: rotateY(180deg); }
+.dl-face { position: absolute; inset: 0; border-radius: 6px; border: 1px solid var(--gold); background: #1b1d2b; display: flex; align-items: center; justify-content: center; text-align: center; padding: 4px; font-size: 14px; color: var(--ink); backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(180deg); }
 .dl-face--b { opacity: 0; }
 .dl-face--b { transform: rotateY(180deg) scaleX(0); }
 .go .dl-face--a[style*="animation-delay"] { animation: dl-out .25s ease-in both; }
@@ -676,10 +687,11 @@ body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glo
 /* ---- チャット画面: チャット本文以外はスクロールせず常に表示 ---- */
 body.chat-mode { height: 100vh; height: var(--app-h, 100dvh); min-height: 0; overflow: hidden; }
 html:has(body.chat-mode) { overflow: hidden; overscroll-behavior: none; }
-body.chat-mode .onw-header { padding: 6px 10px 6px 40px; gap: 8px; }
-body.chat-mode .onw-header__title { font-size: 15px; }
-body.chat-mode .onw-header__title-sub { display: none; }
-body.chat-mode .onw-header__phase, body.chat-mode .onw-header__day { min-width: 0; padding: 3px 10px; font-size: 12px; }
+/* res-compact: 結果発表のあいだもヘッダーを小さいまま保つ（投票→結果でヘッダーの高さが1コマで変わり、カードが下にジャンプするのを防ぐ） */
+body.chat-mode .onw-header, body.res-compact .onw-header { padding: 6px 10px 6px 40px; gap: 8px; }
+body.chat-mode .onw-header__title, body.res-compact .onw-header__title { font-size: 15px; }
+body.chat-mode .onw-header__title-sub, body.res-compact .onw-header__title-sub { display: none; }
+body.chat-mode .onw-header__phase, body.chat-mode .onw-header__day, body.res-compact .onw-header__phase, body.res-compact .onw-header__day { min-width: 0; padding: 3px 10px; font-size: 12px; }
 body.chat-mode .onw-footer, body.chat-mode .moon-glow { display: none; }
 body.chat-mode .onw-app { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 6px 6px 0; overflow: hidden; }
 body.chat-mode .onw-app > * { flex: 0 0 auto; }
@@ -794,6 +806,12 @@ body.chat-mode .tb-players { gap: 6px 8px; }
 .tb-card { position: relative; width: var(--cw); height: var(--ch); perspective: 700px; transition: transform .2s ease; }
 .tb-inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .75s cubic-bezier(.3,.7,.3,1); }
 .tb-seat.up .tb-inner { transform: rotateY(180deg); }
+/* めくれている途中、裏面には絶対に役職名を出さない（ブラウザの backface-visibility に頼らず、真横(90°)を通る瞬間に面を切り替える。
+   .75s の cubic-bezier(.3,.7,.3,1) で角度が90°になるのは約 .154s 後） */
+.tb-back  { visibility: visible; transition: visibility 0s linear .154s; }
+.tb-front { visibility: hidden;  transition: visibility 0s linear .154s; }
+.tb-seat.up .tb-back  { visibility: hidden; }
+.tb-seat.up .tb-front { visibility: visible; }
 .tb-back, .tb-front { position: absolute; inset: 0; border-radius: 6px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .tb-back { border: 1px solid var(--gold-dim); background: var(--card-back); display: flex; align-items: center; justify-content: center; color: var(--gold-dim); }
 .tb-back::after { content: "☾"; font-size: calc(var(--cw) * .42); }
@@ -938,6 +956,22 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
 .res-dock { padding: 0 8px 16px; }   /* スマホ: 従来どおり結果の下に並べる（固定は PC のみ） */
 .stage-col { display: contents; }           /* スマホでは包みを無かったことにする */
 .big-timer { display: none; }
+
+/* ---- カードの大きさが切り替わるときのちらつき対策（スマホ）----
+   議論・投票（chat-mode: 小さいカード）→ 結果発表（大きいカード）で、カードの大きさ・間隔・テーブルの余白が1コマで切り替わっていた。
+   --cw / --ch を「長さ」として登録して、なめらかに変化させる。 */
+@property --cw { syntax: "<length>"; inherits: true; initial-value: 52px; }
+@property --ch { syntax: "<length>"; inherits: true; initial-value: 74px; }
+@media (max-width: 999px) {
+  .tb-wrap { transition: --cw .4s ease, --ch .4s ease, padding .4s ease; }
+  .tb-table { transition: padding .4s ease, border-radius .4s ease; }
+  .tb-center { transition: margin-bottom .4s ease, gap .4s ease; }
+  .tb-players { transition: gap .4s ease; }
+  .tb-badge { transition: font-size .4s ease, top .4s ease, right .4s ease; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-wrap, .tb-table, .tb-center, .tb-players, .tb-badge { transition: none; }
+}
 
 @media (min-width: 1000px) {
   body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
@@ -1141,6 +1175,17 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .info-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--gold); font-family: var(--font-display); font-weight: 700; }
 .info-body { padding: 10px 14px 14px; overflow-y: auto; overscroll-behavior: contain; }
 .info-body .night-step__hint { margin: 6px 0; }
+/* PC版: 情報確認は右のチャット・COボタンの列を覆わず、左（カードのテーブル側）に重ねて出す。背景は暗くせず、情報確認を開いたままCOボタンなどを操作できる */
+/* スマホ: 情報確認は画面の上側に出し、背景は暗くせず触れる（下側の CO ボタン・CO パネルを情報を見ながら操作できる） */
+@media (max-width: 999px) {
+  .info-overlay { inset: 0 0 auto 0; align-items: flex-start; padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 0; background: transparent; pointer-events: none; }
+  .info-overlay .info-card { pointer-events: auto; max-height: 42vh; max-height: 42dvh; box-shadow: 0 8px 28px rgba(0,0,0,.7); }
+  body.info-open .co-dock .co-panel { max-height: 34vh; max-height: 34dvh; }   /* 開いた CO パネルが情報確認と重なりすぎないように */
+}
+@media (min-width: 1000px) {
+  body:has(#table.on) .info-overlay { inset: 0 clamp(400px, 31vw, 560px) 0 0; background: transparent; pointer-events: none; }
+  body:has(#table.on) .info-overlay .info-card { pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,.7); }
+}
 
 /* 最終結果のチャット: 画面の上に重ねる（fixed なので結果画面はずれない） */
 #rchat-overlay { position: fixed; inset: 0; z-index: 920; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
@@ -1278,6 +1323,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .t-lover { color: #ff7eb6; }
 .tb-front.tb-team-love { border-color: #ff7eb6; }
 .tb-front .tb-wolfmark.tb-love { filter: drop-shadow(0 0 7px rgba(255,126,182,.95)); }
+.tb-front .tb-wolfmark.tb-break { filter: drop-shadow(0 0 7px rgba(190,190,215,.9)); }   /* 破局師の💔（壊れた恋人のペア） */
+.tb-front .tb-wolfmark.tb-keep { filter: drop-shadow(0 0 6px rgba(255,170,205,.8)); }   /* 悪女のキープの♡（恋人ではないので少し控えめ） */
 .tb-front .tb-wolfmark.tb-duo { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); }
 .tb-front .tb-wolfmark.tb-duo span:first-child { filter: drop-shadow(0 0 6px rgba(255,85,85,.9)); }
 .tb-front .tb-wolfmark.tb-duo span:last-child { filter: drop-shadow(0 0 6px rgba(255,126,182,.95)); }
@@ -1291,6 +1338,10 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* 結果でめくれた恋人のカード: 左上の丸いハート（右上の票数などの札と重ならないよう左端へ） */
 .tb-lov { display: none; position: absolute; top: -5px; left: -5px; z-index: 4; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); min-width: 22px; min-height: 22px; border-radius: 50%; background: #fff; border: 2px solid #e0558f; color: #e0558f; font-size: max(calc(var(--cw) * .14), 9px); font-weight: 800; line-height: 1; flex-direction: row; gap: 1px; align-items: center; justify-content: center; pointer-events: none; box-shadow: 0 0 6px rgba(224,85,143,.8); }
 .tb-seat.lov.up .tb-lov { display: flex; }
+/* 結果発表: シャッフラーつきのカードの左上の🔀（恋人の丸ハートと同じ大きさ。恋人も付いているときは、その右にずらして並べる） */
+.tb-shuf { display: none; position: absolute; top: -5px; left: -5px; z-index: 4; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); min-width: 22px; min-height: 22px; border-radius: 50%; background: #fff; border: 2px solid #7a4fd1; align-items: center; justify-content: center; font-size: max(calc(var(--cw) * .2), 12px); line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.45); pointer-events: none; }
+.tb-seat.shuf.up .tb-shuf { display: flex; }
+.tb-seat.lov.up .tb-shuf { left: calc(max(var(--cw) * .36, 22px) - 1px); }
 .result-sheet .t-lover { color: #ff7eb6; }
 
 /* 従者の身代わり: ご主人のカードがめくれそうになる（途中の70°前後まで回って揺れ、また裏のまま戻る。絶対に表にならない） */
@@ -1317,6 +1368,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* 最終結果の役職履歴: 本家どおり (+恋人1) はピンク、(+酔っ払い) は金色 */
 .result-sheet .rs-tag-love { color: #ff77dd; }
 .result-sheet .rs-tag-drunk { color: #ffaa00; }
+.result-sheet .rs-tag-shuffler { color: #c4c9e0; }   /* シャッフラー: 山札から置かれたカードの「(+シャッフラー)」 */
 .result-sheet .rs-tag-cat { color: #aaaaaa; }   /* シュレディンガーの猫: 参照先が第三陣営の役職のときの「(+役職名)」 */
 .tb-front b .tb-catsfx { color: #aaaaaa; font-weight: 700; }   /* 「(+オポチュニスト)」は同じ行に灰色で続ける */
 
@@ -1361,12 +1413,13 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 @keyframes gx-star { 0% { opacity: 0; transform: translateY(8px) scale(0) rotate(0deg); } 45% { opacity: 1; transform: translateY(-6px) scale(1.15) rotate(calc(var(--r) * .5)); } 100% { opacity: 0; transform: translateY(-22px) scale(.2) rotate(var(--r)); } }
 /* 吹き飛ばされるカード（死んだオポチュニスト・天邪鬼・負け組） */
 .tb-seat.gx-blow { z-index: 8; pointer-events: none; }
-.tb-seat.gx-blow .tb-card { animation: gx-blow 1.2s cubic-bezier(.5,0,.9,.4) forwards; }
+.tb-seat.gx-blow .tb-card { animation: gx-blow 1.8s cubic-bezier(.4,0,.8,.5) forwards; }
+body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ横スクロールを出さない */
 .tb-seat.gx-blow:nth-child(even) .tb-card { animation-name: gx-blow2; }
 /* カードがあった場所には、点々でカードの形だけ残す（プレイヤー名・札はそのまま） */
 .tb-seat.gx-blow::before { content: attr(data-ghost); position: absolute; top: 0; left: 50%; width: var(--cw); height: var(--ch); transform: translateX(-50%); box-sizing: border-box; border: 2px dotted rgba(217,196,143,.75); border-radius: 6px; pointer-events: none; display: flex; align-items: center; justify-content: center; text-align: center; padding: 3px; font-size: calc(var(--cw) * .2); line-height: 1.2; color: rgba(217,196,143,.8); }   /* カードの真下に最初から置き、カードが飛んだらそのまま見える（一度何もない状態にならない） */
-@keyframes gx-blow { 0% { transform: none; opacity: 1; } 100% { transform: translate(140%, -190%) rotate(520deg) scale(.3); opacity: 0; } }
-@keyframes gx-blow2 { 0% { transform: none; opacity: 1; } 100% { transform: translate(-140%, -190%) rotate(-520deg) scale(.3); opacity: 0; } }
+@keyframes gx-blow { 0% { transform: none; opacity: 1; } 100% { transform: translate(90vw, -130vh) rotate(520deg) scale(.4); opacity: 1; } }   /* 透明にはならず、画面の外まで飛んでいく */
+@keyframes gx-blow2 { 0% { transform: none; opacity: 1; } 100% { transform: translate(-90vw, -130vh) rotate(-520deg) scale(.4); opacity: 1; } }
 /* 祝福で勝つ人のカードは金色に光る */
 .tb-seat.gx-win .tb-card { animation: gx-win 1.6s ease-in-out infinite; }
 @keyframes gx-win { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255,214,102,.7)); } 50% { filter: drop-shadow(0 0 13px rgba(255,236,160,1)); } }

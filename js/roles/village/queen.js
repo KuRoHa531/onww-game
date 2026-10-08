@@ -85,7 +85,7 @@
     cpuFirst(k, g, p, r) {
       if (k.isWolfSide(r)) return null;
       const out = [], pl = k.plainLie(g, p, "queen"), co = pl.co, result = pl.result;
-      if (co) { out.push({ p, text: `${k.rn(co)}CO`, co, claim: result ? null : { kind: "villager" }, gap: result ? 1200 : 3500 }); if (result) out.push({ p, text: result.text, short: result.short, result: true, claim: result.claim, gap: 3500 }); }
+      if (co) { out.push({ p, text: k.coText(co), co, claim: result ? null : { kind: "villager" }, gap: result ? 1200 : 3500 }); if (result) out.push({ p, text: result.text, short: result.short, result: true, claim: result.claim, gap: 3500 }); }
       return out;
     },
     cpuNotice(g, id, queenIds, k) { const i = k.infoOf(g, id); queenIds.forEach((q) => { i.known[q] = "queen"; }); },   // CPU: 女王を知らされた(村人陣営として、女王には投票しない)

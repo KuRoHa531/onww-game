@@ -61,7 +61,7 @@
   ONW.defineRole(ROLE_ID, {
     info: { deck: 53, name: "口封じの狂人", team: ONW.TEAM.WOLF, wakeOrder: 43, sort: 1.85,
       desc: "人狼陣営。夜の始まりに、自分を含む全員からランダムな1人を口封じします。口封じされた人は、昼のチャットとCOボタン（結果開示も）が使えません。人狼が誰かは分かりません。人狼を勝たせるのが目的です。" },
-    groups: { mad: 2.6, "transform:dark_avatar": 9.7 },
+    groups: { mad: 2.6, "transform:dark_avatar": 15 },
     // 夜の画面: 夜の行動はない
     uiNight: {
       idle(X) {

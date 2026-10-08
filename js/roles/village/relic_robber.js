@@ -67,6 +67,12 @@
       },
     },
     cpuClaim,
+    /** 墓荒らしを騙るとき（人外のCPUなど）も、COだけで終わらず「墓地N と役職を交換して ○○ になりました」と結果を言う */
+    cpuLieResult(k, g, p, selfRole, co) {
+      if (!g.center || !g.center.length) return null;
+      const idx = k.pick ? k.pick([...g.center.keys()]) : Math.floor(Math.random() * g.center.length);
+      return fakeGot(k, g, { relic: { graveIdx: idx } }, k.fakeVillageRole(g, (r) => k.canGetByClaim(g, "relic", r)));
+    },
     cpuFakeGot: { kind: "relic", make: fakeGot },
     cpuNight: { order: 50, stage: "relic", chain: true, chainEnd: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     info: { deck: 10, name: "墓荒らし", team: ONW.TEAM.VILLAGE, wakeOrder: 50, sort: 26,

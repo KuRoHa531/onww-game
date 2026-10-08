@@ -36,9 +36,9 @@ window.ONW = window.ONW || {};
     return steps.sort((a, b) => a.order - b.order || a.idx - b.idx);
   };
 
-  /** CPUの夜行動（占い師系 → 墓荒らし → ドッペルゲンガー → 怪盗 → いたずらっ子の順）。占いは初期役職を見るので順序に影響されない。
+  /** CPUの夜行動（占い師系 → 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子の順）。占いは初期役職を見るので順序に影響されない。
    *  役職ごとの行動は各役職ファイルの cpuNight.run（order の小さい順）。ここは「誰が・いつ使うか」の枠組みだけ */
-  cpu.runNight = function (g, stage, ids) {   // stage: "init" | "seer" | "relic" | "doppel" | "robber" | "gremlin" | "tm"（省略時は全部を起床順に実行）
+  cpu.runNight = function (g, stage, ids) {   // stage: "init" | "seer" | "relic" | "doppel" | "shuffler" | "gremlin" | "robber" | "tm"（省略時は全部を起床順に実行）
     const all = !stage;
     if (all || stage === "init") g.cpuInfo = {};
     g.cpuInfo = g.cpuInfo || {};
@@ -117,6 +117,16 @@ window.ONW = window.ONW || {};
     g.cpuInfo = g.cpuInfo || {};
     ONW.roleHook("freeter", "cpuNotice")(g, id, freeterIds, cpu.kit);
   };
+  /** 純愛者に選ばれたCPU: 待機時間に、純愛者のカードを持っている人を知る。中身は pure_lover.js の cpuNotice */
+  cpu.noticePureLovers = function (g, id, holderIds) {
+    g.cpuInfo = g.cpuInfo || {};
+    ONW.roleHook("pure_lover", "cpuNotice")(g, id, holderIds, cpu.kit);
+  };
+  /** 悪女に選ばれたCPU（本命もキープも）: 待機時間に、悪女のカードを持っている人を知る。中身は evil_woman.js の cpuNotice */
+  cpu.noticeEvilWomen = function (g, id, holderIds, keep) {
+    g.cpuInfo = g.cpuInfo || {};
+    ONW.roleHook("evil_woman", "cpuNotice")(g, id, holderIds, cpu.kit, !!keep);
+  };
   /** 女王を知らされたCPU（最終盤面が村人陣営で酔いが覚めている）: 誰が女王かを知る。中身は queen.js の cpuNotice */
   cpu.noticeQueens = function (g, id, queenIds) {
     g.cpuInfo = g.cpuInfo || {};
@@ -143,6 +153,17 @@ window.ONW = window.ONW || {};
   const AVOID_RESULT = ["tanner", "love_tanner", "opportunist", "amanojaku", "winner", "freeter", "servant"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
   const setupRoles = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])];   // 占い結果に出してよい（実在する）役職
   const roleInSetup = (g, role) => setupRoles(g).includes(role) || (g.coDeck || []).some((x) => x.r === role);
+  /** 「村人CO」をしてよいか: 配役(selectedRoles)か、変化公開で公開された役職(coDeck の cand でないもの)に、村人・忘却の人狼・狼憑き(本人は村人だと思い込む役職)がいるときだけ。
+   *  変化後の本当の役職(initialRoles)は公開されていないと分からないので見ない（見ると、配役にも公開にも村人がいないのに村人COできてしまう） */
+  const villagerAppears = (g) => [...(g.selectedRoles || setupRoles(g)), ...(g.coDeck || []).filter((x) => !x.cand).map((x) => x.r)]
+    .some((r) => r === "villager" || ONW.SELF_AS_VILLAGER.includes(r));
+  /** 騙りで名乗れる役職が1つもないときの「村人陣営CO」（COボタンの陣営COと同じ値）。co にこの値が入ったら、発言は「村人陣営CO」になる */
+  const TEAM_CO = "team:village";
+  /** 騙りでは名乗らない役職（マーリン: 人狼が見えている / 女王・チキン: 待機時間の扱いが特別）。これだけしか名乗れる村役職がないときは、役職COではなく村人陣営COにする */
+  const NO_LIE_ROLES = ["merlin", "queen", "chicken", "wolf_marked", "wolf_dreamer"];   // 狼憑き・狼夢人は本人が自分の役職を知らない（思い込み系）ので、騙りでも名乗らない
+  const noLie = (r) => NO_LIE_ROLES.includes(r) || ONW.SELF_AS_VILLAGER.includes(r) || ONW.SELF_AS_WOLF.includes(r);   // 思い込み系の役職が増えても自動で含める
+  /** COの発言文: 陣営COは「村人陣営CO」、それ以外は「〇〇CO」 */
+  const coText = (co) => (String(co).startsWith("team:") ? ({ village: "村人陣営CO", wolf: "人狼陣営CO", third: "第三陣営CO" }[String(co).slice(5)] || "陣営CO") : `${rn(co)}CO`);
   /** この試合に実在するその役職のカード枚数（配られた役職 + 墓地） */
   const roleCount = (g, role) => setupRoles(g).filter((r) => r === role).length;
   /**
@@ -163,7 +184,7 @@ window.ONW = window.ONW || {};
     return pick(pref.length ? pref : pool.length ? pool : ["villager"]);
   }
   const wolfLikeResult = (g) => pickResultRole(g, WOLF_LIKE());
-  const villageLikeResult = (g, ok) => pickResultRole(g, ["villager", "mason", "seer", "robber", "troublemaker", "insomniac"], ok);
+  const villageLikeResult = (g, ok) => pickResultRole(g, ["villager", "mason", "seer", "robber", "troublemaker", "insomniac"], (r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && (!ok || ok(r)));   // 村人側の結果は必ず村人陣営の役職から（候補が無いときに人狼などを言って自白しない）
   /** 騙り占いの対象: 人狼陣営は本物の人狼を避ける（本家 chooseFakeSeerTarget） */
   function fakeSeerTarget(g, p) {
     const others = g.players.filter((q) => q.id !== p.id);
@@ -190,26 +211,38 @@ window.ONW = window.ONW || {};
     .sort((a, b) => a.nd.order - b.nd.order || a.idx - b.idx).map((x) => [x.id, x.nd.weight]);
   function pickLieRole(g) {
     const chosen = weighted(lieTable());   // 重みは各役職ファイルの cpuLie(order 順)。従者は村人陣営以外だけが騙れる（本家も配役にいるときだけ、低めの確率）
-    if (roleInSetup(g, chosen)) return chosen;   // 村人も、配役にいるときだけ名乗る
+    if (chosen === "villager" ? villagerAppears(g) : roleInSetup(g, chosen)) return chosen;   // 村人も、配役か変化公開に村人・忘却の人狼・狼憑きがいるときだけ名乗る
     const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleInSetup(g, r));
-    return fb.length ? pick(fb) : "villager";
+    if (fb.length) return pick(fb);
+    const pool = villageLieRoles(g);
+    return pool.length ? pick(pool) : TEAM_CO;   // 名乗れる役職が1つもなければ村人陣営CO
   }
   /** あり得る村役職 = この試合に実在する村人陣営の役職（変化後の役職・墓地・COの候補）。村人も、配役に入っているときだけ含む */
+  /** 騙りで名乗れる村役職（実在する村人陣営の役職。マーリン・女王・チキンは含めない）。なければ空配列 */
+  function villageLieRoles(g, ok) {
+    return [...new Set([...setupRoles(g), ...(g.coDeck || []).map((x) => x.r), ...(villagerAppears(g) ? ["villager"] : [])])]
+      .filter((r) => r !== "villager" || villagerAppears(g))
+      .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && !noLie(r) && (!ok || ok(r)));   // 思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
+  }
+  /** あり得る村役職 = 上の一覧。空のときは「手にした役職」の嘘などで役職名が要るので、最終手段として村人を返す（COの発言には使わない: CO は bareCo / pickLieRole が村人陣営COにする） */
   function villageRolesInPlay(g, ok) {
-    const pool = [...new Set([...setupRoles(g), ...(g.coDeck || []).map((x) => x.r)])]
-      .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && r !== "merlin" && !ONW.SELF_AS_VILLAGER.includes(r) && !ONW.SELF_AS_WOLF.includes(r) && (!ok || ok(r)));   // マーリンCOは禁止。思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
-    return pool.length ? pool : ["villager"];   // 村人が配役にいないときは名乗らない（最終手段としてだけ村人）
+    const pool = villageLieRoles(g, ok);
+    return pool.length ? pool : ["villager"];
   }
   const fakeVillageRole = (g, ok) => pick(villageRolesInPlay(g, ok));
   /** 村人が配役にいないのに「村人CO」をすると嘘がバレるので、村人COの代わりに名乗れる役職を返す（結果なしのCOだけ） */
   function bareCo(g, pref) {
-    if (roleInSetup(g, "villager")) return "villager";
-    if (pref && pref !== "villager" && pref !== "merlin") return pref;
-    return ["seer", "troublemaker", "robber", "mason", "insomniac"].find((r) => roleInSetup(g, r)) || "villager";
+    if (pref === TEAM_CO) return TEAM_CO;
+    if (villagerAppears(g)) return "villager";
+    if (pref && pref !== "villager" && !noLie(pref)) return pref;
+    const found = ["seer", "troublemaker", "robber", "mason", "insomniac"].find((r) => roleInSetup(g, r));
+    if (found) return found;
+    const pool = villageLieRoles(g);
+    return pool.length ? pick(pool) : TEAM_CO;   // 名乗れる役職がなければ村人陣営CO
   }
   /** 「ただの村人のふり」をしたいときのCO。村人がいなければ、いる村役職の騙り（占い師なら偽結果つき）にする */
   function plainLie(g, p, selfRole) {
-    if (roleInSetup(g, "villager")) return { co: "villager", result: null };
+    if (villagerAppears(g)) return { co: "villager", result: null };
     const pool = ["seer", "troublemaker", "robber", "mason"].filter((r) => roleInSetup(g, r));
     return pool.length ? lieClaim(g, p, selfRole, pick(pool)) : { co: bareCo(g), result: null };
   }
@@ -255,6 +288,8 @@ window.ONW = window.ONW || {};
     const co = forceCo || pickLieRole(g);
     const nd = (ONW.roleDef(co) || {}).cpuLie;   // 騙りの結果開示は、その役職ファイルの cpuLie.claim（null なら通常の「COだけ」）
     if (nd && nd.role === co && nd.claim) { const res = nd.claim(cpu.kit, g, p, others, selfRole, co); if (res) return res; }
+    const lr = (ONW.roleDef(co) || {}).cpuLieResult;   // 騙りの結果開示の作り方を持つ役職（墓荒らし: 「墓地N → 役職」）。COだけで終わらせず結果も言う
+    if (lr) { const res = lr(cpu.kit, g, p, selfRole, co); if (res) return res; }
     return { co: forceCo && forceCo !== "villager" ? forceCo : bareCo(g, co), result: null };   // その他の村役職は、結果なしでCOだけする（村人がいなければ村人COはしない）
   }
 
@@ -303,7 +338,9 @@ window.ONW = window.ONW || {};
     g.players.filter((p) => p.isCpu && (!only || only.includes(p.id))).forEach((p) => {
       const od = !!(g.drunkOverlay && g.drunkOverlay[p.id]), hid = ONW.hiddenDrunk(g, p.id);
       // 酔っ払い: 覚めるまでは「酔っ払いCO」だけ。覚めたあとは最終的な役職として振る舞う
-      const r = hid ? "drunk" : ONW.shownRole(g.currentRoles[p.id] !== undefined && od ? g.currentRoles[p.id] : g.initialRoles[p.id]), i = infoOf(g, p.id);   // 忘却の人狼のCPUは自分を村人だと思っている
+      const i = infoOf(g, p.id);
+      let r = hid ? "drunk" : ONW.shownRole(g.currentRoles[p.id] !== undefined && od ? g.currentRoles[p.id] : g.initialRoles[p.id]);   // 忘却の人狼のCPUは自分を村人だと思っている
+      if (!hid && i.shuffledTo) r = i.shuffledTo;   // シャッフラーに役職を変えられた（自分に置いた）CPUは、知っている新しい役職として振る舞う（shuffler.js の cpuNotice / cpuRun）
       const others = g.players.filter((q) => q.id !== p.id);
       const c = { co: null, result: null, extra: null };   // extra: 結果開示のあとに続けて言う2つ目の結果
       if (hid) { plan.push({ p, text: `${rn("drunk")}CO`, co: "drunk", claim: { kind: "villager" }, gap: 3500 }); return; }
@@ -327,7 +364,7 @@ window.ONW = window.ONW || {};
       const hf = c.co ? ONW.roleHook(c.co, "cpuCoFollow") : null;   // 名乗った役職ごとの後処理（後覚者: 結果を言わないと騙りだと透けるので、嘘の結果開示もする）
       if (hf) hf(cpu.kit, g, p, r, i, c);
       if (!c.co) return;                                              // COしない
-      plan.push({ p, text: `${rn(c.co)}CO`, co: c.co, claim: c.result ? null : { kind: "villager" }, gap: c.result ? 1200 : 3500 });
+      plan.push({ p, text: coText(c.co), co: c.co, claim: c.result ? null : { kind: "villager" }, gap: c.result ? 1200 : 3500 });
       if (c.result) plan.push({ p, text: c.result.text, short: c.result.short, result: true, claim: c.result.claim, gap: c.extra ? 1200 : 3500 });
       if (c.result && c.extra) plan.push({ p, text: c.extra.text, short: c.extra.short, result: true, claim: c.extra.claim, gap: 3500 });
       spoke.push({ p, r, i, c });
@@ -359,9 +396,9 @@ window.ONW = window.ONW || {};
   /** 投票先候補（本家 chooseBestVoteTarget: 自分以外・生存・共有者の相方は除く） */
   function voteCandidates(g, p) {
     const i = infoOf(g, p.id), me = selfRole(g, p);
-    const mate = ONW.loverMate(g, p.id);   // 恋人の相方には投票しない（追放されると心中で一緒に敗北するため）
+    const mates = [...ONW.loverMates(g, p.id), ...(ONW.heartbreaker ? ONW.heartbreaker.believed(g, p.id) : [])];   // 恋人の相方には投票しない（追放されると心中で一緒に敗北するため）。破局で壊されたことはCPUには知らされないので、壊された相方もまだ恋人だと思って避ける
     const hx = ONW.roleHook(me, "cpuVoteExclude");   // 役職ごとの除外（従者はご主人に投票しない / 共有者は相方に投票しない）。各役職ファイルの cpuVoteExclude
-    return g.players.filter((q) => q.id !== p.id && q.id !== mate && alive(g, q.id) && !(hx && hx(cpu.kit, g, p, q, i, me)));
+    return g.players.filter((q) => q.id !== p.id && !mates.includes(q.id) && alive(g, q.id) && !(hx && hx(cpu.kit, g, p, q, i, me)));
   }
 
   /** 投票先の評価点（本家 scoreTargetForCpu を、この版にある役職に合わせたもの） */
@@ -472,6 +509,6 @@ window.ONW = window.ONW || {};
   cpu.decideVote = function (g, p) { return chooseVote(g, p); };
 
   // 役職ファイルのCPUフック(cpuClaim / cpuLie / cpuFakeGot など)が使う、役職をまたぐ道具
-  Object.assign(cpu.kit, { rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo });
+  Object.assign(cpu.kit, { rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
   ONW.cpu = cpu;
 })(window.ONW);

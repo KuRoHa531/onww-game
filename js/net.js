@@ -17,7 +17,7 @@ window.ONW = window.ONW || {};
   // 夜に自分で操作する役職・朝に使える役職は js/roles/ の各役職ファイル(night 定義)から決まる。ここには役職名を書かない
   const isActive = (r) => ONW.roleIsActive(r);   // 夜に自分で操作する役職か
   /** 夜が明けるときに実行する段階(起床順)。各役職ファイルの night.kind がこのどれかに対応する。段階を増やすときは cpu.js の runNight も同じ名前で合わせる */
-  const NIGHT_STAGES = ["seer", "relic", "doppel", "robber", "gremlin", "tm"];
+  const NIGHT_STAGES = ["seer", "relic", "doppel", "shuffler", "gremlin", "robber", "tm"];
   const G = () => ONW.game;
   const PH = () => ONW.PHASE;
   const rerender = () => ONW.ui.render(G());
@@ -44,13 +44,15 @@ window.ONW = window.ONW || {};
   net.pendingCount = () => { const g = G(); return (g.players || []).filter((p) => !p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]) && isActive(g.initialRoles[p.id]) && !actDone(g, p.id)).length; };
 
   // ---- タイマー（ホストの端末が時計）----
-  function stopTimer() { const g = G(); if (g.tickId) clearInterval(g.tickId); g.tickId = null; }
+  function stopTimer() { const g = G(); if (g.tickId) clearInterval(g.tickId); g.tickId = null; g.tickCb = null; }
   function startTimer(sec, onEnd, onTick) {
     const g = G();
     stopTimer();
     g.remain = sec;
     sendAll({ t: "tick", sec }); sendSpec({ t: "tick", sec });
-    g.tickId = setInterval(() => {
+    g.tickCb = { onEnd, onTick };   // 画面を離れて一時停止したあと、同じ終わり方で続きから動かすため
+    const myTick = g.tickId = setInterval(() => {
+      if (g.tickId !== myTick) { clearInterval(myTick); return; }   // 取り残された古い時計（ホスト復元などで置き換わったもの）は止める。二重に動くと残り時間が倍速で進み、フェーズ移行も二重に走る
       g.remain -= 1;
       sendAll({ t: "tick", sec: g.remain }); sendSpec({ t: "tick", sec: g.remain });
       if (onTick) onTick(g.remain);
@@ -79,7 +81,7 @@ window.ONW = window.ONW || {};
     const it = g.cpuQueue.shift();
     if (isDead(it.p.id)) { g.pumpId = setTimeout(pump, 50); return; }   // 死亡したCPUは発言しない
     if (ONW.muzzle && ONW.muzzle.isMuzzled(g, it.p.id)) { g.pumpId = setTimeout(pump, 50); return; }   // 口封じされたCPUは、発言もCOもしない
-    if (it.co || it.result) pushChat(null, `${it.p.name} ${it.text}`, "co");   // 人間のCOボタンと同じ表示（「名前 占い師CO」「名前 〇〇を占って…」）
+    if (it.co || it.result) pushChat(null, `${it.p.name}: ${it.text}`, "co");   // 人間のCOボタンと同じ表示（「名前: 占い師CO」「名前: 〇〇を占って…」。名前と発言の区切りに「:」を付ける）
     else pushChat(it.p.name, it.text, "chat");
     if (it.claim) g.cpuClaims.push({ from: it.p.id, ...it.claim });
     if (it.co) { boardEntry(it.p.id).co = it.co; sendBoard(); }
@@ -131,17 +133,20 @@ window.ONW = window.ONW || {};
     if (d.t === "dead") { g.isDead = !!d.v; if (d.v) { g.chatTab = "ghost"; g.ghostLog = d.log || g.ghostLog || []; } }   // 昼中に死亡した（霊界チャットに入る）
     if (d.t === "chatlog") { g.chatLog = d.log; ONW.ui.updateChat(); return; }
     if (d.t === "role") {
-      Object.assign(g, { isDead: false, specInfo: null, ghostLog: [], chatTab: "main", tfShown: false, tfIntro: false, tfAppeared: false, voteSel: null, myVote: null, resultStage: null, resultCap: "", debugOn: !!d.dbg, deck: d.deck, myFrom: d.from, myLover: !!d.lover, myName: d.me || "", dealStart: d.ds || Date.now(), myCo: null, co: null, boardView: [], tfView: null, resultChatOpen: false, nightInfoClosed: false, chatLog: [], myRole: d.role, others: d.others, graveCount: d.graveCount, seerGraveCount: d.seerGraveCount, nightLogs: [], soberRole: null, soberLines: [], dayLines: [], abilityOpen: false, abilityMsg: "", nightDone: false, morningChain: null, morningChainDone: false, morningChainReady: false, settleInsom: null, settleShown: false, settleStars: [], starNames: [], breadN: 0, breadPending: false, mapoDone: false, muzzled: false, settleMuzzled: [], settleMuzzledShown: false, exposeRows: [], exposePending: false, exposeSkip: false, exposeForce: false, mapoPending: false, mapoSkip: false, mapoForce: false, newsLines: null, newsPending: false, newsSkip: false, newsForce: false, settleStarShown: false, morningReveal: null, morningShown: false, phase: PH().ONLINE_ROLE });
+      Object.assign(g, { isDead: false, specInfo: null, ghostLog: [], chatTab: "main", tfShown: false, tfIntro: false, tfAppeared: false, voteSel: null, myVote: null, resultStage: null, resultCap: "", debugOn: !!d.dbg, deck: d.deck, myFrom: d.from, myLover: !!d.lover, myName: d.me || "", dealStart: d.ds || Date.now(), myCo: null, co: null, boardView: [], tfView: null, resultChatOpen: false, nightInfoClosed: false, chatLog: [], myRole: d.role, others: d.others, graveCount: d.graveCount, seerGraveCount: d.seerGraveCount, nightLogs: [], soberRole: null, soberLines: [], dayLines: [], abilityOpen: false, abilityMsg: "", nightDone: false, morningChain: null, morningChainDone: false, morningChainReady: false, settleInsom: null, settleShown: false, settleStars: [], starNames: [], breadN: 0, breadPending: false, mapoDone: false, muzzled: false, settleMuzzled: [], settleMuzzledShown: false, exposeRows: [], exposePending: false, exposeSkip: false, exposeForce: false, mapoPending: false, mapoSkip: false, mapoForce: false, newsLines: null, newsPending: false, newsSkip: false, newsForce: false, settleStarShown: false, morningReveal: null, morningShown: false, logHold: 0, phase: PH().ONLINE_ROLE });
     }
-    if (d.t === "night") { g.nightLogs = [d.text, d.text2, d.loveText, ...(d.lines || [])].filter(Boolean); g.loveReveal = d.love || null; g.masterReveal = d.master || null; g.muzzleReveal = d.muzzle ? { id: d.muzzle } : null; g.godReveal = d.godPeek || null; g.nightAck = []; g.nightDone = !d.act; g.actRole = d.act ? g.myRole : null; g.nightSel = d.sel ? { players: [...(d.sel.players || [])], graves: [...(d.sel.graves || [])] } : { players: [], graves: [] }; g.bigReveal = d.bigGraves || null; g.cultReveal = d.cultWolves || null; g.masonReveal = d.masonMates || null; g.phase = PH().ONLINE_NIGHT; }
+    if (d.t === "night") { g.nightLogs = [d.text, d.text2, d.loveText, ...(d.lines || [])].filter(Boolean); g.loveReveal = d.love || null; g.masterReveal = d.master || null; g.muzzleReveal = d.muzzle ? { id: d.muzzle } : null; g.godReveal = d.godPeek || null; g.nightAck = []; g.nightDone = !d.act; g.actRole = d.act ? g.myRole : null; g.nightSel = d.sel ? { players: [...(d.sel.players || [])], graves: [...(d.sel.graves || [])] } : { players: [], graves: [] }; g.bigReveal = d.bigGraves || null; g.cultReveal = d.cultWolves || null; g.masonReveal = d.masonMates || null; ONW.ui.releaseLogs(g); if ((g.loveReveal || g.masterReveal || g.muzzleReveal || g.godReveal || g.bigReveal || g.cultReveal || g.masonReveal) && !g.isSpectator) ONW.ui.holdLogs(g, 3900);   // 夜の始まりにカードがめくれる人は、めくれ終わってから文章を出す
+ g.phase = PH().ONLINE_NIGHT; }
     if (d.t === "observeday") {   // 昼の入れ替えで観測の人狼になった: 自分のカードがめくれて、観測結果が飛び出す
       const tx = ["【観測通知】", ...((d.lines && d.lines.length) ? d.lines : ["観測できる夜能力はありませんでした。"])];
+      ONW.ui.holdLogs(g, 3200);   // カードがめくれて観測結果が飛び出してから文章を出す
       g.nightLogs = [...(g.nightLogs || []), ...tx]; g.dayLines = [...(g.dayLines || []), ...tx]; g.soberFlash = d.role;
       if (g.soberRole) g.soberRole = d.role;
       ONW.stage.sync(g);
       if (!g.isSpectator && ONW.stage.observe) setTimeout(() => ONW.stage.observe(d.lines || []), 1400);
     }
     if (d.t === "insomday") {   // 昼の入れ替えで後覚者の能力が発動した
+      ONW.ui.holdLogs(g, 1500);   // 自分のカードがめくれてから文章を出す
       g.nightLogs = [...(g.nightLogs || []), d.text]; g.dayLines = [...(g.dayLines || []), d.text]; g.soberFlash = d.role;
       if (g.soberRole) g.soberRole = d.role;
       ONW.stage.sync(g);
@@ -151,7 +156,8 @@ window.ONW = window.ONW || {};
       ONW.stage.sync(g);
     }
     if (d.t === "jobday") {   // 昼に、誰かが自分のところに就職した: フリーターのカードが数秒だけ表になる
-      g.nightLogs = [...(g.nightLogs || []), d.text]; g.jobFlash = [{ id: d.id, role: d.role }];
+      ONW.ui.holdLogs(g, 1800);   // フリーターのカードが表になってから文章を出す
+      g.nightLogs = [...(g.nightLogs || []), d.text]; g.jobFlash = d.items && d.items.length ? d.items : [{ id: d.id, role: d.role }];   // 悪女: 本命❤・キープ♡を同時に出すときは items
       ONW.stage.sync(g);
     }
     if (d.t === "starup") {   // 昼に酔いが覚めたスター: 全員の画面でカードが表になって裏に戻る。情報確認にも載る
@@ -165,15 +171,17 @@ window.ONW = window.ONW || {};
       return;
     }
     if (d.t === "queenup") {   // 昼に、新しく女王が分かった（酔いが覚めた・役職が動いた など）: 村人陣営の人の画面で、女王のカードが表になって裏に戻る。ログにも残る
+      ONW.ui.holdLogs(g, 1800);   // 女王のカードが表になってから文章を出す
       g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.queenFlash = d.ids || [];
       ONW.stage.sync(g);
       return;
     }
     if (d.t === "sober") {   // 酔いが覚めた（昼）: その時点の最終役職と、役職の情報。能力があれば昼のうちに1回使える
       g.soberRole = d.role; g.soberLines = d.lines || []; g.soberBase = (d.lines || []).length; g.abilityOpen = false;
-      if (!d.quiet) { g.soberFlash = d.role; g.soberPeek = d.peek || null; g.nightLogs = [...(g.nightLogs || []), ...(d.lines || [])]; g.morningChain = d.chain || null; g.morningChainDone = false; g.morningChainReady = !!d.chain; g.nightSel = { players: [], graves: [] }; }
+      if (!d.quiet) { ONW.ui.holdLogs(g, d.peek && d.peek.love ? 3600 : 1500); g.soberFlash = d.role; g.soberPeek = d.peek || null; g.nightLogs = [...(g.nightLogs || []), ...(d.lines || [])]; g.morningChain = d.chain || null; g.morningChainDone = false; g.morningChainReady = !!d.chain; g.nightSel = { players: [], graves: [] }; }
     }
     if (d.t === "ack") {   // 朝に使った能力の結果（即座に返る）
+      if (d.reveal && ONW.stage.ackDelay) ONW.ui.holdLogs(g, ONW.stage.ackDelay(d.reveal) + 300);   // 交換・コピーなどの演出が終わってから「〇〇をしました」を出す
       if (g.phase === PH().ONLINE_DAY) { g.abilityOpen = false; g.soberLines = [...(g.soberLines || []), ...(d.lines || [])]; if (d.chain) { g.morningChain = d.chain; g.morningChainReady = true; g.nightSel = { players: [], graves: [] }; } }
       if (g.phase === PH().ONLINE_MORNING || g.phase === PH().ONLINE_DAY) {
       g.nightLogs = [...(g.nightLogs || []), ...(d.lines || [])];
@@ -184,8 +192,9 @@ window.ONW = window.ONW || {};
       ONW.stage.onAck(d);
       if (d.peek) ONW.stage.sync(g);
     }
-    if (d.t === "morning") { g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.morningReveal = d.reveal || null; g.morningInsom = d.insom || null; g.morningShown = !!d.quiet; g.morningChain = d.chain || null; g.settleInsom = null; g.settleShown = false; g.settleStars = []; g.starNames = []; g.settleFreeters = []; g.settleFreeterShown = false; g.settleVisitors = []; g.settleVisitorShown = false; g.settleObserve = []; g.settleObserveShown = false; g.settleQueens = []; g.settleQueenShown = false; g.settleKings = []; g.kingNames = []; g.settleKingShown = false; g.breadN = 0; g.settleStarShown = false; g.morningChainDone = !!d.chainDone; g.morningChainReady = !!d.quiet; g.nightSel = { players: [], graves: [] }; g.remain = null; g.settling = false; g.phase = PH().ONLINE_MORNING; }
-    if (d.t === "settle") { g.settling = true; g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.settleInsom = d.insom || null; g.settleShown = !!d.quiet; g.settleStars = d.stars || []; g.starNames = d.starNames || []; g.settleStarShown = !!d.quiet; g.settleFreeters = d.fids || []; g.settleFreeterShown = !!d.quiet; g.settleVisitors = d.vids || []; g.settleVisitorShown = !!d.quiet; g.settleObserve = d.observe ? (d.observe.lines && d.observe.lines.length ? d.observe.lines : ["観測できる夜能力はありませんでした。"]) : []; g.settleObserveShown = !!d.quiet; g.settleQueens = d.queens || []; g.settleQueenShown = !!d.quiet; g.settleKings = d.kings || []; g.kingNames = d.kingNames || []; g.settleKingShown = !!d.quiet; g.muzzled = !!d.muzzled; g.settleMuzzled = d.muzzled ? [1] : []; g.settleMuzzledShown = !!d.quiet; g.morningChainReady = !!d.quiet; }
+    if (d.t === "morning") { g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.morningReveal = d.reveal || null; g.morningInsom = d.insom || null; g.morningShown = !!d.quiet; g.morningChain = d.chain || null; g.settleInsom = null; g.settleShown = false; g.settleStars = []; g.starNames = []; g.settleFreeters = []; g.settleFreeterShown = false; g.settlePure = []; g.settlePureShown = false; g.settleEvil = []; g.settleCupid = []; g.settleCupidShown = false; g.settleBreaker = []; g.settleBreakerShown = false; g.settleShuffled = []; g.settleShuffledShown = false; g.settleEvilShown = false; g.settleVisitors = []; g.settleVisitorShown = false; g.settleObserve = []; g.settleObserveShown = false; g.settleQueens = []; g.settleQueenShown = false; g.settleKings = []; g.kingNames = []; g.settleKingShown = false; g.breadN = 0; g.settleStarShown = false; g.morningChainDone = !!d.chainDone; g.morningChainReady = !!d.quiet; g.nightSel = { players: [], graves: [] }; g.remain = null; g.settling = false; g.logHold = 0; if (!d.quiet && (d.reveal || d.insom) && ONW.ui && ONW.ui.holdLogs) ONW.ui.holdLogs(g, 30000);   // カードがめくれ終わるまで結果の文章は出さない（めくれる長さは stage.sync が決め直す）
+ g.phase = PH().ONLINE_MORNING; }
+    if (d.t === "settle") { g.settling = true; g.nightLogs = [...(g.nightLogs || []), ...(d.logs || [])]; g.settleInsom = d.insom || null; g.settleShown = !!d.quiet; g.settleStars = d.stars || []; g.starNames = d.starNames || []; g.settleStarShown = !!d.quiet; g.settleFreeters = d.fids || []; g.settleFreeterShown = !!d.quiet; g.settlePure = d.pure || []; g.settlePureShown = !!d.quiet; g.settleEvil = d.evil || []; g.settleEvilShown = !!d.quiet; g.settleCupid = d.cupid || []; g.settleCupidShown = !!d.quiet; g.settleBreaker = d.breaker || []; g.settleBreakerShown = !!d.quiet; g.settleShuffled = d.shuffled || []; g.settleShuffledShown = !!d.quiet; g.settleVisitors = d.vids || []; g.settleVisitorShown = !!d.quiet; g.settleObserve = d.observe ? (d.observe.lines && d.observe.lines.length ? d.observe.lines : ["観測できる夜能力はありませんでした。"]) : []; g.settleObserveShown = !!d.quiet; g.settleQueens = d.queens || []; g.settleQueenShown = !!d.quiet; g.settleKings = d.kings || []; g.kingNames = d.kingNames || []; g.settleKingShown = !!d.quiet; g.muzzled = !!d.muzzled; g.settleMuzzled = d.muzzled ? [1] : []; g.settleMuzzledShown = !!d.quiet; g.morningChainReady = !!d.quiet; }
     if (d.t === "muzzle") { g.muzzled = !!d.on; if (d.on) g.co = null; if (d.on && !d.quiet && !g.isSpectator && ONW.stage && ONW.stage.muzzled) ONW.stage.muzzled(); if (d.text) g.nightLogs = [...(g.nightLogs || []), d.text]; if (ONW.ui && ONW.ui.render) ONW.ui.render(g); return; }   // 口封じの狂人: 昼のうちに口封じされた/解かれた
     if (d.t === "muzzlenote") { g.chatLog = [...(g.chatLog || []), { name: null, text: "あなたは口封じされているため送信できませんでした。", kind: "co" }]; if (ONW.ui && ONW.ui.render) ONW.ui.render(g); return; }
     if (d.t === "news") { g.newsLines = d.lines || []; if (!(d.quiet || quiet) && !g.isSpectator && ONW.stage && ONW.stage.news) ONW.stage.news(g.newsLines, !!d.late); return; }   // 新聞配達員: 変化公開の紙のあとに新聞の紙が出る。「情報確認」からも見返せる
@@ -244,7 +253,7 @@ window.ONW = window.ONW || {};
     const g = G();
     if (!g.inGame || !g.initialRoles || !g.players.length || !Object.keys(g.initialRoles).length) return { t: "specinfo", info: null };
     const res = !!g.nightResolved, nm = (id) => (g.players.find((q) => q.id === id) || {}).name || "?";
-    const players = g.players.map((p) => ({ id: p.id, name: p.name, cpu: !!p.isCpu, dead: isDead(p.id), from: g.transformFrom[p.id] || null, lover: !!ONW.loverMate(g, p.id), ini: g.initialRoles[p.id], cur: res ? g.currentRoles[p.id] : null }));
+    const players = g.players.map((p) => ({ id: p.id, name: p.name, cpu: !!p.isCpu, dead: isDead(p.id), from: g.transformFrom[p.id] || null, lover: ONW.isLover(g, p.id), ini: g.initialRoles[p.id], cur: res ? g.currentRoles[p.id] : null }));
     const center = (g.center0 || g.center || []).map((r, i) => ({ ini: r, from: (g.centerTransformFrom || {})[i] || null, cur: res ? g.center[i] : null }));
     let sels = [];
     if (g.phase === PH().ONLINE_NIGHT) {
@@ -265,7 +274,7 @@ window.ONW = window.ONW || {};
   }
 
   /** 昼中に死亡させる（ホストのみ）。死亡した人は投票・発言ができなくなり、霊界チャットに入る */
-  net.killPlayer = function (id, byMate) {
+  net.killPlayer = function (id, byMate, kind) {
     const g = G(), p = g.players.find((q) => q.id === id);
     if (!net.isHost || !g.inGame || !p || ![PH().ONLINE_DAY, PH().ONLINE_VOTE].includes(g.phase)) return;
     g.deadIds = g.deadIds || [];
@@ -273,11 +282,12 @@ window.ONW = window.ONW || {};
     g.deadIds.push(id);
     delete g.votes[id];
     Object.keys(g.votes).forEach((v) => { if (g.votes[v] === id) delete g.votes[v]; });
-    pushChat(null, byMate ? `${p.name} は ${byMate} の後を追って心中しました。` : `${p.name} が死亡しました。`, "sys");
+    pushChat(null, kind === "cupid" ? `キューピッドの ${p.name} は、作った恋人 ${byMate} の後を追って死亡しました。` : byMate ? `${p.name} は ${byMate} の後を追って心中しました。` : `${p.name} が死亡しました。`, "sys");
     if (!p.isCpu) send(id, { t: "dead", v: true, log: g.ghostLog });
     // 恋人: 昼中の死因が何であっても（今後増える死因も、この関数を通すかぎり）、死んだ瞬間に相方も心中で死亡する
-    const mate = ONW.loverMate(g, id);
-    if (mate && !g.deadIds.includes(mate)) net.killPlayer(mate, p.name);
+    ONW.loverMates(g, id).forEach((mate) => { if (!g.deadIds.includes(mate)) net.killPlayer(mate, p.name); });
+    // キューピッド: 選んだ2人の一方が昼中に死んだら（死因を問わず）、キューピッドも作った恋人の後を追って死亡する（酔いが覚めていないキューピッドの組は成立していないので対象外）
+    if (ONW.cupid) ONW.cupid.pairs(g).filter(([a, b, h]) => (a === id || b === id) && h !== id).forEach(([, , h]) => { if (!g.deadIds.includes(h)) net.killPlayer(h, p.name, "cupid"); });
     sendBoard(); sendSpecInfo(); sendGhost();
     rerender();
   };
@@ -332,7 +342,7 @@ window.ONW = window.ONW || {};
     "roleCounts", "villageSize", "graveCount", "seerGraveCount", "mayorVoteCount", "cpuCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "transformCandidates", "transformOff", "cpuNames", "debugOn", "dbg", "dbgWarn",
     "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "playerCount", "selectedRoles",
     "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds", "ghostLog", "nightResolved", "dbgVotes", "nightResults",
-    "coBoard", "tfLines", "tfPairs", "chatLog", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets", "executed", "chainIds", "chainBy", "chainKind", "chainSub", "chainLate", "mentalIds", "shockIds", "chickenReverse", "catPicks", "catSources", "catInfo", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult", "toughBounces", "toughBlocks", "kingGuards",
+    "coBoard", "tfLines", "tfPairs", "chatLog", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "brokenKeys", "breakerShow", "breakerSuccess", "breakerSeen", "breakerBelief", "breakerApplied", "breakerSettle", "shufflerMarks", "shufflerStamp", "shufflerSettle", "shufflerTold", "loveLostD", "cupidSeen", "cupidTold", "cupidSettle", "akujoSeen", "akujoTold", "evilSettle", "pureLoverPairs", "pureLoverSeen", "pureLoverSettle", "pureLoverTold", "pureLoverNo", "pureLoverNoU", "pureLoverGen", "loveHist", "loveLast", "executed", "chainIds", "chainBy", "chainKind", "chainSub", "chainLate", "mentalIds", "shockIds", "chickenReverse", "catPicks", "catSources", "catInfo", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult", "toughBounces", "toughBlocks", "kingGuards",
     "masterPick", "masterCard", "cpuVotePlan", "cpuRealVote", "cpuInfo", "announced", "holdUntil", "remain", "settling", "promotedWolfIds", "queenSeen", "kingdomIds", "queenFallen", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "dealStart", "resultObj", "drunkCount", "drunkChance", "drunkOverlay", "drunkRevealed", "drunkSober", "soberLines", "loverCount", "loverChance", "loverOf", "servantMasters", "servantSubs", "servantNotified", "execTargets", "gremlinPicks", "newsRoles", "newsLines", "newsAnnounced", "mapoAnnounced", "observeLog", "observerSeen", "exposeTargets", "exposeAnnounced", "exposeLines", "muzzleTargets", "muzzleNotified",
   ];
   /** 参加者としての画面にも同じ意味で入っている項目。ホストを引き継ぐ人は、自分が見ていた最新の値を優先する */
@@ -340,7 +350,7 @@ window.ONW = window.ONW || {};
   /** ホストをやめて参加者に戻るとき、消す項目（参加者の画面では使わないもの） */
   const HOST_ONLY_KEYS = [
     "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds",
-    "nightResolved", "dbgVotes", "nightResults", "coBoard", "tfLines", "tfPairs", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets",
+    "nightResolved", "dbgVotes", "nightResults", "coBoard", "tfLines", "tfPairs", "coState", "nightLogsAll", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "visitorTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "brokenKeys", "breakerShow", "breakerSuccess", "breakerSeen", "breakerBelief", "breakerApplied", "breakerSettle", "shufflerMarks", "shufflerStamp", "shufflerSettle", "shufflerTold", "loveLostD", "cupidSeen", "cupidTold", "cupidSettle", "akujoSeen", "akujoTold", "evilSettle", "pureLoverPairs", "pureLoverSeen", "pureLoverSettle", "pureLoverTold", "pureLoverNo", "pureLoverNoU", "pureLoverGen", "loveHist", "loveLast",
     "executed", "chainIds", "chainBy", "chainKind", "chainSub", "chainLate", "mentalIds", "shockIds", "chickenReverse", "catPicks", "catSources", "catInfo", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult", "toughBounces", "toughBlocks", "kingGuards", "masterPick", "masterCard", "cpuVotePlan", "cpuRealVote", "cpuInfo", "announced", "holdUntil", "promotedWolfIds", "queenSeen", "kingdomIds", "queenFallen", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "resultObj", "dbg", "dbgWarn", "loverOf", "servantMasters", "servantSubs", "servantNotified", "execTargets", "gremlinPicks", "newsRoles", "newsLines", "newsAnnounced", "mapoAnnounced", "observeLog", "observerSeen", "exposeTargets", "exposeAnnounced", "exposeLines",
   ];
 
@@ -454,7 +464,14 @@ window.ONW = window.ONW || {};
     });
     peer.on("error", (e) => {
       if (net.peer !== peer || !net.isHost) return;
-      if (e.type === "unavailable-id") demoteToClient();   // 切れている間に別の人がルームを引き継いだ → 参加者として戻る
+      if (e.type === "unavailable-id") {
+        // 切れている間に別の人がルームを引き継いだ → 参加者として戻る。
+        // ただし、他に人間の参加者がいない（一人でCPUとデバッグしているなど）なら引き継ぐ人はいない。
+        // 参加者として戻ると初期状態（ロビー・CPUなし）に戻されてしまうので、状態を保ったまま同じコードを取り直す
+        const others = G().players.some((p) => !p.isCpu && p.id !== net.selfSeat) || (net.order && net.order.length);
+        if (others) demoteToClient();
+        else { net.peer = null; try { peer.destroy(); } catch (x) {} reviveHost(makeSnapshot(), net.gen, 0); }
+      }
     });
     clearInterval(hbId); hbId = setInterval(hostTick, HB_MS);
     clearInterval(snapPeriodic); snapPeriodic = setInterval(flushSnap, 5000);
@@ -606,7 +623,7 @@ window.ONW = window.ONW || {};
       if (p.id === net.selfSeat) p.status = "host";
       else if (p.id === oldHost && p.status === "host") p.status = g.inGame ? "playing" : "waiting";
     });
-    if (g.inGame) { if (s.gphase) g.phase = s.gphase; g.cpuQueue = []; g.pumpId = null; g.dayStartId = null; g.dayBegin = null; g.tickId = null; }
+    if (g.inGame) { try { clearTimers(); } catch (e) {} if (s.gphase) g.phase = s.gphase; }   // 古い時計・CPU発言・昼の開始待ちを、null にするだけでなく実際に止める（残すと二重に動く）
     else {                                            // ロビー: みんなが戻ってくるまで待ち、戻らなかった席は少ししたら外す
       g.phase = PH().LOBBY;
       g.players.forEach((p) => { if (!p.isCpu && p.id !== net.selfSeat) { p.off = true; dropTimers[p.id] = setTimeout(() => removeSeat(p.id), LOBBY_GRACE_MS); } });
@@ -643,6 +660,20 @@ window.ONW = window.ONW || {};
     banner("接続が切れました。ルームを復元しています…", { cancel: false });
     tryRegister(net.code, (peer) => {
       if (gen !== net.gen) { if (peer) { try { peer.destroy(); } catch (e) {} } return; }
+      if (peer && net.isHost) {
+        // この端末はまだホストのまま（スマホで別アプリに切り替えて、合図用サーバーとの接続だけ落ちた場合など）:
+        // ゲームの状態・時計・CPUの発言予定には触れず、接続の受け付けだけ新しい peer に載せ替える
+        const old = net.peer;
+        net.peer = peer;
+        try { if (old && old !== peer) old.destroy(); } catch (e) {}
+        banner(null);
+        startHosting(peer);
+        if (ONW.account && ONW.account.roomSave) ONW.account.roomSave(net.code, net.selfSeat, net.myKey);
+        pushOrder();
+        const g = G();
+        if (!g.inGame) broadcastLobby(); else rerender();
+        return;
+      }
       if (peer && becomeHost(peer, snapStr, true)) return;
       if (peer) { try { peer.destroy(); } catch (e) {} }
       if (n >= 20) { banner("ルームを復元できませんでした。タイトルの「前回のルームを再開」から戻れます。", { cancel: true }); return; }
@@ -672,7 +703,8 @@ window.ONW = window.ONW || {};
     go();
   };
   net.checkLocalHost = function () {
-    const r = net.peer || net.rec ? null : loadLocalSnap();
+    const A = ONW.account;
+    const r = net.peer || net.rec || !(A && A.user) ? null : loadLocalSnap();   // ログインしていないときは出さない（HTMLを直接開いてデバッグしているときに邪魔になる）
     net.hostResume = r ? { code: r.code, at: r.at } : null;
   };
 
@@ -943,8 +975,9 @@ window.ONW = window.ONW || {};
   net.checkRejoin = async function () {
     net.checkLocalHost();   // ログインしていなくても、この端末で自分がホストだったルームがあれば「再開」を出す
     const A = ONW.account;
-    if (!A || !A.user || !A.roomLoad || net.peer || net.rec) { net.rejoinInfo = null; return; }
+    if (!A || !A.user || !A.roomLoad || net.peer || net.rec) { net.rejoinInfo = null; if (!net.peer && !net.rec && G().phase === PH().TITLE) rerender(); return; }   // ログアウトしたら、再入室・再開のボタンもすぐ消す
     let row = null;
+    net.rejoinInfo = null;   // 調べ終わるまでは出さない（前回調べた結果を残さない）
     try { if (net.forgetP) await net.forgetP; } catch (e) {}
     net.forgetP = null;
     if (net.peer || net.rec) return;
@@ -957,6 +990,7 @@ window.ONW = window.ONW || {};
       if (st === "gone") { await new Promise((r) => setTimeout(r, 2500)); if (net.peer || net.rec) return; st = await probeRoom(row.room_code); }   // ホスト交代の最中かもしれないので、少し待ってもう一度
       if (net.peer || net.rec) return;
       if (st === "gone") { try { await A.roomClear(); } catch (e) {} row = null; }
+      else if (st !== "alive") row = null;   // 通信できず確かめられなかったときも出さない（記録は消さず、次にタイトルを開いたときに調べ直す）
     }
     net.rejoinInfo = row ? { code: row.room_code, seat: row.seat_id, key: row.resume_key } : null;
     if (G().phase === PH().TITLE) rerender();
@@ -1162,7 +1196,22 @@ window.ONW = window.ONW || {};
     g.playerCount = n;
     g.dealStart = Date.now();   // 観戦ホストの配布演出用
     g.selectedRoles = roles;
-    ONW.roles.dealRoles(g);
+    // 重複役職: 恋人（配役の枚数には数えず、2人1組でランダムな参加者(CPU含む)に重なる。酔っ払いと同じ人に重なることもある）
+    // 組ごとに「恋人になる確率」で当たる。夜に相方のカードが❤️でめくれて、お互いが分かる
+    g.loverOf = {};
+    {
+      // デバッグ: 指定した組を先に作る（確率は無視）。残りの組は、指定した人を除いたランダムな参加者から
+      const maxPairs = Math.max(0, Math.min(g.loverCount || 0, 5, Math.floor(g.players.length / 2)));
+      const fixedPairs = (ONW.debug ? ONW.debug.loverPairs(g) : []).filter((pr, i, all) => all.slice(0, i).every((q) => !q.includes(pr[0]) && !q.includes(pr[1]))).slice(0, 5);   // 指定した組は、恋人の組数の設定に関係なく全部できる
+      fixedPairs.forEach(([a, b]) => { g.loverOf[a] = b; g.loverOf[b] = a; });
+      const order = ONW.utils.shuffle(g.players.map((p) => p.id).filter((id) => !g.loverOf[id])), pairs = Math.max(0, maxPairs - fixedPairs.length);
+      for (let i = 0; i < pairs; i++) {
+        const a = order[i * 2], b = order[i * 2 + 1];
+        if (!a || !b || !(Math.random() * 100 < (g.loverChance ?? 100))) continue;
+        g.loverOf[a] = b; g.loverOf[b] = a;
+      }
+    }
+    ONW.roles.dealRoles(g);   // 恋人を先に決める（闇鍋の破局師シナジーが「恋人がいるか」を見るため）
     g.center0 = [...g.center];   // 配役直後の墓地（占い・大狼が見るのはこちら。墓荒らしの交換は g.center に反映）
     // COの役職一覧: 配役に入っている役職 + 変化公開ONなら変化後の役職 / OFFで候補ONなら変化先の候補
     const deck = [...new Set(g.selectedRoles)].map((r) => ({ r }));
@@ -1184,25 +1233,10 @@ window.ONW = window.ONW || {};
       ONW.utils.shuffle(g.players.map((p) => p.id).filter((id) => !forced.includes(id))).slice(0, Math.max(0, dn - forced.length)).forEach((id) => { if (Math.random() * 100 < (g.drunkChance ?? 100)) g.drunkOverlay[id] = true; });
     }
     if (Object.keys(g.drunkOverlay).length) g.coDeck.push({ r: "drunk" });
-    // 重複役職: 恋人（配役の枚数には数えず、2人1組でランダムな参加者(CPU含む)に重なる。酔っ払いと同じ人に重なることもある）
-    // 組ごとに「恋人になる確率」で当たる。夜に相方のカードが❤️でめくれて、お互いが分かる
-    g.loverOf = {};
-    {
-      // デバッグ: 指定した組を先に作る（確率は無視）。残りの組は、指定した人を除いたランダムな参加者から
-      const maxPairs = Math.max(0, Math.min(g.loverCount || 0, 5, Math.floor(g.players.length / 2)));
-      const fixedPairs = (ONW.debug ? ONW.debug.loverPairs(g) : []).filter((pr, i, all) => all.slice(0, i).every((q) => !q.includes(pr[0]) && !q.includes(pr[1]))).slice(0, 5);   // 指定した組は、恋人の組数の設定に関係なく全部できる
-      fixedPairs.forEach(([a, b]) => { g.loverOf[a] = b; g.loverOf[b] = a; });
-      const order = ONW.utils.shuffle(g.players.map((p) => p.id).filter((id) => !g.loverOf[id])), pairs = Math.max(0, maxPairs - fixedPairs.length);
-      for (let i = 0; i < pairs; i++) {
-        const a = order[i * 2], b = order[i * 2 + 1];
-        if (!a || !b || !(Math.random() * 100 < (g.loverChance ?? 100))) continue;
-        g.loverOf[a] = b; g.loverOf[b] = a;
-      }
-    }
     if (Object.keys(g.loverOf).length) g.coDeck.push({ r: "lover" });
     g.votes = {};
     g.nightSels = {}; g.morningReveals = {};
-    Object.assign(g, { toughBounces: [], toughBlocks: [], kingGuards: [], strawAsk: {}, deadIds: [], ghostLog: [], nightResolved: false, dbgVotes: {}, nightResults: {}, coBoard: {}, tfLines: [], tfPairs: [], chatLog: [], coState: {}, nightLogsAll: [], newsRoles: [], newsLines: null, newsAnnounced: false, mapoAnnounced: false, observeLog: [], observerSeen: {}, exposeTargets: {}, exposeAnnounced: {}, exposeLines: [], muzzleTargets: {}, muzzleNotified: {}, cpuClaims: [], tmQueue: [], roleTrail: {}, centerTrail: {}, cards: null, morningAct: {}, morningDone: {}, loveTargets: {}, freeterTargets: {}, visitorTargets: {}, executed: [], servantSubs: [], chainIds: [], kingdomIds: [], queenFallen: [], queenSeen: {}, masterPick: null, masterCard: null, cpuQueue: [], cpuVotePlan: {}, cpuRealVote: {}, announced: false, holdUntil: 0, remain: null, morningAck: {}, resultObj: null });
+    Object.assign(g, { toughBounces: [], toughBlocks: [], kingGuards: [], strawAsk: {}, deadIds: [], ghostLog: [], nightResolved: false, dbgVotes: {}, nightResults: {}, coBoard: {}, tfLines: [], tfPairs: [], chatLog: [], coState: {}, nightLogsAll: [], newsRoles: [], newsLines: null, newsAnnounced: false, mapoAnnounced: false, observeLog: [], observerSeen: {}, exposeTargets: {}, exposeAnnounced: {}, exposeLines: [], muzzleTargets: {}, muzzleNotified: {}, cpuClaims: [], tmQueue: [], roleTrail: {}, centerTrail: {}, cards: null, morningAct: {}, morningDone: {}, loveTargets: {}, freeterTargets: {}, visitorTargets: {}, pureLoverTargets: {}, akujoHonmei: {}, akujoKeep: {}, cupidPair: {}, breakerTargets: {}, brokenKeys: {}, breakerShow: {}, breakerSuccess: {}, breakerSeen: {}, breakerBelief: {}, breakerApplied: {}, breakerSettle: {}, shufflerMarks: {}, shufflerStamp: {}, shufflerSettle: {}, shufflerTold: {}, loveLostD: {}, cupidSeen: {}, cupidTold: {}, cupidSettle: {}, akujoSeen: {}, akujoTold: {}, evilSettle: {}, pureLoverPairs: [], pureLoverSeen: {}, pureLoverSettle: {}, pureLoverTold: {}, pureLoverNo: {}, pureLoverNoU: {}, pureLoverGen: {}, loveHist: {}, loveLast: {}, executed: [], servantSubs: [], chainIds: [], kingdomIds: [], queenFallen: [], queenSeen: {}, masterPick: null, masterCard: null, cpuQueue: [], cpuVotePlan: {}, cpuRealVote: {}, announced: false, holdUntil: 0, remain: null, morningAck: {}, resultObj: null });
     ONW.loverPairs(g).forEach(([a, b]) => g.nightLogsAll.push(`恋人 ${(g.players.find((q) => q.id === a) || {}).name} と ${(g.players.find((q) => q.id === b) || {}).name} が恋人になっていました。`));
     ONW.servantPairs(g).forEach(([a, b]) => g.nightLogsAll.push(`従者 ${(g.players.find((q) => q.id === a) || {}).name} のご主人は ${(g.players.find((q) => q.id === b) || {}).name} でした。`));   // 従者のご主人は、配布(ONW.roles.assignServants)のときに決まっている
     ONW.execPairs(g).forEach(([a, b]) => g.nightLogsAll.push(`処刑人 ${(g.players.find((q) => q.id === a) || {}).name} のターゲットは ${(g.players.find((q) => q.id === b) || {}).name} でした。`));   // 処刑人のターゲットも配布(ONW.roles.assignExecutioners)のときに決まっている
@@ -1280,10 +1314,10 @@ window.ONW = window.ONW || {};
 
   function toMorning() {
     const g = G();
-    // 夜の選択を起床順（占い → 墓荒らし → ドッペルゲンガー → 怪盗 → いたずらっ子）に実行。各段階で人間 → CPU の順
+    // 夜の選択を起床順（占い → 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子）に実行。各段階で人間 → CPU の順
     g.morningReveals = {}; g.morningAct = {}; g.morningDone = {}; g.morningAck = {}; g.settling = false;
     ONW.cpu.runNight(g, "init");
-    NIGHT_STAGES.forEach((kind) => { resolveNight(g, kind); ONW.cpu.runNight(g, kind); });
+    NIGHT_STAGES.forEach((kind) => { resolveNight(g, kind); ONW.cpu.runNight(g, kind); ONW.roleHooks("stageEnd").forEach((h) => h.fn(RC(), kind)); });   // stageEnd: 人間もCPUも終わった段階の最後に呼ぶ（破局師の判定。処理順メモ参照）
     applyTroublemakers(g);
     // 墓荒らしが交換した後の役職の能力は、朝に使う。CPUはここで即座に使い、人間は朝の画面で選ぶ
     ONW.cpu.runNight(g, "morning");
@@ -1382,6 +1416,7 @@ window.ONW = window.ONW || {};
     const ids = g.players.map((p) => p.id).filter((id) => ONW.hiddenDrunk(g, id) && !isDead(id) && (!only || id === only));
     if (!ids.length) return;
     pushChat(null, "誰かの酔いが覚めたようです。", "sys");
+    ONW.roleHooks("soberJudge").forEach((h) => h.fn(RC(), ids));   // 破局師: 覚める人の中に破局師のカードがあれば、その時点の盤面で破局を判定（覚めた本人への💔は下の soberExtra）
     const cpuIds = [];
     ids.forEach((id) => {
       g.drunkRevealed[id] = true;
@@ -1578,7 +1613,8 @@ window.ONW = window.ONW || {};
       // 朝に使う能力（墓荒らしが交換した後の役職）: 選んだ瞬間に実行して結果を返す。朝の時点の実際のカードを見る・動かす
       const before = { ...g.currentRoles };
       const me = byId(id), ar = g.morningAct[id], sel = d.sel || {}, label = rn(ar);
-      const okP = (x) => typeof x === "string" && x !== id && !!byId(x);
+      const selfOk = !!((ONW.roleDef(ar) || {}).stagePick || {}).self;   // シャッフラーは自分も選べる（stagePick.self）
+      const okP = (x) => typeof x === "string" && (x !== id || selfOk) && !!byId(x);
       const okG = (x) => Number.isInteger(x) && x >= 0 && x < g.center.length;
       const players = [...new Set((sel.players || []).filter(okP))], graves = [...new Set((sel.graves || []).filter(okG))];
       // 能力の中身は js/roles/<役職>.js の morning.run（結果の文章・演出・次に使える能力を返す。選択が足りなければ null）
@@ -1605,7 +1641,8 @@ window.ONW = window.ONW || {};
     if (d.t === "act" && d.kind === "sel" && g.phase === PH().ONLINE_NIGHT && isActive(role) && !(g.drunkOverlay && g.drunkOverlay[id]) && byId(id)) {
       // 夜の選択: 朝になるまで何度でも変更できる。確定・演出は夜の終わり(resolveNight)
       const sel = d.sel || {}, ar = effRole(g, id);
-      const okP = (x) => typeof x === "string" && x !== id && !!byId(x);
+      const selfOk = !!((ONW.roleDef(ar) || {}).stagePick || {}).self;   // シャッフラーは自分も選べる（stagePick.self）
+      const okP = (x) => typeof x === "string" && (x !== id || selfOk) && !!byId(x);
       const okG = (x) => Number.isInteger(x) && x >= 0 && x < g.center.length;
       let players = [...new Set((sel.players || []).filter(okP))], graves = [...new Set((sel.graves || []).filter(okG))];
       const nz = ONW.roleDef(ar).night.normalize;   // 選べる人数・墓地の枚数は js/roles/<役職>.js の night.normalize
@@ -1656,7 +1693,7 @@ window.ONW = window.ONW || {};
       if (d.disclose) boardEntry(id).results.push(String(d.short || text).slice(0, 80));
       const c = d.claim;
       if (c && ["seer", "robber", "doppel", "freeter", "servant"].includes(c.kind) && byId(c.target) && g.initialRoles[id] !== undefined) g.cpuClaims.push({ from: id, kind: c.kind, target: c.target, role: c.role });   // フリーター・従者は、名指しされたCPUが騙りで話を合わせるために記録する
-      pushChat(null, `${byId(id).name} ${text}`, "co");
+      pushChat(null, `${byId(id).name}: ${text}`, "co");
       sendBoard();
     }
 
@@ -1778,15 +1815,16 @@ window.ONW = window.ONW || {};
       segs.push({ name: rn(ini), team: teamOf(ini), sfx: sfxOf("P:" + p.id) });
       // 入れ替わるたびの役職を全部つなぐ（怪盗 → 怪盗 のように同じ役職に入れ替わった場合も出す）
       const trail = (g.roleTrail || {})[p.id] || [];
-      trail.forEach((r, k) => segs.push({ name: rn(r), team: teamOf(r), sfx: sfxOf(cardTrail[k]) }));
+      const shufStamp = g.shufflerStamp || {};   // シャッフラーの印が付いた段階（置かれた段階と、そのカードが動いたあとの段階）
+      trail.forEach((r, k) => segs.push({ name: rn(r), team: teamOf(r), sfx: sfxOf(cardTrail[k]), shuf: !!shufStamp[p.id + "|" + k] }));
       if ((trail.length ? trail[trail.length - 1] : ini) !== fin) segs.push({ name: rn(fin), team: teamOf(fin) });
       segs[segs.length - 1].sfx = sfx;
       noDarkSfx(segs);   // 闇の化身には (+人狼) を付けない
       // 本家どおり: 恋人は「(+恋人1)」（組の番号つき・ピンク）、酔っ払いは「(+酔っ払い)」（金色）を、最終の役職のあとに並べる
-      // 恋人は「人」についているので、光の使徒(+恋人1)→占い師(+恋人1)→人狼(+恋人1) のように、変化・交換の途中のカードすべてに付ける
-      const loveTags = [];
-      ONW.loverPairs(g).forEach(([a, b], k) => { if (a === p.id || b === p.id) loveTags.push({ t: `(+恋人${k + 1})`, k: "love" }); });
-      if (loveTags.length) segs.forEach((sg) => { sg.tags = [...loveTags]; });
+      // 配布時の恋人は「人」についているので、変化・交換の途中のカードすべてに付ける。
+      // 純愛者の恋人は「成立していた間の段階」にだけ付ける（光の使徒→村人→村人(+恋人1)→村人）。番号は成立した順。純愛者が選んだ段階・組が変わった段階は、役職が同じでも1段階として足す（純愛者→純愛者(+恋人1)）
+      ONW.pureLover.applyMarks(g, p.id, segs, !!from);
+      ONW.shuffler.tagSegs(segs);   // シャッフラーが置いたカードの段階には「(+シャッフラー)」（恋人の印のあとに並べる）   // 配布時の恋人は全段階に、純愛者の恋人は成立していた段階にだけ付ける
       if (g.drunkOverlay && g.drunkOverlay[p.id]) segs.forEach((sg) => { sg.tags = [{ t: "(+酔っ払い)", k: "drunk" }, ...(sg.tags || [])]; });   // 酔っ払いは「人」についているので、変化の途中のカードすべてに付ける: 闇の化身(+酔っ払い)→人狼(+酔っ払い)
       // シュレディンガーの猫: 最終役職の文字色が、参照先の陣営の色になる（村人=緑 / 人狼=赤 / 第三陣営の役職=灰色のまま「(+その役職名)」/ 無所属・堂々巡り・恋人=灰色）
       const catI = fin === ONW.ROLE.SCHRODINGER_CAT ? (g.catInfo || {})[p.id] : null;
@@ -1803,7 +1841,7 @@ window.ONW = window.ONW || {};
       const by = isChain ? nm((g.chainBy || {})[p.id]) : null;
       const sub = isChain && (g.chainSub || {})[p.id] ? nm(g.chainSub[p.id]) : null;   // 道連れの身代わりになった従者: 守られたご主人の名前
       const label = sub ? "身代わり" : kind === "tomo" ? "道連れ" : kind === "lovers" ? "心中" : kind === "queen" ? "王国滅亡" : kind === "follow" ? "後追い" : "無理心中";
-      return { id: p.id, role: fin, ini, win: winIds.includes(p.id), dead: gone.includes(p.id), name: p.name, segs, sub, cause: isChain ? "chain" : gone.includes(p.id) ? "exec" : null, mental: (g.mentalIds || []).includes(p.id), shock: (g.shockIds || []).includes(p.id), kind, by, late: !!(g.chainLate || {})[p.id], lover: ONW.loverMate(g, p.id), loverNo: (ONW.loverPairs(g).findIndex(([a, b]) => a === p.id || b === p.id) + 1) || 0, byRole: isChain ? (g.currentRoles[(g.chainBy || {})[p.id]] || null) : null, bounce, status: isChain ? `［${label}］` : (g.mentalIds || []).includes(p.id) ? "［メンタル崩壊］" : gone.includes(p.id) ? ((g.servantSubs || []).some((x) => x.servant === p.id) ? "［身代わり］" : execTg ? "［処刑］" : bounce ? "［とばっちり］" : "［追放］") : "［生存］", execTg };
+      return { id: p.id, role: fin, ini, shuf: !!(segs[segs.length - 1].tags || []).some((t) => t.k === "shuffler"), win: winIds.includes(p.id), dead: gone.includes(p.id), name: p.name, segs, sub, cause: isChain ? "chain" : gone.includes(p.id) ? "exec" : null, mental: (g.mentalIds || []).includes(p.id), shock: (g.shockIds || []).includes(p.id), kind, by, late: !!(g.chainLate || {})[p.id], lover: ONW.isLover(g, p.id), loverNo: (() => { const q = ONW.loverPairs(g).find(([a, b]) => a === p.id || b === p.id); return q ? ONW.loverNo(g, q[0], q[1], q[2]) : 0; })(), byRole: isChain ? (g.currentRoles[(g.chainBy || {})[p.id]] || null) : null, bounce, status: isChain ? `［${label}］` : (g.mentalIds || []).includes(p.id) ? "［メンタル崩壊］" : gone.includes(p.id) ? ((g.servantSubs || []).some((x) => x.servant === p.id) ? "［身代わり］" : execTg ? "［処刑］" : bounce ? "［とばっちり］" : "［追放］") : "［生存］", execTg };
     });
     const result = {
       title: g.winTitle,
@@ -1846,7 +1884,42 @@ window.ONW = window.ONW || {};
   // ホスト端末: 画面を閉じる・隠す直前にも、進行状態を端末に保存する（スマホで別アプリに切り替えて接続が切れても、戻ってきたら再開できる）
   const saveNow = () => { try { if (net.isHost) saveLocalSnap(); } catch (e) {} };
   window.addEventListener("pagehide", saveNow);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveNow(); });
+  // ホスト（と CPU だけ）の試合: 別のアプリを開いている間は、時計・CPUの発言・昼の開始待ちを止めて、戻ってきたら続きから動かす
+  // （他に人間の参加者がいるときは止めない。止めると全員の試合が止まってしまう）
+  let hidePause = null;
+  const soloHost = () => net.isHost && G().inGame && !net.frozen && !net.xfer && !Object.values(net.conns).some((c) => c && c.open);
+  function pauseForHide() {
+    const g = G();
+    if (hidePause || !soloHost()) return;
+    const P = PH();
+    if (g.phase === P.LOBBY || g.phase === P.ONLINE_RESULT) return;
+    const cb = g.tickCb, hadTick = !!g.tickId, hadPump = !!g.pumpId, hadDay = !!g.dayStartId && !!g.dayBegin;
+    if (!hadTick && !hadPump && !hadDay) return;
+    if (hadTick) stopTimer();
+    if (hadPump) { clearTimeout(g.pumpId); g.pumpId = null; }
+    if (hadDay) clearTimeout(g.dayStartId);
+    hidePause = { cb: hadTick ? cb : null, pump: hadPump, day: hadDay ? g.dayBegin : null };
+  }
+  function resumeFromHide() {
+    const g = G(), h = hidePause;
+    if (!h) return;
+    hidePause = null;
+    if (!net.isHost || !g.inGame) return;
+    if (h.cb && Number.isFinite(g.remain) && g.remain > 0) startTimer(g.remain, h.cb.onEnd, h.cb.onTick);   // 止めた残り時間から続きを数える
+    if (h.pump && g.phase === PH().ONLINE_DAY && g.cpuQueue && g.cpuQueue.length && !g.pumpId) g.pumpId = setTimeout(pump, 800);
+    if (h.day && g.phase === PH().ONLINE_DAY && !g.dayStartId) { g.dayBegin = h.day; g.dayStartId = setTimeout(h.day, 600); }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { pauseForHide(); saveNow(); return; }
+    // 画面に戻ってきた（別アプリから復帰）: 隠れている間はこちらからの生存確認(hb)も止まっていて、参加者からの返事も届いていない。
+    // そのまま判定すると「返事が無い」と誤って接続を切ってしまうので、猶予を作り直し、落ちている合図用サーバーとの接続をつなぎ直す
+    if (!net.isHost) return;
+    const now = Date.now();
+    Object.keys(net.conns).forEach((seat) => { net.rx[seat] = now; });
+    const p = net.peer;
+    if (p && !p.destroyed && p.disconnected) { try { p.reconnect(); } catch (e) {} }
+    resumeFromHide();   // 接続のつなぎ直しを始めたうえで、止めていた時計を動かす
+  });
   setTimeout(() => { net.checkLocalHost(); try { if (G().phase === PH().TITLE) rerender(); } catch (e) {} }, 0);   // 開き直したとき、前回のルームがあればタイトルに「再開」を出す
 
   ONW.net = net;

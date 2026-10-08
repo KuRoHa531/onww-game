@@ -16,7 +16,7 @@
     cpuLearn,   // CPU: 人狼系を知っている
     info: { deck: 6, name: "狂信者", team: ONW.TEAM.WOLF, wakeOrder: 20, sort: 1.7,
       desc: "人狼陣営。墓地以外の人狼プレイヤーを知っている狂人です。" },
-    groups: { mad: 3, "transform:dark_avatar": 10 },
+    groups: { mad: 3, "transform:dark_avatar": 12 },
     nightMsg(c, p) {
       const g = c.g;
       let cultWolves = null;

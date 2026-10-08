@@ -158,15 +158,18 @@ window.ONW = window.ONW || {};
       Object.keys(need).forEach((q) => { slots.filter((s) => s.role === q).slice(0, need[q]).forEach((f) => kept.add(f.key)); });   // 必要役職は必要な枚数だけ守る(余りは他の必要役職に回せる)
     });
     // 個数ルール(SYNERGY_COUNT_RULES): trigger がいるとき、すでにいる対象役職の枠(必要枚数まで)は置き換えで壊さないよう守る
+    const hasLover = Object.keys(game.loverOf || {}).length > 0;
+    const active = (r) => (r.always || has(r.trigger)) && !(r.unlessLover && hasLover);
     ONW.SYNERGY_COUNT_RULES.forEach((r) => {
-      if (!has(r.trigger)) return;
-      slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });   // 後覚者そのものは置き換えない
+      if (!active(r)) return;
+      if (r.trigger) slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });   // 後覚者そのものは置き換えない
       slots.filter((s) => r.anyOf.includes(s.role)).slice(0, r.min).forEach((f) => kept.add(f.key));
     });
     const set = (slot, role) => {
       slot.role = role; kept.add(slot.key);
       if (slot.id !== undefined) { game.initialRoles[slot.id] = role; game.currentRoles[slot.id] = role; } else game.center[slot.idx] = role;
     };
+    const inPair = (s) => (s.role === ONW.ROLE.MERLIN && has(ONW.ROLE.ASSASSIN)) || (s.role === ONW.ROLE.ASSASSIN && has(ONW.ROLE.MERLIN));
     ONW.SYNERGY_RULES.forEach((rule) => {
       if (!has(rule.trigger)) return;
       const seen = {};
@@ -177,7 +180,7 @@ window.ONW = window.ONW || {};
         let cands = slots.filter((s) => !kept.has(s.key) && can(s));
         // 置き換えられる枠がないときだけ、別の変化役の trigger 枠（この rule の trigger は除く）を置き換える
         // 例: 闇の化身が2枚とも忘却の人狼などに変化していて、狼夢人のための人狼を置く枠がない
-        if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && !locked.has(s.key) && triggers.has(s.role) && s.role !== rule.trigger && can(s));
+        if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && !locked.has(s.key) && triggers.has(s.role) && s.role !== rule.trigger && !inPair(s) && can(s));   // アサシン↔マーリンが揃っているときは、その2枚は他のシナジーの置き換えに使わない
         // それでもないときは、デバッグで変化先を固定した枠も置き換える（固定した変化でもシナジーを発動させる）。シナジー役の枠と、必要役職の枠は除く
         if (!cands.length) {
           const req1 = new Set(rule.required);
@@ -191,7 +194,7 @@ window.ONW = window.ONW || {};
     });
     // 個数ルール: 対象役職(anyOf のどれでもよい)が合計で min 枚以上、盤面に出るようにする。足りない分は、変化役から変化した枠を置き換えて足す
     ONW.SYNERGY_COUNT_RULES.forEach((rule) => {
-      if (!has(rule.trigger)) return;
+      if (!active(rule)) return;
       let guard = 8;
       while (slots.filter((s) => rule.anyOf.includes(s.role)).length < rule.min && guard-- > 0) {
         const opts = (s) => s.from ? ONW.roles.enabledTargets(game, s.from).filter((t) => rule.anyOf.includes(t)) : [];
@@ -210,7 +213,7 @@ window.ONW = window.ONW || {};
         set(slot, ONW.utils.randomChoice(o.filter((r) => cnt(r) === min)));
       }
       // 上限(max): 多すぎるときは、変化役から変化した枠の分だけ、対象役職でない役職（シナジーの trigger にならないもの）へ変え直す。最初から配役に入れた枠は動かさない
-      const trig = new Set([...ONW.SYNERGY_RULES.map((r) => r.trigger), ...ONW.SYNERGY_COUNT_RULES.map((r) => r.trigger)]);
+      const trig = new Set([...ONW.SYNERGY_RULES.map((r) => r.trigger), ...ONW.SYNERGY_COUNT_RULES.map((r) => r.trigger)].filter(Boolean));
       guard = 8;
       while (rule.max && slots.filter((s) => rule.anyOf.includes(s.role)).length > rule.max && guard-- > 0) {
         const cands = slots.filter((s) => rule.anyOf.includes(s.role) && s.from && !locked.has(s.key) && ONW.roles.enabledTargets(game, s.from).some((t) => !rule.anyOf.includes(t) && !trig.has(t)));
@@ -235,6 +238,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WHITE_WOLF,     required: [ONW.ROLE.VILLAGER, ONW.ROLE.SEER] },
     { trigger: ONW.ROLE.FORGETFUL_WOLF, required: [ONW.ROLE.VILLAGER] },
     { trigger: ONW.ROLE.ASSASSIN,       required: [ONW.ROLE.MERLIN] },   // アサシンが出る闇鍋には、狙う相手のマーリンも最低1枚出す
+    { trigger: ONW.ROLE.MERLIN,         required: [ONW.ROLE.ASSASSIN] }, // マーリンが出る闇鍋には、狙うアサシンも最低1枚出す（アサシン↔マーリンの相互シナジー）
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
@@ -242,10 +246,12 @@ window.ONW = window.ONW || {};
   ];
   /**
    * 闇鍋シナジー（個数ルール）: trigger がいるとき、anyOf のどれかの役職が合計 min 枚以上 max 枚以下、盤面(プレイヤー+墓地)に出る（max は変化役から変化した枠だけ減らせる）。
-   * 後覚者は「最終的な役職」を知る役職なので、役職を動かす怪盗・いたずらっ子・グレムリン・ドッペルゲンガーが2枚以上ないと能力が活きない。
+   * 後覚者は「最終的な役職」を知る役職なので、役職を動かす怪盗・いたずらっ子・グレムリン・ドッペルゲンガー・シャッフラーが2枚以上ないと能力が活きない。
    */
   ONW.SYNERGY_COUNT_RULES = [
-    { trigger: ONW.ROLE.INSOMNIAC, anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER], min: 2, max: 2 },
+    { trigger: ONW.ROLE.INSOMNIAC, anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
+    { trigger: ONW.ROLE.HEARTBREAKER, anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
+    { always: true, anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
   ];
   /**
    * 本人に見せる「変化前」の役職。思い込み系（忘却の人狼・狼憑き・狼夢人）は、本当の変化前ではなく

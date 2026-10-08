@@ -37,7 +37,7 @@
       g.exposeAnnounced[p.id] = true;
       const extras = [];
       if (g.drunkOverlay && g.drunkOverlay[t]) extras.push("酔っ払い");   // 本家: 酔っぱらい・恋人なら付加情報も公開
-      if (ONW.loverMate(g, t)) extras.push("恋人");
+      if (ONW.isLover(g, t)) extras.push("恋人");
       rows.push({ role: c.rn(g.currentRoles[t]), extras });
     });
     ONW.utils.shuffle(rows);
@@ -62,7 +62,7 @@
   ONW.defineRole("exposed_madman", {
     info: { deck: 52, name: "暴露狂人", team: ONW.TEAM.WOLF, wakeOrder: 42, sort: 1.8,
       desc: "人狼陣営。夜に1人を選びます。昼の始まりに、その人の最終役職だけが全員に公開されます（選んだ相手の名前や暴露狂人本人は公開されません）。恋人や酔っ払いなどの付加情報も一緒に公開されます。人狼が誰かは分かりません。人狼を勝たせるのが目的です。" },
-    groups: { mad: 2.5, "transform:dark_avatar": 9.5 },
+    groups: { mad: 2.5, "transform:dark_avatar": 14 },
     uiNight: uiPick,
     cpuNight: { order: 60, stage: "seer", chain: true, run: cpuRun },   // CPUの夜の行動(chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     stagePick: {},   // 夜(と朝の連鎖)にカードを押して行動する: プレイヤー1人

@@ -68,7 +68,7 @@
       kind: "robber", order: 10,
       complete: (np) => np === 1,
       normalize: (c, players) => ({ players: players.slice(0, 1), graves: [] }),
-      resolve(c, p) {   // 怪盗 → いたずらっ子（起床順）。いたずらっ子の入れ替えは最後にまとめて反映
+      resolve(c, p) {   // 怪盗 → いたずらっ子（起床順。怪盗はシャッフラー・グレムリンのあと）。いたずらっ子の入れ替えは最後にまとめて反映
         const g = c.g, rn = c.rn;
         const t = c.selOf(p).players[0]; if (!t) return;
         ONW.swapPlayers(g, p.id, t);

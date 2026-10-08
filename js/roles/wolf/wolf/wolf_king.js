@@ -23,7 +23,7 @@
    */
   ONW.kingProtected = function kingProtected(g, kid, gone, dying) {
     const R = ONW.ROLE, blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER];
-    const subbed = (w) => !blocked.includes(g.currentRoles[w]) && ONW.servantPairs(g).some(([s, m]) => m === w && s !== w && !dying.has(s) && !gone.has(s) && !ONW.loverMate(g, s));
+    const subbed = (w) => !blocked.includes(g.currentRoles[w]) && ONW.servantPairs(g).some(([s, m]) => m === w && s !== w && !dying.has(s) && !gone.has(s) && !ONW.isLover(g, s));
     const others = ONW.vote.wolfJudgeIds(g).filter((w) => w !== kid && !gone.has(w));
     if (others.some((w) => !dying.has(w) || subbed(w))) return true;                       // 同時に死なない人狼判定が生き残る
     // 生き残る人がいないとき: 人狼王どうしが同時に追放・道連れにされるだけなら、互いを守り合って死なない。人狼王以外の人狼判定も同時に死ぬなら、全員死ぬ

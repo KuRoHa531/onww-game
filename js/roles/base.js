@@ -6,6 +6,8 @@
  *   2) index.html の「役職ファイル」の並びに <script src="js/roles/<陣営>/<役職ID>.js"></script> を1行足す
  *   これだけで、夜の能力・夜の画面の説明・朝/昼の通知が net.js から呼ばれる(net.js は触らなくてよい)。
  *
+ * 【役職の処理順】ユーザー指定の全順序(まだない役職も含む)は _wip/役職の処理順.txt。night.kind / night.order を決めるときは必ず参照すること。
+ *
  * 定義できるもの(すべて省略可):
  *   like: "seer"                他の役職の定義を土台にする(足りない項目だけ自分で上書き)
  *   info: { name, team, wakeOrder, desc, sort, deck, count }   役職の名前・陣営・夜の行動順・説明文(ONW.ROLE_INFO に集約される)。
@@ -15,10 +17,13 @@
  *   groups: { wolf: n, mad: n, tomo: n, selfAsVillager: n, selfAsWolf: n, newsHidden: n, "transform:<変化役のID>": n }
  *         役職グループへの所属(ONW.WOLF_KIND / MAD_KIND / TOMO_ROLES / SELF_AS_VILLAGER / SELF_AS_WOLF / NEWS_HIDDEN / TRANSFORM_GROUPS[変化役])。
  *         n は並び順(小さいほど先)。例: 光の使徒の変化先になる役職は groups: { "transform:light_apostle": 3 }
+ *   【必須・毎回入れること】新しい役職は、陣営に合う変化役の変化先に必ず入れる（抜けると、ロビーの変化候補・固定役の変化指定・設定のOFF・ガイドに出ない）:
+ *       村人系 → "transform:light_apostle"（光の使徒）/ 人狼系 → "transform:dark_avatar"（闇の化身）/ 狂人系 → "transform:dark_avatar"（闇の化身）/ 第三陣営 → "transform:silver_shadow"（銀色の影）
+ *       番号 n は同じ変化役の中での並び順。入れたか確認は node _wip/groupcheck.js .（登録もれがあると FAIL）
  *   hiddenWolf: true            人狼系だが夜に仲間から見えない(一匹狼)。ONW.VISIBLE_WOLF から外れる
  *   descFor(desc, g)            説明文をルーム設定などで差し替えたいとき(メイヤーの票数)。ONW.roleDesc から呼ばれる
  *   night: {                    夜に自分で能力を使う役職
- *     kind:  "seer"|"relic"|"doppel"|"robber"|"gremlin"|"tm"   夜が明けるときに実行される段階(net.js の NIGHT_STAGES)
+ *     kind:  "seer"|"relic"|"doppel"|"shuffler"|"gremlin"|"robber"|"tm"   夜が明けるときに実行される段階(net.js の NIGHT_STAGES)
  *     order: 数字              同じ段階の中の順番(小さいほど先)
  *     chain: false             墓荒らしの交換後/ドッペルのコピー後に「朝のうちに使える」役職から外す(墓荒らし自身)
  *     complete(np, ng)         選択が完了しているか(np=選んだ人数, ng=選んだ墓地の枚数)
@@ -29,6 +34,7 @@
  *   nightMsg(c, p, r)          夜の始まりに本人へ出す内容(text/text2/lines/godPeek/bigGraves/cultWolves/masonMates/master)
  *   got(c, p, got, rev, opts)  墓荒らし/ドッペルでこの役職を手にしたときの夜の情報
  *   soberLines(c, id, fin) / soberPeek(c, id, fin) / soberExtra(c, id, fin)   酔いが覚めたときの情報
+ *   soberJudge(c, ids)   酔いが覚める直前(ids = 覚める人): 覚めた瞬間の判定が必要な役職(破局師)用
  *   settlePre(c) / settlePost(c) / settleMsg(c, p, mode)   朝のあとの待機時間(mode: "settle" | "resync")
  *   dayShift(c, before) / dayCheck(c, before) / dayNews(c) / dayNotice(c)   昼のうちに役職が動いたとき
  *   dayStart(c) / dayAnnounce(c) / soberReveal(c, ids) / resyncDay(c, seat) / cpuLateVisits(c)

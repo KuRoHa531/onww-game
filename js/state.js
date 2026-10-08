@@ -46,10 +46,54 @@ window.ONW = window.ONW || {};
   ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : role);
   /** 酔っ払いが重なっていて、まだ酔いが覚めていない人か */
   ONW.hiddenDrunk = (g, id) => !!(g.drunkOverlay && g.drunkOverlay[id] && !(g.drunkRevealed && g.drunkRevealed[id]));
-  /** 恋人の相方のid（恋人でなければ null）。恋人は「人」についている重複役職なので、役職が入れ替わっても相方は変わらない */
+  /** 配布時の恋人の相方のid（なければ null）。恋人(重複役職)は「人」についているので、役職が入れ替わっても相方は変わらない。夜の「〇〇と恋人です」の表示はこれだけを見る */
   ONW.loverMate = (g, id) => (g && g.loverOf && g.loverOf[id]) || null;
-  /** 恋人の組 [[a, b], ...]（idの並び順で重複なし） */
-  ONW.loverPairs = (g) => { const out = []; Object.keys((g && g.loverOf) || {}).forEach((a) => { const b = g.loverOf[a]; if (b && a < b && g.loverOf[b] === a) out.push([a, b]); }); return out; };
+  /** 恋人の相方すべて（配布時の恋人 + 純愛者で成立した恋人。複数の恋人関係を同時に持てる）。純愛者の組は待機時間に g.pureLoverPairs へ確定する(roles/neutral/pure_lover.js) */
+  ONW.loverMates = (g, id) => {
+    const out = [], base = ONW.loverMate(g, id);
+    if (base && !ONW.brokenDealt(g, id, base)) out.push(base);   // 破局師に壊された配布時の恋人は、恋人として数えない（loverMate は配布時の事実なのでそのまま）
+    ((g && g.pureLoverPairs) || []).forEach(([a, b]) => { const o = a === id ? b : b === id ? a : null; if (o && o !== id && !out.includes(o)) out.push(o); });
+    return out;
+  };
+  /** 破局（破局師）: g.brokenKeys[キー] = true で壊された恋人関係を記録する。配布時の組は "d:小>大"、純愛者・悪女・キューピッドの組は カード＋世代の "c:カード#世代"（relKey）。
+   *  カードのキーなので、壊したあとで役職が動いても壊れたまま。選び直した・コピーされたカードは世代が変わるので別の関係（壊れない） */
+  ONW.relKey = (g, pr) => { const c = ONW.cardAt(g, pr[2] || pr[0]); return "c:" + c + "#" + (((g && g.pureLoverGen) || {})[c] || 0); };
+  ONW.isBrokenRel = (g, pr) => !!(g && g.brokenKeys && g.brokenKeys[ONW.relKey(g, pr)]);
+  ONW.brokenDealt = (g, a, b) => !!(g && g.brokenKeys && g.brokenKeys["d:" + (a < b ? a + ">" + b : b + ">" + a)]);
+  /** 恋人（配布時でも純愛者でも）がいる人か */
+  ONW.isLover = (g, id) => ONW.loverMates(g, id).length > 0;
+  /** 配布時の恋人の組 [[a, b], ...]（a < b） */
+  ONW.dealtPairs = (g) => {
+    const out = [];
+    Object.keys((g && g.loverOf) || {}).forEach((a) => { const b = g.loverOf[a]; if (b && a < b && g.loverOf[b] === a && !out.some((x) => x[0] === a && x[1] === b)) out.push([a, b]); });
+    return out;
+  };
+  /** 恋人の組 [[a, b], ...]（a < b・重複なし。配布時の組が先、純愛者の組は「成立した順」に続く） */
+  /** 恋人の組のキー: 通常は "a>b"。キューピッドの組（3つ目 = キューピッドの持ち主）は、キューピッドのカード＋世代つきの "a>b@カード#世代" にして、
+   *  同じ2人でも別のキューピッド（コピーなど）なら別の恋人関係（恋人1と恋人2）として数える */
+  ONW.pairKey = (g, pr) => {
+    const x = pr[0], y = pr[1], a = x < y ? x : y, b = x < y ? y : x;
+    if (!pr[2]) return a + ">" + b;
+    const c = ONW.cardAt(g, pr[2]);
+    return a + ">" + b + "@" + c + "#" + (((g && g.pureLoverGen) || {})[c] || 0);
+  };
+  ONW.loverPairs = (g, noDealt) => {   // noDealt: true なら配布時の組を除く（番号のずれ防止用）。壊れた組は含めない
+    const act = ONW.dealtPairs(g).filter(([a, b]) => !ONW.brokenDealt(g, a, b)), out = noDealt ? [] : act.slice(), has = (a, b) => act.some((x) => x[0] === a && x[1] === b), pure = [], ks = new Set();
+    ((g && g.pureLoverPairs) || []).forEach((pr) => { const [x, y, o] = pr; if (!x || !y || x === y) return; const a = x < y ? x : y, b = x < y ? y : x, k = ONW.pairKey(g, pr); if (ks.has(k) || (!o && has(a, b))) return; ks.add(k); pure.push(o ? [a, b, o] : [a, b]); });
+    const ord = (pr) => ((g && g.pureLoverNoU) || {})[ONW.pairKey(g, pr)] || 1e9;
+    pure.map((pr, i) => ({ pr, i })).sort((u, v) => ord(u.pr) - ord(v.pr) || u.i - v.i).forEach((o) => out.push(o.pr));
+    return out;
+  };
+  /** 恋人の組の番号（恋人1, 恋人2 ...）: 配布時の組が先、純愛者の組は成立した順（成立後に消えた組も番号は詰めない） */
+  ONW.loverNo = (g, a, b, holder) => {   // holder: キューピッドの組なら持ち主（同じ2人でも別のキューピッドなら別の番号）
+    if (a > b) [a, b] = [b, a];
+    const d = ONW.dealtPairs(g), di = d.findIndex((x) => x[0] === a && x[1] === b);
+    if (di >= 0 && !holder) return di + 1;
+    const o = ((g && g.pureLoverNoU) || {})[ONW.pairKey(g, holder ? [a, b, holder] : [a, b])];
+    if (o) return d.length + o;
+    const pure = ONW.loverPairs(g, true), pi = pure.findIndex((x) => x[0] === a && x[1] === b && (!holder || x[2] === holder));
+    return d.length + Math.max(0, ...Object.values((g && g.pureLoverNoU) || {})) + 1 + Math.max(0, pi);
+  };
   /** 占い師・狂った占い師が占える墓地の枚数（設定値と墓地の枚数の小さい方） */
   ONW.seerGraveMax = (g) => Math.max(0, Math.min(Number.isFinite(+g.seerGraveCount) ? +g.seerGraveCount : 2, g.graveCount || g.graveTotal || 0));
   /* =====================================================================================
@@ -69,10 +113,14 @@ window.ONW = window.ONW || {};
    *   4. 読む時は「最終盤面の持ち主のID」で引く（例: vote.js の resolveChain / determineWinners）。
    *   5. 選ばれた「相手」(対象のプレイヤー)はプレイヤー単位のまま。対象の役職が動いても対象は変わらない。
    *   新しい役職で夜に誰かを選ぶ・何かを記録するものは、すべてこのルールで作ること。
+   *
+   *  【必須・役職追加のたびに入れること】新しい役職は groups に変化先を必ず書く（抜けるとロビーの変化候補・固定役の変化指定・設定・ガイドに出ない）:
+   *     村人系 → "transform:light_apostle" / 人狼系・狂人系 → "transform:dark_avatar" / 第三陣営 → "transform:silver_shadow"
+   *     確認: node _wip/groupcheck.js .（登録もれがあれば FAIL。node _wip/viewall.js . の一覧にも出る）
    * ===================================================================================== */
-  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
+  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
   const holderKeyOfGrave = (i) => "g:" + i;
-  ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; };
+  ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; if ((key === "pureLoverTargets" || key === "akujoHonmei" || key === "cupidPair") && ONW.pureLover) { const c = ONW.cardAt(g, holderId); (g.pureLoverGen = g.pureLoverGen || {})[c] = ((g.pureLoverGen || {})[c] || 0) + 1; ONW.pureLover.note(g, []); } };   // 選び直したカードは、新しい恋人関係（次の番号）   // 純愛者が選んだ瞬間も、結果画面の「恋人の印」の履歴に残す
   ONW.getRoleBound = (g, key, holderId) => (g[key] || {})[holderId];
 
   // 女王の通知文 ONW.queenNoticeText は js/roles/queen.js、従者通知の文言 ONW.SERVANT_NOTICE_TEXT は js/roles/servant.js へ移動
@@ -83,14 +131,28 @@ window.ONW = window.ONW || {};
     const cd = cards(g);
     let role = g.currentRoles[srcId];
     if (role === ONW.ROLE.DOPPELGANGER) role = ONW.ROLE.VILLAGER;
-    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.EXECUTIONER]: "execTargets" }[role];
-    const val = carry ? (g[carry] || {})[srcId] : undefined;
+    const carry2 = role === ONW.ROLE.EVIL_WOMAN ? "akujoKeep" : null;   // 悪女は本命(carry)とキープ(carry2)の2つを持つ
+    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.EXECUTIONER]: "execTargets" }[role];
+    // コピーされた側(dst)は、酔っ払いでない限り（夜に配られた役職のまま眠っていないので）コピーされた役職の能力を自分では使えない。だから選択（フリーターの就職先・悪女の本命/キープ など）もまるごとコピーする。
+    // 酔っ払いの dst は昼に酔いが覚めてから最終役職の能力を自分で使えるので、「能力を使った判定」(選択の記録)はコピーしない（従者のご主人・処刑人のターゲットは能力の使用ではなく自動で決まるのでこれまで通り）。
+    const dstDrunk = !!ONW.hiddenDrunk(g, dstId), passive = carry === "servantMasters" || carry === "execTargets";
+    const copyPick = !dstDrunk || passive;
+    const val = carry && copyPick ? (g[carry] || {})[srcId] : undefined, val2 = carry2 && copyPick ? (g[carry2] || {})[srcId] : undefined;
     g.currentRoles[dstId] = role;
-    if (carry && val !== undefined) (g[carry] = g[carry] || {})[dstId] = val;   // 就職先・ご主人・一目惚れ先・ターゲットごとコピー
+    ["akujoHonmei", "akujoKeep"].forEach((k) => { if (g[k]) delete g[k][dstId]; });   // 上書きされた役職の悪女の記録は消す（悪女をコピーするときは下で新しく入れる）
+    if (g.cupidPair) delete g.cupidPair[dstId];   // 上書きされたキューピッドの記録は消す（キューピッドをコピーするときは下で新しく入れる）
+    if (g.breakerTargets) delete g.breakerTargets[dstId];   // 上書きされた破局師の記録は消す（破局師をコピーするときは下で新しく入れる）
+    if (g.shufflerMarks) delete g.shufflerMarks[cd.at[dstId]];   // 上書きされたカードの上のシャッフラーの印は消える（上に別の役職が置かれたのと同じ）
+    if (g.pureLoverTargets) delete g.pureLoverTargets[dstId];   // 上書きされた役職の純愛者の記録は消す（古い記録の復活を防ぐ。純愛者をコピーするときは下で新しく入れる）
+    (g.pureLoverGen = g.pureLoverGen || {})[cd.at[dstId]] = ((g.pureLoverGen || {})[cd.at[dstId]] || 0) + 1;   // コピー先のカードは別の恋人関係（次の番号）
+    if (carry && val !== undefined) (g[carry] = g[carry] || {})[dstId] = (carry === "pureLoverTargets" && val === dstId) ? srcId : (Array.isArray(val) ? val.slice() : val);
+    if (carry2 && val2 !== undefined) (g[carry2] = g[carry2] || {})[dstId] = val2;
+    if (role === ONW.ROLE.EVIL_WOMAN) ["akujoHonmei", "akujoKeep"].forEach((k) => { if (g[k] && g[k][dstId] === dstId) g[k][dstId] = srcId; });   // 悪女: 本命・キープがコピー先本人なら、コピー元に付け替える（自分自身は選べない）
     const t = (g.roleTrail = g.roleTrail || {});
     (t[dstId] = t[dstId] || []).push(role);
     (cd.trail[dstId] = cd.trail[dstId] || []).push(cd.at[dstId]);   // カードは同じ（役職だけが変わる）
     ONW.fixServants(g);
+    if (ONW.pureLover) ONW.pureLover.note(g, [dstId]);
     return role;
   };
   /** 持ち主AとBの「役職に紐づく状態」を入れ替える（キーはプレイヤーID、または墓地の "g:番号"） */
@@ -99,6 +161,8 @@ window.ONW = window.ONW || {};
       const m = (g[key] = g[key] || {}), va = m[a], vb = m[b];
       if (vb === undefined) delete m[a]; else m[a] = vb;
       if (va === undefined) delete m[b]; else m[b] = va;
+      // 純愛者: 役職が「選ばれた相手」本人の手に渡ったら、相手は元の持ち主に付け替える（自分自身とは恋人になれないため。マイクラ版と同じ）
+      if (key === "pureLoverTargets" || key === "akujoHonmei" || key === "akujoKeep" || key === "breakerTargets") { if (m[a] === a && !String(b).startsWith("g:")) m[a] = b; if (m[b] === b && !String(a).startsWith("g:")) m[b] = a; }
     });
   }
   /** カードの個体追跡（結果画面で「昇格した狂人」の移動前側にも (+人狼) を付けるため）。最初の移動の直前に初期化する */
@@ -119,6 +183,8 @@ window.ONW = window.ONW || {};
     (t[a] = t[a] || []).push(g.currentRoles[a]); (t[b] = t[b] || []).push(g.currentRoles[b]);
     (cd.trail[a] = cd.trail[a] || []).push(cd.at[a]); (cd.trail[b] = cd.trail[b] || []).push(cd.at[b]);
     ONW.fixServants(g);   // 従者: ご主人はカードについて動く（swapBound）。ご主人のいない従者には新しいご主人を決める
+    ONW.shufflerStamp(g, a); ONW.shufflerStamp(g, b);   // シャッフラーの印が付いたカードが動いたら、移動先の段階にも「(+シャッフラー)」を付ける
+    if (ONW.pureLover) ONW.pureLover.note(g, [a, b]);   // 結果画面の恋人の印: この移動のあとの状態を記録
   };
   ONW.swapGrave = (g, pid, i) => {   // プレイヤーと墓地の i 枚目の入れ替え
     const cd = cards(g), gk = holderKeyOfGrave(i);
@@ -130,6 +196,8 @@ window.ONW = window.ONW || {};
     (t[pid] = t[pid] || []).push(g.currentRoles[pid]); (c[i] = c[i] || []).push(mine);
     (cd.trail[pid] = cd.trail[pid] || []).push(cd.at[pid]); (cd.trail[gk] = cd.trail[gk] || []).push(cd.at[gk]);
     ONW.fixServants(g);   // 従者: 墓地に入った従者はご主人を失い、墓地から引いた従者には新しいご主人がランダムで決まる
+    ONW.shufflerStamp(g, pid);   // 印の付いたカードを墓地から引いた人の段階にも「(+シャッフラー)」を付ける
+    if (ONW.pureLover) ONW.pureLover.note(g, [pid]);
   };
   /** ドッペルゲンガーのコピー（コピー先の「その時点の役職」になる。選ばれた側は動かない）。
    *  役職はプレイヤー toId のカードの上で書き換わる（カードそのものは動かない）。ドッペルゲンガーをコピーしたら村人になる。
@@ -140,11 +208,43 @@ window.ONW = window.ONW || {};
     let role = g.currentRoles[fromId];   // コピーするのは「その時点」の役職（夜から朝への処理の中で、自分の番が来た時点）
     if (role === ONW.ROLE.DOPPELGANGER) role = ONW.ROLE.VILLAGER;
     g.currentRoles[toId] = role;
+    ["akujoHonmei", "akujoKeep"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の悪女の記録は消す
+    if (g.cupidPair) delete g.cupidPair[toId];   // 上書きされたキューピッドの記録は消す
+    if (g.breakerTargets) delete g.breakerTargets[toId];   // 上書きされた破局師の記録は消す
+    if (g.shufflerMarks) delete g.shufflerMarks[cd.at[toId]];   // 上書きされたカードの上のシャッフラーの印は消える
+    if (g.pureLoverTargets) delete g.pureLoverTargets[toId];   // 上書きされた役職の純愛者の記録は消す（あとで古い記録が復活しないように）
     const t = (g.roleTrail = g.roleTrail || {});
     (t[toId] = t[toId] || []).push(role);
     (cd.trail[toId] = cd.trail[toId] || []).push(cd.at[toId]);   // カードは同じ（役職だけが変わる）
     ONW.fixServants(g);
+    if (ONW.pureLover) ONW.pureLover.note(g, [toId]);
     return role;
+  };
+  /** シャッフラー: 山札から引いたカード(role)を、toId のカードの上に置く（役職はそのカードの上で書き換わる。カードそのものは動かない）。
+   *  byCard = 置いたシャッフラーのカードID。印は g.shufflerMarks[置かれたカードID] = { by, role }（カード単位。カードが動けば印もついていく。上にもう1枚置かれたら新しい印に置き換わる）。
+   *  上書きされた役職に紐づく記録（悪女・キューピッド・破局師・純愛者の選択、各役職のターゲットなど）は消し、新しい役職が従者・処刑人なら新しいご主人・ターゲットが決まる。
+   *  履歴(roleTrail)には「置かれた役職」を1回分として積む（結果画面の役職の流れ）。戻り値: 置かれた役職 */
+  ONW.shufflerPlace = (g, toId, role, byCard) => {
+    const cd = cards(g), card = cd.at[toId], from = g.currentRoles[toId];   // from = 置かれる前のそのカードの役職（選ばれた人への通知「A から B」の A）
+    g.currentRoles[toId] = role;
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
+    (g.pureLoverGen = g.pureLoverGen || {})[card] = ((g.pureLoverGen || {})[card] || 0) + 1;   // 置かれたカードは別の恋人関係（次の番号）
+    (g.shufflerMarks = g.shufflerMarks || {})[card] = { by: byCard || card, role, from, to: toId };   // to = 置かれた時点の持ち主（選ばれた人）
+    const t = (g.roleTrail = g.roleTrail || {});
+    (t[toId] = t[toId] || []).push(role);
+    (cd.trail[toId] = cd.trail[toId] || []).push(card);   // カードは同じ（役職だけが変わる）
+    ONW.fixServants(g);
+    if (ONW.fixExecutioners) ONW.fixExecutioners(g);
+    ONW.shufflerStamp(g, toId);   // 結果画面: 置かれた段階に「(+シャッフラー)」
+    if (ONW.pureLover) ONW.pureLover.note(g, [toId]);
+    return role;
+  };
+  /** 結果画面の「(+シャッフラー)」: いま印の付いたカードを持っている人の「最新の段階」(roleTrail の末尾)を記録する。g.shufflerStamp[\"人ID|roleTrailの番号\"] = true。
+   *  印が付いたカードが怪盗・いたずらっ子・墓荒らしなどで動いたあとの段階にも付く（動く前の段階には付かない）。あとで上書きされて印が消えても、すでに付いた段階は履歴として残る */
+  ONW.shufflerStamp = (g, id) => {
+    const t = (g.roleTrail || {})[id];
+    if (!t || !t.length || !g.shufflerMarks || !g.cards) return;
+    if (g.shufflerMarks[g.cards.at[id]]) (g.shufflerStamp = g.shufflerStamp || {})[id + "|" + (t.length - 1)] = true;
   };
   ONW.MAD_KIND = [];   // 狂人系(人狼陣営だが人狼判定ではない役職。groups.mad)
 
