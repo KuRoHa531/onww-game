@@ -166,13 +166,8 @@
   }
   /** CPUのシャッフラーの発言: 本家「COのみ」ルールで35%（CPUごとに1回だけ抽選）は本当にCO（「〇〇 を △△ に変化させました。」）、残りは騙り。選んだ結果を知らない（怪盗で奪った等）ときは本当のCOはしない。
    *  自分に置いたCPUは、もうその役職なので cpu.js の plan が置いた役職として振る舞う（このフックは呼ばれない） */
-  function cpuClaim(k, g, p, r, i, c) {
-    const { nameOf, rn } = k;
-    if (i.shuffle && i.shuffle.target && i.shuffle.target !== p.id && k.coTruth(g, p)) {
-      const w = nameOf(g, i.shuffle.target);
-      c.co = "shuffler";
-      c.result = { short: `${w} → ${rn(i.shuffle.role)}`, text: `${w} を ${rn(i.shuffle.role)} に変化させました。`, claim: { kind: "shuffler", target: i.shuffle.target, role: i.shuffle.role } };
-    } else { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
+  function cpuClaim(k, g, p, r, i, c) {   // 第三陣営の役職は名乗らない: 必ず他の村役職を騙る（本当のCOはしない）
+    const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result;
   }
   /** CPUのシャッフラーの投票（マイクラ版 cpu.js の shufflerTarget の加点に合わせる）: 変化させた相手は、追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）に変化させたときだけ狙い、
    *  それ以外は死亡すると失敗なので票を入れない（ONW.shuffler.failed の条件と同じ） */

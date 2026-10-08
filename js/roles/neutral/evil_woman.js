@@ -95,12 +95,8 @@
       pickTwo: (sel, K) => [`本命は ${K.nameOf(sel[0])}、キープは ${K.nameOf(sel[1])} です。`, { kind: "evil_woman", honmei: sel[0], keep: sel[1] }, null, "disclose", `本命 ${K.nameOf(sel[0])} ／ キープ ${K.nameOf(sel[1])}`],
     },
     /** CPUの発言: 本家「COのみ」ルールで35%（CPUごとに1回だけ抽選）は本当にCO（本命・キープを開示）、残りは騙り。本命・キープを知らない（怪盗で奪った等）ときは本当のCOはしない */
-    cpuClaim(k, g, p, r, i, c) {
-      const { nameOf } = k;
-      if (i.mode === "evil_woman" && i.honmei && i.keep && k.coTruth(g, p)) {
-        c.co = "evil_woman";
-        c.result = { short: `本命 ${nameOf(g, i.honmei)} ／ キープ ${nameOf(g, i.keep)}`, text: `本命は ${nameOf(g, i.honmei)}、キープは ${nameOf(g, i.keep)} です。`, claim: { kind: "evil_woman", honmei: i.honmei, keep: i.keep } };
-      } else { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
+    cpuClaim(k, g, p, r, i, c) {   // 第三陣営の役職は名乗らない: 必ず他の村役職を騙る（本当のCOはしない）
+      const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result;
     },
     // ---- 待機時間の演出（朝のあと）: 最終盤面で決まるので、墓荒らし・ドッペル・怪盗など、どの経由でも同じように出る ----
     /** 選ばれた人（本命・キープ。酔いが覚めている人）の画面で、悪女のカードがめくれる。本命は恋人になったので丸いハート付き、キープは付かない。
@@ -134,7 +130,7 @@
             const k = `p:${it.id}`;
             if (it.face === "heart") SK.show(k, SK.LOVE_MARK, true);
             else if (it.face === "keep") SK.show(k, SK.KEEP_MARK, true);
-            else { SK.show(k, "evil_woman", true); if (it.love) { SK.lov[k] = true; if (!evilKeys.includes(k)) evilKeys.push(k); } }   // 悪女のカード（本命の側は右上に丸いハート）
+            else { SK.show(k, "evil_woman", true); }   // 悪女のカード（丸いハートは結果発表のときだけ。待機時間には付けない）
             SK.paint(SK.G());
           }, i * 380));
         }, 900);

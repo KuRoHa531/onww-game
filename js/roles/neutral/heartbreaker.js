@@ -123,12 +123,8 @@
       pickPlayer: (id, K) => [`${K.nameOf(id)} を破局対象に選びました。`, { kind: "heartbreaker", target: id }, null, "disclose", `破局 → ${K.nameOf(id)}`],
     },
     /** CPUの発言: 本家「COのみ」ルールで35%（CPUごとに1回だけ抽選）は本当にCO（破局対象に選んだ相手を開示）、残りは騙り。相手を知らない（怪盗で奪った等）ときは本当のCOはしない */
-    cpuClaim(k, g, p, r, i, c) {
-      const { nameOf } = k;
-      if (i.mode === "heartbreaker" && i.target && k.coTruth(g, p)) {
-        c.co = "heartbreaker";
-        c.result = { short: `破局 → ${nameOf(g, i.target)}`, text: `${nameOf(g, i.target)} を破局対象に選びました。`, claim: { kind: "heartbreaker", target: i.target } };
-      } else { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
+    cpuClaim(k, g, p, r, i, c) {   // 第三陣営の役職は名乗らない: 必ず他の村役職を騙る（本当のCOはしない）
+      const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result;
     },
     cpuNight: { order: 22, stage: "seer", chain: true, run: cpuRun },
     night: {

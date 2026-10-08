@@ -35,23 +35,26 @@
    *  番号は成立した順（g.pureLoverNo["小>大"] = 何組目か。成立後に消えた組も番号は詰めない）。mutated = このとき役職が動いた人 */
   /** 結果画面: 人ごとの役職の段階(segs)に「(+恋人N)」を付ける。配布時の恋人は全段階、純愛者の恋人は loveHist の成立していた段階だけ。
    *  純愛者が選んだ段階・組が変わった段階は、役職が同じでも段階として足す（純愛者→純愛者(+恋人1)）。最後の段階は最終盤面の恋人。hasFrom = 先頭の段階が変化前の役職 */
+  /** 悪女のキープになっている人の集合（酔いが覚めていない持ち主のキープは含めない。キープは恋人ではないので恋人の番号とは別に「(+キープ)」として履歴に残す） */
+  function keepSet(g) { const s = new Set(); (ONW.evilWoman ? ONW.evilWoman.picks(g) : []).forEach(([h, , k]) => { if (k && !ONW.hiddenDrunk(g, h)) s.add(k); }); return s; }
   function applyMarks(g, id, segs, hasFrom) {
     const dealtTags = [];
     ONW.dealtPairs(g).forEach(([a, b], k) => { if (a === id || b === id) dealtTags.push({ t: `(+恋人${k + 1})`, k: "love", dk: k }); });
     const hist = (g.loveHist || {})[id] || [], base = hasFrom ? 1 : 0, per = segs.map(() => ({ nos: [], extras: [] }));
-    hist.forEach((e) => { const j = Math.min(base + e.n, segs.length - 1); if (e.x) per[j].extras.push({ no: e.no, dk: e.dk || [] }); else { per[j].nos = e.no; per[j].dk0 = e.dk || []; } });
+    hist.forEach((e) => { const j = Math.min(base + e.n, segs.length - 1); if (e.x) per[j].extras.push({ no: e.no, dk: e.dk || [], kp: !!e.kp }); else { per[j].nos = e.no; per[j].dk0 = e.dk || []; per[j].kp = !!e.kp; } });
     const out = [], lost = new Set();   // lost: 破局で壊された配布時の恋人の番号（壊れた段階から、その (+恋人N) を付けない）
-    segs.forEach((sg, j) => { (per[j].dk0 || []).forEach((k) => lost.add(k)); sg.pure = per[j].nos; sg.lost = new Set(lost); out.push(sg); per[j].extras.forEach((ex) => { ex.dk.forEach((k) => lost.add(k)); out.push({ ...sg, pure: ex.no, lost: new Set(lost) }); }); });
+    segs.forEach((sg, j) => { (per[j].dk0 || []).forEach((k) => lost.add(k)); sg.pure = per[j].nos; sg.kp = !!per[j].kp; sg.lost = new Set(lost); out.push(sg); per[j].extras.forEach((ex) => { ex.dk.forEach((k) => lost.add(k)); out.push({ ...sg, pure: ex.no, kp: ex.kp, lost: new Set(lost) }); }); });
     const fin = []; ONW.loverPairs(g, true).forEach(([a, b, o]) => { if (a === id || b === id) fin.push(ONW.loverNo(g, a, b, o)); });
     out[out.length - 1].pure = fin.sort((x, y) => x - y);
+    out[out.length - 1].kp = keepSet(g).has(id);   // 最後の段階は最終盤面のキープ
     segs.splice(0, segs.length, ...out);
-    segs.forEach((sg) => { sg.tags = [...dealtTags.filter((t) => !sg.lost.has(t.dk)).map(({ t, k }) => ({ t, k })), ...(sg.pure || []).map((no) => ({ t: `(+恋人${no})`, k: "love" }))]; delete sg.pure; delete sg.lost; if (!sg.tags.length) delete sg.tags; });
+    segs.forEach((sg) => { sg.tags = [...dealtTags.filter((t) => !sg.lost.has(t.dk)).map(({ t, k }) => ({ t, k })), ...(sg.pure || []).map((no) => ({ t: `(+恋人${no})`, k: "love" })), ...(sg.kp ? [{ t: "(+キープ)", k: "keep" }] : [])]; delete sg.pure; delete sg.kp; delete sg.lost; if (!sg.tags.length) delete sg.tags; });
     return segs;
   }
   function note(g, mutated) {
     if (!g || !g.players || !g.currentRoles) return;
     const dealt = ONW.dealtPairs(g), nd = dealt.length, no = (g.pureLoverNo = g.pureLoverNo || {}), hist = (g.loveHist = g.loveHist || {}), last = (g.loveLast = g.loveLast || {});
-    const tags = {};
+    const tags = {}, keeps = keepSet(g);
     allPairs(g).forEach(([h, t, o]) => {
       const a = h < t ? h : t, b = h < t ? t : h, u = ONW.pairKey(g, [h, t, o]);
       if (!o && dealt.some((x) => x[0] === a && x[1] === b && !ONW.brokenDealt(g, a, b))) return;   // キューピッドの組(o あり)は、配布時の恋人と同じ2人でも別の恋人関係として数える   // 配布時の恋人と同じ組は、配布時の番号で全段階に付くのでここでは付けない
@@ -66,9 +69,10 @@
     dealt.forEach(([a, b], k) => { if (ONW.brokenDealt(g, a, b)) [a, b].forEach((id) => { (lostNow[id] = lostNow[id] || []).push(k); }); });
     g.players.forEach((p) => {
       const nos = (tags[p.id] || []).slice().sort((x, y) => x - y), lk = lostNow[p.id] || [], prev = lostPrev[p.id] || [], newly = lk.filter((k) => !prev.includes(k));
-      const sig = nos.join(",") + (lk.length ? "|" + lk.join(",") : ""), mut = (mutated || []).includes(p.id);
+      const kp = keeps.has(p.id), sig = nos.join(",") + (lk.length ? "|" + lk.join(",") : "") + (kp ? "#K" : ""), mut = (mutated || []).includes(p.id);
       if (!mut && sig === (last[p.id] || "")) return;
       const ent = { n: ((g.roleTrail || {})[p.id] || []).length, x: !mut, no: nos };
+      if (kp) ent.kp = true;   // このとき悪女のキープだった（結果画面の「(+キープ)」）
       if (newly.length) ent.dk = newly;   // このとき破局で壊れた配布時の恋人（結果画面で (+恋人N) を外す段階）
       (hist[p.id] = hist[p.id] || []).push(ent);
       last[p.id] = sig; lostPrev[p.id] = lk.slice();
@@ -131,12 +135,8 @@
       pickPlayer: (id, K) => [`${K.nameOf(id)} を恋人に選びました。`, { kind: "pure_lover", target: id }, null, "disclose", `→ ${K.nameOf(id)}`],
     },
     /** CPUの発言: 本家「COのみ」ルールで35%（CPUごとに1回だけ抽選）は本当にCO（恋人にした相手を開示）、残りは騙り。相手を知らない（怪盗で奪った等）ときは本当のCOはしない */
-    cpuClaim(k, g, p, r, i, c) {
-      const { nameOf } = k;
-      if (i.mode === "pure_lover" && i.target && k.coTruth(g, p)) {
-        c.co = "pure_lover";
-        c.result = { short: `→ ${nameOf(g, i.target)}`, text: `${nameOf(g, i.target)} を恋人に選びました。`, claim: { kind: "pure_lover", target: i.target } };
-      } else { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
+    cpuClaim(k, g, p, r, i, c) {   // 第三陣営の役職は名乗らない: 必ず他の村役職を騙る（本当のCOはしない）
+      const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result;
     },
     // ---- 恋人の確定と待機時間の演出 ----
     /** 待機時間(朝のあと): 最終盤面から恋人の組を確定する。選ばれた人(酔いが覚めている人)には、純愛者のカードがめくれる。持ち主が相手をまだ知らされていなければ、持ち主にも「恋人になりました」とハートが出る（怪盗・いたずらっ子などで受け取った人）。

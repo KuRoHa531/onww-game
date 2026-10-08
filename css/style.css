@@ -1335,15 +1335,25 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-front .tb-wolfmark.tb-master.tb-love { filter: drop-shadow(0 0 7px rgba(255,126,182,.95)); }
 .tb-front .tb-wolfmark.tb-master.tb-love small { color: #ffb3d4; }
 .tb-seat.glow.glow-master .tb-card { filter: drop-shadow(0 0 10px rgba(197,139,255,.95)); }
-/* 結果でめくれた恋人のカード: 左上の丸いハート（右上の票数などの札と重ならないよう左端へ） */
-.tb-lov { display: none; position: absolute; top: -5px; left: -5px; z-index: 4; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); min-width: 22px; min-height: 22px; border-radius: 50%; background: #fff; border: 2px solid #e0558f; color: #e0558f; font-size: max(calc(var(--cw) * .14), 9px); font-weight: 800; line-height: 1; flex-direction: row; gap: 1px; align-items: center; justify-content: center; pointer-events: none; box-shadow: 0 0 6px rgba(224,85,143,.8); }
+/* 結果発表: カードの左上から下へ縦に増えていく丸いマーク（上から 🐺昇格した狂人 / ❤恋人(組ごと) / ♡キープ / 🔀シャッフラー）。
+   札(.tb-badge)は右上なのでぶつからない。2つ以上同時に付くときは .mk2 で全部を小さくする */
+.tb-marks { display: none; position: absolute; top: -5px; left: -5px; z-index: 4; flex-direction: column; align-items: flex-start; gap: 2px; pointer-events: none; }
+.tb-seat.lov.up .tb-marks, .tb-seat.shuf.up .tb-marks, .tb-seat.kp.up .tb-marks, .tb-seat.wf.up .tb-marks, .tb-seat.bd.up .tb-marks { display: flex; }
+.tb-lov { display: none; flex-direction: column; align-items: flex-start; gap: 2px; }   /* 恋人の丸(.tb-lv)を組の数だけ縦に並べる入れ物 */
 .tb-seat.lov.up .tb-lov { display: flex; }
-/* 結果発表: シャッフラーつきのカードの左上の🔀（恋人の丸ハートと同じ大きさ。恋人も付いているときは、その右にずらして並べる） */
-.tb-shuf { display: none; position: absolute; top: -5px; left: -5px; z-index: 4; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); min-width: 22px; min-height: 22px; border-radius: 50%; background: #fff; border: 2px solid #7a4fd1; align-items: center; justify-content: center; font-size: max(calc(var(--cw) * .2), 12px); line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.45); pointer-events: none; }
-.tb-seat.shuf.up .tb-shuf { display: flex; }
-.tb-seat.lov.up .tb-shuf { left: calc(max(var(--cw) * .36, 22px) - 1px); }
+.tb-lv, .tb-wf, .tb-kp, .tb-shuf, .tb-bd { box-sizing: border-box; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); min-width: 22px; min-height: 22px; border-radius: 50%; background: #fff; border: 2px solid; align-items: center; justify-content: center; line-height: 1; }
+.tb-lv { display: flex; flex-direction: row; gap: 1px; border-color: #e0558f; color: #e0558f; font-size: max(calc(var(--cw) * .14), 9px); font-weight: 800; box-shadow: 0 0 6px rgba(224,85,143,.8); }
+.tb-wf { display: none; border-color: #c9463d; font-size: max(calc(var(--cw) * .2), 12px); box-shadow: 0 0 6px rgba(255,85,85,.85); }
+.tb-kp { display: none; border-color: #ff9ec9; color: #ff7eb6; font-size: max(calc(var(--cw) * .2), 12px); font-weight: 800; box-shadow: 0 0 6px rgba(255,158,201,.85); }
+.tb-shuf { display: none; border-color: #7a4fd1; font-size: max(calc(var(--cw) * .2), 12px); box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+.tb-bd { display: none; border-color: #e0a100; font-size: max(calc(var(--cw) * .2), 12px); box-shadow: 0 0 6px rgba(255,170,0,.85); }   /* 酔っ払い: 結果発表の丸い🍺（金色） */
+.tb-seat.wf.up .tb-wf, .tb-seat.kp.up .tb-kp, .tb-seat.shuf.up .tb-shuf, .tb-seat.bd.up .tb-bd { display: flex; }
+/* 丸が2つ以上同時に付いたとき（恋人が2組 / 🐺+🔀 / ♡+🐺 など）: 小さくして縦に並べる */
+.tb-seat.mk2 .tb-marks { gap: 1px; }
+.tb-seat.mk2 .tb-lv, .tb-seat.mk2 .tb-wf, .tb-seat.mk2 .tb-kp, .tb-seat.mk2 .tb-shuf, .tb-seat.mk2 .tb-bd { width: calc(var(--cw) * .26); height: calc(var(--cw) * .26); min-width: 16px; min-height: 16px; border-width: 1.5px; font-size: max(calc(var(--cw) * .13), 9px); }
+.tb-seat.mk2 .tb-lv { font-size: max(calc(var(--cw) * .1), 7px); gap: 0; }
+.tb-seat.mk2 .tb-lov { gap: 1px; }
 .result-sheet .t-lover { color: #ff7eb6; }
-
 /* 従者の身代わり: ご主人のカードがめくれそうになる（途中の70°前後まで回って揺れ、また裏のまま戻る。絶対に表にならない） */
 .tb-seat.almost .tb-inner { animation: tb-almost 1.8s ease-in-out both; }
 .tb-seat.almost .tb-card { filter: drop-shadow(0 0 12px rgba(197,139,255,.95)); }
@@ -1368,6 +1378,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* 最終結果の役職履歴: 本家どおり (+恋人1) はピンク、(+酔っ払い) は金色 */
 .result-sheet .rs-tag-love { color: #ff77dd; }
 .result-sheet .rs-tag-drunk { color: #ffaa00; }
+.result-sheet .rs-tag-keep { color: #ff9ec9; }   /* 悪女のキープ: 「(+キープ)」（恋人ではないので恋人より淡いピンク） */
 .result-sheet .rs-tag-shuffler { color: #c4c9e0; }   /* シャッフラー: 山札から置かれたカードの「(+シャッフラー)」 */
 .result-sheet .rs-tag-cat { color: #aaaaaa; }   /* シュレディンガーの猫: 参照先が第三陣営の役職のときの「(+役職名)」 */
 .tb-front b .tb-catsfx { color: #aaaaaa; font-weight: 700; }   /* 「(+オポチュニスト)」は同じ行に灰色で続ける */

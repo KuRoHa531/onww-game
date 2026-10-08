@@ -46,7 +46,7 @@ window.ONW = window.ONW || {};
   const TARGET_MARK = "__target";   // 処刑人に見えるターゲットの「🎯ターゲット」の印（役職名は出さない）
   const MUTE_MARK = "__mute";   // 口封じの狂人に見える、口封じされた人の「🤐」の印（役職名は出さない）
   const MASTER_MARK = "__master";   // 従者に見えるご主人の「👑ご主人」の印（役職名は出さない）
-  let lov = {}, shuf = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）
+  let lov = {}, shuf = {}, kp = {}, wf = {}, bd = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）
   let loveMate = null;                // 夜: 自分の恋人の相方 { id, mode }
   const UNK_MARK = "__unk";   // アサシンが選んでいる間、めくれた人のカードに出す「？」（役職は見せない）
   let nightKeys = [];                  // 夜の始まりに開いたカード（神・大狼）。夜時間が終わるまで裏に戻さない
@@ -87,7 +87,7 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   const seatHtml = (k, label, cls) => `
     <div class="tb-seat ${cls || ""}" data-k="${k}">
-      <div class="tb-card"><div class="tb-inner"><div class="tb-back"></div><div class="tb-front"></div></div><div class="tb-drunk"><span class="tb-beer">🍺</span><span class="tb-drunk-n"></span></div><div class="tb-lov">❤</div><div class="tb-shuf">🔀</div></div>
+      <div class="tb-card"><div class="tb-inner"><div class="tb-back"></div><div class="tb-front"></div></div><div class="tb-drunk"><span class="tb-beer">🍺</span><span class="tb-drunk-n"></span></div><div class="tb-marks"><div class="tb-wf">🐺</div><div class="tb-lov">❤</div><div class="tb-kp">♡</div><div class="tb-shuf">🔀</div><div class="tb-bd">🍺</div></div></div>
       <div class="tb-name">${label}</div><div class="tb-badge"></div>
     </div>`;
   function build(g, list) {
@@ -214,8 +214,10 @@ window.ONW = window.ONW || {};
       s.classList.toggle("kingup", kingKeys.includes(k) || kingFlashKeys.includes(k));   // 人狼王公開中の赤い光と札
       s.classList.toggle("queenup", queenKeys.includes(k) || queenFlashKeys.includes(k));   // 女王公開中の紫の光と札
       s.classList.toggle("shinju", !!shin[k]);
-      s.classList.toggle("lov", !!lov[k]); s.classList.toggle("shuf", !!shuf[k]);   // 結果発表: シャッフラーつきのカードの左上に🔀
-      { const lv = s.querySelector(".tb-lov"); if (lv) { const t = typeof lov[k] === "number" ? `<span>❤</span><span>${lov[k]}</span>` : "<span>❤</span>"; if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }   // 結果発表: 丸の中にハートと恋人番号
+      s.classList.toggle("lov", !!lov[k]); s.classList.toggle("shuf", !!shuf[k]); s.classList.toggle("kp", !!kp[k]); s.classList.toggle("wf", !!wf[k]); s.classList.toggle("bd", !!bd[k]);   // 結果発表: シャッフラーつきのカードの左上に🔀
+      { const lv = s.querySelector(".tb-lov"); const nos = Array.isArray(lov[k]) ? lov[k] : [lov[k]]; const nLov = lov[k] ? nos.length : 0;   // 結果発表: 恋人の丸(❤と番号)。恋人が2組以上なら組ごとに1つずつ縦に並べる
+        s.classList.toggle("mk2", nLov + (shuf[k] ? 1 : 0) + (kp[k] ? 1 : 0) + (wf[k] ? 1 : 0) + (bd[k] ? 1 : 0) >= 2);   // 丸が2つ以上同時に付くときは、全部を小さくして縦に並べる
+        if (lv) { const t = nos.map((n) => `<span class="tb-lv">${typeof n === "number" ? `<span>❤</span><span>${n}</span>` : "<span>❤</span>"}</span>`).join(""); if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }
       s.classList.toggle("almost", !!alm[k]);
       ["descend", "spark", "blow", "win", "chicken", "toughclang", "toughrecv", "kingguard"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
       const baseRole = role && String(role).startsWith(CAT + "@") ? CAT : role;
@@ -284,12 +286,12 @@ window.ONW = window.ONW || {};
     if (!el) return;
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; shuf = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; shuf = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; deathMarks = []; badge = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; alm = {}; gx = {}; catv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; nightKeys = []; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
     if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
@@ -532,9 +534,12 @@ window.ONW = window.ONW || {};
     const chain = res.history.filter((h) => h.cause === "chain" && h.kind !== "queen" && !h.late).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     const lateDeaths = res.history.filter((h) => h.cause === "chain" && h.kind !== "queen" && h.late).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));   // 王国滅亡のあとで死んだ人（心中など）
     const kingdom = res.history.filter((h) => h.cause === "chain" && h.kind === "queen");   // 王国滅亡: 女王が倒れて、一斉にめくれる村人陣営
-    const loverNo = {}; res.history.forEach((h) => { if (h.lover) loverNo[h.id] = h.loverNo || true; });
+    const loverNo = {}; res.history.forEach((h) => { if (h.lover) loverNo[h.id] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; });
     const shufNo = {}; res.history.forEach((h) => { if (h.shuf) shufNo[h.id] = true; });
-    const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; if (shufNo[id]) shuf[P(id)] = true; };   // 結果でめくれる恋人のカードは、右上に丸いハート
+    const keepNo = {}; res.history.forEach((h) => { if (h.keep) keepNo[h.id] = true; });
+    const drunkNo = {}; res.history.forEach((h) => { if (h.drunk) drunkNo[h.id] = true; });   // 酔っ払い: めくれたカードの丸い🍺
+    const promNo = {}; res.history.forEach((h) => { if (h.prom) promNo[h.id] = true; });   // 昇格した狂人(最終段階に (+人狼) が付いた人): めくれたカードの右上に丸い🐺   // 悪女のキープ: めくれたカードの右上に丸い♡
+    const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; if (shufNo[id]) shuf[P(id)] = true; if (keepNo[id]) kp[P(id)] = true; if (promNo[id]) wf[P(id)] = true; if (drunkNo[id]) bd[P(id)] = true; };   // 結果でめくれる恋人のカードは、右上に丸いハート
     const rest = [...res.history.filter((h) => !h.dead).map((h) => [P(h.id), h.role, h.id]), ...res.grave.map((c, i) => [`g:${i}`, c.role])];
     // 役職ファイルに渡す道具箱(stage.kit に、この結果の情報を足したもの)
     //   t = 演出の現在時刻 / subN = 身代わりの数 / noFlip = ほかの演出が重なるので2回目の裏返しをしない席(flipped フックが書く) / restEnd = 全員めくれ終わる時刻 / noBlow = 負けた人のカードを吹き飛ばさない
@@ -597,7 +602,7 @@ window.ONW = window.ONW || {};
     const hk = (key) => ONW.roleHooksIn("stageResult", key);
     clearAll(); alm = {}; hk("clear").forEach((h) => h.fn(stage.kit));   // 身代わりの「めくれそう」演出・処刑人の演出も止める
     const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = skipIds.has(h.id) || h.sub ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.keep) kp[`p:${h.id}`] = true; if (h.prom) wf[`p:${h.id}`] = true; if (h.drunk) bd[`p:${h.id}`] = true; if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = skipIds.has(h.id) || h.sub ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     const R = Object.create(stage.kit); R.res = res;
     hk("skip").forEach((h) => h.fn(R));   // 猫(2回目の面)・神の祝福・処刑人のターゲット(割れた状態)・アサシンに選ばれた人 を、演出なしの最終形で見せる
