@@ -45,8 +45,32 @@ window.ONW = window.ONW || {};
 
     game.center = deck.slice(game.players.length);
     ONW.roles.applyTransforms(game);
+    ONW.roles.avoidCpuDictator(game);   // 独裁者(昼能力)を CPU が引いたら、人間と入れ替える（マイクラ版 avoidUnfixedCpuDayRoles）
     ONW.roles.assignServants(game);   // 変化のあとに、従者のご主人を決める
     ONW.roles.assignExecutioners(game);   // 処刑人のターゲットを決める
+  };
+
+  /**
+   * CPU は昼能力（独裁者）を自分では使わないので、固定していない CPU が独裁者を引いたら、人間の参加者と役職を入れ替える（マイクラ版 avoidUnfixedCpuDayRoles と同じ）。
+   * 「固定している」= デバッグの固定役で指定した席、または デバッグで独裁の対象を指定した席（その場合は CPU が独裁を使う）。
+   * 光の使徒などの変化で独裁者になった CPU も同じ（変化前の記録 transformFrom は人間のほうへ付け替える）。人間が1人もいない（全員 CPU）ときは入れ替えない。
+   */
+  roles.avoidCpuDictator = function avoidCpuDictator(game) {
+    const DICT = ONW.ROLE.DICTATOR;
+    const dbg = game.debugOn && game.dbg ? game.dbg : null;
+    const fixed = (id) => !!(dbg && ((dbg.roles || {})[id] || ((dbg.rand || {}).dictate || {})[id]));
+    const isDict = (id) => game.initialRoles[id] === DICT;
+    const humans = () => game.players.filter((p) => !p.isCpu && !isDict(p.id) && !fixed(p.id)).map((p) => p.id);
+    game.players.filter((p) => p.isCpu && isDict(p.id) && !fixed(p.id)).forEach((p) => {
+      const c = humans();
+      if (!c.length) return;
+      const h = ONW.utils.randomChoice(c);
+      [game.initialRoles[p.id], game.initialRoles[h]] = [game.initialRoles[h], game.initialRoles[p.id]];
+      [game.currentRoles[p.id], game.currentRoles[h]] = [game.currentRoles[h], game.currentRoles[p.id]];
+      const a = game.transformFrom[p.id], b = game.transformFrom[h];
+      if (b === undefined) delete game.transformFrom[p.id]; else game.transformFrom[p.id] = b;
+      if (a === undefined) delete game.transformFrom[h]; else game.transformFrom[h] = a;
+    });
   };
 
   /**
@@ -242,6 +266,9 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
+    { trigger: ONW.ROLE.FOX,            required: [ONW.ROLE.SEER] },                             // 妖狐が出る闇鍋には、占い師も最低1枚出す（妖狐は占われて呪殺されるため。マイクラ版 YAMINABE の妖狐シナジー）
+    { trigger: ONW.ROLE.FOX_MARKED,     required: [ONW.ROLE.SEER, ONW.ROLE.FOX, ONW.ROLE.VILLAGER] },   // 狐憑きが出る闇鍋には、占い師・妖狐・村人も最低1枚ずつ出す（占われて「妖狐」と出る相手と、本物の妖狐。自分を村人だと思い込む狐憑きに、本物の村人が1人は並ぶように）
+    { trigger: ONW.ROLE.FANATIC,        required: [ONW.ROLE.FOX, ONW.ROLE.SEER] },               // 背徳者が出る闇鍋には、ご主人の妖狐と占い師も最低1枚ずつ出す（妖狐を呪殺できる占い師がいる盤面にする）
     { trigger: ONW.ROLE.MASON,          required: [ONW.ROLE.MASON, ONW.ROLE.MASON] },           // 共有者が出る闇鍋には、光の使徒から変化した共有者を合わせて最低2枚出す（共有者が1人だけにならない）
   ];
   /**
@@ -250,6 +277,7 @@ window.ONW = window.ONW || {};
    */
   ONW.SYNERGY_COUNT_RULES = [
     { trigger: ONW.ROLE.INSOMNIAC, anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
+    { trigger: ONW.ROLE.KEYMASTER, anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリン）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
     { trigger: ONW.ROLE.HEARTBREAKER, anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
     { always: true, anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
   ];

@@ -6,6 +6,11 @@
     const g = n.g;
     const i = n.infoOf(p.id);
     if (!g.center.length) return;
+    if (ONW.keymaster.gate(g, p.id, [])) {   // 鍵師のロック: 自分の席がロック中なら🔒に弾かれて失敗（墓地とは交換しない）
+      i.mode = "relic"; i.keyFail = { kind: "self" };
+      ONW.keymaster.fail(g, p.id, "self", "交換", [], `${label} ${p.name}`);
+      return;
+    }
     const fg = (n.forced(p).graves || []).filter((k) => k >= 0 && k < g.center.length);   // デバッグ: 交換する墓地の指定
     const idx = fg.length ? fg[0] : n.pick([...g.center.keys()]), got = g.center[idx], seen = ONW.shownRole(got);   // seen: 本人が思う新しい役職（忘却の人狼・狼憑きは村人、狼夢人は人狼）
     ONW.swapGrave(g, p.id, idx);
@@ -24,6 +29,7 @@
   function cpuClaim(k, g, p, r, i, c) {
     const { rn, isNonVillage, nonVillageLie } = k;
     c.co = "relic_robber";
+    if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }; return; }   // ロックされて交換に失敗した: 正直に言う
     if (!i.relic) return;   // 墓荒らし（交換情報なし）: COだけする
     if (isNonVillage(i.relic.newRole)) { const lie = nonVillageLie(g, p, "relic_robber", i, i.relic.newRole); c.co = lie.co; c.result = lie.result; }
     else c.result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(i.relic.newRole)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(i.relic.newRole)} になりました。`, claim: { kind: "relic", role: i.relic.newRole } };
@@ -85,6 +91,7 @@
       resolve(c, p) {   // 選んだ墓地と役職を交換（起床順。交換後の役職の能力は朝に使う）
         const g = c.g, rn = c.rn, hold = c.hold, rev = c.rev;
         const i = c.selOf(p).graves[0]; if (i === undefined || i < 0 || i >= g.center.length) return;
+        if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "交換", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中なら失敗。墓地は動かず、新聞・観測にも載らない
         const got = g.center[i];
         ONW.swapGrave(g, p.id, i);
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
@@ -100,6 +107,7 @@
       run(c) {   // ドッペルゲンガーがコピーした墓荒らし / 昼に酔いが覚めた墓荒らし
         if (!c.graves.length) return null;
         const g = c.g, rn = c.rn, id = c.id, idx = c.graves[0];
+        if (ONW.keymaster.gate(g, id, [])) return { lines: [ONW.keymaster.fail(g, id, "self", "交換", [], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
         ONW.swapGrave(g, id, idx);
         const got = g.currentRoles[id];
         const lines = [`墓地${idx + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`];

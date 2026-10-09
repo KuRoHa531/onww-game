@@ -10,6 +10,12 @@
     let pair = (f.players || []).filter((id, k, arr) => n.validPlayer(p, id) && arr.indexOf(id) === k).slice(0, 2);
     if (pair.length < 2) pair = [...pair, ...ONW.utils.shuffle(others.filter((q) => !pair.includes(q.id))).slice(0, 2 - pair.length).map((q) => q.id)];
     const [a, b] = pair.map((id) => g.players.find((q) => q.id === id));
+    const why = ONW.keymaster.gate(g, p.id, [a.id, b.id]);   // 鍵師のロック: 自分か選んだどちらかの席がロック中なら🔒に弾かれて失敗（入れ替えはキューに積まない）
+    if (why) {
+      i.mode = "tm"; i.keyFail = { kind: why, pair: [a.id, b.id] };
+      ONW.keymaster.fail(g, p.id, why, "入れ替え", [a.id, b.id], `${label} ${p.name}`, true);
+      return;
+    }
     g.tmQueue.push({ id: p.id, a: a.id, b: b.id });     // 反映は夜の終わり（net.js）
     i.mode = "tm"; i.pair = [a.id, b.id];
     g.nightLogsAll.push(`${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);
@@ -27,6 +33,13 @@
   function cpuClaim(k, g, p, r, i, c) {
     const { nameOf } = k;
     c.co = "troublemaker";
+    if (i.keyFail) {   // ロックされて入れ替えに失敗した: 正直に「失敗した」と言う
+      const [x, y] = (i.keyFail.pair || []).map((id) => nameOf(g, id));
+      c.result = i.keyFail.kind === "self"
+        ? { short: "ロックで失敗", text: "自身の役職がロックされていたため入れ替えに失敗しました。", claim: null }
+        : { short: `${x} ⇄ ${y} ロックで失敗`, text: `${x} と ${y} を選びましたが、どちらかの役職がロックされていたため入れ替えできませんでした。`, claim: null };
+      return;
+    }
     if (!i.pair) return;   // いたずらっ子（入れ替え情報なし）: COだけする
     c.result = { short: `${nameOf(g, i.pair[0])} ⇄ ${nameOf(g, i.pair[1])}`, text: `${nameOf(g, i.pair[0])} と ${nameOf(g, i.pair[1])} を入れ替えました。`, claim: { kind: "troublemaker" } };
   }
@@ -82,6 +95,8 @@
       resolve(c, p) {
         const g = c.g, rn = c.rn, nameOf = c.nameOf;
         const [a, b] = c.selOf(p).players; if (!a || !b) return;
+        const why = ONW.keymaster.gate(g, p.id, [a, b]);   // 鍵師のロック（先の段階で済んでいる）: 自分かどちらかの席がロック中なら失敗。入れ替えず、新聞・観測にも載らない
+        if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a, b], `${rn(c.eff(p))} ${p.name}`, true)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
         g.tmQueue.push({ id: p.id, a, b });
         ONW.observeNote(g, p.id, [a, b]);
         ONW.newsNote(g, "troublemaker");
@@ -95,6 +110,8 @@
         if (c.players.length < 2) return null;
         const g = c.g, id = c.id, nameOf = c.nameOf;
         const [a, b] = c.players;
+        const why = ONW.keymaster.gate(g, id, [a, b]);   // 朝のうち・酔い覚めの入れ替えにもロックは効く
+        if (why) return { lines: [ONW.keymaster.fail(g, id, why, "入れ替え", [a, b], `${c.label} ${c.me.name}`, true)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };
         ONW.swapPlayers(g, a, b);
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         return { lines: [`${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`], reveal: { kind: "tm", a, b }, nextChain: null };

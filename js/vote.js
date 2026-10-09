@@ -113,6 +113,7 @@ window.ONW = window.ONW || {};
    * 酔いが覚めていない酔っ払いは、まだ自分の役職の能力を使えないので1票（新聞配達員・チキンの逆転と同じ扱い）。
    */
   vote.weightOf = function weightOf(game, voterId) {
+    if (ONW.fanatic && ONW.fanatic.lostBy(game, voterId) && !ONW.hiddenDrunk(game, voterId)) return 0;   // 鍵師のロックで狂人になれなかった背徳者: 投票権を失う
     if (game.currentRoles && game.currentRoles[voterId] === ONW.ROLE.MAYOR && !ONW.hiddenDrunk(game, voterId)) return ONW.mayorVotes(game);
     // 麻婆の人狼（本家 MAPO_WOLF）が盤面にいる間、豆腐の人狼は2票持ち
     if (game.currentRoles && game.currentRoles[voterId] === ONW.ROLE.TOFU_WOLF && !ONW.hiddenDrunk(game, voterId) && vote.mapoOn(game)) return 2;
@@ -176,14 +177,16 @@ window.ONW = window.ONW || {};
     // チキン: 1票でも入ったら、つられている人と同時にショック死（追放扱い）
     game.shockIds = game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.CHICKEN && counts[id] > 0 && !gone0.has(id));
     game.shockIds.forEach((id) => { if (!game.eliminated.includes(id)) game.eliminated.push(id); });
-    ONW.vote.applyServantSubstitution(game);   // 本家の順序どおり: 豆腐の人狼のメンタル崩壊 → 従者の身代わり → 連鎖（resolveChain）
+    // 独裁処刑(game.dictator): 本家(applyServantSubstitution の先頭)どおり、従者は身代わりにならない。選ばれた人だけが処刑される（議論を打ち切って投票は行わない。票は独裁者→対象の1票だけ）
+    if (game.dictator) game.servantSubs = [];
+    else ONW.vote.applyServantSubstitution(game);   // 本家の順序どおり: 豆腐の人狼のメンタル崩壊 → 従者の身代わり → 連鎖（resolveChain）
     return game.eliminated;
   };
 
   /**
    * 従者の身代わり（本家 applyServantSubstitution）。追放が決まった直後に1回だけ確定させる（resolveChain / strawNeed は何度も呼ばれるので、ここで決めた結果を使う）。
    * 最終盤面の従者の持ち主 S とそのご主人 M を順に見て、M が追放されていて S が追放されていなければ、M を外して S を入れる。変化がなくなるまで繰り返す。
-   *   ・身代わりにならない: M の最終役職が 従者 / てるてる坊主 / 一目惚れしてるてる（本家 isServantSubstitutionBlockedRole のうちWeb版にあるぶん）
+   *   ・身代わりにならない: M の最終役職が 従者 / てるてる坊主 / 一目惚れしてるてる / 賞金稼ぎ（本家 isServantSubstitutionBlockedRole のうちWeb版にあるぶん）
    *   ・S がすでに昼中に死亡している(game.deadIds)なら身代わりにならない（Web版の安全策。本家は見ていない）
    *   ・S 自身が恋人(重複役職)なら身代わりにならない
    *   ・S と M が同じ人（自分がご主人）なら何もしない
@@ -192,7 +195,7 @@ window.ONW = window.ONW || {};
    */
   vote.applyServantSubstitution = function applyServantSubstitution(game) {
     const R = ONW.ROLE, gone = new Set(game.deadIds || []);
-    const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER];
+    const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER];
     game.servantSubs = [];
     let changed = true;
     while (changed) {
@@ -225,6 +228,7 @@ window.ONW = window.ONW || {};
    *   ・同時に追放された人（同数最多）は、全員が同時にめくれる扱い（道連れ候補に入らない）
    *   ・昼中にすでに死亡した人(game.deadIds)は道連れの候補に入らない
    *   ・従者のご主人が道連れ(tomo)で死ぬときは、従者が身代わりになってご主人は生き残る（game.chainSub[従者] = ご主人。kill() の中で処理）
+   *   ・妖狐が死んだら（どんな死因でも）背徳者も同時に「後追い」で死ぬ（kind: "follow"。道連れ演出・従者の後追いと同じ）
    *   ・従者のご主人が 王国滅亡 / 心中 / 無理心中 で死んだら、従者は身代わりできず「後追い」で死ぬ（kind: "follow"。kill() の中で処理）
    * 一目惚れしてるてるの夜の選択は「役職の持ち主」単位で保存（game.loveTargets[持ち主ID] = 選んだ相手）。
    * 役職が移動したら選択も移動先の持ち主へ移る（ONW.swapPlayers / swapGrave が自動で移す）。選ばれた相手はプレイヤー単位のまま。
@@ -247,6 +251,8 @@ window.ONW = window.ONW || {};
     game.kingdomIds = []; game.queenFallen = [];   // 王国滅亡: 巻き込まれた村人陣営 / 倒れた女王
     game.catPicks = game.catPicks || {}; game.strawTargets = game.strawTargets || {};
     game.assassinTargets = game.assassinTargets || {}; game.assassinList = [];   // アサシン: めくれた順に { id, target }（選んだ相手）
+    game.bountyTargets = game.bountyTargets || {}; game.bountyList = [];          // 賞金稼ぎ: めくれた順に { id, target }（人狼判定だと思って選んだ相手）
+    const bouncedIds = new Set((game.toughBounces || []).flatMap((b) => b.to || []));   // タフガイのとばっちりで追放された人（賞金稼ぎは、てるてる系と同じく「追放」に数えず、能力も発動しない）
     const allIds = game.players.map((p) => p.id);
     const pool = (self) => allIds.filter((id) => id !== self && !done.has(id) && !gone.has(id) && !tomoBuf.some((x) => x.t === id));   // 同じ波の別の猫がもう選んだ人は選ばない
     game.chainLate = {};   // 王国滅亡のあとで死んだ人（心中など）: 結果の演出で王国滅亡のあとに出す
@@ -270,7 +276,7 @@ window.ONW = window.ONW || {};
       // 従者の身代わり（道連れ）: ご主人が道連れ(tomo)で死ぬときは、従者が身代わりになる（ご主人は生き残る）。追放の身代わり(applyServantSubstitution)と同じ条件:
       //   従者がまだ死んでいない / 従者が恋人でない / ご主人の最終役職が 従者・てるてる坊主・一目惚れしてるてる でない。従者が複数いれば先に見つかった1人
       if (kind === "tomo") {
-        const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER];
+        const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER];
         const sub = blocked.includes(game.currentRoles[t]) ? null : ONW.servantPairs(game).find(([s, m]) => m === t && s !== t && !done.has(s) && !gone.has(s) && !tomoSimul.has(s) && !ONW.isLover(game, s));   // 従者が同時に（同じ波で）道連れにされるときも、先に死んでいるときも、身代わりにならない
         if (sub) { game.chainSub[sub[0]] = t; return kill(sub[0], by, "tomo", chain); }
       }
@@ -284,6 +290,9 @@ window.ONW = window.ONW || {};
       // キューピッドの後追い（マイクラ版 cupidFollowIdsForDeadSet）: 選んだ2人のどちらかが（死因を問わず）死んだら、キューピッドも「作った恋人の後を追い」死亡する（kind: "follow"。従者の後追いと同じ扱い）。
       //   後追いで死んだ人は、ほかの人を巻き込まない（chain=false）。酔いが覚めていないキューピッドの組は成立していないので対象外（ONW.cupid.pairs）
       cupidFollowers(t).forEach((h) => kill(h, t, "follow", false));
+      // 背徳者の後追い: 妖狐が（追放・道連れ・心中・王国滅亡など、どんな死因でも）死んだら、背徳者も同時に「後追い」で死ぬ（kind: "follow"。従者の後追いと同じ扱い・ほかの人を巻き込まない）。
+      //   背徳者が死んだことで、その従者・恋人・キューピッドも上の処理で続けて後追い・心中する
+      if (game.currentRoles[t] === R.FOX && ONW.fanatic) ONW.fanatic.followersOf(game).forEach((f) => kill(f, t, "follow", false));
       return true;
     };
     const take = (t, by, kind) => { if (kind === "tomo") tomoBuf.push({ t, by }); else kill(t, by, kind, true); };
@@ -312,11 +321,12 @@ window.ONW = window.ONW || {};
       });
       tomoSimul = new Set();
     };
-    const loveDead = (id, role) => (game.chainKind[id] === "love" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN)) || (game.chainKind[id] === "lovers" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.LOVE_TANNER));   // 無理心中で死んだ人は道連れ能力（わら人形・猫又・黒猫）・アサシンの暗殺が発動しない / 心中で死んだ人は、さらに一目惚れの連鎖も発動しない
+    const loveDead = (id, role) => (game.chainKind[id] === "love" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.BOUNTY_HUNTER)) || (game.chainKind[id] === "lovers" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.BOUNTY_HUNTER || role === R.LOVE_TANNER));   // 無理心中で死んだ人は道連れ能力（わら人形・猫又・黒猫）・アサシンの暗殺・賞金稼ぎの指名が発動しない / 心中で死んだ人は、さらに一目惚れの連鎖も発動しない
     // 始めの心中: 追放・メンタル崩壊・ショック死・昼中の死亡など、resolveChain の前にすでに死んでいる人の相方も、ここで一緒に死ぬ
     [...game.eliminated, ...gone].forEach((id) => {
       cupidFollowers(id).forEach((h) => kill(h, id, "follow", false));   // キューピッド: 選んだ2人の一方がすでに死んでいる（追放・昼中の死亡）なら、後を追う
       ONW.loverMates(game, id).forEach((mate) => kill(mate, id, "lovers"));
+      if (game.currentRoles[id] === R.FOX && ONW.fanatic) ONW.fanatic.followersOf(game).forEach((f) => kill(f, id, "follow", false));   // すでに死んでいる妖狐（追放など）のあとを背徳者が追う
     });
     // 「めくれた順」の波で処理する。同じ波（同時にめくれた人たち）のわら人形・アサシンは、同じ時点の候補から同時に選ぶ
     while (queue.length) {
@@ -359,11 +369,20 @@ window.ONW = window.ONW || {};
           if (t && c.includes(t)) return;
           delete game.assassinTargets[id];
           asks.push({ id, cands: c, kind: "assassin" });
+        } else if (role === R.BOUNTY_HUNTER) {
+          // 賞金稼ぎ: めくれたその場で、自分を除く全プレイヤー（すでにめくれた人も含む）から人狼判定だと思う人を1人選ぶ（選んだ相手は死なない。人狼判定かどうかだけが勝敗に関わる）。心中・無理心中・タフガイのとばっちりでは選ばない
+          if (bouncedIds.has(id)) return;
+          const c = allIds.filter((x) => x !== id);
+          if (!c.length) return;
+          const t = game.bountyTargets[id];
+          if (t && c.includes(t)) return;
+          delete game.bountyTargets[id];
+          asks.push({ id, cands: c, kind: "bounty" });
         }
       });
       if (asks.length) {
         if (!auto) { game.strawPending = asks; return null; }   // 選択待ち（この波の全員ぶんをまとめて返す）
-        asks.forEach((a) => { const f = a.kind === "straw" && ONW.debug ? ONW.debug.randTarget(game, "straw", a.id) : null; (a.kind === "assassin" ? game.assassinTargets : game.strawTargets)[a.id] = f && a.cands.includes(f) ? f : pick(a.cands); });
+        asks.forEach((a) => { const f = a.kind === "straw" && ONW.debug ? ONW.debug.randTarget(game, "straw", a.id) : null; (a.kind === "assassin" ? game.assassinTargets : a.kind === "bounty" ? game.bountyTargets : game.strawTargets)[a.id] = f && a.cands.includes(f) ? f : pick(a.cands); });
       }
       // 3) 選んだ結果を反映
       wave.forEach((id) => {
@@ -375,6 +394,9 @@ window.ONW = window.ONW || {};
         } else if (role === R.ASSASSIN) {
           const t = game.assassinTargets[id];
           if (t) game.assassinList.push({ id, target: t });
+        } else if (role === R.BOUNTY_HUNTER) {
+          const t = game.bountyTargets[id];
+          if (t && !bouncedIds.has(id)) game.bountyList.push({ id, target: t });
         }
       });
       flushTomo();   // わら人形の道連れをまとめて実行
@@ -451,10 +473,17 @@ window.ONW = window.ONW || {};
 
   /**
    * 勝敗を判定する（マイクラ版の優先順位に準拠。このWeb版にある役職の範囲）。
+   * 【勝利優先度（正本: docs/勝利優先度.md。ここを変えるときは必ず合わせて直す）】
+   *   チキン ＞ 神の祝福 ＞ 恋人 ＞ シャッフラー ＞ 賞金稼ぎ ＞ てるてる坊主＝一目惚れしてるてる＝処刑人 ＞ 神 ＞ 妖狐 ＞ アサシン(暗殺成功) ＞ 村人陣営＝人狼陣営
+   *   ・チキン: 村人陣営以外が勝つ結果を、生存したチキンが村人陣営の勝利に逆転（determineWinners / chickenForce で下の分岐をすべて飛ばす）
+   *   ・シャッフラー: 通常の結果が出たあと、対象が勝者に入っていれば乗っ取る（determineWinnersCore。神の祝福・恋人・チキンの逆転では乗っ取らない）
+   *   ・妖狐: 村人陣営・人狼陣営（アサシンの逆転後の人狼陣営も）が勝つ結果だけを、全員生存の妖狐が乗っ取る（determineWinnersCore）
    *   1. 神が追放された        → 神の祝福: 神以外の全員が勝利（追放されたオポチュニストは除く）
-   *   2. てるてる系が追放された → 追放されたてるてる系の勝利（一目惚れしてるてるは選んだ相手も勝利）
+   *   1.5 恋人 / 1.7 賞金稼ぎ
+   *   2. てるてる系が追放された / 2.5 処刑人のターゲットが追放された → 同じ順位（一緒に勝つ）
    *   3. 神が追放されていない   → 神降臨: 神の単独勝利
-   *   4. それ以外              → 村人陣営 / 人狼陣営の基本勝敗
+   *   3.8 王国滅亡（女王が倒れた。この優先度表には載っていない）
+   *   4. それ以外              → 村人陣営 / 人狼陣営の基本勝敗（アサシンの逆転を含む）
    *   ・オポチュニストは、どの結果でも「追放されていなければ」追加で勝利
    * 道連れ(猫又・黒猫・わら人形)・無理心中で死んだ人も、マイクラ版どおり「追放された人」として数える。
    * 結果は game.winners（陣営キー）/ winnerIds / winTitle / winTeams / winDetail / executed に入れる。
@@ -480,6 +509,7 @@ window.ONW = window.ONW || {};
     game.executed = executed;
     ONW.vote.resolveCats(game);   // シュレディンガーの猫: 自分に投票した人からランダムに1人選び、その人の陣営になる
     game.assassinResult = (game.assassinList || []).map((a) => ({ by: a.id, target: a.target, hit: game.currentRoles[a.target] === R.MERLIN }));   // 結果の演出用
+    game.bountyResult = ONW.bountyResult(game);   // 賞金稼ぎ: 選んだ相手が最終盤面で人狼判定（本物の人狼系 + 昇格した狂人）か（結果の演出・勝敗用）
     const dead = ONW.vote.deadSet(game);   // 死んだ人全員（死因を問わない。game.executed は上で更新済み）
     const gods = ids.filter((id) => role(id) === R.GOD);
     game.godMode = null; game.godIds = []; game.godBlown = [];   // 結果の演出用: "bless"（神の祝福）/ "descend"（神降臨）/ null
@@ -491,6 +521,8 @@ window.ONW = window.ONW || {};
     const bounced = new Set((game.toughBounces || []).flatMap((b) => b.to || []));
     const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id));
     const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id));
+    // 賞金稼ぎ: 追放（道連れを含む）でめくれて、選んだ相手が人狼判定なら単独勝利。心中・無理心中・タフガイのとばっちりでは発動せず、恋人（重複役職）の賞金稼ぎは勝てない（マイクラ版 applyLimitedSingleWinners）
+    const bountyWinIds = (game.bountyResult || []).filter((b) => b.hit && executed.includes(b.by) && role(b.by) === R.BOUNTY_HUNTER && !byLove(b.by) && !isLover(b.by) && !bounced.has(b.by)).map((b) => b.by);
     const opportunists = ids.filter((id) => role(id) === R.OPPORTUNIST && !dead.has(id));
     // 恋人: 二人とも死んでいない組が勝利（死因は問わない: dead = 追放・連鎖死(道連れ/心中等)・昼中の死亡。今後死因が増えたら、dead に足すだけでここは変わらない）。勝てなかった恋人は、元の陣営が勝っても敗北（マイクラ版の恋人陣営）
     const loverSurvive = ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).map(([a, b]) => [a, b]);   // キューピッドの組は3つ目に持ち主が付く（番号付け用）。勝者に入れるのは恋人の2人だけ（キューピッド本人は下の追加勝利で判定）
@@ -502,8 +534,12 @@ window.ONW = window.ONW || {};
     const voted = new Set(game.eliminated || []);
     // 従者の身代わりで追放になった従者は「処刑人の手で処刑できた」ことにはならない（自ら死んだようなもの）。処刑人の勝敗の判定では、投票で追放された人から除く（追放以外で死んだ扱い）
     const subbed = new Set((game.servantSubs || []).map((x) => x.servant));
-    const execAll = ONW.execPairs(game).filter(([e, tg]) => e !== tg);
-    const execWinIds = execAll.filter(([e, tg]) => voted.has(tg) && !subbed.has(tg) && !bounced.has(tg) && !lostLover(e)).map(([e]) => e);
+    // 賞金稼ぎがターゲットの処刑人: 賞金稼ぎが投票で追放され、人狼判定を当てられなかった（外れ）ときだけ有効（処刑人の勝利）。的中なら賞金稼ぎの単独勝利、追放されなかった・追放以外で死んだ・能力が発動しなかった場合は無効（勝ちも負けもない）
+     const bountyMissHanged = (tg) => voted.has(tg) && !subbed.has(tg) && !bounced.has(tg) && (game.bountyResult || []).some((b) => b.by === tg && !b.hit);
+     const execAll = ONW.execPairs(game).filter(([e, tg]) => e !== tg && (role(tg) !== R.BOUNTY_HUNTER || bountyMissHanged(tg)));
+    // シャッフラーで処刑人になった人が、シャッフラーの失敗条件（変化させた人・変化後の本人が死亡など）に当たったときは、処刑人の勝利にしない（あとで勝者から外すと、勝者が空の「処刑人勝利」になってしまう）。本来勝てる陣営（村人・人狼など）の結果になる
+    const shFailPre = ONW.shuffler && ONW.shuffler.failed ? new Set(ONW.shuffler.failed(game, new Set(ids), dead)) : new Set();
+    const execWinIds = execAll.filter(([e, tg]) => voted.has(tg) && !subbed.has(tg) && !bounced.has(tg) && !lostLover(e) && !shFailPre.has(e)).map(([e]) => e);
     const execLoseIds = execAll.filter(([, tg]) => (!voted.has(tg) || subbed.has(tg) || bounced.has(tg)) && dead.has(tg)).map(([e]) => e);
     // 神の祝福が起きるのは、神が「追放」か「道連れ」で死んだときだけ。心中・無理心中・処刑（処刑人のターゲットとして追放）で死んだ神は、祝福なし
     const godBless = gods.filter((id) => {
@@ -518,13 +554,23 @@ window.ONW = window.ONW || {};
 
     const set = (title, teams, winners, detail, winnerTeams) => {
       // シャッフラーの乗っ取り勝利（determineWinnersCore が、1回目の結果を見て成立したときだけ game.shufflerTake を付けてもう一度ここへ来る）: 勝者はシャッフラーと変化させた人だけ。追加勝利の役職などは下で通常どおり足す
+      if (game.foxTake) { title = "妖狐陣営勝利"; teams = ["妖狐陣営"]; game.foxTake.fanatics = ONW.fanatic ? ONW.fanatic.partners(game, dead) : []; winners = [...game.foxTake.ids, ...game.foxTake.fanatics]; detail = ONW.fox.takeoverText(game, game.foxTake.ids); winnerTeams = [ONW.TEAM.THIRD]; }   // 妖狐の乗っ取り（determineWinnersCore が成立を確かめたときだけ game.foxTake を付けて、もう一度ここへ来る）
       if (game.shufflerTake) { title = "シャッフラー勝利"; teams = ["シャッフラー"]; winners = game.shufflerTake.ids.slice(); detail = ONW.shuffler.takeoverText(game, game.shufflerTake, game.shufflerBase); winnerTeams = [ONW.TEAM.THIRD]; }
       game.winTitle = title; game.winTeams = teams; game.winDetail = detail; game.winners = winnerTeams;
       const w = new Set(winners);
-      [...(game.kingdomIds || []), ...(game.queenFallen || [])].forEach((id) => w.delete(id));   // 王国滅亡: 倒れた女王と、巻き込まれた村人陣営は勝利できない
+      // 王国滅亡で死んだ人（結果発表で倒れた game.kingdomIds・昼中に倒れた deadKind "queen"）と、倒れた女王は勝者から外す。
+      //   メモ（docs/勝利優先度.md「王国滅亡の判定メモ」）: 本来は 無理心中した / 反転(+反転が奇数個) / 神の祝福が発動 / 羅刹の愛する人として勝利 / (+コピリスト)つき のときだけ勝てる。ここは今、例外なしで外している（例外は未実装）
+      [...(game.kingdomIds || []), ...Object.keys(game.deadKind || {}).filter((id) => game.deadKind[id] === "queen"), ...(game.queenFallen || [])].forEach((id) => w.delete(id));
+      ids.forEach((id) => { if ((role(id) === R.FOX || role(id) === R.FANATIC) && dead.has(id)) w.delete(id); });
+    ids.forEach((id) => { if (ONW.fanatic && ONW.fanatic.lostBy(game, id) && !ONW.hiddenDrunk(game, id)) w.delete(id); });   // 鍵師のロックで狂人になれなかった背徳者は勝利条件を失う（2of4b）   // 背徳者: 後追いなどで死んだ背徳者も勝利条件を失う（5of5）
+      //   // 妖狐: 呪殺・追放・昼中死亡などで死んだ妖狐は勝利条件を失う（神の祝福でも勝てない。生きている妖狐は祝福で勝つ）   // 王国滅亡: 倒れた女王と、巻き込まれた村人陣営は勝利できない
+      // 背徳者（ご主人が狐憑きだけ = 最終盤面に妖狐がいない）: 妖狐陣営ではなく、村人陣営が勝利したら追加で勝利（生きている・ロックされていない背徳者。勝てなかった恋人は下で外れる）
+      if (teams.includes("村人陣営") && ONW.fanatic && ONW.fanatic.villageWinners) { const fv = ONW.fanatic.villageWinners(game, dead); fv.forEach((id) => w.add(id)); if (fv.length && !teams.includes("背徳者")) teams.push("背徳者"); }
       ids.forEach((id) => { if (lostLover(id) && role(id) !== R.WINNER) w.delete(id); });     // 勝てなかった恋人は、元の陣営が勝っても敗北（ただし勝ち組は恋人でも勝つ）
       // シャッフラー（マイクラ版の失敗条件）: 追放・死亡しないと勝てない役職以外に変化させたのに対象が死亡 / 村人・人狼陣営の役職に変化させたのにシャッフラーが死亡 → シャッフラーと対象は勝てない（元の陣営が勝っていても敗北）
       const shBan = ONW.shuffler && ONW.shuffler.failed ? ONW.shuffler.failed(game, w, dead) : new Set();
+      shBan.forEach((id) => { if (loverWinSet.has(id)) shBan.delete(id); });   // 恋人として勝つ人は、シャッフラーの失敗条件で敗北にしない（恋人 ＞ シャッフラー。(+恋人)と(+シャッフラー)の重複は恋人で判定）
+      game.shufflerBan = [...shBan];
       shBan.forEach((id) => w.delete(id));
       winnerRoleIds.forEach((id) => w.add(id));                                                // 勝ち組: 追加勝利
       if (winnerRoleIds.length && !teams.includes("勝ち組")) teams.push("勝ち組");
@@ -612,6 +658,11 @@ window.ONW = window.ONW || {};
       return set("恋人陣営勝利", ["恋人陣営"], loverSurvive.flat(),
         `恋人 ${loverSurvive.map(([a, b]) => `${nm([a])} ❤ ${nm([b])}`).join("、")} が二人とも死亡しませんでした。恋人以外は敗北です。`, [ONW.TEAM.THIRD]);
     }
+    // 1.7 賞金稼ぎの勝利: 選んだ相手が人狼判定だった。てるてる坊主・一目惚れしてるてる・アサシンの逆転勝利より優先（神の祝福・恋人勝利のあと）。ほかの陣営は勝てない
+    if (!game.chickenForce && bountyWinIds.length) {
+      const tg = (game.bountyResult || []).filter((b) => bountyWinIds.includes(b.by)).map((b) => b.target);
+      return set("賞金稼ぎ勝利", ["賞金稼ぎ"], bountyWinIds, `賞金稼ぎ ${nm(bountyWinIds)} が選んだ ${nm(tg)} は人狼判定でした。賞金稼ぎの単独勝利です。`, [ONW.TEAM.THIRD]);
+    }
     // 2. てるてる系の勝利
     if (!game.chickenForce && (tanners.length || loveTanners.length)) {
       const win = [...tanners, ...loveTanners, ...execWinIds];   // ターゲットがてるてる系なら、処刑人もてるてる系も一緒に勝利
@@ -622,16 +673,16 @@ window.ONW = window.ONW || {};
       if (loveTanners.length) { teams.push("一目惚れしてるてる"); parts.push(`追放された一目惚れしてるてる: ${nm(loveTanners)}`); }
       return set(`${teams.join("＆")}勝利`, teams, win, parts.join(" / "), [ONW.TEAM.THIRD]);
     }
-    // 3. 神降臨（神が追放されなかった）
+    // 2.5 処刑人の単独勝利（ターゲットが追放された。てるてる系と同じ順位で、神降臨より前。村人陣営・人狼陣営は勝てない）
+    if (!game.chickenForce && execWinIds.length) {
+      return set("処刑人勝利", ["処刑人"], execWinIds, `処刑人 ${nm(execWinIds)} のターゲット ${nm(execAll.filter(([e]) => execWinIds.includes(e)).map(([, tg]) => tg))} が追放されました。`, [ONW.TEAM.THIRD]);
+    }
+    // 3. 神降臨（処刑人より後）（神が追放されなかった）
     if (!game.chickenForce && godAlive.length) {
       game.godMode = "descend"; game.godIds = godAlive.slice();
       return set("神降臨", ["神"], godAlive, "神が追放されませんでした。", [ONW.TEAM.THIRD]);
     }
-    // 3.5 処刑人の単独勝利（ターゲットが追放された。神降臨より後。村人陣営・人狼陣営は勝てない）
-    if (!game.chickenForce && execWinIds.length) {
-      return set("処刑人勝利", ["処刑人"], execWinIds, `処刑人 ${nm(execWinIds)} のターゲット ${nm(execAll.filter(([e]) => execWinIds.includes(e)).map(([, tg]) => tg))} が追放されました。`, [ONW.TEAM.THIRD]);
-    }
-    // 3.8 王国滅亡（本家 buildQueenOverrideResult）: 女王が追放・道連れ（または昼中に死亡）したとき。神の祝福・恋人勝利・てるてる系・神降臨・処刑人より後ろ、基本勝敗より前
+    // 3.8 王国滅亡（本家 buildQueenOverrideResult。判定が特殊なので勝利優先度の表には載せない。勝てる例外のメモは docs/勝利優先度.md「王国滅亡の判定メモ」）: 女王が追放・道連れ（または昼中に死亡）したとき。神の祝福・恋人勝利・てるてる系・神降臨・処刑人より後ろ、基本勝敗より前
     //   ・女王と人狼判定の者が一緒に倒れた → 勝者なし / 人狼判定の者が倒れていない → 人狼陣営の勝利 / 人狼陣営がいない → 勝者なし
     //   ・生存したチキンがいれば、determineWinners が村人陣営の逆転勝利に作り直す（このときは chickenForce で、ここは通らない）
     const fallenQueens = ids.filter((id) => role(id) === R.QUEEN && dead.has(id));
@@ -668,12 +719,19 @@ window.ONW = window.ONW || {};
   /** 勝敗の判定（シャッフラーの乗っ取り勝利つき）: まず通常どおり判定し、シャッフラーの組が成立していたら（失敗条件を除いた対象が勝者に入っているとき）、勝者をシャッフラーと対象だけにして判定し直す。
    *  神の祝福・チキンの逆転（chickenForce）・恋人が絡む組では乗っ取らない（ONW.shuffler.takeover）。 */
   vote.determineWinnersCore = function determineWinnersCore(game) {
-    game.shufflerTake = null; game.shufflerBan = [];
+    game.shufflerTake = null; game.shufflerBan = []; game.foxTake = null;
     ONW.vote.determineWinnersCoreBase(game);
+    // 妖狐（マイクラ版 applyFoxOverride）: 村人陣営か人狼陣営が勝つ結果のとき、妖狐が全員生き残っていれば勝利を乗っ取る（シャッフラーより先・チキンの逆転より後）。チキンの逆転の再判定（chickenForce）では乗っ取らない
+   
+    if (!game.chickenForce && ONW.fox && ONW.fox.takeover && ((game.winTeams || []).includes("村人陣営") || (game.winTeams || []).includes("人狼陣営"))) {
+      const fx = ONW.fox.takeover(game);
+      if (fx.length) { game.foxTake = { ids: fx, from: game.winTitle }; ONW.vote.determineWinnersCoreBase(game); }
+    }
     if (ONW.shuffler && ONW.shuffler.takeover && !game.chickenForce && !(game.winTeams || []).includes("神の祝福")) {
       const tk = ONW.shuffler.takeover(game);
       if (tk) { game.shufflerBase = game.winTitle; game.shufflerTake = tk; ONW.vote.determineWinnersCoreBase(game); game.shufflerTake = null; }
     }
+    game.foxTake = null;
     return game.winners;
   };
 

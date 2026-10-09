@@ -8,6 +8,11 @@
     const f = n.forced(p), i = n.infoOf(p.id);
     const t = n.validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : n.pick(g.players.filter((q) => q.id !== p.id));
     if (!t) return;
+    if (ONW.keymaster.gate(g, p.id, [])) {   // 鍵師のロック: 自分の席がロック中ならコピーに失敗（選ばれた人の役職はコピーするだけで動かないので、相手がロック中でもコピーできる）
+      i.mode = "doppel"; i.target = t.id; i.keyFail = { kind: "self", target: t.id };
+      ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${label} ${p.name}`);
+      return;
+    }
     const seen = g.currentRoles[t.id], got = ONW.copyRole(g, t.id, p.id), shown = ONW.shownRole(got);
     i.mode = "doppel"; i.target = t.id; i.newRole = shown; i.known[p.id] = shown; i.known[t.id] = ONW.shownRole(seen);
     i.doppel = { target: t.id, newRole: shown };
@@ -22,6 +27,7 @@
   function cpuClaim(k, g, p, r, i, c) {   // ドッペルゲンガー: 選んだ人と、コピーして手にした役職を開示（人外を手にしたら村人役を騙る）
     const { rn, nameOf, isNonVillage, nonVillageLie } = k;
     c.co = "doppelganger";
+    if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたためコピーに失敗しました。", claim: null }; return; }   // ロックされてコピーに失敗した: 正直に言う
     if (!i.doppel) return;   // コピー情報なし: COだけする
     const dt = nameOf(g, i.doppel.target), dn = i.doppel.newRole;
     if (isNonVillage(dn)) { const lie = nonVillageLie(g, p, "doppelganger", i, dn); c.co = lie.co; c.result = lie.result; }
@@ -102,6 +108,7 @@
       resolve(c, p) {
         const g = c.g, rn = c.rn, nameOf = c.nameOf, rev = c.rev;
         const t = c.selOf(p).players[0]; if (!t || t === p.id || !g.players.some((q) => q.id === t)) return;
+        if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中ならコピー失敗。新聞・観測にも載らない
         const seen = g.currentRoles[t], got = ONW.copyRole(g, t, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
         ONW.observeNote(g, p.id, [t]);
         ONW.newsNote(g, "doppelganger");
@@ -115,7 +122,9 @@
     morning: {
       run(c) {   // 墓荒らしが墓地から引いたドッペルゲンガー: 朝にコピーする（その時点の役職）
         if (!c.players.length) return null;
-        const g = c.g, rn = c.rn, id = c.id, t = c.players[0], seen = g.currentRoles[t], got = ONW.copyRole(g, t, id);
+        const g = c.g, rn = c.rn, id = c.id, t = c.players[0];
+        if (ONW.keymaster.gate(g, id, [])) return { lines: [ONW.keymaster.fail(g, id, "self", "コピー", [], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
+        const seen = g.currentRoles[t], got = ONW.copyRole(g, t, id);
         const lines = [`${c.nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} をコピーし、${rn(got)} になりました。`);
         lines.push(...c.soberInfoLines(g, id, got));

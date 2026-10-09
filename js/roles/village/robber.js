@@ -6,6 +6,12 @@
     const g = n.g;
     const f = n.forced(p), i = n.infoOf(p.id);
     const t = n.validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : n.pick(g.players.filter((q) => q.id !== p.id));
+    const why = ONW.keymaster.gate(g, p.id, [t.id]);   // 鍵師のロック: 自分の席か相手の席がロック中なら🔒に弾かれて失敗（役職は動かない）
+    if (why) {
+      i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]); i.keyFail = { kind: why, target: t.id };
+      ONW.keymaster.fail(g, p.id, why, "交換", [t.id], `${label} ${p.name}`);
+      return;
+    }
     ONW.swapPlayers(g, p.id, t.id);
     i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]);
     i.known[p.id] = i.newRole; i.known[t.id] = "robber";
@@ -25,6 +31,13 @@
   function cpuClaim(k, g, p, r, i, c) {
     const { rn, nameOf, isNonVillage, nonVillageLie } = k;
     c.co = "robber";
+    if (i.keyFail) {   // ロックされて交換に失敗した: 正直に「失敗した」と言う（役職は怪盗のまま）
+      const t = nameOf(g, i.target);
+      c.result = i.keyFail.kind === "self"
+        ? { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }
+        : { short: `${t} → ロックで失敗`, text: `${t} を選びましたが、役職がロックされていたため交換できませんでした。`, claim: null };
+      return;
+    }
     if (isNonVillage(i.newRole)) { const lie = nonVillageLie(g, p, "robber", i, i.newRole); c.co = lie.co; c.result = lie.result; }   // 人外を手にした: 村人役を騙る
     else c.result = { short: `${nameOf(g, i.target)} → ${rn(i.newRole)}`, text: `${nameOf(g, i.target)} の役職を奪って ${rn(i.newRole)} になりました。`, claim: { kind: "robber", target: i.target, role: i.newRole } };
   }
@@ -71,6 +84,8 @@
       resolve(c, p) {   // 怪盗 → いたずらっ子（起床順。怪盗はシャッフラー・グレムリンのあと）。いたずらっ子の入れ替えは最後にまとめて反映
         const g = c.g, rn = c.rn;
         const t = c.selOf(p).players[0]; if (!t) return;
+        const why = ONW.keymaster.gate(g, p.id, [t]);   // 鍵師のロック（鍵師は先の段階で済んでいる）: 自分か相手の席がロック中なら失敗。役職は動かず、新聞・観測にも載らない
+        if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
         ONW.swapPlayers(g, p.id, t);
         const got = g.currentRoles[p.id];
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);
@@ -84,6 +99,8 @@
       run(c) {
         if (!c.players.length) return null;
         const g = c.g, rn = c.rn, id = c.id, t = c.players[0];
+        const why = ONW.keymaster.gate(g, id, [t]);   // 朝のうち（墓荒らし・ドッペルで手にした怪盗 / 酔い覚め）もロックは効く
+        if (why) return { lines: [ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };
         ONW.swapPlayers(g, id, t);
         const got = g.currentRoles[id];
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);

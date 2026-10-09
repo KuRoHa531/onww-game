@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null };
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle", "dictate"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -66,6 +66,11 @@ window.ONW = window.ONW || {};
     if (!game.debugOn || !game.dbg || !game.dbg.rand) return [];
     const ok = (id) => game.players.some((p) => p.id === id);
     return (game.dbg.rand.lover || []).filter((pr) => Array.isArray(pr) && pr.length === 2 && pr[0] !== pr[1] && ok(pr[0]) && ok(pr[1]));
+  };
+  /** CPUの独裁の対象（CPUのID → 対象のID。指定なしなら null）。指定したCPUだけが昼に独裁を使う */
+  debug.dictateTarget = function (game, id) {
+    if (!game.debugOn || !game.dbg || !game.dbg.rand) return null;
+    return ((game.dbg.rand.dictate || {})[id]) || null;
   };
   /** CPUの夜の能力先指定 { player?, graves? } */
   debug.cpuTarget = function (game, id) {
@@ -197,7 +202,7 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", gremlin: "gr" };
+  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", gremlin: "gr" };
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
@@ -218,7 +223,7 @@ window.ONW = window.ONW || {};
     const valid = new Set(players.map((x) => x.key));
     const rows = players.map((s) => {
       const t = d.cpu[s.key] || {}, role = d.roles[s.key], k = cpuKinds(s.key), rs = cpuRoles(s.key);
-      const rk = rs ? RAND_KINDS.filter((x) => x.roles.some((r) => rs.includes(r))) : [];   // 従者のご主人など（人間もCPUも）
+      const rk = rs ? RAND_KINDS.filter((x) => x.roles.some((r) => rs.includes(r)) && (!x.cpuOnly || s.cpu)) : [];   // 従者のご主人など（人間もCPUも）
       if (!rs) return "";   // 固定役がない人は出さない
       if (!rk.length && (!s.cpu || !Object.values(k).some(Boolean))) return "";   // 指定できるものがない人も出さない
       const parts = [];
@@ -263,6 +268,7 @@ window.ONW = window.ONW || {};
     { kind: "cat", roles: ["cat_sidhe", "black_cat", "cat_pumpkin"], label: "道連れ先" },
     { kind: "straw", roles: ["straw_doll"], label: "道連れ先（自動で選ぶとき）" },
     { kind: "exec", roles: ["executioner"], label: "ターゲット" },
+    { kind: "dictate", roles: ["dictator"], label: "独裁の対象（昼に宣言する・CPUのみ）", cpuOnly: true },   // 指定したCPUだけが独裁を使う。指定のないCPUは独裁者を配られず（人間と入れ替え）、使わない
     { kind: "muzzle", roles: ["muzzle_madman"], label: "口封じ先", self: true },   // 自分自身も口封じ先になれる
   ];
   function tabCpu() {
@@ -366,7 +372,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; refresh(); };
-  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
+  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, dictate: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
 
   // 指定を書き換える（空になったら項目ごと消す）
   const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };

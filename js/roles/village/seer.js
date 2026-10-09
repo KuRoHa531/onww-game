@@ -20,6 +20,7 @@
     } else {
       const t = fp ? g.players.find((q) => q.id === fp) : n.pick(g.players.filter((q) => q.id !== p.id));
       i.mode = "player"; i.target = t.id; i.known[t.id] = ONW.seerSees(rolesNow[t.id]);
+      if (ONW.foxInspect) ONW.foxInspect(g, t.id);   // 妖狐: 占われた席を記録（呪殺の判定は最終盤面で）
       g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${n.rn(ONW.seerSees(rolesNow[t.id]))} でした。`);
       n.ob(p.id, [t.id]);
     }
@@ -83,6 +84,7 @@
         const sel = c.selOf(p), label = rn(c.eff(p));
         if (sel.players.length === 1) {
           const t = sel.players[0], r = ONW.seerSees(g.initialRoles[t]);
+          if (ONW.foxInspect) ONW.foxInspect(g, t);   // 妖狐: 占われた席を記録
           g.nightLogsAll.push(`${label} ${p.name} は ${nameOf(t)} を占い、${rn(r)} でした。`);
           hold(p.id, `${nameOf(t)} の役職は「${rn(r)}」でした。`);
           rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
@@ -109,6 +111,7 @@
           reveal = { kind: "peek", items: graves.map((i) => ({ k: `g:${i}`, role: ONW.seerSees(g.center[i]) })) };
         } else if (players.length) {
           const t = players[0], r = ONW.seerSees(g.currentRoles[t]);
+          if (ONW.foxInspect) ONW.foxInspect(g, t);   // 妖狐: 占われた席を記録（朝・昼のうちの占い）
           lines = [`${nameOf(t)} の役職は「${rn(r)}」でした。`];
           g.nightLogsAll.push(`${label} ${me.name} は ${nameOf(t)} を占い、${rn(r)} でした。`);
           reveal = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };

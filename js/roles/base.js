@@ -38,8 +38,9 @@
  *   settlePre(c) / settlePost(c) / settleMsg(c, p, mode)   朝のあとの待機時間(mode: "settle" | "resync")
  *   dayShift(c, before) / dayCheck(c, before) / dayNews(c) / dayNotice(c)   昼のうちに役職が動いたとき
  *   dayStart(c) / dayAnnounce(c) / soberReveal(c, ids) / resyncDay(c, seat) / cpuLateVisits(c)
+ *   dayCurse(c) 昼になった瞬間の呪殺(妖狐: 待機時間に決めた席を昼中死亡に) / daySober(c) 昼に酔いが覚めたとき(妖狐: 酔い覚めの呪殺) / dayCheck(c) 昼に役職が動いた・占ったとき(妖狐: 新しく占われた席に妖狐が来たら呪殺)
  *   stageNight / stageMorning / stagePick: stage.js の夜・朝の演出とカードの選び方(stage.kit を使う)
- *   stageResult: { execExclude(res), intro, flipUp, flipped, kingdom, assassin, restUp, rest, afterRest, reverse, skip, clear }   結果発表の演出(stage.js の startResult / skipResult)
+ *   stageResult: { execExclude(res), intro, flipUp, flipped, kingdom, assassin, bounty, restUp, rest, afterRest, reverse, skip, clear }   結果発表の演出(stage.js の startResult / skipResult)
  *   stageSettle: { field, shown, run, end } / stageFlash: { field, when, run }   朝の待機時間・昼の公開演出(スター・女王・フリーター・訪問者)
  *   stageSober: { list, listLate }   昼に酔いが覚めたときにめくれるカードの並び(stage.js の soberPeek)
  *   フックは関数、または { order: 数字, run: 関数 } で書ける(order が小さいほど先に呼ばれる。省略は100)

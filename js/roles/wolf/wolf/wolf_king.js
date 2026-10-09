@@ -22,7 +22,7 @@
    * 他の人狼判定の人が「同時に死ぬ」場合でも、その人に従者の身代わりが付く（従者が同時に死なない・先に死んでいない）なら、その人は生き残る
    */
   ONW.kingProtected = function kingProtected(g, kid, gone, dying) {
-    const R = ONW.ROLE, blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER];
+    const R = ONW.ROLE, blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER];
     const subbed = (w) => !blocked.includes(g.currentRoles[w]) && ONW.servantPairs(g).some(([s, m]) => m === w && s !== w && !dying.has(s) && !gone.has(s) && !ONW.isLover(g, s));
     const others = ONW.vote.wolfJudgeIds(g).filter((w) => w !== kid && !gone.has(w));
     if (others.some((w) => !dying.has(w) || subbed(w))) return true;                       // 同時に死なない人狼判定が生き残る

@@ -136,7 +136,7 @@
       const mid = ONW.servantMaster(g, p.id), mp = mid && g.players.find((q) => q.id === mid);
       return {
         text: mp ? `あなたのご主人は ${mp.name}${mid === p.id ? "（あなた）" : ""} です。` : "ご主人が見つかりませんでした。",
-        text2: "ご主人が追放されそうになると、あなたが身代わりになって追放されます。ご主人が道連れで死ぬときも身代わりになります。ご主人が王国滅亡・心中・無理心中で死ぬときは、身代わりできず後追いします。ご主人が勝利したら、あなたも追加で勝利します。",
+        text2: "ご主人が追放されそうになると、あなたが身代わりになって追放されます。ご主人が道連れで死ぬときも身代わりになります。ご主人が王国滅亡・心中・無理心中・呪殺（占い師に占われた妖狐）で死ぬときは、身代わりできず後追いします（妖狐投票の追放では身代わりになります）。ご主人が勝利したら、あなたも追加で勝利します。",
         master: (mp && mid !== p.id) ? { id: mid } : null,   // 自分自身がご主人のときは、自分のカードはめくらない
       };
     },
@@ -167,7 +167,8 @@
     } },
     settleMsg: { order: 50, run(c, p, mode) {
       if (mode !== "settle") return {};   // 再入室(resync)のときは、朝のログ(hold)として戻るのでここでは出さない
-      return { logs: (c.tmp.sn || []).filter((m) => m === p.id).map(() => ONW.SERVANT_NOTICE_TEXT) };
+      const mine = (c.tmp.sn || []).filter((m) => m === p.id);
+      return mine.length ? { logs: mine.map(() => ONW.SERVANT_NOTICE_TEXT), servant: true } : {};   // servant: true = 待機時間に「あなたの従者がいるようです」のバナーを出す（パン屋のバナーと同じ作り。誰が従者かは出さない）
     } },
     /** 昼に新しく従者通知が出る人へ送る（再入室でも消えないよう hold も記録する） */
     dayNotice(c) {

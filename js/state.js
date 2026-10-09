@@ -60,6 +60,46 @@ window.ONW = window.ONW || {};
   ONW.relKey = (g, pr) => { const c = ONW.cardAt(g, pr[2] || pr[0]); return "c:" + c + "#" + (((g && g.pureLoverGen) || {})[c] || 0); };
   ONW.isBrokenRel = (g, pr) => !!(g && g.brokenKeys && g.brokenKeys[ONW.relKey(g, pr)]);
   ONW.brokenDealt = (g, a, b) => !!(g && g.brokenKeys && g.brokenKeys["d:" + (a < b ? a + ">" + b : b + ">" + a)]);
+  /** 昼中に死んだ人のあとを追って死ぬ人（killPlayer と、待機時間の演出の予定 deathPlan が同じものを使う）。kind: その人自身の死因。
+   *  恋人の相方 = 心中(kind "lovers") → 従者(ご主人が 心中・後追い・王国滅亡で死んだとき。身代わりはできない) = 後追い("follow") → キューピッド(選んだ2人の一方が死んだら) = 後追い("cupid") → 死んだのが妖狐なら背徳者 = 後追い("fanatic")。順番は この並び（投票時間の vote.js kill() と同じ）。 */
+  const SERVANT_FOLLOW = ["lovers", "love", "queen", "follow", "cupid", "fanatic", "fox"];   // 従者が後追いするご主人の死因。呪殺(fox)も後追い（背徳者の後追いと同じ段）。追放・道連れ・妖狐投票(foxvote)は身代わりになるので後追いしない
+  ONW.deathFollowers = (g, id, kind) => {
+    const out = [];
+    ONW.loverMates(g, id).forEach((m) => out.push({ id: m, kind: "lovers" }));
+    // 王国滅亡: 女王が昼中に死んだら（死因は問わない）、その場で他の村人陣営も「王国滅亡」で死ぬ（投票のあとの結果発表まで待たない）。女王本人どうしは巻き込まない
+    if (g.currentRoles && g.currentRoles[id] === ONW.ROLE.QUEEN) (g.players || []).forEach((q) => { const info = ONW.ROLE_INFO[g.currentRoles[q.id]]; if (q.id !== id && g.currentRoles[q.id] !== ONW.ROLE.QUEEN && info && info.team === ONW.TEAM.VILLAGE && !out.some((o) => o.id === q.id)) out.push({ id: q.id, kind: "queen" }); });
+    if (SERVANT_FOLLOW.includes(kind)) ONW.servantPairs(g).filter(([s, m]) => m === id && s !== id).forEach(([s]) => out.push({ id: s, kind: "follow" }));
+    if (ONW.cupid) ONW.cupid.pairs(g).filter(([a, b, h]) => (a === id || b === id) && h !== id).forEach(([, , h]) => out.push({ id: h, kind: "cupid" }));
+    if (ONW.fanatic && (g.currentRoles[id] === ONW.ROLE.FOX || (g.currentRoles[id] === ONW.ROLE.FOX_MARKED && kind === "fox"))) ONW.fanatic.followersOf(g).forEach((f) => out.push({ id: f, kind: "fanatic" }));
+    return out;
+  };
+  /** seeds（今から死ぬ席。死因 seedKind）が昼中に死んだとき、連鎖で死ぬ人の予定: [{ id, kind, by(死んだ席), depth(1=seedの直接の相方) }]（killPlayer の連鎖と同じ順・同じ死因）。seed 自身は含めない */
+  ONW.deathPlan = (g, seeds, seedKind) => {
+    const dead = new Set(g.deadIds || []), out = [];
+    const visit = (id, depth, kind) => {
+      if (dead.has(id)) return;
+      dead.add(id);
+      ONW.deathFollowers(g, id, kind).forEach((f) => { if (!dead.has(f.id)) { out.push({ id: f.id, kind: f.kind, by: id, depth }); visit(f.id, depth + 1, f.kind); } });
+    };
+    (seeds || []).forEach((s) => visit(s, 1, seedKind || "fox"));
+    return out.filter((e) => !(seeds || []).includes(e.id));
+  };
+  /** 昼中死亡の札の文字（呪殺は妖狐の🦊の面なのでここには出ない）。死因そのものを出す（女王が心中で死んだなら「心中」。王国滅亡は、女王が倒れたせいで死んだ村人陣営の側 kind "queen" に付く） */
+  ONW.deathMarkOf = (kind) => kind === "queen" ? "王国滅亡" : kind === "lovers" ? "心中" : kind === "cupid" || kind === "fanatic" || kind === "follow" ? "後追い" : null;
+  /** 結果画面・PNG共通: 「道連れ・後追い」欄の行。従者の身代わり（追放）→ 連鎖で死んだ順（道連れ・心中・無理心中・後追い・王国滅亡、道連れの身代わり）。
+   *  返り値: [{ k: "sub"|"chain"|"chainSub", name, by, master, label }]（何も起きていなければ空） */
+  ONW.chainRows = (res) => {
+    const rows = [];
+    (res.servantSubs || []).forEach((x) => rows.push({ k: "sub", name: x.servant, master: x.master }));
+    const hist = res.history || [];
+    (res.chainOrder || []).forEach((id) => {
+      const h = hist.find((q) => q.id === id && q.cause === "chain");
+      if (!h) return;
+      if (h.sub) rows.push({ k: "chainSub", name: h.name, master: h.sub });
+      else rows.push({ k: "chain", name: h.name, by: h.kind === "queen" ? null : h.by, label: h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中" });
+    });
+    return rows;
+  };
   /** 恋人（配布時でも純愛者でも）がいる人か */
   ONW.isLover = (g, id) => ONW.loverMates(g, id).length > 0;
   /** 配布時の恋人の組 [[a, b], ...]（a < b） */
@@ -118,7 +158,7 @@ window.ONW = window.ONW || {};
    *     村人系 → "transform:light_apostle" / 人狼系・狂人系 → "transform:dark_avatar" / 第三陣営 → "transform:silver_shadow"
    *     確認: node _wip/groupcheck.js .（登録もれがあれば FAIL。node _wip/viewall.js . の一覧にも出る）
    * ===================================================================================== */
-  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
+  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
   const holderKeyOfGrave = (i) => "g:" + i;
   ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; if ((key === "pureLoverTargets" || key === "akujoHonmei" || key === "cupidPair") && ONW.pureLover) { const c = ONW.cardAt(g, holderId); (g.pureLoverGen = g.pureLoverGen || {})[c] = ((g.pureLoverGen || {})[c] || 0) + 1; ONW.pureLover.note(g, []); } };   // 選び直したカードは、新しい恋人関係（次の番号）   // 純愛者が選んだ瞬間も、結果画面の「恋人の印」の履歴に残す
   ONW.getRoleBound = (g, key, holderId) => (g[key] || {})[holderId];
@@ -132,7 +172,7 @@ window.ONW = window.ONW || {};
     let role = g.currentRoles[srcId];
     if (role === ONW.ROLE.DOPPELGANGER) role = ONW.ROLE.VILLAGER;
     const carry2 = role === ONW.ROLE.EVIL_WOMAN ? "akujoKeep" : null;   // 悪女は本命(carry)とキープ(carry2)の2つを持つ
-    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.EXECUTIONER]: "execTargets" }[role];
+    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.KEYMASTER]: "keyTargets", [ONW.ROLE.EXECUTIONER]: "execTargets" }[role];
     // コピーされた側(dst)は、酔っ払いでない限り（夜に配られた役職のまま眠っていないので）コピーされた役職の能力を自分では使えない。だから選択（フリーターの就職先・悪女の本命/キープ など）もまるごとコピーする。
     // 酔っ払いの dst は昼に酔いが覚めてから最終役職の能力を自分で使えるので、「能力を使った判定」(選択の記録)はコピーしない（従者のご主人・処刑人のターゲットは能力の使用ではなく自動で決まるのでこれまで通り）。
     const dstDrunk = !!ONW.hiddenDrunk(g, dstId), passive = carry === "servantMasters" || carry === "execTargets";
@@ -142,6 +182,7 @@ window.ONW = window.ONW || {};
     ["akujoHonmei", "akujoKeep"].forEach((k) => { if (g[k]) delete g[k][dstId]; });   // 上書きされた役職の悪女の記録は消す（悪女をコピーするときは下で新しく入れる）
     if (g.cupidPair) delete g.cupidPair[dstId];   // 上書きされたキューピッドの記録は消す（キューピッドをコピーするときは下で新しく入れる）
     if (g.breakerTargets) delete g.breakerTargets[dstId];   // 上書きされた破局師の記録は消す（破局師をコピーするときは下で新しく入れる）
+    if (g.keyTargets) delete g.keyTargets[dstId];   // 上書きされた鍵師の記録は消す（鍵師をコピーするときは下で新しく入れる。ロックそのものは席についているので消えない）
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[dstId]];   // 上書きされたカードの上のシャッフラーの印は消える（上に別の役職が置かれたのと同じ）
     if (g.pureLoverTargets) delete g.pureLoverTargets[dstId];   // 上書きされた役職の純愛者の記録は消す（古い記録の復活を防ぐ。純愛者をコピーするときは下で新しく入れる）
     (g.pureLoverGen = g.pureLoverGen || {})[cd.at[dstId]] = ((g.pureLoverGen || {})[cd.at[dstId]] || 0) + 1;   // コピー先のカードは別の恋人関係（次の番号）
@@ -211,6 +252,7 @@ window.ONW = window.ONW || {};
     ["akujoHonmei", "akujoKeep"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の悪女の記録は消す
     if (g.cupidPair) delete g.cupidPair[toId];   // 上書きされたキューピッドの記録は消す
     if (g.breakerTargets) delete g.breakerTargets[toId];   // 上書きされた破局師の記録は消す
+    if (g.keyTargets) delete g.keyTargets[toId];   // 上書きされた鍵師の記録は消す（ロックは席についているので残る）
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[toId]];   // 上書きされたカードの上のシャッフラーの印は消える
     if (g.pureLoverTargets) delete g.pureLoverTargets[toId];   // 上書きされた役職の純愛者の記録は消す（あとで古い記録が復活しないように）
     const t = (g.roleTrail = g.roleTrail || {});
@@ -227,7 +269,7 @@ window.ONW = window.ONW || {};
   ONW.shufflerPlace = (g, toId, role, byCard) => {
     const cd = cards(g), card = cd.at[toId], from = g.currentRoles[toId];   // from = 置かれる前のそのカードの役職（選ばれた人への通知「A から B」の A）
     g.currentRoles[toId] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
     (g.pureLoverGen = g.pureLoverGen || {})[card] = ((g.pureLoverGen || {})[card] || 0) + 1;   // 置かれたカードは別の恋人関係（次の番号）
     (g.shufflerMarks = g.shufflerMarks || {})[card] = { by: byCard || card, role, from, to: toId };   // to = 置かれた時点の持ち主（選ばれた人）
     const t = (g.roleTrail = g.roleTrail || {});

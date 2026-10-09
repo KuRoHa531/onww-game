@@ -191,9 +191,9 @@ window.ONW = window.ONW || {};
       <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.toggleGroup('${key}')">
         <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
       </button>`;
-    const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy"];
+    const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator"];
     const wolfLike = ["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf"], madLike = ["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"], dark = ["dark_avatar"];
-    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler"];
+    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"];
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -467,7 +467,7 @@ window.ONW = window.ONW || {};
     let body = "";
     if (info) {
       const live = info.night && info.sels.length ? `<div class="si-h">夜の選択（朝に実行）</div>${info.sels.map((x) => row(`${esc(x.name)} <small class="rs-dim">${esc(ONW.roles.getInfo(x.role).name)}</small>`, esc(x.text))).join("")}` : "";
-      const votes = info.vote ? `<div class="si-h">投票状況（変更あり）</div>${info.votes.map((v) => row(esc(v.from), v.to ? `→ <strong>${esc(v.to)}</strong>${v.w > 1 ? ` <span class="rs-dim">(${v.w}票)</span>` : ""}` : '<span class="rs-dim">未投票</span>')).join("")}` : "";
+      const votes = info.dict ? `<div class="si-h">独裁処刑</div>${row(esc(info.dict.by), `→ <strong>${esc(info.dict.target)}</strong>`)}` : info.vote ? `<div class="si-h">投票状況（変更あり）</div>${info.votes.map((v) => row(esc(v.from), v.to ? `→ <strong>${esc(v.to)}</strong>${v.w > 1 ? ` <span class="rs-dim">(${v.w}票)</span>` : ""}` : v.x ? '<span class="rs-dead">投票無効</span>' : '<span class="rs-dim">未投票</span>')).join("")}` : "";
       const log = info.log.length ? `<div class="si-h">夜の行動ログ</div>${info.log.map((t) => `<div class="si-log">${esc(t)}</div>`).join("")}` : "";
       body = live + votes + log || `<div class="si-log">まだ記録はありません。</div>`;
     }
@@ -728,6 +728,11 @@ window.ONW = window.ONW || {};
   ui.useAbility = function (kind) {   // kind: "day" | "night"。夜能力: 酔いが覚めたあとの最終役職の夜能力（押すとカードを選べて、確定/キャンセルが出る。もう一度押すと閉じる）
     const g = ONW.game, flash = (t) => { g.abilityMsg = t; ui.render(g); setTimeout(() => { if (g.abilityMsg === t) { g.abilityMsg = ""; ui.render(g); } }, 4000); };
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.isDead || g.isSpectator) return;
+    if (kind === "day") {   // 昼能力: 独裁者だけが使える。押すとホストに確認し、使える人にだけカード選択が開く（使えない人は押しても何も起きない = 誰が独裁者か透けない）。もう一度押すと閉じる
+      if (g.dictOpen) { g.dictOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
+      ONW.net.dictOpen();
+      return;
+    }
     if (kind !== "night") return;   // 使えない人は押しても何も出ない
     if (g.morningChainDone) return;
     if (!g.morningChain || !g.morningChainReady || !g.soberRole) return;
@@ -741,6 +746,31 @@ window.ONW = window.ONW || {};
     ONW.net.morningUse();
     ONW.stage.sync(g); ui.render(g);
   };
+  /** 独裁者: 選んだ相手を独裁処刑にする（確定）。確定するとすぐ議論が終わって結果発表へ */
+  ui.dictConfirm = function () {
+    const g = ONW.game, id = g.nightSel && g.nightSel.players && g.nightSel.players[0];
+    if (!g.dictOpen || !id) return;
+    g.dictOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.net.dictate(id);
+    ONW.stage.sync(g); ui.render(g);
+  };
+  ui.dictCancel = function () {
+    const g = ONW.game;
+    g.dictOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 独裁者の昼能力の操作欄（昼能力ボタンで開いたとき）。上のテーブルから1人選んで「独裁を宣言する」 */
+  ui.dictBlock = function (game) {
+    if (!game.dictOpen || game.isDead || game.isSpectator) return "";
+    const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
+    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    return `<div class="sober-box dict-box">
+      <p class="night-step__hint"><strong>独裁者の昼能力</strong>: 上のテーブルから、<strong>独裁で処刑する相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
+      <p class="night-step__hint">「独裁を宣言する」を押すと、すぐに議論を打ち切って、選んだ相手だけを処刑します（投票はしません）。取り消せません。</p>
+      <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.dictConfirm()">独裁を宣言する</button><button class="btn" onclick="ONW.ui.dictCancel()">キャンセル</button></div>
+    </div>`;
+  };
   ui.abilityCancel = function () {
     const g = ONW.game;
     g.abilityOpen = false; g.nightSel = { players: [], graves: [] };
@@ -753,6 +783,8 @@ window.ONW = window.ONW || {};
     const src = ui.canGhost() ? mergedChat(game) : (game.chatLog || []);
     const lines = src.map((c) => c.ghost
       ? `<div class="chat-line chat-ghost"><span class="chat-ghost__tag">【霊界】</span><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`
+      : c.kind === "death"
+      ? `<div class="chat-line chat-death">${esc(c.text)}</div>`
       : c.kind === "sys"
       ? `<div class="chat-line chat-sys">${esc(c.text)}</div>`
       : c.kind === "co"
@@ -767,6 +799,15 @@ window.ONW = window.ONW || {};
     const el = document.createElement("div");
     el.className = "bread-banner";
     el.innerHTML = `<span class="bread-banner__icon">🍞</span><span class="bread-banner__text">${n > 1 ? `パンが${n}個焼けました` : "パンが焼けました"}</span>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
+  };
+  /** 従者: ご主人に「あなたの従者がいるようです」のバナーを出す（パン屋のバナーと同じ位置・同じ長さ。カードには重ならない。誰が従者かは出さない） */
+  ui.showServant = function () {
+    document.querySelectorAll(".servant-banner").forEach((e) => e.remove());
+    const el = document.createElement("div");
+    el.className = "servant-banner";
+    el.innerHTML = `<span class="servant-banner__text">あなたの従者がいるようです</span>`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3600);
   };
@@ -803,7 +844,7 @@ window.ONW = window.ONW || {};
   ui.coTable = function () {
     const g = ONW.game, me = ONW.net.myId();
     return `<div class="cb-table">` + (g.boardView || []).map((p) => {
-      const [label, cls] = p.dead ? ["死亡", "co-none"] : coLabel(p.co);
+      const [label, cls] = p.dead ? [p.fox ? "呪殺" : p.fx || p.mark || "死亡", "co-dead"] : coLabel(p.co);
       const res = (p.results || []).map((t) => `<div class="cb-r">${esc(t)}</div>`).join("");
       return `<div class="cb-row ${p.id === me ? "cb-me" : ""} ${p.dead ? "cb-dead" : ""}">
         <div class="cb-who">${ONW.account.avatarHtml(p.name, null, "av--sm")}<span class="cb-name">${esc(p.name)}${p.cpu ? '<small class="cb-cpu">CPU</small>' : ""}</span></div>
@@ -815,7 +856,7 @@ window.ONW = window.ONW || {};
     if (!el) return;
     const g = ONW.game, me = ONW.net.myId();
     const chips = (g.boardView || []).map((p) => {
-      const [label, cls] = p.dead ? ["死亡", "co-none"] : coLabel(p.co);
+      const [label, cls] = p.dead ? [p.fox ? "呪殺" : p.fx || p.mark || "死亡", "co-dead"] : coLabel(p.co);
       return `<div class="cb-chip ${p.id === me ? "cb-me" : ""} ${p.dead ? "cb-dead" : ""}">
         <div class="cb-line"><span class="cb-name">${ONW.account.avatarMap[p.name] ? ONW.account.avatarHtml(p.name, null, "av--xs") : ""}${esc(p.name)}${p.cpu ? '<small class="cb-cpu">CPU</small>' : ""}</span><span class="cb-co ${cls}">${label}</span></div></div>`;
     }).join("");
@@ -1001,6 +1042,7 @@ window.ONW = window.ONW || {};
         <h2>議論タイム</h2>
         <p class="lede">${game.isDead ? "あなたは死亡しました。発言は霊界チャットになり、死亡者と観戦者にだけ届きます。" : "誰が人狼か話し合いましょう。"}</p>
         ${sober}
+        ${ui.dictBlock(game)}
         ${game.abilityMsg ? `<p class="night-step__hint"><strong>${esc(game.abilityMsg)}</strong></p>` : ""}
         ${(ui.logsHeld(game) ? [] : game.dayLines || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("")}
         ${ui.chatTabs(game)}
@@ -1012,18 +1054,31 @@ window.ONW = window.ONW || {};
       </section>`;
   };
 
+  /** 妖狐投票の結果（得票数と追放された人）。妖狐投票のあとの本投票の画面にも残す */
+  const foxVoteBlock = (game) => {
+    const v = game.foxVoteView;
+    if (!v || game.foxVoteOn) return "";
+    const rows = (v.counts || []).length ? v.counts.map((c) => `${esc(c.name)} ${c.n}票`).join("、") : "得票なし";
+    const out = (v.executed || []).length ? `追放: <strong>${v.executed.map((e) => esc(e.name) + (e.sub ? "（従者の身代わり）" : "")).join("、")}</strong>` : "妖狐は追放されませんでした";
+    return `<div class="foxvote-box"><div class="foxvote-box__t">妖狐投票の結果</div><div>得票数: ${rows}</div><div>${out}</div></div>`;
+  };
   ui.renderOnlineVote = function renderOnlineVote(game) {
-    const log = `${ui.chatTabs(game)}<div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>${game.isDead ? ui.ghostInput(game) : ""}`;
+    const fvb = foxVoteBlock(game);
+    if (game.foxVoteWait && !game.strawPick) return `<section class="panel night-step"><p class="lede">妖狐投票の結果を発表しています…</p>${fvb}</section>`;
+    const log = `${fvb}${ui.chatTabs(game)}<div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>${game.isDead ? ui.ghostInput(game) : ""}`;
+    if (game.strawPick && game.strawKind === "bounty") return `<section class="panel"><h2>賞金稼ぎ</h2><p class="lede">あなたがめくれました。上のテーブルで、<strong>人狼だと思う相手のカード</strong>を押してください。自分以外の全員から選べます。</p><p class="night-step__hint">選んだ相手が人狼判定（人狼系・昇格した狂人）なら、賞金稼ぎの勝利です。選び終わるまでタイマーは止まっています。</p></section>`;
     if (game.strawPick && game.strawKind === "assassin") return `<section class="panel"><h2>アサシン</h2><p class="lede">あなたがめくれました。上のテーブルで、<strong>暗殺する相手のカード</strong>を押してください。自分以外の全員から選べます。</p><p class="night-step__hint">選んだ相手がマーリンなら、人狼陣営の逆転勝利です。選び終わるまでタイマーは止まっています。</p></section>`;
     if (game.strawPick) return `<section class="panel"><h2>わら人形</h2><p class="lede">あなたがめくれました。上のテーブルで、<strong>道連れにする相手のカード</strong>を押してください。</p><p class="night-step__hint">選び終わるまでタイマーは止まっています。</p></section>`;
     if (game.strawWait) return `<section class="panel night-step"><p class="lede">結果を待っています…</p>${log}</section>`;   // 誰が選んでいるかは出さない
+    if (game.dictDeclared) return `<section class="panel night-step"><p class="lede">独裁者が独裁を宣言しました。議論を打ち切って、結果を待っています…</p>${log}</section>`;
     if (game.isDead) return `<section class="panel night-step"><p class="lede">あなたは死亡しているため、投票できません。結果を待っています…</p>${log}</section>`;
     if (game.voted) return `<section class="panel night-step"><p class="lede">あなたの投票先は固定されています。結果を待っています…</p>${log}</section>`;
     const sel = (game.others || []).find((p) => p.id === game.voteSel);
     return `
       <section class="panel">
-        <h2>投票</h2>
+        <h2>${game.foxVoteOn ? "妖狐投票" : "投票"}</h2>
         <p class="lede">上のテーブルで、追放したい人の<strong>カードを押して</strong>ください。もう一度押すと未投票に戻ります。タイマーが終わった時に、選んでいる人に投票されます。</p>
+        ${game.foxVoteOn ? `<p class="night-step__hint">妖狐投票です。最多得票の人（同数最多も）が<strong>妖狐か狐憑き</strong>のときだけ追放されます（そうでなければ誰も追放されず、票数だけ発表されます）。このあとに通常の投票があります。</p>` : ""}
         <p class="night-step__hint vote-now">${sel ? `現在の投票先: <strong>${esc(sel.name)}</strong>` : "現在: 未投票"}</p>
         ${log}
       </section>`;
@@ -1042,6 +1097,7 @@ window.ONW = window.ONW || {};
     // 結果画面では、霊界チャットも含めて全員が読める。場所は分けず、発言順に並べる（霊界の発言は 👻 付き）
     const lines = mergedChat(ONW.game).map((c) => c.ghost
       ? `<div class="chat-line chat-ghost"><span class="chat-ghost__tag">👻</span><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`
+      : c.kind === "death" ? `<div class="chat-line chat-death">${esc(c.text)}</div>`
       : c.kind === "sys" ? `<div class="chat-line chat-sys">${esc(c.text)}</div>`
       : c.kind === "co" ? `<div class="chat-line chat-co">${esc(c.text)}</div>`
       : `<div class="chat-line"><strong>${esc(c.name)}</strong>: ${esc(c.text)}</div>`).join("");
@@ -1057,7 +1113,7 @@ window.ONW = window.ONW || {};
   ui.saveResultChat = function () {
     const g = ONW.game, d = new Date(), z = (n) => String(n).padStart(2, "0");
     const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
-    const lines = mergedChat(g).map((c) => (c.ghost ? `[霊界] ${c.name}: ${c.text}` : c.kind === "sys" || c.kind === "co" ? c.text : `${c.name}: ${c.text}`));
+    const lines = mergedChat(g).map((c) => (c.ghost ? `[霊界] ${c.name}: ${c.text}` : c.kind === "sys" || c.kind === "co" || c.kind === "death" ? c.text : `${c.name}: ${c.text}`));
     const head = [`ワンナイト人狼 チャット履歴`, `保存日時: ${d.getFullYear()}/${z(d.getMonth() + 1)}/${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`, g.result && g.result.title ? `結果: ${g.result.title}` : "", "----------------------------------------"].filter((x, i) => x || i !== 2);
     const blob = new Blob(["\uFEFF" + head.concat(lines.length ? lines : ["（発言はありませんでした）"]).join("\r\n") + "\r\n"], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
@@ -1078,28 +1134,47 @@ window.ONW = window.ONW || {};
     const chain = (segs) => segs.map(seg).join(' <span class="rs-dim">→</span> ');
     const winTeam = res.title.startsWith("村人") ? "village" : res.title.startsWith("人狼") ? "wolf" : "third";
     const none = (t) => L(`<span class="rs-dim">${t}</span>`);
+    const chainRows = ONW.chainRows(res);
+    const chainSec = chainRows.length ? `${sep}${H("道連れ・後追い")}${chainRows.map((r) => r.k === "sub" ? L(`<span class="rs-info">従者:</span> ${esc(r.name)} が ${esc(r.master)} の身代わりになりました。`) : r.k === "chainSub" ? L(`<span class="rs-info">従者:</span> ${esc(r.name)} が ${esc(r.master)} の道連れの身代わりになりました。`) : L(`${r.by ? `${esc(r.by)} <span class="rs-dim">→</span> ` : ""}${esc(r.name)} <span class="rs-dead">${r.label}</span>`)).join("")}` : "";
     return `
       <section class="panel result-sheet">
-        ${H("投票結果")}
-        ${res.votes.map((v) => L(`${esc(v.from)} <span class="rs-dim">→</span> ${v.to ? `<span class="rs-vote">${esc(v.to)}</span><span class="rs-dim">(${v.w || 1})</span>` : `<span class="rs-dim">未投票</span>`}`)).join("")}
+        ${res.foxVote ? `${H("妖狐投票結果")}
+        ${res.foxVote.votes.map((v) => L(`${esc(v.from)} <span class="rs-dim">→</span> ${v.x ? `<span class="rs-dead">投票無効</span>` : v.to ? `<span class="rs-vote">${esc(v.to)}</span><span class="rs-dim">(${v.w || 1})</span>` : `<span class="rs-dim">未投票</span>`}`)).join("")}
+        ${sep}${H("妖狐投票 得票数")}
+        ${res.foxVote.counts.length ? res.foxVote.counts.map((c) => L(`${esc(c.name)} <span class="rs-dim">:</span> <span class="rs-vote">${c.c}票</span>`)).join("") : none("得票はありません。")}
+        ${L(res.foxVote.executed.length ? `<span class="rs-dead">妖狐投票で追放:</span> ${res.foxVote.executed.map((e) => esc(e.name) + (e.sub ? '<span class="rs-dim">(従者の身代わり)</span>' : "")).join("、")}` : `<span class="rs-dim">妖狐投票では妖狐は追放されませんでした。</span>`)}
+        ${sep}` : ""}
+        ${res.dictator ? `${H("独裁処刑")}
+        ${L(`${esc(res.dictator.by)} <span class="rs-dim">→</span> <span class="rs-vote">${esc(res.dictator.target)}</span> <span class="rs-dim">（議論を打ち切り、投票は行いませんでした）</span>`)}` : `${H("投票結果")}
+        ${res.votes.map((v) => L(`${esc(v.from)} <span class="rs-dim">→</span> ${v.x ? `<span class="rs-dead">投票無効</span>` : v.to ? `<span class="rs-vote">${esc(v.to)}</span><span class="rs-dim">(${v.w || 1})</span>` : `<span class="rs-dim">未投票</span>`}`)).join("")}
         ${sep}${H("得票数")}
-        ${res.counts.length ? res.counts.map((c) => L(`${esc(c.name)} <span class="rs-dim">:</span> <span class="rs-vote">${c.c}票</span>`)).join("") : none("得票はありません。")}
+        ${res.counts.length ? res.counts.map((c) => L(`${esc(c.name)} <span class="rs-dim">:</span> <span class="rs-vote">${c.c}票</span>`)).join("") : none("得票はありません。")}`}
+        ${/* 【道連れ・後追い】投票結果のすぐ下（本家と同じ）。従者の身代わり・道連れ・心中・後追いなど、連鎖で起きたことを順に並べる。何も無ければ欄ごと出さない */ ""}
+        ${chainSec}
         ${sep}
         <div class="rs-win t-${winTeam}">${esc(res.title)}</div>
         ${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}
         ${L(`<span class="rs-good">勝者:</span> ${res.winners.map(esc).join("、") || "なし"}`)}
         ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map(esc).join("、") || "なし"}`)}
         ${sep}${H("役職履歴")}
-        ${(res.gremlins || []).map((x) => L(`<span class="rs-info">グレムリン:</span> ${esc(x.gremlin)} は ${esc(x.from)} → ${esc(x.to)} を選んでいました。`)).join("")}
-        ${(res.execs || []).map((x) => L(`<span class="rs-info">処刑人:</span> ${esc(x.exec)} のターゲットは ${esc(x.target)} でした。${x.win ? "ターゲットが追放（処刑）されたので処刑人の勝利です。" : x.dead ? "ターゲットが追放以外で死亡したので処刑人は敗北です。" : "ターゲットは追放されませんでした。"}`)).join("")}
-        ${(res.servantSubs || []).map((x) => L(`<span class="rs-info">従者:</span> ${esc(x.servant)} が ${esc(x.master)} の身代わりになりました。`)).join("")}
-        ${(res.chainSubs || []).map((x) => L(`<span class="rs-info">従者:</span> ${esc(x.servant)} が ${esc(x.master)} の道連れの身代わりになりました。`)).join("")}
-        ${res.history.map((h) => L(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
+        ${res.history.map((h) => L(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead || h.day ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
         ${sep}
         ${res.grave.map((c) => L(`${c.label} ${chain(c.segs)}`)).join("")}
         ${none("欠け: なし")}
         ${sep}${H("夜行動結果")}
         ${res.nightLogs.length ? res.nightLogs.map((t) => L(esc(t))).join("") : none("夜行動ログはありません。")}
+        ${/* 【昼行動結果】夜行動結果の下。昼能力（独裁者など）の結果はここに1行ずつ並べる */ ""}
+        ${res.dictator ? `${sep}${H("昼行動結果")}${L(`<span class="rs-info">独裁者:</span> ${esc(res.dictator.by)} は ${esc(res.dictator.target)} を独裁処刑対象にしていました。`)}` : ""}
+        ${/* 【役職情報】夜行動結果・昼行動結果の下。結果で分かる役職の情報（賞金稼ぎ・処刑人・従者・口封じの狂人）を1つの欄にまとめて1行ずつ並べる（本家は役職ごとに分かれているが、Web版は一括）。1行も無い試合は欄ごと出さない。役職を足すときもここへ */ ""}
+        ${(() => {
+          const rows = [
+            ...(res.bounty || []).map((x) => L(`<span class="rs-info">賞金稼ぎ:</span> ${esc(x.by)} は ${esc(x.target)} を人狼判定だと選びました。${x.hit ? "人狼判定だったので成功です。" : "人狼判定ではなかったので失敗です。"}`)),
+            ...(res.execs || []).map((x) => L(`<span class="rs-info">処刑人:</span> ${esc(x.exec)} のターゲットは ${esc(x.target)} でした。${x.win ? (x.late ? "ターゲットの賞金稼ぎが追放され、人狼判定を外したので処刑人の勝利です。" : "ターゲットが追放（処刑）されたので処刑人の勝利です。") : x.dead ? "ターゲットが追放以外で死亡したので処刑人は敗北です。" : "ターゲットは追放されませんでした。"}`)),
+            ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`)),
+            ...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`)),
+          ];
+          return rows.length ? `${sep}${H("役職情報")}${rows.join("")}` : "";
+        })()}
         ${/* 【昇格情報】結果画面の一番下。今後「姫君 → 女王」などの昇格を足すときも、ここ（昇格情報）に1行ずつ並べる */ ""}
         ${res.promoted.length ? `${sep}${H("昇格情報")}${L(`<span class="rs-dim">[狂人昇格] 今回は</span> ${res.promoted.map(esc).join("、")} <span class="rs-dim">が人狼判定になっていました。</span>`)}` : ""}
         ${sep}${H("試合のチャット")}

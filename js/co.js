@@ -130,6 +130,7 @@ window.ONW = window.ONW || {};
     ["gremlin", "グレムリンに上書きされていそうです。", "グレムリンに上書きされた"],
   ];
   co.changedInfo = () => set({ step: "chg" });
+  co.lockFailed = () => done("役職がロックされていて、能力に失敗しました。", null, null, "disclose", "ロックされて失敗");   // 鍵師のロックで変化役の能力が弾かれた（怪盗・いたずらっ子・墓荒らし・ドッペル・シャッフラー・グレムリン）
   co.pickChanged = (i) => { const x = CHANGED_LINES[i]; if (x) done(x[1], null, null, "disclose", x[2]); };
 
   // 情報開示のページは、戻るボタンを上（見出しの横）に置く。下まで押し下げてスクロールしなくても戻れる
@@ -137,6 +138,8 @@ window.ONW = window.ONW || {};
   const infoBackFn = (step) => ({ back: "ONW.co.back()", info: "ONW.co.info()", freeterInfo: "ONW.co.freeterInfo()" }[INFO_BACK[step]]);
 
   // ---- 描画 ----
+  const LOCKABLE = ["robber", "relic", "tm", "doppel", "shuffler", "gremlin"];   // 鍵師のロックで能力が弾かれることがある役職（結果開示の最初の画面に「ロックされて失敗」を出す）
+  const lockBtn = (kind) => (LOCKABLE.includes(kind) ? btn("ロックされて失敗", "ONW.co.lockFailed()") : "");
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
   const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin");   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）
@@ -159,7 +162,7 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).targetLabel || "奪った相手"}を選んでください。</p>` +
         ((hookOfKind(s.kind) || {}).self ? btn("自分", `ONW.co.pickPlayer('${ONW.net.myId()}')`) : "") +   // 自分も選べる結果開示（シャッフラー）
         (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickPlayer('${p.id}')`)).join("") +
-        ((hookOfKind(s.kind) || {}).graves ? Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`)).join("") : "") + back;
+        ((hookOfKind(s.kind) || {}).graves ? Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`)).join("") : "") + lockBtn(s.kind) + back;
     } else if (s.step === "gpick") {
       title = "結果開示";
       body = `<p class="night-step__hint">${s.sel.length + 1}枚目の墓地を選んでください。</p>` +
@@ -172,14 +175,14 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">墓地${s.sel[s.k] + 1} の役職を選んでください。</p>` + roleBtns("graveRole") + back;
     } else if (s.step === "rgrave") {
       title = "結果開示";
-      body = `<p class="night-step__hint">交換した墓地を選んでください。</p>` + Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickRelicGrave(${i})`)).join("") + back;
+      body = `<p class="night-step__hint">交換した墓地を選んでください。</p>` + Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickRelicGrave(${i})`)).join("") + lockBtn(s.kind) + back;
     } else if (s.step === "rrole") {
       title = "結果開示";
       body = `<p class="night-step__hint">墓地${s.idx + 1} と交換して、新しくなった役職を選んでください。</p>` + roleBtns("relicRole", btn("伏せる", "ONW.co.relicRole('hide')")) + back;
     } else if (s.step === "tm") {
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).twoHint || "入れ替えた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => esc(nameOf(id))).join("、")}）` : ""}</p>` +
-        (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + esc(p.name), `ONW.co.pickTm('${p.id}')`)).join("") + back;
+        (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + esc(p.name), `ONW.co.pickTm('${p.id}')`)).join("") + (s.sel.length ? "" : lockBtn(s.kind)) + back;
     } else if (s.step === "mason") {
       title = "結果開示";
       body = `<p class="night-step__hint">他に共有者がいたら選んでください。いなければそのまま確定します。${s.sel.length ? `（選択中: ${s.sel.map((id) => esc(nameOf(id))).join("、")}）` : ""}</p>` +
@@ -190,7 +193,7 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()");
     } else if (s.step === "visited") {
       title = "訪問された";
       body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(esc(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("");

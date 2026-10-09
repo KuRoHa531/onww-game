@@ -84,13 +84,14 @@
   }
 
   // ---- 勝敗（マイクラ版 vote.js の shufflerFailsByDeathRule / enforceShufflerFailureRules / 乗っ取り勝利 を、Web版のカード単位の印(picks)に当てはめたもの）----
-  //  ・失敗条件: 追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）以外に変化させたのに、変化させた対象が死亡したら、シャッフラー陣営（シャッフラーと対象）は勝てない。
+  //  ・失敗条件: 追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる・賞金稼ぎ）以外に変化させたのに、変化させた対象が死亡したら、シャッフラー陣営（シャッフラーと対象）は勝てない。
   //    村人陣営・人狼陣営の役職に変化させた場合は、シャッフラー本人が死亡しても失敗。自分に変化させた場合は、自分が変化後の役職として死亡すれば失敗。
   //  ・乗っ取り勝利: 失敗していない組で、対象が（変化後の役職として）勝利していれば、シャッフラーと対象が「シャッフラー勝利」。元の勝者のうち、この2人以外は敗北（追加勝利の役職・勝ち組などは通常どおり）。
   //  ・勝ち組に変化させた場合は、勝ち組は必ず勝つので乗っ取りにはせず、シャッフラーが（本人も対象も死亡していなければ）追加で勝利する。
-  //  ・恋人（重複役職）の人が絡む組は乗っ取らない。チキンの逆転（chickenForce）のときも乗っ取らない。
+  //  ・恋人（重複役職）: 恋人陣営が勝っているときは乗っ取らない（恋人 ＞ シャッフラー）。恋人陣営が勝てなかったときは、(+恋人)を持つシャッフラー本人は恋人として判定されて敗北、対象(第三陣営など)だけがシャッフラー陣営として勝てる。対象が(+恋人)の組は乗っ取らない。
+  //  ・チキンの逆転（chickenForce）のときも乗っ取らない。
   //  すべてカードの印（picks）で追従するので、昼のうちに怪盗などでカードが動いても、最終盤面のカードの持ち主で判定される。
-  const DEATH_WIN = () => [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER];   // 追放・死亡しないと勝てない役職
+  const DEATH_WIN = () => [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER];   // 追放・死亡しないと勝てない役職（処刑人は入れない: 処刑人に変化させた組は、変化させた人が死亡したら失敗）
   const teamOfRole = (r) => (ONW.roles.getInfo(r) || {}).team;
   const isLv = (g, id) => !!(ONW.isLover && ONW.isLover(g, id));
   /** この組が失敗か。w = 勝者の集合（てるてる系は勝者に入っていれば死亡しても可） */
@@ -115,11 +116,13 @@
   /** 乗っ取り勝利: 追加勝利まで足した最終の勝者 game.winnerIds を見て、成立する組の ID（シャッフラーと対象）を返す。なければ null。game.shufflerBan は失敗した人 */
   function takeover(g) {
     if (g.chickenForce) return null;
+    if ((g.winTeams || []).includes("恋人陣営")) return null;   // 恋人陣営が勝っているときは、シャッフラー陣営は勝てない（恋人 ＞ シャッフラー）
     const w = new Set(g.winnerIds || []), ban = new Set(g.shufflerBan || []), ids = new Set(), pairs = [];
     picks(g).forEach(([sh, th, role, self]) => {
-      if (ban.has(sh) || ban.has(th) || isLv(g, sh) || isLv(g, th)) return;
+      if (ban.has(sh) || ban.has(th) || isLv(g, th)) return;   // 変化させた対象が恋人(重複役職)なら乗っ取らない
       if (g.currentRoles[th] === ONW.ROLE.WINNER || !w.has(th)) return;
-      ids.add(sh); ids.add(th); pairs.push({ sh, th, role: g.currentRoles[th], self });
+      if (!isLv(g, sh)) ids.add(sh);   // (+恋人)と(+シャッフラー)の両方を持つシャッフラー本人は、恋人として判定される（恋人 ＞ シャッフラー）。恋人陣営が勝てなかったなら、本人はシャッフラー陣営としても勝てない。対象だけが勝つ
+      ids.add(th); pairs.push({ sh, th, role: g.currentRoles[th], self });
     });
     return pairs.length ? { ids: [...ids], pairs } : null;
   }
@@ -147,6 +150,13 @@
     const g = n.g, f = n.forced(p), i = n.infoOf(p.id);
     const ok = (id) => id && g.players.some((q) => q.id === id);
     const t = ok(f.player) ? f.player : n.pick(g.players).id;
+    const why = ONW.keymaster.gate(g, holderOf(g, p.id), [t]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら🔒に弾かれて失敗（山札からは引かない）
+    if (why) {
+      if (!cur) { i.mode = "shuffler"; i.target = t; }
+      i.keyFail = { kind: why, target: t };
+      ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${label} ${p.name}`);
+      return;
+    }
     const r = shuffle(g, holderOf(g, p.id), t), shown = ONW.shownRole(r.role);
     i.shuffle = { target: t, role: shown };   // 発言(cpuClaim)・投票(cpuVoteScore)が使う。朝に墓荒らし・ドッペルで手にした連鎖(cur)でも、本人の怪盗などの記録(mode / target)は上書きしない
     if (!cur) { i.mode = "shuffler"; i.target = t; }
@@ -173,7 +183,7 @@
    *  それ以外は死亡すると失敗なので票を入れない（ONW.shuffler.failed の条件と同じ） */
   function cpuVoteScore(k, g, p, q, i) {
     if (!i.shuffle || i.shuffle.target !== q.id || q.id === p.id) return 0;
-    return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER].includes(i.shuffle.role) ? 100 : -100;
+    return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER].includes(i.shuffle.role) ? 100 : -100;
   }
 
   ONW.defineRole("shuffler", {
@@ -208,6 +218,8 @@
       resolve(c, p) {
         const g = c.g, nameOf = c.nameOf;
         const t = c.selOf(p).players[0]; if (!t) return;
+        const why = ONW.keymaster.gate(g, holderOf(g, p.id), [t]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら失敗。山札から引かず、新聞・観測にも載らない
+        if (why) { c.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${c.rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, holderOf(g, p.id), p.id); return; }
         const r = shuffle(g, holderOf(g, p.id), t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         c.hold(p.id, `${nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`);
@@ -221,6 +233,8 @@
       run(c) {
         if (!c.players.length) return null;
         const g = c.g, id = c.id, t = c.players[0];
+        const why = ONW.keymaster.gate(g, id, [t]);   // 朝のうち(墓荒らし・ドッペル経由)・酔い覚めにもロックは効く
+        if (why) return { lines: [ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };
         const r = shuffle(g, id, t);
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         const lines = [`${c.nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`];

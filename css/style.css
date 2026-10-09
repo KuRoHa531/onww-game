@@ -453,6 +453,7 @@ body {
 .cb-line { display: flex; align-items: center; gap: 6px; }
 .cb-name { font-weight: 700; }
 .cb-cpu { margin-left: 3px; color: var(--ink-dim); font-weight: 400; font-size: calc(10px * var(--cb-s, 1)); }
+.cb-co.co-dead { color: #e8685e; }   /* 死亡者の欄は死因を赤で出す */
 .cb-co { font-size: calc(11px * var(--cb-s, 1)); padding: 0 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
 .co-none { color: var(--ink-dim); }
 .cb-tf { margin-top: calc(8px * var(--cb-s, 1)); padding-top: calc(6px * var(--cb-s, 1)); border-top: 1px dashed var(--line); display: flex; flex-wrap: wrap; gap: calc(4px * var(--cb-s, 1)) calc(6px * var(--cb-s, 1)); align-items: center; }
@@ -465,7 +466,8 @@ body {
 .role-group__title { font-weight: 700; margin-bottom: 2px; }
 .role-sub { font-size: 12px; color: var(--ink-dim); margin: 6px 0 0; }
 .role-group .field-row { color: var(--ink); }
-.chat-sys { color: #b79cf0; }
+.chat-sys { color: #f0a85a; }   /* システム行（妖狐投票など）は橙。紫(.chat-ghost 霊界)・水色(.chat-co)・赤(.chat-death)と区別する */
+.chat-death { color: #e8685e; }   /* 死因（呪殺・後追い・心中・王国滅亡・死亡）は赤。水色(.chat-co)は生存者の発言・CO */
 
 /* 配役: 陣営ヘッダー（押すと開く） */
 .rg-head { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; padding: 8px 0; text-align: left; cursor: pointer; }
@@ -1488,6 +1490,30 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 }
 @keyframes tg-pop { 0% { transform: translate(-50%, -50%) scale(.2) rotate(-12deg); opacity: 0; } 18% { transform: translate(-50%, -80%) scale(1.5) rotate(4deg); opacity: 1; } 35% { transform: translate(-50%, -80%) scale(1.15) rotate(-2deg); } 100% { transform: translate(-50%, -130%) scale(1); opacity: 0; } }
 
+/* ---- 独裁者の演出: カードがめくれて「独裁宣言!」→ 処刑対象のカードに印が付く ---- */
+.tb-seat.gx-dictdecree .tb-card { animation: dc-decree 1.2s ease-out both; }
+.tb-seat.gx-dictdecree .tb-front { border-color: #ffd36b; box-shadow: 0 0 20px rgba(255,200,90,.95), inset 0 0 12px rgba(255,255,255,.55); }
+.tb-seat.gx-dictdecree .tb-badge { background: #7a1d1d; border-color: #ffd36b; color: #fff6dd; }
+@keyframes dc-decree {
+  0% { transform: scale(1.2); filter: brightness(2.4) drop-shadow(0 0 26px rgba(255,210,100,1)); }
+  15% { transform: translate(-4px, 2px) rotate(-2.5deg) scale(1.1); }
+  30% { transform: translate(4px, -2px) rotate(2.5deg) scale(1.08); }
+  100% { transform: none; filter: brightness(1.1) drop-shadow(0 0 12px rgba(255,200,90,.9)); }
+}
+.tb-seat.gx-dicttarget .tb-card { animation: dc-target 1.1s ease-out both; }
+.tb-seat.gx-dicttarget .tb-front, .tb-seat.gx-dicttarget .tb-back { border-color: var(--blood); box-shadow: 0 0 20px rgba(220,60,60,.95); }
+.tb-seat.gx-dicttarget .tb-badge { background: var(--blood); border-color: #ff8a80; }
+@keyframes dc-target {
+  0% { transform: translateY(-10px) scale(1.15); filter: brightness(2) drop-shadow(0 0 24px rgba(255,90,80,1)); }
+  20% { transform: translate(-5px, 3px) rotate(-3deg); }
+  40% { transform: translate(5px, -2px) rotate(2deg); }
+  100% { transform: none; filter: drop-shadow(0 0 10px rgba(220,60,60,.9)); }
+}
+.dc-burst { position: fixed; z-index: 9998; width: 0; height: 0; pointer-events: none; }
+.dc-burst .dc-ring { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,215,120,.95); box-shadow: 0 0 12px rgba(255,200,90,.9); animation: dc-ring .8s ease-out both; }
+.dc-burst .dc-ring2 { animation-delay: .15s; border-color: rgba(255,120,100,.9); }
+@keyframes dc-ring { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(7); opacity: 0; } }
+
 /* ---- 麻婆の人狼: 麻婆豆腐の完成演出（変化公開 → 新聞 → 麻婆豆腐 → 昼タイマー開始） ---- */
 .mpo-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: default; animation: mpo-out .4s ease 3.4s forwards; }
 .mpo-wrap--late { pointer-events: none; }
@@ -1597,3 +1623,58 @@ body:has(.settings-modal) .top-right { visibility: hidden; pointer-events: none;
 body:has(.dbg-sheet) .top-right { visibility: hidden; pointer-events: none; }
 .dbg-sheet { z-index: 850; }
 .x-bar .x-close, .x-bar .x-back, .dbg-head .btn { position: relative; z-index: 6; touch-action: manipulation; }
+
+
+/* ---- 賞金稼ぎの演出: 賞金稼ぎのカードが金色に脈打つ → 選ばれたカードが手配書に変わる → 顔写真の位置に 🐺(成功) / ❌(失敗) ---- */
+.tb-seat.bnt-by .tb-card { animation: bnt-by 1s ease-in-out infinite; }
+@keyframes bnt-by {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(215,170,60,.6)); }
+  50% { filter: drop-shadow(0 0 16px rgba(255,205,90,1)); }
+}
+.tb-front.tb-team-bounty { border-color: #8a5a22; background: #d8c08a; }
+.tb-front .tb-bnt { flex: 1 1 auto; width: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 2px; padding: 2px 1px; background: repeating-linear-gradient(0deg, rgba(120,80,30,.07) 0 2px, transparent 2px 4px), #d8c08a; border-radius: 3px; color: #3b2410; }
+.tb-front .tb-bnt-h { font-style: normal; font-family: Georgia, "Times New Roman", serif; font-weight: 900; font-size: max(7px, calc(var(--cw) * .17)); letter-spacing: .08em; color: #5a2a0e; border-bottom: 1px solid #5a2a0e; line-height: 1.1; }
+.tb-front .tb-bnt-face { flex: 1 1 auto; min-height: 0; width: 82%; display: flex; align-items: center; justify-content: center; border: 1.5px dashed #6d4a22; background: rgba(255,245,215,.55); border-radius: 4px; }
+.tb-front .tb-bnt-face span { font-size: calc(var(--cw) * .42); line-height: 1; filter: drop-shadow(0 0 3px rgba(0,0,0,.35)); }
+.tb-front .tb-bnt b { color: #3b2410; font-size: max(7px, calc(var(--cw) * .17)); }
+.tb-front .tb-bnt--pick .tb-bnt-face span { color: #6d4a22; font-weight: 700; }
+.tb-front .tb-bnt--hit .tb-bnt-face span, .tb-front .tb-bnt--miss .tb-bnt-face span { animation: bnt-stamp .55s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes bnt-stamp { 0% { transform: scale(2.6) rotate(-14deg); opacity: 0; } 70% { transform: scale(.9) rotate(3deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+.tb-seat.bnt-hit .tb-front { box-shadow: 0 0 18px rgba(255,90,80,.9); }
+.tb-seat.bnt-hit .tb-badge { background: var(--blood); border-color: #ff8a80; }
+.tb-seat.bnt-miss .tb-badge { background: #3d5a73; border-color: #8fb4d1; }
+
+
+/* 従者: ご主人への「あなたの従者がいるようです」バナー（パン屋のバナーと同じ位置・長さ。第三陣営の灰色の縁） */
+.servant-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-radius: 999px; background: rgba(34,36,52,.94); border: 2px solid #c9c9d6; color: #eceef7; font-weight: 800; font-size: clamp(16px, 4.2vw, 26px); letter-spacing: .05em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
+
+/* ---- 妖狐: 呪殺された席（待機時間にカードが🦊へ裏返り、灰色のまま議論中〜結果発表の直前まで） ---- */
+.tb-front.tb-team-fox { border-color: #8d8d99; }
+.tb-front .tb-wolfmark.tb-fox { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,160,70,.9)); }
+.tb-front .tb-wolfmark.tb-fox small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffcf9a; line-height: 1.1; letter-spacing: -.02em; }
+.tb-seat.cursed .tb-front { filter: grayscale(1) brightness(.62); border-color: #6f6f7a; box-shadow: 0 0 10px rgba(120,120,135,.6); }
+.tb-seat.cursed .tb-front .tb-wolfmark.tb-fox { filter: grayscale(1) drop-shadow(0 0 4px rgba(150,150,160,.8)); }
+.tb-seat.cursed .tb-front .tb-wolfmark.tb-fox small { color: #b9b9c4; }
+.tb-seat.cursed .tb-name { color: #a0a0ab; text-decoration: line-through; }
+
+/* ---- 背徳者: 夜に見える妖狐の気配（🦊の印。役職名は出さない） ---- */
+.tb-front .tb-wolfmark.tb-foxsee { filter: drop-shadow(0 0 7px rgba(255,160,70,.9)); }
+
+/* 背徳者: 妖狐の呪殺で連鎖して死ぬ人のカード（役職名のところが「心中」「後追い」の文字）。灰色になる */
+.tb-front .tb-wolfmark.tb-follow { font-size: calc(var(--cw) * .3); font-weight: 800; color: #ffd0d8; letter-spacing: -.02em; text-align: center; filter: drop-shadow(0 0 6px rgba(255,126,182,.85)); }
+.tb-seat.cursed .tb-front .tb-wolfmark.tb-follow { color: #b9b9c4; filter: grayscale(1) drop-shadow(0 0 4px rgba(150,150,160,.8)); }
+.tb-front .tb-wolfmark.tb-follow--long { font-size: calc(var(--cw) * .21); }   /* 「王国滅亡」など4文字 */
+
+/* 妖狐投票の結果（得票数・追放された人）。本投票の画面にも残る */
+.foxvote-box { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: rgba(160, 160, 170, .14); font-size: .9rem; line-height: 1.5; }
+.foxvote-box__t { font-weight: 700; margin-bottom: 2px; }
+
+/* ---- 鍵師: 🔓→🔑→🔒（朝の演出）/ 🔒に弾かれる（失敗の演出） ---- */
+.tb-front.tb-team-key { border-color: #e0b84a; }
+.tb-front .tb-wolfmark.tb-key { position: relative; filter: drop-shadow(0 0 7px rgba(240,200,90,.95)); }
+.tb-front .tb-wolfmark.tb-key--locked { animation: keyLockPop .45s cubic-bezier(.3,1.6,.5,1); }
+.tb-front .tb-wolfmark.tb-key i { position: absolute; right: 8%; top: 14%; font-style: normal; font-size: .55em; animation: keyIn .8s ease-out forwards; }
+.tb-front .tb-wolfmark.tb-key--turnu i { animation: keyOut .8s ease-in-out forwards; }
+@keyframes keyIn { 0% { transform: translate(90%,-70%) rotate(-50deg); opacity: 0; } 55% { transform: translate(0,0) rotate(0deg); opacity: 1; } 100% { transform: translate(0,0) rotate(90deg); opacity: 1; } }
+@keyframes keyOut { 0% { transform: translate(0,0) rotate(0deg); opacity: 1; } 50% { transform: translate(0,0) rotate(-90deg); opacity: 1; } 100% { transform: translate(90%,-70%) rotate(-50deg); opacity: 0; } }
+@keyframes keyLockPop { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }

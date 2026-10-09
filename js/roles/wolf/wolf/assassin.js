@@ -6,15 +6,15 @@
     // （選ばれた相手は死なない。当たりは赤い閃光で「暗殺」、外れは静かに「無事」）
     stageResult: {
       assassin: { order: 10, run(R) {
-        const { res, P, later, setCap, esc, paint, G, up, badge, asn } = R;
+        const { res, P, later, setCap, esc, paint, G, up, badge, asn, veil } = R;
         (res.assassin || []).forEach((a) => {
           const head = `<div class="res-cap__t t-wolf">アサシン</div><div>${esc(a.by)} → ${esc(a.target)}</div>`;
           const tk = P(a.targetId), bk = P(a.byId);
-          later(() => { setCap(`<div class="res-cap__t t-wolf">アサシン</div><div>${esc(a.by)} が暗殺する相手を選びました…</div>`); asn[bk] = "by"; paint(G()); }, R.t);
+          later(() => { setCap(`<div class="res-cap__t t-wolf">アサシン</div><div>${esc(a.by)} が暗殺する相手を選びました…</div>`); asn[bk] = "by"; delete veil[bk]; paint(G()); }, R.t);   // この人の演出が始まったので、「？」で隠していた暗殺者(別のアサシン・賞金稼ぎ視点)のカードも本当の役職で見える
           later(() => { setCap(head); asn[tk] = "aim"; paint(G()); }, R.t + 1300);                    // 照準
           later(() => { asn[tk] = "slash"; paint(G()); }, R.t + 2400);                                // 斬撃
           later(() => {                                                                              // カードが表に → 結果
-            up[tk] = a.role; asn[tk] = a.hit ? "hit" : "miss"; delete asn[bk];
+            up[tk] = a.role; delete veil[tk]; asn[tk] = a.hit ? "hit" : "miss"; delete asn[bk];
             badge[tk] = a.hit ? "暗殺" : "無事";
             setCap(`${head}<div class="${a.hit ? "t-wolf" : "rs-dim"}">${a.hit ? "マーリンでした！ 暗殺成功" : "マーリンではありませんでした（暗殺失敗）"}</div>`);
             paint(G());

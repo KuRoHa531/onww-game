@@ -54,6 +54,11 @@
       return [...new Set(g.players.filter((p) => isMuzzler(g, p.id)).map((p) => t[p.id]).filter((x) => x && g.players.some((q) => q.id === x)))];
     },
     isMuzzled(g, id) { return ONW.muzzle.mutedIds(g).includes(id); },
+    /** 結果画面用: 最終盤面で口封じの狂人になっている人(酔いが覚めている)と、その口封じの対象の [[持ち主ID, 対象ID], ...] */
+    pairs(g) {
+      const t = g.muzzleTargets || {};
+      return g.players.filter((p) => isMuzzler(g, p.id) && t[p.id] && g.players.some((q) => q.id === t[p.id])).map((p) => [p.id, t[p.id]]);
+    },
     /** 口封じの狂人本人が、自分の対象を知るための文章 */
     lineOf(g, id) { const t = (g.muzzleTargets || {})[id]; return t ? `あなたは${nameOf(g, t)}を口封じしました。` : ""; },
   };

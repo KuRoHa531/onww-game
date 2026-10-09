@@ -53,7 +53,7 @@
       const b = document.createElement("div"); b.className = "gl-blade"; card.appendChild(b);
       later(() => b.remove(), 600);
     }, at + 1900);
-    later(() => { const s = R.$t().querySelector(`[data-k="${k}"]`); if (s) s.classList.remove("gl-shake"); const hs = glHalves(R, k); if (hs) requestAnimationFrame(() => hs.forEach((h) => h.classList.add("split"))); }, at + 2150);   // 刃が通り抜けた瞬間に真っ二つ
+    later(() => { const s = R.$t().querySelector(`[data-k="${k}"]`); if (s) s.classList.remove("gl-shake"); const hs = glHalves(R, k); if (hs) requestAnimationFrame(() => hs.forEach((h) => h.classList.add("split"))); if (x.late) { R.badge[k] = "処刑"; R.paint(R.G()); } }, at + 2150);   // 刃が通り抜けた瞬間に真っ二つ（賞金稼ぎのターゲットは、ここで「追放」の札が「処刑」に変わる）
     later(() => setCap(`<div class="res-cap__t t-third">処刑人勝利</div><div>${esc(x.exec)} のターゲット ${esc(x.target)} が追放されました</div>`), at + 3000);
   }
   const glWin = (res) => (res.execs || []).filter((x) => x.win && x.execId !== x.targetId);   // ターゲットが追放された処刑人
@@ -63,10 +63,16 @@
     //   flipped: 追放・道連れ・心中で死んだターゲットのカードがめくれたあと、ギロチンで割れる(R.noFlip に入れて、猫など他の演出に「重なっている」と伝える) / skip: スキップ時は最初から割れた状態 / clear: スキップ時に演出を止める
     stageResult: {
       flipped: { order: 10, run(R, hs, at) {
-        const hit = glWin(R.res).filter((x) => hs.some((h) => h.id === x.targetId));
+        const hit = glWin(R.res).filter((x) => !x.late && hs.some((h) => h.id === x.targetId));   // 賞金稼ぎのターゲット(late)は、めくれた直後ではなく、賞金稼ぎの外れが出たあと(bountyAfter)
         hit.forEach((x) => glSeq(R, x, at));
         hit.forEach((x) => R.noFlip.add(x.targetId));
         return hit.length ? GL_DUR : 0;
+      } },
+      // 賞金稼ぎがターゲットの処刑人: 賞金稼ぎが追放され、人狼判定を外したあと（バツマークの札が出て一呼吸おいてから）ギロチンが落ちて処刑人勝利。的中なら賞金稼ぎの勝利なので、ここには来ない（net.js の res.execs に入らない）
+      bountyAfter: { order: 10, run(R) {
+        const late = glWin(R.res).filter((x) => x.late);
+        late.forEach((x) => { glSeq(R, x, R.t); R.noFlip.add(x.targetId); });
+        if (late.length) R.t += GL_DUR;
       } },
       skip(R) { glWin(R.res).forEach((x) => glFinal(R, `p:${x.targetId}`)); },
       clear(SK) { glClear(SK); },
@@ -74,10 +80,10 @@
     // 昼に酔いが覚めた処刑人: ターゲットのカードがめくれる(stage.js の soberPeek の並び: 共有者 → 処刑人 → 従者 → 女王)
     stageSober: { list: { order: 20, run(sp, list, SK) { if (sp.target) list.push([`p:${sp.target}`, SK.TARGET_MARK, true]); } } },
     // 投票: ターゲットを追放させたいので、ターゲットに投票する（ターゲットを知っているときだけ。怪盗で奪った処刑人などは知らない）
-    cpuVoteScore: (k, g, p, q, i) => (i.execTarget === q.id ? 15 : 0),
+    cpuVoteScore: (k, g, p, q, i) => (i.execTarget === q.id ? 15 : 0),   // ターゲットが賞金稼ぎでも狙う（吊られて人狼判定を外せば処刑人の勝利。当てられたら賞金稼ぎの勝ち）
     cpuInit: cpuTarget, cpuLearn: cpuTarget,   // CPU: ターゲットを知る
     info: { deck: 40, name: "処刑人", team: ONW.TEAM.THIRD, wakeOrder: null, sort: 39,
-      desc: "第三陣営。試合開始時にランダムなターゲット（他の参加者）が決まり、夜のはじめにターゲットのカードがめくれて🎯の印が出ます。ターゲットが追放されたら、あなたの勝利です（他の陣営の勝敗とは別に、追加で勝利します）。ターゲットは役職のカードについてきて、墓地に入った処刑人はターゲットを失い、墓地から引いた人・コピーした人には新しいターゲットが決まります。" },
+      desc: "第三陣営。試合開始時にランダムなターゲット（他の参加者）が決まり、夜のはじめにターゲットのカードがめくれて🎯の印が出ます。ターゲットが追放されたら、あなたの勝利です（他の陣営の勝敗とは別に、追加で勝利します）。ターゲットは役職のカードについてきて、墓地に入った処刑人はターゲットを失い、墓地から引いた人・コピーした人には新しいターゲットが決まります。ターゲットが賞金稼ぎのときは、賞金稼ぎが追放されて人狼判定を外したときだけ処刑人の勝利になります（当てられたら賞金稼ぎの勝利）。" },
     groups: { "transform:silver_shadow": 12 },
     nightMsg(c, p) {   // 夜のはじめに、ターゲットのカードがめくれて🎯の印が出る（ターゲットはカードについてくる。配布時に決まっている）
       const g = c.g;

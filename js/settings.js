@@ -40,7 +40,13 @@ window.ONW = window.ONW || {};
   const ROLES_V33 = [...ROLES_V32, "evil_woman"];                                                                                    // 旧コード(ONW33)の並び
   const ROLES_V34 = [...ROLES_V33, "cupid"];                                                                                    // 旧コード(ONW34)の並び
   const ROLES_V35 = [...ROLES_V34, "heartbreaker"];                                                                                     // 旧コード(ONW35)の並び
-  const ROLES = [...ROLES_V35, "shuffler"];                                                                                        // 現在(ONW28)。末尾に足していく（画面の並びはui.jsの方で、コードの並びとは別）
+  const ROLES_V36 = [...ROLES_V35, "shuffler"];                                                                                    // 旧コード(ONW36)の並び
+  const ROLES_V37 = [...ROLES_V36, "bounty_hunter"];                                                                                    // 旧コード(ONW37)の並び
+  const ROLES_V38 = [...ROLES_V37, "fox"];                                                                                      // 旧コード(ONW38)の並び
+  const ROLES_V39 = [...ROLES_V38, "fanatic"];                                                                                    // 旧コード(ONW39)の並び
+  const ROLES_V40 = [...ROLES_V39, "fox_marked"];                                                                                    // 旧コード(ONW40)の並び
+  const ROLES_V41 = [...ROLES_V40, "keymaster"];                                                                                    // 旧コード(ONW41)の並び
+  const ROLES = [...ROLES_V41, "dictator"];                                                                                        // 現在(ONW42)。末尾に足していく（画面の並びはui.jsの方で、コードの並びとは別）
   const ROLES_V1 = ["werewolf", "madman", "villager", "robber", "seer"];   // 旧コード(ONW1)の並び
   const clamp = (v, a, b, d) => (Number.isFinite(+v) && v !== null && v !== "" ? Math.max(a, Math.min(b, Math.round(+v))) : d);
   const store = {
@@ -76,14 +82,14 @@ window.ONW = window.ONW || {};
   S.encode = function (rules) {
     const r = S.sanitize(rules), t = r.timers;
     const body = b64.enc(JSON.stringify([ROLES.map((k) => r.roleCounts[k]), r.graveCount, r.cpuCount, r.fake ? 1 : 0, [t.night, t.morning, t.day, t.vote], r.reveal ? 1 : 0, r.cand ? 1 : 0, r.off, r.seerGrave, r.villageSize, r.drunk, r.drunkp, r.lover, r.loverp, r.mayorVote]));
-    return `ONW36-${body}-${chk(body)}`;
+    return `ONW42-${body}-${chk(body)}`;
   };
   /** 正しいコードならルールを返す。壊れていれば null（旧形式 ONW1 も読める） */
   S.decode = function (code) {
     try {
-      const m = /^(ONW(?:3[0123456]|2[0123456789]|1[0123456789]|[123456789]))-([A-Za-z0-9_-]+)-([0-9A-Z]{2})$/.exec(String(code || "").replace(/\s+/g, ""));
+      const m = /^(ONW(?:4[012]|3[0123456789]|2[0123456789]|1[0123456789]|[123456789]))-([A-Za-z0-9_-]+)-([0-9A-Z]{2})$/.exec(String(code || "").replace(/\s+/g, ""));
       if (!m || chk(m[2]) !== m[3]) return null;
-      const v2 = m[1] !== "ONW1", names = m[1] === "ONW36" ? ROLES : m[1] === "ONW35" ? ROLES_V35 : m[1] === "ONW34" ? ROLES_V34 : m[1] === "ONW33" ? ROLES_V33 : m[1] === "ONW32" ? ROLES_V32 : m[1] === "ONW31" ? ROLES_V31 : m[1] === "ONW30" ? ROLES_V30 : m[1] === "ONW29" ? ROLES_V29 : m[1] === "ONW28" ? ROLES_V28 : m[1] === "ONW27" ? ROLES_V27 : m[1] === "ONW26" ? ROLES_V26 : m[1] === "ONW25" ? ROLES_V25 : m[1] === "ONW24" ? ROLES_V24 : m[1] === "ONW23" ? ROLES_V23 : m[1] === "ONW22" ? ROLES_V22 : m[1] === "ONW21" ? ROLES_V21 : m[1] === "ONW20" ? ROLES_V20 : m[1] === "ONW19" ? ROLES_V19 : m[1] === "ONW18" ? ROLES_V18 : m[1] === "ONW17" ? ROLES_V17 : m[1] === "ONW16" ? ROLES_V16 : m[1] === "ONW15" ? ROLES_V15 : m[1] === "ONW14" ? ROLES_V14 : m[1] === "ONW13" ? ROLES_V13 : m[1] === "ONW12" ? ROLES_V12 : m[1] === "ONW11" ? ROLES_V11 : m[1] === "ONW10" ? ROLES_V10 : m[1] === "ONW9" ? ROLES_V9 : m[1] === "ONW8" ? ROLES_V8 : m[1] === "ONW7" ? ROLES_V7 : m[1] === "ONW6" ? ROLES_V6 : m[1] === "ONW5" ? ROLES_V5 : m[1] === "ONW4" ? ROLES_V4 : m[1] === "ONW3" ? ROLES_V3 : v2 ? ROLES_V2 : ROLES_V1;
+      const v2 = m[1] !== "ONW1", names = m[1] === "ONW42" ? ROLES : m[1] === "ONW41" ? ROLES_V41 : m[1] === "ONW40" ? ROLES_V40 : m[1] === "ONW39" ? ROLES_V39 : m[1] === "ONW38" ? ROLES_V38 : m[1] === "ONW37" ? ROLES_V37 : m[1] === "ONW36" ? ROLES_V36 : m[1] === "ONW35" ? ROLES_V35 : m[1] === "ONW34" ? ROLES_V34 : m[1] === "ONW33" ? ROLES_V33 : m[1] === "ONW32" ? ROLES_V32 : m[1] === "ONW31" ? ROLES_V31 : m[1] === "ONW30" ? ROLES_V30 : m[1] === "ONW29" ? ROLES_V29 : m[1] === "ONW28" ? ROLES_V28 : m[1] === "ONW27" ? ROLES_V27 : m[1] === "ONW26" ? ROLES_V26 : m[1] === "ONW25" ? ROLES_V25 : m[1] === "ONW24" ? ROLES_V24 : m[1] === "ONW23" ? ROLES_V23 : m[1] === "ONW22" ? ROLES_V22 : m[1] === "ONW21" ? ROLES_V21 : m[1] === "ONW20" ? ROLES_V20 : m[1] === "ONW19" ? ROLES_V19 : m[1] === "ONW18" ? ROLES_V18 : m[1] === "ONW17" ? ROLES_V17 : m[1] === "ONW16" ? ROLES_V16 : m[1] === "ONW15" ? ROLES_V15 : m[1] === "ONW14" ? ROLES_V14 : m[1] === "ONW13" ? ROLES_V13 : m[1] === "ONW12" ? ROLES_V12 : m[1] === "ONW11" ? ROLES_V11 : m[1] === "ONW10" ? ROLES_V10 : m[1] === "ONW9" ? ROLES_V9 : m[1] === "ONW8" ? ROLES_V8 : m[1] === "ONW7" ? ROLES_V7 : m[1] === "ONW6" ? ROLES_V6 : m[1] === "ONW5" ? ROLES_V5 : m[1] === "ONW4" ? ROLES_V4 : m[1] === "ONW3" ? ROLES_V3 : v2 ? ROLES_V2 : ROLES_V1;
       const a = JSON.parse(b64.dec(m[2]));
       if (!Array.isArray(a) || !Array.isArray(a[0]) || a[0].length !== names.length || !Array.isArray(a[4])) return null;
       const rc = {}; names.forEach((k, i) => { rc[k] = a[0][i]; });

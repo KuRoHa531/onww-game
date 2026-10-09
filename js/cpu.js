@@ -150,7 +150,7 @@ window.ONW = window.ONW || {};
   // =========================================================
   const isWolfSide = (r) => isWolf(r) || isMad(r);                       // 人狼陣営（狂人含む）= 本家の isWolfTeam
   const WOLF_LIKE = () => ONW.WOLF_KIND;                                  // 占い結果で「人狼」と見える役職
-  const AVOID_RESULT = ["tanner", "love_tanner", "opportunist", "amanojaku", "winner", "freeter", "servant"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
+  const AVOID_RESULT = ["tanner", "love_tanner", "bounty_hunter", "opportunist", "amanojaku", "winner", "freeter", "servant", "fox"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
   const setupRoles = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])];   // 占い結果に出してよい（実在する）役職
   const roleInSetup = (g, role) => setupRoles(g).includes(role) || (g.coDeck || []).some((x) => x.r === role);
   /** 「村人CO」をしてよいか: 配役(selectedRoles)か、変化公開で公開された役職(coDeck の cand でないもの)に、村人・忘却の人狼・狼憑き(本人は村人だと思い込む役職)がいるときだけ。
@@ -201,6 +201,7 @@ window.ONW = window.ONW || {};
     }
     if (isWolfSide(selfRole)) {
       if (isWolf(tr)) return villageLikeResult(g);                                // 仲間の人狼は白と言う
+      if ((roleCount(g, "fox") + roleCount(g, "fox_marked")) > 0 && Math.random() < 0.15) return "fox";           // 妖狐が実在するときは、「妖狐でした」と言うことがある（マイクラ版 cpuPickSeerResultRole の候補に妖狐がある）。投票はされにくくなるが、人狼が吊られる流れを乱せる
       return Math.random() < 0.72 ? wolfLikeResult(g) : villageLikeResult(g);      // 72%で人狼だと告発
     }
     return Math.random() < 0.5 ? wolfLikeResult(g) : villageLikeResult(g);         // 非人狼の騙り（てるてる系）
@@ -382,6 +383,10 @@ window.ONW = window.ONW || {};
     return plan;
   };
 
+  /** 賞金稼ぎのCPUが指名する相手: 人狼と分かっている人がいればその人、いなければランダム */
+  cpu.bountyPick = function (g, id, cands) {   // 中身は bounty_hunter.js の cpuPick
+    return ONW.roleHook("bounty_hunter", "cpuPick")(cpu.kit, g, id, cands);
+  };
   /** アサシンのCPUが暗殺する相手: 仲間と分かっている人は避け、あとはランダム */
   cpu.assassinPick = function (g, id, cands) {   // 中身は assassin.js の cpuPick
     return ONW.roleHook("assassin", "cpuPick")(cpu.kit, g, id, cands);
@@ -422,7 +427,7 @@ window.ONW = window.ONW || {};
     // 他人のCO（役職）
     if (co === "villager") s += wolfSide ? 1.8 : 0.8;
     if (co && WOLF_LIKE().includes(co) || co === "team:wolf") s += wolfSide ? -1.0 : 2.4;
-    if (co === "tanner" || co === "love_tanner") s -= wolfSide ? 0.6 : 2.4;
+    if (co === "tanner" || co === "love_tanner" || co === "bounty_hunter") s -= wolfSide ? 0.6 : 2.4;
     if (co === "seer" || co === "mad_seer") {
       const n = g.players.filter((x) => { const c = g.coBoard && g.coBoard[x.id] && g.coBoard[x.id].co; return c === "seer" || c === "mad_seer"; }).length;
       s += n >= 2 ? (wolfSide ? 0.6 : 1.5) : (wolfSide ? -0.3 : -0.8);
@@ -432,7 +437,7 @@ window.ONW = window.ONW || {};
     // 占い師COの結果（この人を占ったという報告）
     claims.filter((c) => c.kind === "seer" && c.target === q.id).forEach((c) => {
       if (WOLF_LIKE().includes(c.role)) s += wolfSide ? 0.8 : 2.8;
-      else if (c.role === "tanner" || c.role === "love_tanner") s -= wolfSide ? 0.5 : 2.2;
+      else if (c.role === "tanner" || c.role === "love_tanner" || c.role === "bounty_hunter" || c.role === "fox") s -= wolfSide ? 0.5 : 2.2;   // 妖狐と占われた人は、投票しても妖狐が負けるだけ（占い師に呪殺されている）ので避ける
       else s += wolfSide ? -0.4 : -1.0;
       if (c.from === p.id) {   // 自分が報告した結果には従う（本家）
         if (WOLF_LIKE().includes(c.role)) s += 12;

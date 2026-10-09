@@ -15,11 +15,19 @@ window.ONW = window.ONW || {};
     const add = (...segs) => L.push({ segs });
     const head = (t) => L.push({ segs: [{ t, c: C.head, b: true }] });
     const sep = () => L.push({ sep: true });
-    head("投票結果");
-    res.votes.forEach((v) => add(T(v.from), T(" → ", C.dim), v.to ? T(v.to, C.vote) : T("未投票", C.dim), ...(v.to ? [T(`(${v.w || 1})`, C.dim)] : [])));
-    sep(); head("得票数");
-    if (res.counts.length) res.counts.forEach((c) => add(T(c.name), T(" : ", C.dim), T(`${c.c}票`, C.vote)));
-    else add(T("得票はありません。", C.dim));
+    if (res.dictator) {
+      head("独裁処刑");
+      add(T(res.dictator.by), T(" → ", C.dim), T(res.dictator.target, C.vote), T("（投票は行いませんでした）", C.dim));
+    } else {
+      head("投票結果");
+      res.votes.forEach((v) => add(T(v.from), T(" → ", C.dim), v.x ? T("投票無効", C.dead) : v.to ? T(v.to, C.vote) : T("未投票", C.dim), ...(v.to ? [T(`(${v.w || 1})`, C.dim)] : [])));
+      sep(); head("得票数");
+      if (res.counts.length) res.counts.forEach((c) => add(T(c.name), T(" : ", C.dim), T(`${c.c}票`, C.vote)));
+      else add(T("得票はありません。", C.dim));
+    }
+    // 【道連れ・後追い】投票結果のすぐ下（画面の最終結果と同じ）
+    const cr = ONW.chainRows(res);
+    if (cr.length) { sep(); head("道連れ・後追い"); cr.forEach((r) => r.k === "sub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の身代わりになりました。`)) : r.k === "chainSub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の道連れの身代わりになりました。`)) : add(...(r.by ? [T(r.by), T(" → ", C.dim)] : []), T(r.name), T(" "), T(r.label, C.dead))); }
     sep();
     const wt = res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
     L.push({ segs: [{ t: res.title, c: wt, b: true }], big: true });
@@ -27,14 +35,10 @@ window.ONW = window.ONW || {};
     add(T("勝者: ", C.good), T(res.winners.join("、") || "なし"));
     add(T("敗者: ", C.dead), T(res.losers.join("、") || "なし"));
     sep(); head("役職履歴");
-    // 画面の最終結果と同じく、役職履歴の上に恋人・従者の身代わりの行を並べる
-    (res.gremlins || []).forEach((x) => add(T("グレムリン: ", C.info), T(`${x.gremlin} は ${x.from} → ${x.to} を選んでいました。`)));
-    (res.execs || []).forEach((x) => add(T("処刑人: ", C.info), T(`${x.exec} のターゲットは ${x.target} でした。${x.win ? "追放されたので処刑人の勝利です。" : "追放されませんでした。"}`)));
-    (res.servantSubs || []).forEach((x) => add(T("従者: ", C.info), T(`${x.servant} が ${x.master} の身代わりになりました。`)));
     res.history.forEach((h) => {
       const segs = [T(h.name + " ")];
       h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : t.k === "keep" ? "#ff9ec9" : t.k === "cat" ? C.third : "#ffaa00"))); });
-      segs.push(T(" " + h.status, h.dead ? C.dead : C.alive));
+      segs.push(T(" " + h.status, h.dead || h.day ? C.dead : C.alive));
       L.push({ segs, fit: true });   // 1人ぶんの役職履歴は、長くても1行に収める（画像の横幅を広げる）
     });
     sep();
@@ -42,6 +46,16 @@ window.ONW = window.ONW || {};
     add(T("欠け: なし", C.dim));
     sep(); head("夜行動結果");
     if (res.nightLogs.length) res.nightLogs.forEach((t) => add(T(t))); else add(T("夜行動ログはありません。", C.dim));
+    // 【昼行動結果】夜行動結果の下。昼能力（独裁者など）の結果はここに1行ずつ並べる
+    if (res.dictator) { sep(); head("昼行動結果"); add(T("独裁者: ", C.info), T(`${res.dictator.by} は ${res.dictator.target} を独裁処刑対象にしていました。`)); }
+    // 【役職情報】夜行動結果・昼行動結果の下。賞金稼ぎ・処刑人・従者・口封じの狂人の情報を1つの欄に並べる（画面の最終結果と同じ並び）。1行も無い試合は欄ごと出さない
+    const info = [
+      ...(res.bounty || []).map((x) => [T("賞金稼ぎ: ", C.info), T(`${x.by} は ${x.target} を人狼判定だと選びました。${x.hit ? "成功です。" : "失敗です。"}`)]),
+      ...(res.execs || []).map((x) => [T("処刑人: ", C.info), T(`${x.exec} のターゲットは ${x.target} でした。${x.win ? (x.late ? "賞金稼ぎが追放され、人狼判定を外したので処刑人の勝利です。" : "追放されたので処刑人の勝利です。") : "追放されませんでした。"}`)]),
+      ...(res.servants || []).map((q) => [T("従者: ", C.info), T(`${q[0]} のご主人は ${q[1]} です。`)]),
+      ...(res.muzzles || []).map((x) => [T("口封じの狂人: ", C.info), T(`${x.by} は ${x.target} を口封じしました。`)]),
+    ];
+    if (info.length) { sep(); head("役職情報"); info.forEach((r) => add(...r)); }
     // 【昇格情報】一番下。今後「姫君 → 女王」などの昇格を足すときも、ここ（昇格情報）に1行ずつ並べる
     if (res.promoted.length) { sep(); head("昇格情報"); add(T("[狂人昇格] 今回は ", C.dim), T(res.promoted.join("、")), T(" が人狼判定になっていました。", C.dim)); }
     return L;
