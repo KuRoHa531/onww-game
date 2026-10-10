@@ -46,6 +46,7 @@
 
   function implCategoryOf(role) {
     if (role.team === "village") return 0;
+    if (role.key === "SAM") return 3; // サムは人狼陣営だが特殊: 実装順ではホタルの直後(第三と同じ並びに入れる)
     if (role.team === "wolf") return MAD_KEYS.has(role.key) ? 2 : 1; // 1:人狼 2:狂人
     return 3; // third（ドッペルゲンガーもここに含まれる）
   }

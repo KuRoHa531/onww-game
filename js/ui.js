@@ -193,9 +193,9 @@ window.ONW = window.ONW || {};
       <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.toggleGroup('${key}')">
         <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
       </button>`;
-    const village = ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "watchdog", "sheriff"];
-    const wolfLike = ["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf"], madLike = ["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"], dark = ["dark_avatar"];
-    const third = ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"];
+    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "watchdog", "sheriff"]);
+    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"]), dark = ["dark_avatar"];
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"]);
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -1344,7 +1344,7 @@ window.ONW = window.ONW || {};
   // セットアップ画面（人数・役職構成）
   // ---------------------------------------------------------
   ui.renderSetup = function renderSetup(game) {
-    const roleChips = Object.keys(ONW.ROLE_INFO).filter((r) => r !== "drunk" && r !== "lover").map((role) => {
+    const roleChips = ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO)).filter((r) => r !== "drunk" && r !== "lover").map((role) => {
       const info = ONW.roles.getInfo(role);
       const countSelected = game.selectedRoles.filter((r) => r === role).length;
       return `

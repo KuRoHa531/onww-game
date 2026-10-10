@@ -93,9 +93,9 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "watchdog", "sheriff"],
-    wolf: ["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat"],
-    third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"],
+    village: ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "watchdog", "sheriff"]),
+    wolf: ONW.sortByRoleOrder(["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat"]),
+    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"]),
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
@@ -136,8 +136,9 @@ window.ONW = window.ONW || {};
         <div class="gd-desc">${esc(ONW.roleDesc(r, g) || i.desc || "説明はありません。")}</div></details>`;
     };
     const teamBlock = (team) => {
-      const list = [...ORDER[team]];
-      Object.keys(ONW.ROLE_INFO).forEach((r) => { if (info(r).team === team && r !== "drunk" && r !== "lover" && !list.includes(r)) list.push(r); });   // 酔っ払いは重複役職として別枠
+      const list0 = [...ORDER[team]];
+      Object.keys(ONW.ROLE_INFO).forEach((r) => { if (info(r).team === team && r !== "drunk" && r !== "lover" && !list0.includes(r)) list0.push(r); });   // 酔っ払いは重複役職として別枠
+      const list = ONW.sortByRoleOrder(list0);   // 全部、基準の並び(ONW.ROLE_ORDER)
       const have = list.filter((r) => counts[r] > 0);
       const cand = list.filter((r) => cands.includes(r));
       if (!have.length && !cand.length) return "";

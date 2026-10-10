@@ -158,7 +158,8 @@ window.ONW = window.ONW || {};
   }
 
   /** 役職ボタンを陣営ごとに見出し付きで並べる。人狼陣営は「変化役 / 人狼系 / 狂人系」に分ける。見出しが1つだけなら見出しは出さない */
-  function groupBtns(list, mkBtn) {
+  function groupBtns(list0, mkBtn) {
+    const list = ONW.sortByRoleOrder(list0);   // 役職の並びは基準(ONW.ROLE_ORDER)
     const teamOf = (r) => ONW.roles.getInfo(r).team, T = ONW.TEAM;
     const isMad = (r) => ONW.MAD_KIND.includes(r), isWolfKind = (r) => ONW.WOLF_KIND.includes(r);
     const wolfSide = list.filter((r) => teamOf(r) === T.WOLF);
@@ -180,7 +181,7 @@ window.ONW = window.ONW || {};
     const { players, graves } = slots();
     const valid = new Set([...players, ...graves].map((s) => s.key));
     const nmOf = (k) => (players.find((s) => s.key === k) || {}).name || "?";
-    const deckRoles = Object.keys(ONW.ROLE_INFO).filter((r) => (g.roleCounts[r] || 0) > 0);
+    const deckRoles = ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO)).filter((r) => (g.roleCounts[r] || 0) > 0);
     const slotRow = (s) => {
       const role = d.roles[s.key];
       const isGrave = s.key.startsWith("center:");

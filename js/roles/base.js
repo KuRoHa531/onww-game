@@ -16,7 +16,8 @@
  *         sort は ONW.ROLE_INFO の並び順(小さいほど先。省略した役職は最後に登録順)。like で土台にしても info は引き継がない(必ず自分で書く)
  *   groups: { wolf: n, mad: n, tomo: n, selfAsVillager: n, selfAsWolf: n, newsHidden: n, "transform:<変化役のID>": n }
  *         役職グループへの所属(ONW.WOLF_KIND / MAD_KIND / TOMO_ROLES / SELF_AS_VILLAGER / SELF_AS_WOLF / NEWS_HIDDEN / TRANSFORM_GROUPS[変化役])。
- *         n は並び順(小さいほど先)。例: 光の使徒の変化先になる役職は groups: { "transform:light_apostle": 3 }
+ *         n は「所属」を表すための数字。並び順は js/roleorder.js の ONW.ROLE_ORDER(wikiの順)で決まるので、n の大きさは気にしなくてよい(基準に無い役職どうしの予備の並びだけに使う)。
+ *         例: 光の使徒の変化先になる役職は groups: { "transform:light_apostle": 3 }
  *   【必須・毎回入れること】新しい役職は、陣営に合う変化役の変化先に必ず入れる（抜けると、ロビーの変化候補・固定役の変化指定・設定のOFF・ガイドに出ない）:
  *       村人系 → "transform:light_apostle"（光の使徒）/ 人狼系 → "transform:dark_avatar"（闇の化身）/ 狂人系 → "transform:dark_avatar"（闇の化身）/ 第三陣営 → "transform:silver_shadow"（銀色の影）
  *       番号 n は同じ変化役の中での並び順。入れたか確認は node _wip/groupcheck.js .（登録もれがあると FAIL）
@@ -162,9 +163,10 @@ window.ONW = window.ONW || {};
       if (!o) infoObjs.set(x.info, (o = { name: x.info.name, team: x.info.team, wakeOrder: x.info.wakeOrder, desc: x.info.desc }));
       T[x.id] = o;
     });
-    // 役職グループ: groups[名前] の数字の小さい順(同じ数字は ROLE_INFO の並び順)
+    // 役職グループ: 並びは js/roleorder.js の ONW.ROLE_ORDER(wikiの順=実装した順)。groups の数字は「基準に無い役職」どうしの予備の並びにだけ使う(同じ数字は ROLE_INFO の並び順)
+    const rk = (id) => (ONW.roleRank ? ONW.roleRank(id) : 1e6);
     const members = (name) => list.filter((x) => raw[x.id] && raw[x.id].groups && raw[x.id].groups[name] != null)
-      .sort((a, b) => raw[a.id].groups[name] - raw[b.id].groups[name] || list.indexOf(a) - list.indexOf(b)).map((x) => x.id);
+      .sort((a, b) => rk(a.id) - rk(b.id) || raw[a.id].groups[name] - raw[b.id].groups[name] || list.indexOf(a) - list.indexOf(b)).map((x) => x.id);
     fill(ONW.WOLF_KIND, members("wolf"));
     fill(ONW.VISIBLE_WOLF, ONW.WOLF_KIND.filter((r) => !(raw[r] && raw[r].hiddenWolf)));
     fill(ONW.MAD_KIND, members("mad"));

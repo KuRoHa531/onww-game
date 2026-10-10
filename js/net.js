@@ -1458,7 +1458,8 @@ window.ONW = window.ONW || {};
       ...Object.keys(g.centerTransformFrom).map((i) => ({ b: g.centerTransformFrom[i], a: (g.center0 || g.center)[i] })),   // 配役直後の墓地で見る（墓荒らしの交換後の g.center だと変化先が墓荒らしになってしまう）
     ].filter((e) => e.b !== e.a);
     if (!list.length) return;
-    list.sort((x, y) => (order[x.b] ?? 9) - (order[y.b] ?? 9) || Math.random() - 0.5);
+    // 変化公開の並び: 変化役(光の使徒 → 闇の化身 → 銀色の影)の順 → 変化役の基準順 → 変化後の役職の基準順(js/roleorder.js)。乱数は使わない
+    list.sort((x, y) => (order[x.b] ?? 9) - (order[y.b] ?? 9) || ONW.roleRank(x.b) - ONW.roleRank(y.b) || ONW.roleRank(x.a) - ONW.roleRank(y.a));
     g.tfLines = list.map((e) => `${rn(e.b)} → ${rn(e.a)}`);
     g.tfPairs = list.map((e) => ({ b: e.b, a: e.a }));   // tfLines と同じ並び
     // 変化公開はチャットには流さず、プレイヤー一覧の下の欄(tfLines)にだけ出す

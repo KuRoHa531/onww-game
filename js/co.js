@@ -144,9 +144,9 @@ window.ONW = window.ONW || {};
   const lockBtn = (kind) => (LOCKABLE.includes(kind) ? btn("ロックされて失敗", "ONW.co.lockFailed()") : "");
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
-  const TEAM_ORDER = { village: 0, wolf: 1, third: 2 };   // COボタンの並び: 村人陣営 → 人狼陣営 → 第三陣営（同じ陣営の中は、もとの並びのまま）
+  const TEAM_ORDER = { village: 0, wolf: 1, third: 2 };   // COボタンの並び: 村人陣営 → 人狼陣営 → 第三陣営（同じ陣営の中は、基準の並び ONW.ROLE_ORDER=wikiの順。同じ役職どうしはもとの並び）
   const teamRank = (r) => { const t = (ONW.roles.getInfo(r) || {}).team; return t in TEAM_ORDER ? TEAM_ORDER[t] : 3; };
-  const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin").map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）
+  const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin").map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || ONW.roleRank(a.x.r) - ONW.roleRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）
   const roleBtns = (fn, extra = "", skip = []) => deckList().filter((x) => !skip.includes(x.r)).map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.${fn}('${x.r}')`)).join("") + extra;
 
   co.render = function () {

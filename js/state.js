@@ -163,6 +163,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
    *  【必須・役職追加のたびに入れること】新しい役職は groups に変化先を必ず書く（抜けるとロビーの変化候補・固定役の変化指定・設定・ガイドに出ない）:
    *     村人系 → "transform:light_apostle" / 人狼系・狂人系 → "transform:dark_avatar" / 第三陣営 → "transform:silver_shadow"
    *     確認: node _wip/groupcheck.js .（登録もれがあれば FAIL。node _wip/viewall.js . の一覧にも出る）
+   *  【必須・役職追加のたびに入れること】並びは js/roleorder.js の ONW.ROLE_ORDER(wikiの順)の末尾にIDを足す(groups の数字では並ばない)。確認: node _wip/orderAll.js .
    * ===================================================================================== */
   ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
   const holderKeyOfGrave = (i) => "g:" + i;

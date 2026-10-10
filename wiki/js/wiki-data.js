@@ -2438,7 +2438,7 @@ window.ONW_WIKI_ROLES = [
     "id": "smoke_madman",
     "name": "煙幕の狂人",
     "team": "wolf",
-    "order": 107,
+    "order": 106,
     "desc": "昼開始時、煙幕を投げ変化公開以外の昼通知を隠します。\n詳細設定でONの場合は昼能力対象と投票対象の名前も隠します。\n封印されている場合は発動しません。",
     "achievements": [
       {
@@ -2464,7 +2464,7 @@ window.ONW_WIKI_ROLES = [
     "id": "monkey_madman",
     "name": "猿の狂人",
     "team": "wolf",
-    "order": 117,
+    "order": 116,
     "desc": "現世にいる間、保安官、ヴァニティ、独裁者、天秤の能力は猿凸状態になり対象がランダムになります。",
     "achievements": [
       {
@@ -2516,7 +2516,7 @@ window.ONW_WIKI_ROLES = [
     "id": "ox_madman",
     "name": "牛の狂人",
     "team": "wolf",
-    "order": 110,
+    "order": 109,
     "desc": "牛の狂人が同数最多投票になった場合、\n同数最多の人はそれぞれ1/2の確率で生き延びます。\n全員が生き残った場合は引き分け、\n全員が死亡した場合は相打ちになります。\n生き残りが2人以上いる場合は引き分け、\n生き残りが1人だけの場合は通常の生存扱いです。\n死亡した人は押し切りになります。",
     "achievements": [
       {
@@ -2542,7 +2542,7 @@ window.ONW_WIKI_ROLES = [
     "id": "mad_mayor",
     "name": "狂ったメイヤー",
     "team": "wolf",
-    "order": 102,
+    "order": 101,
     "desc": "設定した票数分投票できる狂人です。",
     "achievements": [
       {
@@ -2573,7 +2573,7 @@ window.ONW_WIKI_ROLES = [
     "id": "mad_exchanger",
     "name": "狂った交換者",
     "team": "wolf",
-    "order": 104,
+    "order": 103,
     "desc": "昼能力で2人を選び、その2人の票数を入れ替えます。狂人系として扱われます。",
     "achievements": [
       {
@@ -2609,7 +2609,7 @@ window.ONW_WIKI_ROLES = [
     "id": "mad_queen",
     "name": "狂った女王",
     "team": "wolf",
-    "order": 100,
+    "order": 99,
     "desc": "村人目線では女王と同じ通知が出ますが、人狼側には狂った女王として見えます。",
     "achievements": [
       {
@@ -2635,7 +2635,7 @@ window.ONW_WIKI_ROLES = [
     "id": "mad_priest",
     "name": "狂った神官",
     "team": "wolf",
-    "order": 108,
+    "order": 107,
     "desc": "狂った神官が生存していると神勝利を無効にする。\n神の祝福は無効にしない。\n狂った神官が死亡していると神が勝利しても、\n人狼陣営が一緒に勝てる。",
     "achievements": [
       {
@@ -2800,7 +2800,7 @@ window.ONW_WIKI_ROLES = [
     "id": "rooster_madman",
     "name": "鶏の狂人",
     "team": "wolf",
-    "order": 118,
+    "order": 117,
     "desc": "1票でも入るとショック死します。生存していると、人狼陣営が負けそうな時に逆転勝利させます。チキンも生存している場合は、どちらが逆転させるかは生存数に応じて決まります。",
     "achievements": [
       {
@@ -2826,7 +2826,7 @@ window.ONW_WIKI_ROLES = [
     "id": "dog_madman",
     "name": "犬の狂人",
     "team": "wolf",
-    "order": 119,
+    "order": 118,
     "desc": "夜に飼い主を選びます。飼い主に投票した場合は噛み殺し、飼い主に投票しなかった場合は飼い主を吊られないようにします。",
     "achievements": [
       {
@@ -2852,7 +2852,7 @@ window.ONW_WIKI_ROLES = [
     "id": "tiger_madman",
     "name": "虎の狂人",
     "team": "wolf",
-    "order": 111,
+    "order": 110,
     "desc": "吊られた時、生存している第三陣営がいればランダムに1人道連れにします。",
     "achievements": [
       {
@@ -2878,7 +2878,7 @@ window.ONW_WIKI_ROLES = [
     "id": "muzzle_madman",
     "name": "口封じの狂人",
     "team": "wolf",
-    "order": 98,
+    "order": 97,
     "desc": "夜の開始時に全プレイヤーの中からランダムな1人を口封じします。口封じされたプレイヤーはチャット、CO、結果開示ができません。",
     "achievements": [
       {
@@ -2909,7 +2909,7 @@ window.ONW_WIKI_ROLES = [
     "id": "black_wolf_madman",
     "name": "黒子の狂人",
     "team": "wolf",
-    "order": 101,
+    "order": 100,
     "desc": "占い結果が人狼と出る狂人です。",
     "achievements": [
       {
@@ -2966,7 +2966,7 @@ window.ONW_WIKI_ROLES = [
     "id": "tenacious_madman",
     "name": "執念の狂人",
     "team": "wolf",
-    "order": 105,
+    "order": 104,
     "desc": "人狼陣営が勝利していても、自身が死亡していると敗北します。",
     "achievements": [
       {
@@ -2992,7 +2992,7 @@ window.ONW_WIKI_ROLES = [
     "id": "snake_madman",
     "name": "蛇の狂人",
     "team": "wolf",
-    "order": 114,
+    "order": 113,
     "desc": "自身が投票した相手が最多得票になった場合、その相手を追放ではなく毒殺します。追放時に発動する能力や護衛を貫通します。封印されている場合は発動しません。",
     "achievements": [
       {
@@ -3162,7 +3162,7 @@ window.ONW_WIKI_ROLES = [
     "id": "rat_madman",
     "name": "鼠の狂人",
     "team": "wolf",
-    "order": 109,
+    "order": 108,
     "desc": "昼能力で逃げ込む対象を選びます。逃げ込んだ先が死亡しない限り、投票・噛殺・爆殺などでは死亡しません。ただし保安官やヴァニティには執行されます。逃げ込んだ先が死亡した場合は後追いします。第三陣営に逃げ込んでいた場合は、投票終了時に無条件で後追いします。",
     "achievements": [
       {
@@ -3224,7 +3224,7 @@ window.ONW_WIKI_ROLES = [
     "id": "boar_madman",
     "name": "猪の狂人",
     "team": "wolf",
-    "order": 120,
+    "order": 119,
     "desc": "夜にプレイヤー1人を選びます。投票ではどこを選んでもその相手に投票します。ペンギンや交換者でもこの投票先は変わりません。",
     "achievements": [
       {
@@ -3255,7 +3255,7 @@ window.ONW_WIKI_ROLES = [
     "id": "rabbit_madman",
     "name": "兎の狂人",
     "team": "wolf",
-    "order": 112,
+    "order": 111,
     "desc": "ゲーム開始時にランダムなプレイヤーを草むらへ隠れさせます。兎の狂人は誰が隠れたかを知ります。隠れた本人は気づきません。隠れた相手に夜能力または昼能力を使うと失敗します。",
     "achievements": [
       {
@@ -3348,7 +3348,7 @@ window.ONW_WIKI_ROLES = [
     "id": "jester_madman",
     "name": "道化の狂人",
     "team": "wolf",
-    "order": 106,
+    "order": 105,
     "desc": "追放または道連れで死亡した場合、人狼が1人以上死んでいても人狼陣営勝利になります。しかし道化の狂人自身が人狼判定に昇格したうえでつられた場合は人狼陣営は敗北します。",
     "achievements": [
       {
@@ -3395,7 +3395,7 @@ window.ONW_WIKI_ROLES = [
     "id": "horse_madman",
     "name": "馬の狂人",
     "team": "wolf",
-    "order": 115,
+    "order": 114,
     "desc": "現世にいる間、馬の狂人以外は一度投票した先から投票先を変更できません。",
     "achievements": [
       {
@@ -3452,7 +3452,7 @@ window.ONW_WIKI_ROLES = [
     "id": "rebel_madman",
     "name": "反逆の狂人",
     "team": "wolf",
-    "order": 99,
+    "order": 98,
     "desc": "独裁が発動したとき、生存しているなら独裁者本人を代わりに処刑します。",
     "achievements": [
       {
@@ -3478,7 +3478,7 @@ window.ONW_WIKI_ROLES = [
     "id": "seal_madman",
     "name": "封印の狂人",
     "team": "wolf",
-    "order": 103,
+    "order": 102,
     "desc": "夜の最初に1人を選び、その相手のさまざまな能力や通知を封印します。",
     "achievements": [
       {
@@ -3540,7 +3540,7 @@ window.ONW_WIKI_ROLES = [
     "id": "exposed_madman",
     "name": "暴露狂人",
     "team": "wolf",
-    "order": 97,
+    "order": 96,
     "desc": "夜に1人選びます。昼開始時に、その相手の最終役職だけが全体公開されます。対象名や暴露狂人本人は公開されません。恋人陣営や酔っぱらいならその情報も追加で公開されます。",
     "achievements": [
       {
@@ -3709,7 +3709,7 @@ window.ONW_WIKI_ROLES = [
     "id": "sheep_madman",
     "name": "羊の狂人",
     "team": "wolf",
-    "order": 116,
+    "order": 115,
     "desc": "昼能力で1人を迷える子羊状態にし、その人の投票先をランダムにします。人狼陣営に能力を使った場合は、自身の票もランダムになります。",
     "achievements": [
       {
@@ -3735,7 +3735,7 @@ window.ONW_WIKI_ROLES = [
     "id": "dragon_madman",
     "name": "龍の狂人",
     "team": "wolf",
-    "order": 113,
+    "order": 112,
     "desc": "夜能力を使われた瞬間、誰のどの役職が自分の逆鱗に触れたかを知ります。",
     "achievements": [
       {
@@ -3797,7 +3797,7 @@ window.ONW_WIKI_ROLES = [
     "id": "crazy_donut_shop",
     "name": "狂ったドーナツ屋",
     "team": "wolf",
-    "order": 96,
+    "order": 121,
     "desc": "昼開始時ドーナツ屋を除く\nランダムなプレイヤー1人に粗悪なドーナツを届けます。\nドーナツは1人1回までしか受け取れず\nドーナツ屋自身もドーナツを受け取ることが出来ないので\n他に届ける相手がいなかった場合\n届けられず自分の元に戻ってきます。",
     "achievements": [
       {
@@ -3823,7 +3823,7 @@ window.ONW_WIKI_ROLES = [
     "id": "mad_agitator",
     "name": "狂った煽動者",
     "team": "wolf",
-    "order": 121,
+    "order": 120,
     "desc": "夜に煽るプレイヤーを1人選択します。\n煽られたプレイヤーは投票される票数が1票加算されます。",
     "achievements": [
       {
