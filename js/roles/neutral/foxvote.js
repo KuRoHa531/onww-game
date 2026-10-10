@@ -66,7 +66,7 @@
     if (!ids.length) return null;
     const chain = ONW.fox.chainView(g, ids, "foxvote");
     const depth = Math.max(0, ...chain.map((e) => e.depth || 1));
-    const ms = (( r.subs || []).length ? 2200 : 0) + 700 + ids.length * 380 + 1400 + depth * 1900 + 900;   // 身代わりがあるときは、先にご主人のカードがめくれそうになる分(2.2秒)が足される   // 札が🦊にめくれる → 灰色 → 連鎖の段ごとにめくれる（ONW.fox.playChain と同じ間隔）
+    const ms = (( r.subs || []).length ? 2200 : 0) + 700 + ids.length * 380 + 1400 + depth * 2200 + 900;   // 身代わりがあるときは、先にご主人のカードがめくれそうになる分(2.2秒)が足される   // 札が🦊にめくれる → 灰色 → 連鎖の段ごとにめくれる（ONW.fox.playChain と同じ間隔）
     return { ids, subs: (r.subs || []).map((x) => ({ servant: x.servant, master: x.master, role: g.currentRoles[x.servant] })), chain, ms };
   }
   /** 追放を実行する（昼中死亡と同じ扱い: net.killPlayer が 霊界・恋人の心中・従者・キューピッド・背徳者の後追い まで面倒を見る）。

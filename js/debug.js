@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null };
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle", "dictate"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -27,15 +27,19 @@ window.ONW = window.ONW || {};
     const n = game.players.length;
     const keys = [...game.players.map((p) => p.id), ...Array.from({ length: Math.max(0, deck.length - n) }, (_, i) => `center:${i}`)];
     const nameOfKey = (k) => (k.startsWith("center:") ? `墓地${Number(k.slice(7)) + 1}` : (game.players.find((p) => p.id === k) || {}).name || k);
-    const locked = new Set();
-    Object.entries(game.dbg.roles || {}).forEach(([key, role]) => {
-      const idx = keys.indexOf(key);
-      if (idx < 0) return;                                    // 参加していない人の固定は無視
-      if (deck[idx] === role) { locked.add(idx); return; }
-      const j = deck.findIndex((r, k) => r === role && k !== idx && !locked.has(k));
-      if (j < 0) { game.dbgWarn.push(`${nameOfKey(key)} の「${rn(role)}」固定は、配役に枚数が足りないため無効でした。`); return; }
-      [deck[idx], deck[j]] = [deck[j], deck[idx]];            // 枚数は変えず、入れ替えて固定する
-      locked.add(idx);
+    // 役職固定は絶対: 配役の枚数(設定の役職数)に関係なく、指定した役職をその席に必ず置く（マイクラ版の nextRoleLocks と同じ。山札に無ければ固定した役職をそのまま配る）。
+    // 1) 固定した席を全部先に確定する  2) 山札に同じ役職が余っていれば、固定していない席から入れ替えて持ってくる  3) 余りが無ければ、その席のカードを固定役に差し替える(枚数の超過を許す)
+    const lockedIdx = new Set();
+    const entries = Object.entries(game.dbg.roles || {}).map(([key, role]) => [keys.indexOf(key), role]).filter(([idx, role]) => idx >= 0 && role && idx < deck.length);   // 参加していない人の固定は無視
+    entries.forEach(([idx]) => lockedIdx.add(idx));
+    const done = new Set();
+    entries.forEach(([idx, role]) => { if (deck[idx] === role) done.add(idx); });   // すでに固定どおりの席は動かさない
+    entries.forEach(([idx, role]) => {
+      if (done.has(idx)) return;
+      const j = deck.findIndex((r, k) => r === role && !lockedIdx.has(k));
+      if (j >= 0) { [deck[idx], deck[j]] = [deck[j], deck[idx]]; }   // 枚数は変えず、入れ替えて固定する
+      else { deck[idx] = role; }                                      // 枚数が足りなくても固定を優先して差し替える（超過配役）
+      done.add(idx);
     });
   };
   /** 変化役の「変化後」固定。固定役が変化役のときだけ有効 */
@@ -66,11 +70,6 @@ window.ONW = window.ONW || {};
     if (!game.debugOn || !game.dbg || !game.dbg.rand) return [];
     const ok = (id) => game.players.some((p) => p.id === id);
     return (game.dbg.rand.lover || []).filter((pr) => Array.isArray(pr) && pr.length === 2 && pr[0] !== pr[1] && ok(pr[0]) && ok(pr[1]));
-  };
-  /** CPUの独裁の対象（CPUのID → 対象のID。指定なしなら null）。指定したCPUだけが昼に独裁を使う */
-  debug.dictateTarget = function (game, id) {
-    if (!game.debugOn || !game.dbg || !game.dbg.rand) return null;
-    return ((game.dbg.rand.dictate || {})[id]) || null;
   };
   /** CPUの夜の能力先指定 { player?, graves? } */
   debug.cpuTarget = function (game, id) {
@@ -132,20 +131,30 @@ window.ONW = window.ONW || {};
   }
 
   // ---- 投票先指定 ----
+  /** 妖狐がいるときだけ、妖狐投票と通常投票を別々に指定できる（妖狐がいなければ、今までどおり通常投票の指定だけ）。
+   *  今後、魔界公爵追放会議にも対応する予定（投票の種類ごとに section を足す。net.js の dbgKey / 入れ物 g.dbg〇〇Votes も足す） */
   function tabVotes() {
     const g = G();
-    if (!inGame() || ![PH().ONLINE_DAY, PH().ONLINE_VOTE].includes(g.phase)) return hint("昼の議論〜投票の間に使えます。指定した票は通常の投票として扱われます。");
+    if (!inGame() || ![PH().ONLINE_DAY, PH().ONLINE_VOTE].includes(g.phase)) return hint("昼の議論〜投票の間に使えます。指定した票は、妖狐がいるときは妖狐投票と通常投票で別々に指定できます。");
     const nm = (id) => (g.players.find((p) => p.id === id) || {}).name || "?";
-    const forced = g.dbgVotes || {};
+    const hasFox = !!(ONW.foxVote && (ONW.foxVote.living(g).length > 0 || (g.foxVote && g.foxVote.active)));
+    const foxNow = !!(g.foxVote && g.foxVote.active);
     const targets = (self) => g.players.filter((p) => p.id !== self);
-    const rows = g.players.map((p) => {
-      const cur = forced[p.id] ? `指定: ${esc(nm(forced[p.id]))}` : (g.phase === PH().ONLINE_VOTE && g.votes[p.id]) ? `投票済: ${esc(nm(g.votes[p.id]))}` : "未指定";
-      let h = row(esc(p.name) + (p.isCpu ? cpuBadge : ""), `<span class="dbg-val">${cur}</span> ${b("変更", "pick", ["v:" + p.id])}`);
-      if (ui.pick === "v:" + p.id) h += `<div class="dbg-pick">${targets(p.id).map((t) => b(esc(t.name), "voteSet", [p.id, t.id])).join("")}${b("指定を解除", "voteSet", [p.id, ""], "dbg-clear")}</div>`;
-      return h;
-    }).join("");
-    const all = ui.pick === "vall" ? `<div class="dbg-pick">${g.players.map((t) => b(esc(t.name), "voteAll", [t.id])).join("")}</div>` : "";
-    return rows + `<div class="dbg-actions">${b("全員の投票先を一括指定", "pick", ["vall"])}${b("全員の指定を解除", "voteClear")}</div>${all}`;
+    // kind: "f" = 妖狐投票 / "v" = 通常投票
+    const section = (kind) => {
+      const fox = kind === "f", forced = (fox ? g.dbgFoxVotes : g.dbgVotes) || {};
+      const live = g.phase === PH().ONLINE_VOTE && fox === foxNow;   // いま行われている投票と同じ種類のときだけ「投票済」を出す
+      const rows = g.players.map((p) => {
+        const cur = forced[p.id] ? `指定: ${esc(nm(forced[p.id]))}` : (live && g.votes[p.id]) ? `投票済: ${esc(nm(g.votes[p.id]))}` : "未指定";
+        let h = row(esc(p.name) + (p.isCpu ? cpuBadge : ""), `<span class="dbg-val">${cur}</span> ${b("変更", "pick", [kind + ":" + p.id])}`);
+        if (ui.pick === kind + ":" + p.id) h += `<div class="dbg-pick">${targets(p.id).map((t) => b(esc(t.name), "voteSet", [p.id, t.id, kind])).join("")}${b("指定を解除", "voteSet", [p.id, "", kind], "dbg-clear")}</div>`;
+        return h;
+      }).join("");
+      const all = ui.pick === kind + "all" ? `<div class="dbg-pick">${g.players.map((t) => b(esc(t.name), "voteAll", [t.id, kind])).join("")}</div>` : "";
+      return rows + `<div class="dbg-actions">${b("全員の投票先を一括指定", "pick", [kind + "all"])}${b("全員の指定を解除", "voteClear", [kind])}</div>${all}`;
+    };
+    if (!hasFox) return section("v");
+    return `<div class="dbg-h">妖狐投票${foxNow ? "（いま行われています）" : ""}</div>${section("f")}<div class="dbg-h">通常投票${g.phase === PH().ONLINE_VOTE && !foxNow ? "（いま行われています）" : ""}</div>${section("v")}`;
   }
 
   /** 役職ボタンを陣営ごとに見出し付きで並べる。人狼陣営は「変化役 / 人狼系 / 狂人系」に分ける。見出しが1つだけなら見出しは出さない */
@@ -181,8 +190,7 @@ window.ONW = window.ONW || {};
       const lab = (role ? esc(rn(role)) + (d.tf[s.key] ? `→${esc(rn(d.tf[s.key]))}` : "") : "固定なし") + dupLab;   // 例: 闇の化身→人狼(+恋人1) / 村人(+酔っ払い)(+恋人2)
       let h = row(esc(s.name) + (s.cpu ? cpuBadge : ""), `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["l:" + s.key])}`);
       if (ui.pick === "l:" + s.key) {
-        const used = (r) => Object.entries(d.roles).filter(([k, v]) => v === r && k !== s.key && valid.has(k)).length;
-        const roleBtn = (r) => b(esc(rn(r)), "lockSet", [s.key, r], role === r ? "dbg-on" : "", used(r) >= (g.roleCounts[r] || 0));
+        const roleBtn = (r) => b(esc(rn(r)), "lockSet", [s.key, r], role === r ? "dbg-on" : "");   // 固定は配役の枚数を超えて指定できる（固定が最優先）
         // 陣営ごとに見出しを付けて並べる。人狼陣営は 変化役 / 人狼系 / 狂人系 に分ける（役職の選択も「変化後」の選択も同じ並べ方）
         const rb = groupBtns(deckRoles, roleBtn);
         const tg = role && ONW.TRANSFORM_GROUPS[role]
@@ -202,7 +210,7 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", gremlin: "gr" };
+  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", gremlin: "gr" };
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
@@ -268,12 +276,35 @@ window.ONW = window.ONW || {};
     { kind: "cat", roles: ["cat_sidhe", "black_cat", "cat_pumpkin"], label: "道連れ先" },
     { kind: "straw", roles: ["straw_doll"], label: "道連れ先（自動で選ぶとき）" },
     { kind: "exec", roles: ["executioner"], label: "ターゲット" },
-    { kind: "dictate", roles: ["dictator"], label: "独裁の対象（昼に宣言する・CPUのみ）", cpuOnly: true },   // 指定したCPUだけが独裁を使う。指定のないCPUは独裁者を配られず（人間と入れ替え）、使わない
     { kind: "muzzle", roles: ["muzzle_madman"], label: "口封じ先", self: true },   // 自分自身も口封じ先になれる
   ];
   function tabCpu() {
     if (!inLobby()) return hint("能力先・ランダム対象はルーム（ロビー）で設定します。次の試合に反映されます。");
     return `<div class="dbg-h">夜の能力先・ランダムに決まる対象</div>` + cpuPart();
+  }
+
+  // ---- 昼能力（CPUをリアルタイムで発動する）----
+  /** 昼の議論中に、CPUの昼能力（独裁・交換・保安官・再就職）を「いま」使わせる。事前指定ではなく、押した瞬間に発動する（マイクラ版の能力先指定の昼版と同じ） */
+  const DAY_KINDS = [
+  ];
+  function tabDay() {
+    const g = G();
+    if (!inGame() || g.phase !== PH().ONLINE_DAY) return hint("昼の議論中に使えます。CPUの昼能力（独裁・交換・保安官・フリーターの再就職）を、押した瞬間に発動します。");
+    const nm = (id) => (g.players.find((p) => p.id === id) || {}).name || "?";
+    const rows = g.players.filter((p) => p.isCpu).map((p) => {
+      const k = DAY_KINDS.find((x) => g.currentRoles[p.id] === x.role);
+      if (!k) return "";
+      const dead = (g.deadIds || []).includes(p.id), ok = !dead && !!k.can(g, p.id);
+      let h = row(esc(p.name) + cpuBadge + ` <small class="dbg-dim">(${esc(rn(k.role))})</small>`, ok ? b(`${k.label}を使う`, "pick", ["d:" + p.id]) : `<span class="dbg-val">${dead ? "死亡" : "今は使えません"}</span>`);
+      if (ok && ui.pick === "d:" + p.id) {
+        const first = ui.dayFirst && ui.dayFirst.id === p.id ? ui.dayFirst.t : null;
+        const lab = k.two ? (first ? `2人目（1人目: ${esc(nm(first))}）` : "1人目") : "対象";
+        const ts = k.targets(g, p.id).filter((t) => t !== first);
+        h += `<div class="dbg-pick"><div class="dbg-sub">${lab}を選ぶと、すぐに発動します</div>${ts.map((t) => b(esc(nm(t)) + (t === p.id ? "（自分）" : ""), "dayUse", [p.id, k.kind, t])).join("")}${b("やめる", "dayCancel")}</div>`;
+      }
+      return h;
+    }).join("");
+    return rows || hint("昼能力を使えるCPU（独裁者・交換者・保安官・再就職できるフリーター）がいません。役職を固定したCPUに配ると出ます。");
   }
 
   // ---- その他（CPU議論発言 / 夜ログ）----
@@ -288,7 +319,7 @@ window.ONW = window.ONW || {};
       `<div class="dbg-h">昼中に死亡させる（霊界チャットの確認用）</div>${kill}<div class="dbg-h">夜ログ（GM用）</div>${logs}`;
   }
 
-  const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "能力先", tabCpu], ["misc", "その他", tabMisc]];
+  const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "能力先", tabCpu], ["day", "昼能力", tabDay], ["misc", "その他", tabMisc]];
 
   /** 🛠ボタンは右上の縦並び(アカウント・📖ガイドと同じ列)に置く。重ならないよう、固定位置ではなく列の中に入れる */
   function placeFab(show) {
@@ -337,9 +368,9 @@ window.ONW = window.ONW || {};
   debug.talkToggle = () => { const d = data(); d.cpuTalkOff = !d.cpuTalkOff; refresh(); };
 
   debug.kill = (id) => { ONW.net.killPlayer(id); refresh(); };
-  debug.voteSet = (vid, tid) => { ui.pick = null; ONW.net.debugVote(vid, tid || null); refresh(); };
-  debug.voteAll = (tid) => { ui.pick = null; ONW.net.debugVoteAll(tid); refresh(); };
-  debug.voteClear = () => { ui.pick = null; ONW.net.debugVoteClearAll(); refresh(); };
+  debug.voteSet = (vid, tid, kind) => { ui.pick = null; ONW.net.debugVote(vid, tid || null, kind === "f"); refresh(); };   // kind: "f" = 妖狐投票 / それ以外 = 通常投票
+  debug.voteAll = (tid, kind) => { ui.pick = null; ONW.net.debugVoteAll(tid, kind === "f"); refresh(); };
+  debug.voteClear = (kind) => { ui.pick = null; ONW.net.debugVoteClearAll(kind === "f"); refresh(); };
 
   debug.lockSet = (key, role) => {
     const d = data();
@@ -351,6 +382,17 @@ window.ONW = window.ONW || {};
     }
     refresh();
   };
+  debug.dayUse = (id, kind, t) => {   // 昼能力をいま発動（交換は1人目→2人目の順に選ぶ。選び終えた瞬間に使う）
+    const k = DAY_KINDS.find((x) => x.kind === kind);
+    if (!k) return;
+    if (k.two) {
+      if (!ui.dayFirst || ui.dayFirst.id !== id) { ui.dayFirst = { id, t }; refresh(); return; }
+      const a = ui.dayFirst.t; ui.dayFirst = null; ui.pick = null;
+      ONW.net.debugDayAbility(id, kind, a, t);
+    } else { ui.pick = null; ONW.net.debugDayAbility(id, kind, t); }
+    refresh();
+  };
+  debug.dayCancel = () => { ui.pick = null; ui.dayFirst = null; refresh(); };
   debug.masterSet = (key, t) => { const d = data(); if (t) d.master[key] = t; else delete d.master[key]; ui.pick = null; refresh(); };
   debug.randSet = (kind, key, t) => {   // kind: master / freeter / cat / straw / exec / muzzle（持ち主ごとに1人）
     const d = data(), store = kind === "master" ? d.master : d.rand[kind];
@@ -372,7 +414,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; refresh(); };
-  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, dictate: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
+  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
 
   // 指定を書き換える（空になったら項目ごと消す）
   const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };

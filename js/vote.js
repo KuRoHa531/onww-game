@@ -139,13 +139,47 @@ window.ONW = window.ONW || {};
     return game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.TOFU_WOLF && (counts[id] || 0) > 0 && !gone.has(id));
   };
 
-  /** 得票数を集計する（メイヤーの1票は、設定した票数ぶんとして数える） */
-  vote.tally = function tally(game) {
-    const counts = {};
+  /**
+   * 交換者(g.exchanges)の入れ替え1回ぶん: counts の a と b の得票数を入れ替える（「Aに入った票はBへ、Bに入った票はAへ」= マイクラ版 vote.js の voteSwapPairs と同じ結果）。
+   * counts は書き換えず、新しいオブジェクトを返す。0票の側は 0 として扱う（0票になった人は counts から消える）。
+   */
+  vote.swapCounts = function swapCounts(counts, a, b) {
+    const out = { ...counts };
+    const ca = counts[a] || 0, cb = counts[b] || 0;
+    if (cb > 0) out[a] = cb; else delete out[a];
+    if (ca > 0) out[b] = ca; else delete out[b];
+    return out;
+  };
+  /** 得票数を集計する（メイヤーの1票は、設定した票数ぶんとして数える）。raw:true なら交換者の入れ替えをする前の得票数 */
+  vote.tally = function tally(game, opts) {
+    let counts = {};
     Object.entries(game.votes).forEach(([voterId, targetId]) => {
       counts[targetId] = (counts[targetId] || 0) + ONW.vote.weightOf(game, voterId);
     });
+    if (opts && opts.raw) return counts;
+    // 交換者: 使った順に1つずつ、2人の得票数を入れ替える。入れ替わった先が昼中に死亡している人なら、その票は無効（マイクラ版: 死亡した相手への票は無効）
+    (game.exchanges || []).forEach((e) => { counts = vote.swapCounts(counts, e.a, e.b); });
+    if ((game.exchanges || []).length) (game.deadIds || []).forEach((id) => { delete counts[id]; });
+    // 番犬: 飼い主への票は無効（最終盤面の番犬の飼い主は追放されない。入れ替え後の得票数で見る＝マイクラ版 protectedOwnerIds と同じ）
+    if (opts && opts.unguarded) return counts;   // 無効になる前の得票数（結果発表の「無効票」表示用）
+    vote.guardedIds(game).forEach((id) => { delete counts[id]; });
     return counts;
+  };
+  /** 番犬の飼い主として票が無効になる人（最終盤面で番犬を持っていて酔いが覚めている人の飼い主）。番犬の役職ファイルがない場合は空 */
+  vote.guardedIds = function guardedIds(game) {
+    return ONW.watchdog ? ONW.watchdog.protectedIds(game) : [];
+  };
+  /** 交換者の入れ替えの途中経過: [入れ替え前の得票数, 1つ目を入れ替えた後, 2つ目を入れ替えた後, ...]（結果発表の演出用。最後の要素は vote.tally と同じ） */
+  vote.tallySteps = function tallySteps(game) {
+    let counts = vote.tally(game, { raw: true });
+    const guard = vote.guardedIds(game), shown = (c) => { const o = { ...c }; guard.forEach((id) => { delete o[id]; }); return o; };   // 番犬の飼い主への票は表示から外す（入れ替えは無効になる前の票で行う）
+    const steps = [shown(counts)];
+    (game.exchanges || []).forEach((e) => {
+      counts = vote.swapCounts(counts, e.a, e.b);
+      counts = { ...counts }; (game.deadIds || []).forEach((id) => { delete counts[id]; });   // vote.tally と同じ（死亡した人への票は無効）
+      steps.push(shown(counts));
+    });
+    return steps;
   };
 
   /**
@@ -322,6 +356,16 @@ window.ONW = window.ONW || {};
       tomoSimul = new Set();
     };
     const loveDead = (id, role) => (game.chainKind[id] === "love" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.BOUNTY_HUNTER)) || (game.chainKind[id] === "lovers" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.BOUNTY_HUNTER || role === R.LOVE_TANNER));   // 無理心中で死んだ人は道連れ能力（わら人形・猫又・黒猫）・アサシンの暗殺・賞金稼ぎの指名が発動しない / 心中で死んだ人は、さらに一目惚れの連鎖も発動しない
+    // 番犬の噛殺（マイクラ版 resolveChainDeaths）: 最終盤面の番犬（酔いが覚めている・昼中に死んでいない）が、自分の飼い主に投票していたら、飼い主を噛み殺す（kind: "bite"）。
+    //   ・飼い主がすでに追放される / 昼中に死亡しているときは噛まない。噛み殺された人は道連れ・暗殺などの能力が発動しない（chain=false。恋人の心中・後追いは kill() が処理する）
+    //   ・飼い主がネコカボチャなら、噛み返されて番犬も死ぬ（kind: "bite"・by = ネコカボチャ）。結果は game.dogBites = [{ by, target, back? }]（起きた順）
+    game.dogBites = [];
+    if (ONW.watchdog) ONW.watchdog.pairs(game).forEach(([w, o]) => {
+      if ((game.votes || {})[w] !== o || gone.has(w) || done.has(o) || gone.has(o)) return;
+      if (!kill(o, w, "bite", false)) return;
+      game.dogBites.push({ by: w, target: o });
+      if (game.currentRoles[o] === R.CAT_PUMPKIN && kill(w, o, "bite", false)) game.dogBites.push({ by: o, target: w, back: true });   // ネコカボチャ: 噛まれたら噛み返す
+    });
     // 始めの心中: 追放・メンタル崩壊・ショック死・昼中の死亡など、resolveChain の前にすでに死んでいる人の相方も、ここで一緒に死ぬ
     [...game.eliminated, ...gone].forEach((id) => {
       cupidFollowers(id).forEach((h) => kill(h, id, "follow", false));   // キューピッド: 選んだ2人の一方がすでに死んでいる（追放・昼中の死亡）なら、後を追う
@@ -430,7 +474,10 @@ window.ONW = window.ONW || {};
    *   ・参照先が別のシュレディンガーの猫なら、その猫の陣営を引き継ぐ（猫同士の相互参照で堂々巡りになったら "loop" = どの陣営にもなれない）
    *   ・1票も入っていなければ "none"（どの陣営にもなれない）
    *   ・恋人（重複役職）になっている猫は恋人陣営として扱うので "lover"（この能力は働かない）
-   * 参照先は一度決めたら game.catSources[猫の持ち主ID] に覚え、勝敗判定を何度呼び直しても同じ人になる（その人がまだ投票者に入っているかぎり）。試合開始時に net.js 側で空に戻す。
+   * 保安官に撃たれた猫（game.sheriffCatFix[猫の持ち主] = 撃った保安官）は、参照先を保安官にして村人陣営に固定される（fixed: true）。
+   * 番犬に噛まれた猫（game.dogBites の target。猫が飼い主で、番犬が猫に投票して噛み殺した）は、参照先を噛んだ番犬にして、番犬の陣営に固定される（fixed: true・bitten: true。今は番犬 = 村人陣営）。
+   *   【確定メモ・今後の実装】模倣番犬・犬の狂人に噛まれた猫は人狼陣営に確定する（ONW.watchdog.biteTeam が噛んだ人の役職の陣営を返す）。【確定】一度陣営に入ることが決まった猫は、その後変わらない（保安官に撃たれて村人陣営に固定された猫は、あとで噛まれても村人陣営のまま）。
+ * 参照先は一度決めたら game.catSources[猫の持ち主ID] に覚え、勝敗判定を何度呼び直しても同じ人になる（その人がまだ投票者に入っているかぎり）。試合開始時に net.js 側で空に戻す。
    * 結果は game.catInfo[猫の持ち主ID] = { team, direct: 参照先, final: 最終的な参照先（猫をたどった先）, via: 猫を経由したか, votes: 得票数, voters: 投票した人たち } に入れる。
    * 戻り値: game.catInfo
    */
@@ -446,12 +493,16 @@ window.ONW = window.ONW || {};
       if (!vs.includes(game.catSources[id])) game.catSources[id] = ONW.utils.randomChoice(vs);   // 自分に投票した人からランダムに1人
     });
     const info = {}, done = {};
+    const bittenBy = (id) => { const b = (game.dogBites || []).find((x) => x.target === id && !x.back); return b ? b.by : null; };   // 番犬に噛み殺された猫（resolveChain が記録した game.dogBites。ネコカボチャの「噛み返し」は数えない）→ 噛んだ番犬のID
     const teamOfRole = (r) => ONW.roles.getInfo(r).team;
     const resolve = (id, trail) => {
       if (done[id]) return done[id];
       const src = game.catSources[id];
       let r;
-      if (!src) r = { team: "none", direct: null, final: null, via: false };
+      const bite = bittenBy(id);
+      if (game.sheriffCatFix && game.sheriffCatFix[id]) r = { team: "village", direct: game.sheriffCatFix[id], final: game.sheriffCatFix[id], via: false, fixed: true };   // 保安官に撃たれた猫は村人陣営に固定（投票した人の陣営より優先。恋人の猫は下で恋人陣営）
+      else if (bite) r = { team: ONW.watchdog.biteTeam(game, bite), direct: bite, final: bite, via: false, fixed: true, bitten: true };   // 番犬に噛まれた猫は、噛んだ番犬の陣営に固定（番犬 = 村人陣営。模倣番犬・犬の狂人は人狼陣営に確定する予定: docs/シュレ猫の陣営.md）。投票した人の陣営より優先
+      else if (!src) r = { team: "none", direct: null, final: null, via: false };
       else if (trail.includes(id)) r = { team: "loop", direct: src, final: null, via: true };
       else if (role(src) === R.SCHRODINGER_CAT) { const nx = resolve(src, [...trail, id]); r = { team: nx.team, direct: src, final: nx.final, via: true }; }
       else r = { team: teamOfRole(role(src)), direct: src, final: src, via: false };
@@ -519,10 +570,11 @@ window.ONW = window.ONW || {};
     const isLover = (id) => ONW.isLover(game, id);
     // タフガイのとばっちりで追放された人は、てるてる・一目惚れしてるてる・処刑人のターゲットとしての「追放」には数えない（追放されても、その勝利条件は満たさない）
     const bounced = new Set((game.toughBounces || []).flatMap((b) => b.to || []));
-    const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id));
-    const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id));
+    const bitten = (id) => (game.chainKind || {})[id] === "bite";   // 番犬に噛み殺された人: 追放ではないので、てるてる系・賞金稼ぎ・神の祝福の「追放」条件を満たさない
+    const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id));
+    const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id));
     // 賞金稼ぎ: 追放（道連れを含む）でめくれて、選んだ相手が人狼判定なら単独勝利。心中・無理心中・タフガイのとばっちりでは発動せず、恋人（重複役職）の賞金稼ぎは勝てない（マイクラ版 applyLimitedSingleWinners）
-    const bountyWinIds = (game.bountyResult || []).filter((b) => b.hit && executed.includes(b.by) && role(b.by) === R.BOUNTY_HUNTER && !byLove(b.by) && !isLover(b.by) && !bounced.has(b.by)).map((b) => b.by);
+    const bountyWinIds = (game.bountyResult || []).filter((b) => b.hit && executed.includes(b.by) && !bitten(b.by) && role(b.by) === R.BOUNTY_HUNTER && !byLove(b.by) && !isLover(b.by) && !bounced.has(b.by)).map((b) => b.by);
     const opportunists = ids.filter((id) => role(id) === R.OPPORTUNIST && !dead.has(id));
     // 恋人: 二人とも死んでいない組が勝利（死因は問わない: dead = 追放・連鎖死(道連れ/心中等)・昼中の死亡。今後死因が増えたら、dead に足すだけでここは変わらない）。勝てなかった恋人は、元の陣営が勝っても敗北（マイクラ版の恋人陣営）
     const loverSurvive = ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).map(([a, b]) => [a, b]);   // キューピッドの組は3つ目に持ち主が付く（番号付け用）。勝者に入れるのは恋人の2人だけ（キューピッド本人は下の追加勝利で判定）
@@ -545,11 +597,12 @@ window.ONW = window.ONW || {};
     const godBless = gods.filter((id) => {
       if (!executed.includes(id)) return false;
       const ck = (game.chainKind || {})[id];
-      if (ck === "lovers" || ck === "love") return false;                       // 心中・無理心中
+      if (ck === "lovers" || ck === "love" || ck === "bite") return false;       // 心中・無理心中・番犬の噛殺
       if (voted.has(id) && execAll.some(([, tg]) => tg === id)) return false;   // 処刑（処刑人のターゲットとして追放）
       return true;                                                              // 追放 / 道連れ
     });
-    const godAlive = gods.filter((id) => !executed.includes(id));
+    const shotLostIds = ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : [];   // 保安官に撃たれて死に、勝利条件を失った人（身代わりで撃たれた従者は含まない）
+    const godAlive = gods.filter((id) => !executed.includes(id) && !shotLostIds.includes(id));   // 撃たれて死んだ神は降臨しない（マイクラ版 teamVictoryBreaks.god）
     if (!godBless.length && godAlive.length) { game.godMode = "descend"; game.godIds = godAlive.slice(); }   // 生存している神は、結果発表でめくれるときに降臨の演出（どの勝敗でも）
 
     const set = (title, teams, winners, detail, winnerTeams) => {
@@ -561,6 +614,8 @@ window.ONW = window.ONW || {};
       // 王国滅亡で死んだ人（結果発表で倒れた game.kingdomIds・昼中に倒れた deadKind "queen"）と、倒れた女王は勝者から外す。
       //   メモ（docs/勝利優先度.md「王国滅亡の判定メモ」）: 本来は 無理心中した / 反転(+反転が奇数個) / 神の祝福が発動 / 羅刹の愛する人として勝利 / (+コピリスト)つき のときだけ勝てる。ここは今、例外なしで外している（例外は未実装）
       [...(game.kingdomIds || []), ...Object.keys(game.deadKind || {}).filter((id) => game.deadKind[id] === "queen"), ...(game.queenFallen || [])].forEach((id) => w.delete(id));
+      const shotCut = new Set(shotLostIds.filter((id) => w.has(id)));   // 保安官に撃たれて死んだ人は勝利条件を失う（4of6。勝利優先度の表に行は作らない）
+      shotLostIds.forEach((id) => w.delete(id));
       ids.forEach((id) => { if ((role(id) === R.FOX || role(id) === R.FANATIC) && dead.has(id)) w.delete(id); });
     ids.forEach((id) => { if (ONW.fanatic && ONW.fanatic.lostBy(game, id) && !ONW.hiddenDrunk(game, id)) w.delete(id); });   // 鍵師のロックで狂人になれなかった背徳者は勝利条件を失う（2of4b）   // 背徳者: 後追いなどで死んだ背徳者も勝利条件を失う（5of5）
       //   // 妖狐: 呪殺・追放・昼中死亡などで死んだ妖狐は勝利条件を失う（神の祝福でも勝てない。生きている妖狐は祝福で勝つ）   // 王国滅亡: 倒れた女王と、巻き込まれた村人陣営は勝利できない
@@ -641,6 +696,8 @@ window.ONW = window.ONW || {};
       shBan.forEach((id) => w.delete(id));
       if (ONW.shuffler && ONW.shuffler.addWinnerPairs && ONW.shuffler.addWinnerPairs(game, w).length && !teams.includes("シャッフラー")) teams.push("シャッフラー");
       if (shBan.size && ONW.shuffler) game.winDetail = `${game.winDetail}\n${ONW.shuffler.failText(game, [...shBan])}`;
+      shotLostIds.forEach((id) => { if (w.has(id)) shotCut.add(id); w.delete(id); });   // 追加勝利（破局師・天邪鬼・勝ち組など）でも、撃たれて死んだ人は勝てない
+      if (shotCut.size) game.winDetail = `${game.winDetail}\n${nm([...shotCut])} は保安官に撃たれたため、勝利条件を失いました。`;
       game.winnerIds = [...w];
       return game.winners;
     };

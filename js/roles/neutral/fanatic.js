@@ -4,6 +4,7 @@
  *   ・待機時間の時点で、最終盤面に妖狐も狐憑きもいない（墓地にいる・上書きで消えた）と、カードが裏返って「狂人」になる（狐憑きがいれば妖狐がいなくても狂人にならない）。
  *   ・妖狐が呪殺・追放・昼中死亡などで死ぬと、あとを追って死ぬ（カードが「後追い」にめくれる）。
  *   ・妖狐が生き残って勝利を乗っ取ったとき、いっしょに勝つ。
+ *   ・ご主人のいない背徳者が鍵師にロックされていると、狂人に変化できず発狂して死亡する（待機時間にカードが「発狂」にめくれ、昼になった瞬間に死亡。情報確認は「〇〇は狂い死にました。」）。
  *   ・最終盤面に妖狐がおらず狐憑きだけがいるときは、狂人にならず、村人陣営が勝利したら追加で勝利する（妖狐と狐憑きの両方 / 妖狐だけのときは従来どおり妖狐陣営）。
  * ※ wiki の key は FANATIC（マイクラ版の役職ID fanatic）。Web版の「狂信者」は cultist（別の役職）。
  * 実装の進み具合は _wip/背徳者_依頼文.txt を参照。
@@ -30,7 +31,7 @@
   function judge(g, id) {
     if (!g || g.currentRoles[id] !== FAN() || (g.fanaticConv || {})[id]) return false;
     if (finalFoxIds(g).length || g.players.some((q) => g.currentRoles[q.id] === ONW.ROLE.FOX_MARKED)) return false;   // 妖狐がいなくても、最終盤面に狐憑きがいれば狂人にならない（狐憑きも妖狐に見えるため）
-    if (ONW.keymaster && ONW.keymaster.locked(g, id)) { (g.fanaticLocked = g.fanaticLocked || {})[id] = true; return false; }   // 鍵師のロック: ご主人のいない背徳者がロックされていると、狂人に変化できない（背徳者のまま。投票権と勝利条件を失う）
+    if (ONW.keymaster && ONW.keymaster.locked(g, id)) { (g.fanaticLocked = g.fanaticLocked || {})[id] = true; return false; }   // 鍵師のロック: ご主人のいない背徳者がロックされていると、狂人に変化できず、発狂して死亡する（待機時間にカードが「発狂」にめくれ、昼になった瞬間に死亡 = 昼中死亡。madPending）
     g.fanaticConv = g.fanaticConv || {};
     g.fanaticConv[id] = true;
     g.currentRoles[id] = ONW.ROLE.MADMAN;
@@ -38,7 +39,7 @@
   }
   /** ロックされて狂人になれなかった背徳者（投票権と勝利条件を失っている席）。いまも背徳者を持っている席だけ */
   const lostBy = (g, id) => !!((g && g.fanaticLocked) || {})[id] && g.currentRoles[id] === FAN();
-  const LOCK_TEXT = "ご主人のいない背徳者は、役職がロックされていたため狂人に変化できず、勝利条件と投票権を失いました。";
+  const LOCK_TEXT = "ご主人のいない背徳者は、役職がロックされていたため狂人に変化できず、発狂して死亡しました。";   // 本人にだけ届く説明。全員の情報確認には「〇〇は狂い死にました。」が載る（net.js killPlayer）
   /** 妖狐が死んだとき後を追う背徳者の席（最終盤面。酔いが覚めていない背徳者は、覚めたときに扱う 5of5） */
   const followersOf = (g) => g.players.filter((q) => g.currentRoles[q.id] === FAN() && !ONW.hiddenDrunk(g, q.id)).map((q) => q.id);
   const CONV_TEXT = "妖狐がいなかったため、背徳者から狂人になりました。";
@@ -72,7 +73,26 @@
       ids.forEach((id) => ONW.net.killPlayer(id, nm(g, by), "fanatic"));
     }, (delay || 0) + 3200);
   }
-  ONW.fanatic = { initialFoxIds, finalFoxIds, followersOf, judge, nm, CONV_TEXT, LOCK_TEXT, lostBy, partners, foxMarkedOnly, villageWinners, lateFollow };
+  /** 発狂（鍵師のロックで狂人になれなかった背徳者）の演出つき連鎖: [{ id, label: "発狂", depth: 0 }, ...連鎖で死ぬ人(心中・従者・キューピッドの後追い)]。待機時間・昼のうちで共通 */
+  const madChainOf = (g, ids) => [...ids.map((id) => ({ id, label: "発狂", depth: 0 })), ...ONW.fox.chainView(g, ids, "mad")];
+  /** 昼のうちの発狂（酔いが覚めた背徳者がロックされていたとき）: 本人のカードが背徳者とめくれ終わってから（delay ms）全員の画面で「発狂」にめくれて灰色になり、死亡する。何度呼んでも二重にならない */
+  function lateMad(c, delay) {
+    const g = c.g;
+    if (g.phase !== ONW.PHASE.ONLINE_DAY) return;
+    const dead = new Set(g.deadIds || []);
+    g.madLate = g.madLate || [];
+    const ids = g.players.map((q) => q.id).filter((id) => lostBy(g, id) && !ONW.hiddenDrunk(g, id) && !dead.has(id) && !g.madLate.includes(id) && !(g.madPending || []).includes(id));
+    if (!ids.length) return;
+    g.madLate.push(...ids);
+    const m = { t: "fanfollow", chain: madChainOf(g, ids), delay: delay || 0 };
+    c.sendAll(m); c.sendSpec(m);
+    setTimeout(() => {   // 演出（めくれ → 灰色）が終わってから死亡にする（killPlayer が心中・従者・キューピッドの連鎖まで面倒を見る）
+      const cur = ONW.game;
+      if (!cur || cur !== g || ![ONW.PHASE.ONLINE_DAY, ONW.PHASE.ONLINE_VOTE].includes(g.phase)) return;
+      ids.forEach((id) => ONW.net.killPlayer(id, null, "mad"));
+    }, (delay || 0) + 3200);
+  }
+  ONW.fanatic = { madChainOf, lateMad, initialFoxIds, finalFoxIds, followersOf, judge, nm, CONV_TEXT, LOCK_TEXT, lostBy, partners, foxMarkedOnly, villageWinners, lateFollow };
 
   const cpuLearn = (g, id, k) => initialFoxIds(g, id).forEach((fid) => { k.infoOf(g, id).known[fid] = "fox"; });   // CPU: 妖狐（ご主人）を知っている
 
@@ -100,7 +120,7 @@
     cpuInit: cpuLearn, cpuLearn,
     cpuClaim(k, g, p, r, i, c) { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; },
     info: { deck: 61, name: "背徳者", team: ONW.TEAM.THIRD, wakeOrder: 21, sort: 36.9,
-      desc: "第三陣営。夜に妖狐の気配（妖狐のカードに🦊）が見えます。待機時間の時点で妖狐がいない（墓地にいる・役職が上書きで消えた）と、カードが裏返って狂人になります。妖狐が死ぬとあとを追って死にます。妖狐が生き残って勝利を乗っ取ったとき、いっしょに勝利します。ご主人が狐憑きだけ（妖狐がいない）のときは、狂人にならず、妖狐陣営ではなく、村人陣営が勝利したら追加で勝利します。" },
+      desc: "第三陣営。夜に妖狐の気配（妖狐のカードに🦊）が見えます。待機時間の時点で妖狐がいない（墓地にいる・役職が上書きで消えた）と、カードが裏返って狂人になります。妖狐が死ぬとあとを追って死にます。ご主人がいないのに鍵師にロックされて狂人になれなかったときは、発狂して死亡します。妖狐が生き残って勝利を乗っ取ったとき、いっしょに勝利します。ご主人が狐憑きだけ（妖狐がいない）のときは、狂人にならず、妖狐陣営ではなく、村人陣営が勝利したら追加で勝利します。" },
     // ---- 2of5: 待機時間の狂人化 ----
     /** 待機時間(朝のあと): 酔っていない背徳者は、最終盤面に妖狐がいなければ狂人になる。ほかの待機時間の判定より先に、最終盤面を確定させる。CPUはここで狂人としての情報を知る */
     settlePre: { order: 5, run(c) {
@@ -112,27 +132,44 @@
         i.known[p.id] = ONW.shownRole(g.currentRoles[p.id]);
         ONW.cpu.learnInfo(g, p.id, g.currentRoles[p.id]);
       });
+      // 鍵師のロックで狂人になれなかった背徳者（酔いが覚めている人）: 発狂して死亡する。待機時間にカードが「発狂」にめくれ、昼になった瞬間に死亡（dayCurse）
+      g.madPending = g.players.map((q) => q.id).filter((id) => lostBy(g, id) && !ONW.hiddenDrunk(g, id) && !(g.deadIds || []).includes(id));
+      g.madSettleIds = g.madPending.slice(); g.madLate = [];
+      g.madChainSettle = g.madSettleIds.length ? madChainOf(g, g.madSettleIds) : [];
     } },
     /** 本人の画面へ: 自分のカードが裏返って「狂人」（後覚者の最終役職と同じ insom の表示）と、文章。再入室でも同じものを送る */
     settleMsg: { order: 12, run(c, p) {
       const g = c.g;
-      if (!p.isCpu && lostBy(g, p.id) && !ONW.hiddenDrunk(g, p.id)) return { logs: [LOCK_TEXT], keylock: [p.id] };   // ロックで狂人になれなかった本人へ（他の人には知らせない）
-      if (p.isCpu || !(g.fanaticConv || {})[p.id] || ONW.hiddenDrunk(g, p.id) || g.currentRoles[p.id] !== ONW.ROLE.MADMAN) return {};
-      return { logs: [CONV_TEXT], insom: ONW.shownRole(g.currentRoles[p.id]) };
+      const mad = (g.madChainSettle || []).length ? { mad: g.madChainSettle.slice() } : {};   // 全員の画面で、発狂する席のカードが「発狂」にめくれて灰色になる（連鎖で死ぬ人も続けてめくれる）
+      if (!p.isCpu && lostBy(g, p.id) && !ONW.hiddenDrunk(g, p.id)) return { logs: [LOCK_TEXT], ...mad };   // ロックで狂人になれなかった本人へは説明の文章も
+      if (p.isCpu || !(g.fanaticConv || {})[p.id] || ONW.hiddenDrunk(g, p.id) || g.currentRoles[p.id] !== ONW.ROLE.MADMAN) return mad;
+      return { logs: [CONV_TEXT], insom: ONW.shownRole(g.currentRoles[p.id]), ...mad };
     } },
-    /** 待機時間の演出（鍵師）: ロックで狂人になれなかった背徳者の本人の画面で、自分のカードが🔒に弾かれる（他の人には出さない） */
-    stageSettle: { field: "settleKeyLock", shown: "settleKeyLockShown", run: { order: 46, run(ids, SK) {
-      SK.later(() => ids.forEach((id) => {
-        const k = `p:${id}`; SK.show(k, SK.KEYLOCK_MARK, true);
-        SK.later(() => { const el = SK.$t(), card = el && el.querySelector(`[data-k="${k}"] .tb-card`); if (card && card.animate) card.animate([{ transform: "translateX(0)" }, { transform: "translateX(-9px) rotate(-4deg)" }, { transform: "translateX(9px) rotate(4deg)" }, { transform: "translateX(-6px) rotate(-2deg)" }, { transform: "translateX(0)" }], { duration: 520, easing: "ease-in-out" }); }, 650);
-      }), 900);
+    /** 待機時間の演出（発狂）: 鍵師のロックで狂人になれなかった背徳者のカードが、全員の画面で「発狂」にめくれて灰色になる（連鎖で死ぬ人は同じ深さごとに続けてめくれる） */
+    //   失敗する背徳者本人の画面だけは、先に鍵の失敗演出（カードが🔒に弾かれて揺れる）→ そのあと一度裏返ってから「発狂」にめくれる。ほかの人は「発狂」にめくれるだけ
+    stageSettle: { field: "settleMad", shown: "settleMadShown", run: { order: 46, run(chain, SK) {
+      const me = ONW.net.myId(), mine = chain.some((e) => e.id === me && e.depth === 0);
+      let base = 900;
+      if (mine) {
+        const k = `p:${me}`;
+        SK.later(() => SK.show(k, SK.KEYLOCK_MARK, true), 900);   // 🔒の面でめくれる
+        SK.later(() => { const el = SK.$t(), card = el && el.querySelector(`[data-k="${k}"] .tb-card`); if (card && card.animate) card.animate([{ transform: "translateX(0)" }, { transform: "translateX(-9px) rotate(-4deg)" }, { transform: "translateX(9px) rotate(4deg)" }, { transform: "translateX(-6px) rotate(-2deg)" }, { transform: "translateX(0)" }], { duration: 520, easing: "ease-in-out" }); }, 1550);   // 🔒に弾かれて揺れる
+        base = 3200;   // 失敗演出が終わってから「発狂」へ（flipUp が、🔒の面をいったん裏返してからめくり直す）
+      }
+      ONW.fox.playChain(chain, base, SK);
     } } },
+    /** 昼になった瞬間に発狂した背徳者を死亡させる（昼中死亡 → 霊界チャット・心中などの連鎖）。net.js の toDay から呼ばれる */
+    dayCurse(c) {
+      const g = c.g, ids = (g.madPending || []).slice();
+      g.madPending = [];
+      ids.forEach((id) => { if (!(g.deadIds || []).includes(id)) ONW.net.killPlayer(id, null, "mad"); });
+    },
     /** 酔いが覚める直前: 覚める背徳者の判定（その時点の盤面。覚めた本人には soberExtra で「狂人になった」と知らせ、役職は最終役職の狂人で届く） */
     soberJudge: { order: 5, run(c, ids) { ids.forEach((id) => judge(c.g, id)); } },
     soberExtra(c, id) { return (c.g.fanaticConv || {})[id] ? { lines: [CONV_TEXT] } : lostBy(c.g, id) ? { lines: [LOCK_TEXT] } : {}; },
     // ---- 5of5: 昼のうちの後追い ----
     /** 酔いが覚めた背徳者: 妖狐がもう死んでいれば、本人のカードが背徳者とめくれ終わってから（約4秒後）全員の画面で「後追い」 */
-    daySober(c) { lateFollow(c, 4000); },
+    daySober(c) { lateFollow(c, 4000); lateMad(c, 4000); },
     /** 昼に役職が動いて背徳者になった人（妖狐がすでに死んでいるとき）もすぐ後追い */
     dayCheck(c) { lateFollow(c, 300); },
     // 昼の後追い演出(fanfollow): 「後追い」の面に裏返って灰色になる。連鎖で死ぬ人（心中・キューピッドの後追い）は同じ深さごとに続けてめくれる

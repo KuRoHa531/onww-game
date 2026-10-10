@@ -36,7 +36,113 @@
     n.nn(rid);
   }
 
+
+  // ================================================================
+  //  昼の再就職（マイクラ版 main.js の canFreeterRejobDuringDay / フリーター再就職 を参考）
+  //   ・就職先が昼中に死亡（呪殺・後追い・心中・デバッグの死亡など = g.deadIds / 呪殺済み g.foxCursed）したら、
+  //     フリーターは「昼能力」で、生きている自分以外の1人へ再就職できる。
+  //   ・使えるのは、最終盤面でフリーターを持っていて（酔いは覚めている）・生きていて・昼のタイマーが動いている間だけ。
+  //   ・再就職すると、新しい就職先が死ぬまでは使えない（就職先が死ぬたびに何回でも再就職できる）。
+  //   ・就職先は「役職の持ち主」に記録されている(freeterTargets)ので、役職が動いてもついていく。履歴(freeterHist)も同じ。
+  //  このファイルのここは「状態と判定」。通信・画面は net.js / ui.js / stage.js 側(ステップ2〜)。
+  // ================================================================
+  const R_ = () => ONW.ROLE;
+  const dead = (g, id) => (g.deadIds || []).includes(id) || (g.foxCursed || []).includes(id);
+  /** この人(役職の持ち主)の現在の就職先ID（なければ null） */
+  function jobOf(g, id) { return ONW.getRoleBound(g, "freeterTargets", id) || null; }
+  /** 就職先が昼中に死亡しているか */
+  function jobDead(g, id) { const t = jobOf(g, id); return !!t && dead(g, t); }
+  /** 就職してきた順の就職先の履歴 [最初の就職先, 1回目の再就職先, ...]。記録がなければ今の就職先だけ */
+  function history(g, id) {
+    const h = ONW.getRoleBound(g, "freeterHist", id);
+    if (Array.isArray(h) && h.length) return h.slice();
+    const t = jobOf(g, id);
+    return t ? [t] : [];
+  }
+  /** 昼の再就職を使えるか（酔いが覚めたあとのフリーター・生きている・就職先が死亡・昼の議論中でタイマーが動いている） */
+  function canRejob(g, id) {
+    if (!g || g.dictator || g.allDeadSkip) return false;
+    if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞などの紙が出ている間）は使えない
+    if (!g.currentRoles || g.currentRoles[id] !== R_().FREETER) return false;
+    if (ONW.hiddenDrunk(g, id) || dead(g, id)) return false;
+    if (!jobDead(g, id)) return false;
+    return targets(g, id).length > 0;
+  }
+  /** 再就職できる相手（生きている自分以外） */
+  function targets(g, id) {
+    return (g.players || []).map((p) => p.id).filter((x) => x !== id && !dead(g, x));
+  }
+  /**
+   * 再就職を記録する（通信・画面は呼び出し側）。就職先を新しい人に付け替え、履歴に積む。
+   * 戻り値: { target, role(新しい就職先の最終役職), prev(死亡した前の就職先), n(再就職の通算回数) }
+   * 夜の就職は「初期役職」がわかるが、昼の再就職は「最終役職」(いまのカード)がわかる。
+   */
+  function rejob(g, id, target) {
+    const prev = jobOf(g, id), hist = history(g, id);
+    hist.push(target);
+    ONW.setRoleBound(g, "freeterTargets", id, target);
+    ONW.setRoleBound(g, "freeterHist", id, hist);
+    return { target, role: g.currentRoles[target], prev, n: hist.length - 1 };
+  }
+  /** 「就職先が死亡した」ことの本人への通知文（画面には出さない。情報確認用に記録だけ残る） */
+  const cutText = (name) => `あなたの就職先の ${name} が死亡しました。昼能力で、生きている人へ再就職できます。`;
+  /** 昼中に deadId が死亡した: その人に就職しているフリーター（酔いが覚めていて生きている人）に知らせる。何度呼んでも同じ死亡の通知は1回だけ */
+  function noticeCut(c) {
+    const g = c.g;
+    g.freeterCutSeen = g.freeterCutSeen || {};
+    g.players.forEach((p) => {
+      if (g.currentRoles[p.id] !== R_().FREETER || ONW.hiddenDrunk(g, p.id) || dead(g, p.id)) return;
+      const job = jobOf(g, p.id);
+      if (!job || !dead(g, job)) return;
+      const key = `${p.id}:${job}`;
+      if (g.freeterCutSeen[key]) return;
+      g.freeterCutSeen[key] = true;
+      if (p.isCpu) cpuRejob(c, p.id); else c.send(p.id, { t: "jobcut", text: cutText(c.nameOf(job)) });
+    });
+  }
+  /** CPUのフリーター: 就職先の死亡を知ったら、少し間をおいて（人間が選ぶ時間のつもり）生きている人から1人を選んで再就職する。人間と同じ検証（canRejob・targets）を通す */
+  function cpuRejob(c, id) {
+    if (!ONW.CPU_AUTO_DAY.freeter) return;   // 基本、CPUは昼能力を勝手に使わない: ホストがデバッグの「昼能力」タブでリアルタイムに発動する（ONW.net.debugDayAbility）
+    const run = () => {
+      const g = c.g;
+      if (!canRejob(g, id)) return;   // その間に昼が終わった・就職先が決まった・酔った などは何もしない
+      const ts = targets(g, id); if (!ts.length) return;
+      applyRejob(c, id, ts[Math.floor(Math.random() * ts.length)]);
+      if (c.sendSpecInfo) c.sendSpecInfo();
+    };
+    if (ONW.freeter.cpuRejobNow) run(); else setTimeout(run, 1500 + Math.random() * 3500);
+  }
+  /**
+   * 再就職の確定（ホストが検証したあとに呼ぶ。c = net.js の RC()）。
+   *   ・就職先と履歴を更新（rejob）→ 夜行動ログ(全体ログ)に残す
+   *   ・本人(人間): 新しい就職先のカードが数秒だけ表になり（jobday の items）、「最終役職は○○でした」が出る（夜の就職と違い、初期役職ではなく最終役職）
+   *   ・新しい就職先: 人間なら「あなたのところにフリーターの○○が就職しました」＋フリーターのカードが表になる(jobday) / CPUなら就職してきた人を知る
+   *     （酔いが覚めていない就職先には出さない。覚めたあとの待機時間の通知と同じ扱い）
+   *   ・公開チャットには流さない（誰がフリーターかが全員に漏れるため）。結果発表の「フリーター情報」はステップ4
+   * 戻り値は rejob と同じ { target, role, prev, n }
+   */
+  function applyRejob(c, id, target) {
+    const g = c.g, r = rejob(g, id, target), me = c.byId(id), tp = c.byId(target);
+    const nm = c.nameOf;
+    (g.dayLogsAll = g.dayLogsAll || []).push(`${c.rn("freeter")} ${me.name} は ${nm(r.prev)} の死亡により、${c.rn(r.role)} の ${tp.name} に再就職しました（${r.n}回目の再就職）。`);
+    if (!me.isCpu) {
+      const text = `${tp.name} の最終役職は「${c.rn(r.role)}」でした。${tp.name} に再就職しました（${r.n}回目の再就職）。新しい就職先が勝利すると、あなたも追加で勝利します。`;
+      c.hold(id, text);
+      c.send(id, { t: "jobday", id: target, text, role: r.role, items: [{ id: target, role: r.role }] });
+    }
+    if (!ONW.hiddenDrunk(g, target)) {
+      if (!tp.isCpu) { const text = logs(g, [id])[0]; c.hold(target, text); c.send(target, { t: "jobday", id, text, role: ONW.shownRole(g.currentRoles[id]) }); }
+      else if (ONW.cpu && ONW.cpu.noticeEmployers) ONW.cpu.noticeEmployers(g, target, [id]);
+    }
+    return r;
+  }
+  ONW.freeter = { cpuRejob, cpuRejobNow: false, jobOf, jobDead, history, canRejob, targets, rejob, applyRejob, noticeCut, cutText };
+
   ONW.defineRole("freeter", {
+    // 昼中に誰かが死亡したとき(net.js killPlayer が呼ぶ): その人に就職しているフリーターへ「再就職できる」と知らせる
+    dayDeath: { order: 30, run(c) { noticeCut(c); } },
+    // 酔いが覚めたとき: 酔っている間に就職先が死亡していたら、いま知らされる（人間は昼能力で再就職できる / CPUは自動で再就職）
+    daySober: { order: 30, run(c) { noticeCut(c); } },
     // 朝の待機時間(stage.js が g.settleFreeters を受け取って呼ぶ): 就職先になった人の画面で、就職してきたフリーターのカードが表になる（就職先本人だけ。昼になったら札を外して伏せる）
     stageSettle: { field: "settleFreeters", shown: "settleFreeterShown", run: { order: 30, run(ids, SK) { SK.later(() => { ids.forEach((id) => { SK.show(`p:${id}`, "freeter"); }); SK.paint(SK.G()); }, 900); } } },
     // 昼にフリーターが就職してきた就職先: そのときのフリーターのカードが表になり、数秒後に閉じる(酔い覚めの演出より先に始める)
@@ -82,7 +188,7 @@
     },
     cpuNight: { order: 30, stage: "seer", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     info: { deck: 34, name: "フリーター", team: ONW.TEAM.THIRD, wakeOrder: 6, sort: 37,
-      desc: "第三陣営。夜に1人を選んで就職し、その人の初期役職がわかります。就職先が勝利したら自分も追加で勝利します（役職が入れ替わっても、就職先はカードについていきます）。朝のあとの待機時間に、あなたに就職したフリーターのカードが表になります。" },
+      desc: "第三陣営。夜に1人を選んで就職し、その人の初期役職がわかります。就職先が勝利したら自分も追加で勝利します（役職が入れ替わっても、就職先はカードについていきます）。昼の議論中に就職先が死亡したら、昼能力ボタンから生きている人へ再就職でき（新しい就職先が死亡するたびに何度でも）、新しい就職先の最終役職（そのときのカード）がわかります。勝敗は最後の就職先で決まります。朝のあとの待機時間に、あなたに就職したフリーターのカードが表になります。" },
     groups: { "transform:silver_shadow": 6 },
     night: {
       kind: "seer", order: 30,   // 占い師と同じ段階（占い → 一目惚れ → 就職 → 訪問）

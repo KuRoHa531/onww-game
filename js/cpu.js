@@ -341,7 +341,7 @@ window.ONW = window.ONW || {};
       // 酔っ払い: 覚めるまでは「酔っ払いCO」だけ。覚めたあとは最終的な役職として振る舞う
       const i = infoOf(g, p.id);
       let r = hid ? "drunk" : ONW.shownRole(g.currentRoles[p.id] !== undefined && od ? g.currentRoles[p.id] : g.initialRoles[p.id]);   // 忘却の人狼のCPUは自分を村人だと思っている
-      if (!hid && i.shuffledTo) r = i.shuffledTo;   // シャッフラーに役職を変えられた（自分に置いた）CPUは、知っている新しい役職として振る舞う（shuffler.js の cpuNotice / cpuRun）
+      if (!hid && i.shuffledTo) r = i.shuffledTo;   // 自分に置いたCPUシャッフラーだけは、自分で見た新しい役職として振る舞う（shuffler.js の cpuRun）。他人に役職を変えられたCPUは通知されないので、元の役職のつもりのまま（マイクラ版 selfPerceivedRole と同じ）
       const others = g.players.filter((q) => q.id !== p.id);
       const c = { co: null, result: null, extra: null };   // extra: 結果開示のあとに続けて言う2つ目の結果
       if (hid) { plan.push({ p, text: `${rn("drunk")}CO`, co: "drunk", claim: { kind: "villager" }, gap: 3500 }); return; }
@@ -444,6 +444,8 @@ window.ONW = window.ONW || {};
         else if (AVOID_RESULT.includes(c.role) || ONW.roles.getInfo(c.role).team === "village") s -= 100;
       }
     });
+    // 番犬COの飼い主: 票が無効になる(追放されない)ので、あまり狙わない。自分が番犬COのときの自分の報告は別(cpuVoteExclude)
+    claims.filter((c) => c.kind === "watchdog" && c.target === q.id && c.from !== p.id).forEach(() => { s -= wolfSide ? 0.2 : 0.9; });
     // 人狼を奪ったと名乗る怪盗系（本家に近い読み）
     if (!wolfSide) claims.forEach((c) => { if ((c.kind === "robber" || c.kind === "relic" || c.kind === "insomniac" || c.kind === "doppel") && WOLF_LIKE().includes(c.role) && c.from === q.id && c.from !== p.id) s += 3; });
     // 「人狼をコピーした」と名乗るドッペルゲンガーが選んだ相手も、初期役職は人狼（本当のことを言っているなら）
@@ -457,6 +459,8 @@ window.ONW = window.ONW || {};
       s += 0.6;
       if (ally) s += 1.2;
     });
+    // 投票者の役職によらない加点（保安官COと「撃ちました」の申告・撃たれて執行された人の占い結果は嘘 など）。各役職ファイルの cpuVoteSee
+    ONW.roleHooks("cpuVoteSee").forEach((h) => { s += h.fn(cpu.kit, g, p, q, i, me, wolfSide) || 0; });
     // 役職ごとの加点（てるてる系・処刑人・従者）。各役職ファイルの cpuVoteScore
     const hv = ONW.roleHook(me, "cpuVoteScore");
     if (hv) s += hv(cpu.kit, g, p, q, i, me);

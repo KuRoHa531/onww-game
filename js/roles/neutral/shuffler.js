@@ -12,7 +12,7 @@
  *   ・夜の能力なので新聞に載る（ONW.newsNote）。墓荒らし・ドッペルで手にした場合は朝のうちに選べる（morning）。
  *   ・夜の能力は「夜に配られた役職の持ち主(人間)」が使う。そのときカードが怪盗などで別の人に移っていても、記録は「いまそのカードを持っている人」に書く（ONW.shuffler.holderOf）。
  * 実装の進み具合は _wip/シャッフラー_依頼文.txt を参照。
- *  1of4: 登録・夜の選択(自分も可)・山札から引いて上に置く確定ロジック・役職移動への追従・ルールコード・処理順メモ【済】 / 2of4: 朝の演出(山札→めくる→カードの上に置く)・選ばれた人の通知と演出(待機時間)・情報確認・再入室・結果画面の「(+シャッフラー)」【済】 / 3of4: 酔い(覚めたあと)・昼のうち(昼に選ぶ演出と、選ばれた人への通知)・陣営の乗っ取りと勝敗(失敗条件)【済】 / 4of4: CPU(選ばれたときの認識・発言/CO・投票判断)・COボタンの結果開示・闇鍋シナジー(後覚者)・wiki・総合テスト【済】
+ *  1of4: 登録・夜の選択(自分も可)・山札から引いて上に置く確定ロジック・役職移動への追従・ルールコード・処理順メモ【済】 / 2of4: 朝の演出(山札→めくる→カードの上に置く)・情報確認・再入室・結果画面の「(+シャッフラー)」【済。選ばれた人への通知と演出(待機時間)は、マイクラ版に合わせて廃止】 / 3of4: 酔い(覚めたあと)・昼のうち(昼に選ぶ演出)・陣営の乗っ取りと勝敗(失敗条件)【済。選ばれた人への通知は廃止】 / 4of4: CPU(発言/CO・投票判断。選ばれたときの認識は廃止＝元の役職のつもりのまま)・COボタンの結果開示・闇鍋シナジー(後覚者)・wiki・総合テスト【済】
  */
 (function (ONW) {
   const R_ = () => ONW.ROLE.SHUFFLER;
@@ -27,7 +27,7 @@
     "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman",
     "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler",
     "assassin", "merlin", "mason", "cultist",
-    "muzzle_madman",
+    "muzzle_madman", "watchdog",
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
   function pool() {
@@ -73,16 +73,6 @@
     return segs;
   }
   const rnOf = (r) => ONW.roles.getInfo(r).name;
-  /** 選ばれた人 th に出す通知（置かれた時点の持ち主 mark.to が、いまもそのカードを持っているときだけ。自分に置いた本人・入れ替わって別の人の手に渡ったカードには出さない）。なければ null。
-   *  from は置かれる前の役職（酔っていた期間に置かれた分も mark.from を使う）。 */
-  function notice(g, th) {
-    const hit = picks(g).find((x) => x[1] === th && !x[3]); if (!hit) return null;
-    const e = (g.shufflerMarks || {})[ONW.cardAt(g, th)];
-    if (!e || e.to !== th) return null;
-    const B = ONW.shownRole(hit[2]);
-    return { from: e.from || null, role: B, text: e.from ? `あなたは ${rnOf(ONW.shownRole(e.from))} から ${rnOf(B)}(+シャッフラー) になりました。` : `あなたは ${rnOf(B)}(+シャッフラー) になりました。` };
-  }
-
   // ---- 勝敗（マイクラ版 vote.js の shufflerFailsByDeathRule / enforceShufflerFailureRules / 乗っ取り勝利 を、Web版のカード単位の印(picks)に当てはめたもの）----
   //  ・失敗条件: 追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる・賞金稼ぎ）以外に変化させたのに、変化させた対象が死亡したら、シャッフラー陣営（シャッフラーと対象）は勝てない。
   //    村人陣営・人狼陣営の役職に変化させた場合は、シャッフラー本人が死亡しても失敗。自分に変化させた場合は、自分が変化後の役職として死亡すれば失敗。
@@ -143,7 +133,7 @@
   }
   function failText(g, ban) { return ban.length ? `シャッフラーの陣営の ${ban.map((id) => nm(g, id)).join("、")} は、死亡条件を満たせず勝利できませんでした。` : ""; }
 
-  ONW.shuffler = { BLOCKED, pool, draw, holderOf, holderOfCard, picks, picksOf, shuffle, tagSegs, notice, failed, takeover, addWinnerPairs, takeoverText, failText };
+  ONW.shuffler = { BLOCKED, pool, draw, holderOf, holderOfCard, picks, picksOf, shuffle, tagSegs, failed, takeover, addWinnerPairs, takeoverText, failText };
 
   // ---- CPUの夜の行動: 自分を含む1人をランダムに選ぶ（デバッグの指定があればそれ。自分も指定できる） ----
   function cpuRun(n, p, label, cur, rid) {
@@ -166,14 +156,6 @@
     n.ob(p.id, [t]);
     n.nn(rid);
   }
-  /** CPUが選ばれたことを知る（人間の「あなたは A から B(+シャッフラー) になりました。」と同じ。知るのは新しい役職だけ。仲間の人狼やターゲットなど、役職ごとの情報は人間にも知らされないのでCPUも知らない）。
-   *  待機時間(settlePre)・昼に使われた(dayNotify / dayCheck)・酔いが覚めたとき(cpu.sober は最終役職を知る)で呼ばれる。発言・投票は cpu.js の plan / selfRole が i.shuffledTo / i.known[自分] を見る */
-  function cpuNotice(g, id, role, k) {
-    g.cpuInfo = g.cpuInfo || {};
-    const i = k.infoOf(g, id), shown = ONW.shownRole(role);
-    i.shuffledTo = shown; i.known[id] = shown;
-    i.mode = null; i.target = null; i.shuffle = null;   // 元の役職の夜の行動の記録は、もう自分の役職のものではない
-  }
   /** CPUのシャッフラーの発言: 本家「COのみ」ルールで35%（CPUごとに1回だけ抽選）は本当にCO（「〇〇 を △△ に変化させました。」）、残りは騙り。選んだ結果を知らない（怪盗で奪った等）ときは本当のCOはしない。
    *  自分に置いたCPUは、もうその役職なので cpu.js の plan が置いた役職として振る舞う（このフックは呼ばれない） */
   function cpuClaim(k, g, p, r, i, c) {   // 第三陣営の役職は名乗らない: 必ず他の村役職を騙る（本当のCOはしない）
@@ -188,7 +170,7 @@
 
   ONW.defineRole("shuffler", {
     info: { deck: 58, name: "シャッフラー", team: ONW.TEAM.THIRD, wakeOrder: 55, sort: 40.5,
-      desc: "第三陣営。夜に自分を含むプレイヤーを1人選びます。朝に山札から1枚引いてめくり、選んだ人のカードの上に置きます（その人の役職が、引いたカードの役職に変わります）。引いた役職はあなたに分かります。山札には、変化役・夜に誰かを選ぶ役職・マーリン・アサシン・共有者・狂信者などは入っていません。変化させられた人には「あなたは A から B(+シャッフラー) になりました。」と知らされます。自分を変化させたときは変化後の役職として勝利すれば単独勝利、他人を変化させたときは変化させた人が変化後の役職として勝利すれば、シャッフラーと一緒に乗っ取り勝利です。ただし、追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）以外に変化させたのに対象が死亡すると失敗、村人陣営・人狼陣営の役職に変化させたときはシャッフラー本人が死亡しても失敗です。（処理順: 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子）" },
+      desc: "第三陣営。夜に自分を含むプレイヤーを1人選びます。朝に山札から1枚引いてめくり、選んだ人のカードの上に置きます（その人の役職が、引いたカードの役職に変わります）。引いた役職はあなたに分かります。山札には、変化役・夜に誰かを選ぶ役職・マーリン・アサシン・共有者・狂信者などは入っていません。変化させられた人には知らされません（本人は元の役職のつもりのままです）。自分を変化させたときは変化後の役職として勝利すれば単独勝利、他人を変化させたときは変化させた人が変化後の役職として勝利すれば、シャッフラーと一緒に乗っ取り勝利です。ただし、追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）以外に変化させたのに対象が死亡すると失敗、村人陣営・人狼陣営の役職に変化させたときはシャッフラー本人が死亡しても失敗です。（処理順: 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子）" },
     groups: { "transform:silver_shadow": 18 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）
     uiNight: {
       action(X) {
@@ -200,7 +182,7 @@
     },
     stagePick: { self: true },   // 夜(と朝の連鎖)にカードを押して行動する: プレイヤー1人（自分も選べる）
     cpuNight: { order: 90, stage: "shuffler", chain: true, run: cpuRun },
-    cpuClaim, cpuVoteScore, cpuNotice,
+    cpuClaim, cpuVoteScore,
     // 結果開示(COボタン)の流れ(co.js が kind で引く): 変化させた相手(自分も選べる)を選ぶ → 山札から引いて置いた役職を選ぶ（マイクラ版の「〇〇を△△に変化させました」）
     coResult: {
       kind: "shuffler", targetLabel: "カードの上に置いた相手", roleHint: "のカードの上に置いた（山札から引いた）役職", self: true,
@@ -240,16 +222,6 @@
         const lines = [`${c.nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`];
         return { lines, reveal: { kind: "shuffler", target: t, role: ONW.shownRole(r.role) }, nextChain: null };
       },
-      /** 昼に使った（酔いが覚めてから使う・昼の連鎖）: 選ばれた人（人間・酔いが覚めている）の画面でも、その場で自分のカードが新しい役職で数秒だけ表になり、「あなたは A から B(+シャッフラー) になりました。」が出る（jobday）。
-       *  自分に置いたとき・まだ酔っている人（覚めたとき soberExtra で出す）には出さない。CPUは新しい役職を知るだけ。 */
-      dayNotify(c) {
-        const g = c.g, t = c.players[0]; if (!t || t === c.id) return;
-        const tp = c.byId(t); if (!tp || ONW.hiddenDrunk(g, t)) return;
-        const n = notice(g, t); if (!n) return;
-        (g.shufflerTold = g.shufflerTold || {})[t] = true;
-        if (tp.isCpu) { cpuNotice(g, t, g.currentRoles[t], ONW.cpu.kit); return; }   // CPUは新しい役職を知るだけ
-        c.hold(t, n.text); c.send(t, { t: "jobday", id: t, text: n.text, role: n.role });
-      },
     },
     // ---- 朝の演出（stage.js の playMorning / morningDur が reveal.kind === "shuffler" のときに呼ぶ。シャッフラー本人の画面）----
     // テーブル中央の山札の一番上のカードが浮く → その場でめくれて引いた役職が見える → 選んだ人のカードの上へ飛んで重なる → 選んだ人のカードが引いた役職で表になる（朝のあいだ表のまま）。
@@ -283,60 +255,9 @@
         later(hide, LIFT + FLIP + FLY + LAND + HOLD - 200);                       // ⑥ 少し見せたあと、置いたカードが裏面に戻る                    // ⑤ 重ねたカードを片づける（下のカードがすでに同じ役職で表になっている）
       },
     },
-    // ---- 選ばれた人の目線（待機時間 = 朝のあと）----
-    // 山札から置かれたカードをいま持っている人(人間)の画面で、自分のカードが新しい役職でめくれて光る（昼になったら伏せる）。「あなたは A から B(+シャッフラー) になりました。」が情報確認に載る。
-    //   ・自分に置いたシャッフラー本人には出さない（自分の朝の演出で知っている）。置かれたカードが怪盗などで別の人の手に渡っていたら、渡った先の人には出さない（入れ替わりは知らされない）。
-    //   ・酔っ払い（未覚醒）の人にはここでは出さない（酔いが覚めたとき = 3of4）。CPUは画面がないので、新しい役職を知るだけ（cpuNotice）。
-    settlePre: { order: 19, run(c) {
-      const g = c.g, set = (g.shufflerSettle = {});
-      picks(g).forEach(([sh, th, role, self]) => {
-        if (self) return;
-        const e = (g.shufflerMarks || {})[ONW.cardAt(g, th)];
-        if (!e || e.to !== th || ONW.hiddenDrunk(g, th)) return;
-        const q = g.players.find((x) => x.id === th); if (!q) return;
-        (g.shufflerTold = g.shufflerTold || {})[th] = true;   // 待機時間に知らせた（酔い覚めで二重に出さない）
-        if (q.isCpu) { cpuNotice(g, th, role, ONW.cpu.kit); return; }   // CPUも、自分が変えられたことを知る（人間と同じ。新しい役職だけ）
-        set[th] = { from: e.from || null, role };
-      });
-    } },
-    settleMsg: { order: 29, run(c, p) {
-      const e = (c.g.shufflerSettle || {})[p.id]; if (!e) return {};
-      const B = ONW.shownRole(e.role), line = e.from ? `あなたは ${c.rn(ONW.shownRole(e.from))} から ${c.rn(B)}(+シャッフラー) になりました。` : `あなたは ${c.rn(B)}(+シャッフラー) になりました。`;
-      return { logs: [line], shuffled: [{ role: B }] };
-    } },
-    /** 昼のうちの取りこぼし（酔いが覚めたCPUのシャッフラーが昼に選んだ・昼に怪盗などで役職が動いた）: まだ知らされていない、置かれた時点の持ち主（起きている・生きている）に知らせる。
-     *  人間には jobday の通知、CPUには新しい役職を知らせる。net.js の dayCheck から呼ばれる（何度呼んでもよい。g.shufflerTold で重複を防ぐ） */
-    dayCheck(c) {
-      const g = c.g; if (g.phase !== c.PH.ONLINE_DAY) return;
-      picks(g).forEach(([, th, , self]) => {
-        if (self || (g.shufflerTold || {})[th] || ONW.hiddenDrunk(g, th) || c.isDead(th)) return;
-        const tp = c.byId(th), n = notice(g, th); if (!tp || !n) return;
-        (g.shufflerTold = g.shufflerTold || {})[th] = true;
-        if (tp.isCpu) { cpuNotice(g, th, g.currentRoles[th], ONW.cpu.kit); return; }
-        c.hold(th, n.text); c.send(th, { t: "jobday", id: th, text: n.text, role: n.role });
-      });
-    },
-    // ---- 酔いが覚めたとき（昼）: 酔っている間に選ばれた人（置かれた時点の持ち主のまま）に、覚めた瞬間にまとめて知らせる。破局師の soberExtra / stageSober が手本 ----
-    //   文章「あなたは A から B(+シャッフラー) になりました。」は「酔いが覚めました。…最終的な役職は B です」のあとに続き、自分のカードが新しい役職で（最終役職として直接）めくれて光る。
-    //   A は酔っていた期間に置かれた分も mark.from（置かれる前の役職）。待機時間にすでに知らせた人・自分に置いた本人・カードが別の人の手に渡った人には出さない。
-    soberExtra(c, id) {
-      const g = c.g; g.shufflerTold = g.shufflerTold || {};
-      if (g.shufflerTold[id]) return {};
-      const n = notice(g, id); if (!n) return {};
-      g.shufflerTold[id] = true;
-      return { lines: [n.text], peek: { shuffled: n.role } };
-    },
-    stageSober: { list: { order: 98, run(sp, list, SK) {
-      if (!sp.shuffled) return;
-      const k = `p:${ONW.net.myId()}`;   // 自分のカードは soberFlash がめくる。ここでは光らせるだけ
-      SK.later(() => { SK.glow[k] = true; SK.paint(SK.G()); }, 300);
-      SK.later(() => { delete SK.glow[k]; SK.paint(SK.G()); }, 4300);
-    } } },
-    stageSettle: {
-      field: "settleShuffled", shown: "settleShuffledShown",
-      run: { order: 42, run(items, SK) {
-        SK.later(() => { items.forEach((it) => SK.show(`p:${ONW.net.myId()}`, it.role, true)); SK.paint(SK.G()); }, 900);   // 自分のカードが新しい役職でめくれて光る
-      } },
-    },
+    // ---- 選ばれた人の目線 ----
+    // マイクラ版と同じく、シャッフラーで役職を変えられた人（人間もCPUも）には、待機時間・昼・酔い覚めのどこでも知らせない。
+    // （night.js の tell() は術者にだけ送られ、対象者には送られない。cpu.js の selfPerceivedRole: 本人は変化前の役職のつもりのまま行動・COし続ける。）
+    // 実際の役職・結果画面の「(+シャッフラー)」・勝敗は変わる。自分に置いたシャッフラー本人だけは、術者の結果として新しい役職を知っている。
   });
 })(window.ONW);

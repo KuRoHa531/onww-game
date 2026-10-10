@@ -80,7 +80,7 @@ window.ONW = window.ONW || {};
     return `
       <p class="gd-note">${g.phase === P.LOBBY ? "設定の変更はホストが、ロビーの「ルーム設定」から行います。" : "試合中は設定を変更できません(確認のみ)。"}</p>
       ${sec("人数設定", line("参加人数", `${total}人${cpu ? `（CPU ${cpu}人を含む）` : ""}`) + line("墓地の枚数", `${g.graveCount ?? 0}枚`) + line("CPU人数", `${cpu}人`))}
-      ${sec("タイマー設定", line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
+      ${sec("タイマー設定", line("役職配布(演出のあとの待ち)", `${t.deal ?? 5}秒`) + line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("待機時間", `${t.settle ?? 5}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
       ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", g.drunkChance)) + line("恋人", dupText(g.loverCount, "組", g.loverChance)))}
       ${sec("詳細設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("変化公開", onoff(g.revealTransforms)) + line("デバッグモード", onoff(g.debugOn)))}
       ${sec("変化先の有無", tf)}`;
@@ -93,7 +93,7 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator"],
+    village: ["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "watchdog", "sheriff"],
     wolf: ["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat"],
     third: ["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"],
   };

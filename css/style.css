@@ -29,23 +29,24 @@ html, body {
   font-family: var(--font-body);
 }
 
+/* 横にはみ出して左右にずらせてしまうのを防ぐ（Android Chrome は body だけの overflow-x:hidden だと効かないことがある）。
+   clip はスクロール領域を作らないので sticky などは今までどおり動く */
+html { overflow-x: clip; max-width: 100%; }
 body {
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  overflow-x: hidden;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* 背景の血月の光暈 */
 .moon-glow {
   position: fixed;
-  top: -220px;
-  right: -160px;
-  width: 480px;
-  height: 480px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 40%, rgba(201, 70, 61, 0.35), rgba(201, 70, 61, 0.08) 55%, transparent 70%);
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(circle 285px at calc(100% - 128px) -28px, rgba(201, 70, 61, 0.35) 0, rgba(201, 70, 61, 0.08) 224px, transparent 285px);
   pointer-events: none;
   z-index: 0;
 }
@@ -103,8 +104,10 @@ body {
   flex: 1;
   width: 100%;
   max-width: 720px;
+  min-width: 0;
   margin: 0 auto;
   padding: 32px 20px 64px;
+  overflow-x: clip;
 }
 
 .onw-loading {
@@ -396,7 +399,7 @@ body {
 .co-title__t { flex: 1 1 auto; min-width: 0; }
 
 /* 最終結果（マイクラ版風） */
-.result-sheet { text-align: left; line-height: 1.7; }
+.result-sheet { text-align: left; line-height: 1.7; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .rs-head { color: #e8d36a; font-weight: 700; margin-top: 4px; }
 .rs-title { color: #e8d36a; font-weight: 800; text-align: center; margin: 4px 0; }
 .rs-line { font-size: 14px; word-break: break-all; }
@@ -407,10 +410,13 @@ body {
 .rs-dead { color: var(--blood); }
 .rs-good { color: #7fd47f; }
 .rs-info { color: #6fd3e0; }
+.rs-pl { color: #ffb86b; }   /* 結果画面: 夜行動結果・昼行動結果・役職情報の文章中のプレイヤー名（役職名は陣営の色 t-village / t-wolf / t-third） */
+.rs-gv { color: #5aa9ff; }   /* 結果画面: 墓地名（墓地1 など）。プレイヤー名・役職名・得票の色とは別 */
+.rs-me { color: #c792ff; font-weight: 700; }   /* 結果画面・チャット: 自分の名前（他の人のプレイヤー名 rs-pl のオレンジと区別する。rs-pl の後に書いて上書き） */
 .rs-win { font-size: 20px; font-weight: 800; margin: 6px 0; }
 .t-village { color: var(--village); }
 .t-wolf { color: var(--wolf); }
-.t-third { color: var(--gold); }
+.t-third { color: #cfcfd6; }   /* 第三陣営は薄い灰色（結果画面・ガイド・観戦・プロフィールの #cfcfd6 と同じ）。COの一覧・COの結果開示・チャットのCO行もこれ */
 .t-dup { color: #f5c518; }   /* 重複役職（酔っ払いの黄色） */
 
 /* ルーム */
@@ -1123,7 +1129,7 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
 .chat-tabs { display: flex; gap: 6px; margin: 4px 0 0; }
 .chat-tab { flex: 1; padding: 6px 8px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg-night); color: var(--ink-dim); font-size: 13px; cursor: pointer; }
 .chat-tab.on { color: var(--gold); border-color: var(--gold-dim); background: var(--bg-panel-raised); }
-.chat-tab--ghost.on { color: #b79cf0; border-color: #8f74d6; }
+.chat-tab--ghost.on { color: #2f7bff; border-color: #fff; -webkit-text-stroke: 2px #fff; paint-order: stroke fill; }   /* 霊界: 白縁の青文字 */
 .chat-tabs + .chat-log { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .cb-chip.cb-dead { opacity: .55; }
 
@@ -1193,11 +1199,22 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 #rchat-overlay { position: fixed; inset: 0; z-index: 920; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
 #rchat-overlay .rchat-box { width: min(640px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #22253a; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
 #rchat-overlay .rchat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--gold); font-size: 16px; }
-#rchat-overlay .rchat-btns { display: flex; gap: 8px; }
+#rchat-overlay .rchat-btns, #rinfo-overlay .rchat-btns { display: flex; gap: 8px; }
 #rchat-overlay .rchat-log { flex: 1 1 auto; height: auto !important; min-height: 160px; max-height: calc(var(--app-h, 100dvh) - 120px); overflow-y: auto; margin: 0; overscroll-behavior: contain; cursor: default; }
-.chat-ghost { color: #b79cf0; }
+/* 最終結果の情報確認（全員ぶん）: チャットと同じく画面の上に重ねる */
+#rinfo-overlay { position: fixed; inset: 0; z-index: 920; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
+#rinfo-overlay .rinfo-box { width: min(560px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #22253a; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+#rinfo-overlay .rchat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--gold); font-size: 16px; }
+#rinfo-overlay .rinfo-body { flex: 1 1 auto; min-height: 120px; max-height: calc(var(--app-h, 100dvh) - 120px); overflow-y: auto; overscroll-behavior: contain; }
+#rinfo-overlay .rinfo-card { margin-bottom: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.18); }
+#rinfo-overlay .rinfo-name { font-weight: 700; font-size: 15px; }
+#rinfo-overlay .rinfo-cpu { margin-left: 6px; padding: 0 5px; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; color: #cfcfd6; }
+#rinfo-overlay .night-step__hint { margin: 5px 0; }
+#rinfo-overlay .t-village { color: #55ff55; } #rinfo-overlay .t-wolf { color: #ff5555; } #rinfo-overlay .t-third { color: #cfcfd6; }
+.chat-ghost { color: #2f7bff; -webkit-text-stroke: 3px #fff; paint-order: stroke fill; }   /* 霊界チャット: 白縁の青文字（縁を文字の外側に描く） */
 .chat-ghost__tag { margin-right: 4px; }
-.chat-ghost strong { color: #c9b4f5; }
+.chat-ghost strong { color: #2f7bff; }
+.chat-ghost .rs-pl, .chat-ghost .rs-me { color: #2f7bff; }
 
 /* ---- 観戦者向けの配布演出（全員と墓地のカードが配られ、順に表になる）---- */
 .dl-spec .dl-card { perspective: 700px; transform-style: preserve-3d; }
@@ -1336,6 +1353,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-front .tb-wolfmark.tb-master small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #d9b8ff; line-height: 1.1; letter-spacing: -.02em; }
 .tb-front .tb-wolfmark.tb-master.tb-love { filter: drop-shadow(0 0 7px rgba(255,126,182,.95)); }
 .tb-front .tb-wolfmark.tb-master.tb-love small { color: #ffb3d4; }
+.tb-front .tb-wolfmark.tb-bone { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,214,150,.9)); }   /* 番犬: 飼い主の🦴 */
+.tb-front .tb-wolfmark.tb-bone small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffe2b0; line-height: 1.1; letter-spacing: -.02em; }
 .tb-seat.glow.glow-master .tb-card { filter: drop-shadow(0 0 10px rgba(197,139,255,.95)); }
 /* 結果発表: カードの左上から下へ縦に増えていく丸いマーク（上から 🐺昇格した狂人 / ❤恋人(組ごと) / ♡キープ / 🔀シャッフラー）。
    札(.tb-badge)は右上なのでぶつからない。2つ以上同時に付くときは .mk2 で全部を小さくする */
@@ -1678,3 +1697,71 @@ body:has(.dbg-sheet) .top-right { visibility: hidden; pointer-events: none; }
 @keyframes keyIn { 0% { transform: translate(90%,-70%) rotate(-50deg); opacity: 0; } 55% { transform: translate(0,0) rotate(0deg); opacity: 1; } 100% { transform: translate(0,0) rotate(90deg); opacity: 1; } }
 @keyframes keyOut { 0% { transform: translate(0,0) rotate(0deg); opacity: 1; } 50% { transform: translate(0,0) rotate(-90deg); opacity: 1; } 100% { transform: translate(90%,-70%) rotate(-50deg); opacity: 0; } }
 @keyframes keyLockPop { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
+/* ---- 交換者: 結果発表で、票数のバッジが浮き上がって入れ替わる（光の尾を引き、輪を一周ぶん描く） ---- */
+.tb-seat.gx-exsel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(255,120,100,.95)); }
+.ex-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
+.ex-fx .ex-svg { position: absolute; inset: 0; }
+.ex-arc { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: .3 2; stroke-dashoffset: .3; }
+.ex-arc--glow { stroke: #ff5a4d; stroke-width: 10; opacity: .8; filter: blur(3px); }
+.ex-arc--core { stroke: #fff2ec; stroke-width: 3; }
+.ex-fly { position: absolute; left: 0; top: 0; min-width: 28px; padding: 2px 9px; border-radius: 999px; background: var(--blood-soft); border: 1px solid #ff8a80; color: #fff; font-size: clamp(12px, 1vw, 16px); font-weight: 700; text-align: center; white-space: nowrap; box-shadow: 0 0 14px rgba(255,110,90,.95), 0 0 4px rgba(255,255,255,.8); will-change: transform; }
+.ex-fly--zero { opacity: .85; filter: saturate(.7); }
+.ex-sp { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: #fff3d0; box-shadow: 0 0 6px 2px rgba(255,190,110,.95); opacity: 0; animation: ex-sp .6s ease-out forwards; }
+@keyframes ex-sp { 0% { transform: scale(0); opacity: 0; } 30% { transform: scale(1.4); opacity: 1; } 100% { transform: scale(.2); opacity: 0; } }
+.ex-ring { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid rgba(255,225,190,.95); box-shadow: 0 0 10px rgba(255,120,100,.9); opacity: 0; animation: ex-ring .75s ease-out forwards; }
+.ex-ring2 { border-color: rgba(255,110,95,.9); }
+@keyframes ex-ring { 0% { transform: scale(.3); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(3.2); opacity: 0; } }
+
+
+/* ---- 保安官: 撃たれたカードの銃痕とひび（裏面(.tb-back)の中にある。めくれると一緒に裏返り、表は普通のカード。執行・誤爆・従者の身代わりで同じ見た目） ----
+   撃たれた瞬間(shot-fire): 銃弾が飛んでくる(.30s) → 当たる瞬間に閃光・カードが揺れる → 銃痕が付く → ひびが走る */
+.tb-shot { display: none; position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; border-radius: 6px; }
+.tb-seat.shot .tb-shot { display: block; }
+.tb-shot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: translate(var(--sx, 0%), var(--sy, 0%)) rotate(var(--sr, 0deg)) scale(1.6); transform-origin: 50% 50%; }
+.tb-crack path { fill: none; stroke: #07070b; stroke-width: 1.5; stroke-linejoin: miter; stroke-linecap: round; filter: drop-shadow(0 0 .6px rgba(255,255,255,.9)) drop-shadow(0 0 1.4px rgba(255,255,255,.55)); }
+.tb-burst { fill: rgba(0,0,0,.42); stroke: rgba(255,255,255,.5); stroke-width: .5; stroke-linejoin: round; }
+.tb-ring { fill: none; stroke: rgba(235,235,245,.7); stroke-width: .9; }
+.tb-hole { fill: #020203; }
+/* 銃弾: 当たる点(銃痕の中心)を原点に、向き(--sr)の方向から飛んでくる。撃たれた瞬間だけ出る */
+.tb-bullet { display: none; position: absolute; left: calc(50% + var(--sx, 0%)); top: calc(50% + var(--sy, 0%)); width: 0; height: 0; z-index: 4; pointer-events: none; transform: rotate(var(--sr, 0deg)); }
+.tb-bullet i { position: absolute; right: 0; top: -2px; width: calc(var(--cw) * .6); height: 4px; border-radius: 2px 6px 6px 2px; background: linear-gradient(90deg, rgba(255,200,90,0) 0%, rgba(255,214,120,.85) 70%, #fff 100%); box-shadow: 0 0 6px rgba(255,200,90,.9); opacity: 0; }
+.tb-seat.shot-fire .tb-bullet { display: block; }
+.tb-seat.shot-fire .tb-bullet i { animation: shot-bullet .3s cubic-bezier(.5,0,1,.6) both; }
+.tb-seat.shot-fire .tb-card { animation: shot-jolt .5s ease-out .3s; }
+.tb-seat.shot-fire .tb-shot::before { content: ""; position: absolute; inset: -30%; background: radial-gradient(circle at calc(50% + var(--sx, 0%)) calc(50% + var(--sy, 0%)), rgba(255,250,225,.98) 0%, rgba(255,214,120,.65) 22%, rgba(255,214,120,0) 55%); opacity: 0; animation: shot-flash .45s ease-out .3s both; }
+.tb-seat.shot-fire .tb-burst, .tb-seat.shot-fire .tb-ring, .tb-seat.shot-fire .tb-hole { transform-box: fill-box; transform-origin: 50% 50%; animation: shot-hole .32s cubic-bezier(.2,1.6,.4,1) .3s both; }
+.tb-seat.shot-fire .tb-crack path { stroke-dasharray: 90; stroke-dashoffset: 90; animation: shot-crack .55s ease-out .4s forwards; }
+@keyframes shot-bullet { 0% { transform: translateX(-260%); opacity: 0; } 15% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateX(0); opacity: 0; } }
+@keyframes shot-jolt { 0% { transform: translate(0,0) rotate(0); } 12% { transform: translate(3px,-4px) rotate(2.5deg); } 28% { transform: translate(-3px,2px) rotate(-2deg); } 50% { transform: translate(1.5px,-1px) rotate(.8deg); } 100% { transform: translate(0,0) rotate(0); } }
+@keyframes shot-flash { 0% { opacity: 1; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes shot-hole { 0% { transform: scale(2.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes shot-crack { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .tb-seat.shot-fire .tb-bullet { display: none; } .tb-seat.shot-fire .tb-card, .tb-seat.shot-fire .tb-shot::before, .tb-seat.shot-fire .tb-burst, .tb-seat.shot-fire .tb-ring, .tb-seat.shot-fire .tb-hole, .tb-seat.shot-fire .tb-crack path { animation: none; } .tb-seat.shot-fire .tb-crack path { stroke-dashoffset: 0; } }
+
+/* ---- PC: ルーム設定のメニューが小さすぎたので大きくする（スマホ版 = 1000px未満は今のまま）----
+   zoom で中の文字・ボタン・余白をまとめて大きくする。zoom 後の実寸は 幅 360×1.4≒500px・高さ 画面の約75%。 */
+@media (min-width: 1000px) {
+  .settings-modal .settings-panel--modal { zoom: 1.4; max-width: 400px; height: calc(75vh / 1.4); height: calc(75dvh / 1.4); max-height: calc(100vh / 1.4 - 28px); }
+}
+
+/* 昼能力・夜能力の操作欄: 説明だけ閉じ開きでき、チャットが押し出されて見えなくならないようにする（スマホ） */
+.ab-help { margin: 0 0 4px; }
+.ab-help > summary { cursor: pointer; color: var(--gold-dim); font-size: 13px; padding: 2px 0; list-style: none; }
+.ab-help > summary::-webkit-details-marker { display: none; }
+.ab-help > summary::before { content: "▸ "; }
+.ab-help[open] > summary::before { content: "▾ "; }
+body.chat-mode .panel .sober-box { margin: 4px 0; padding: 6px 8px; max-height: 40vh; overflow-y: auto; }
+body.chat-mode .panel .sober-box .night-step__hint { margin: 3px 0; font-size: 13px; }
+body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
+
+/* ---- 番犬: 飼い主のカードの上に🦴が出て守る / 🐕が飛び込んで噛み付く（結果発表）。別のカードは出さない ---- */
+.dg-card { position: absolute; left: 50%; top: 12%; z-index: 9; font-size: calc(var(--cw) * .8); line-height: 1; opacity: 0; pointer-events: none; transform: translate(-50%, 0) scale(0); }
+.dg-card.guard { animation: dg-guard .7s cubic-bezier(.2,1.3,.4,1) both; filter: drop-shadow(0 0 12px rgba(255,226,140,.95)); }
+@keyframes dg-out { from { opacity: 1; transform: translate(-50%, 0) scale(1); } to { opacity: 0; transform: translate(-50%, -30%) scale(.6); } }
+.dg-card.guard.out { animation: dg-out .4s ease-in both; }
+@keyframes dg-guard { 0% { opacity: 0; transform: translate(-50%, -90%) scale(.2) rotate(-30deg); } 60% { opacity: 1; transform: translate(-50%, -4%) scale(1.25) rotate(8deg); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); } }
+.dg-card.bite { animation: dg-bite .8s cubic-bezier(.5,0,.8,.4) both; }
+.dg-card.bite::after { content: "💥"; position: absolute; left: 50%; top: 50%; font-size: .9em; transform: translate(-50%,-50%) scale(0); animation: dg-boom .5s ease-out .45s both; }
+@keyframes dg-bite { 0% { opacity: 0; transform: translate(-170%, -90%) scale(.4) rotate(-30deg); } 55% { opacity: 1; transform: translate(-50%, 0) scale(1.3) rotate(0); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } }
+@keyframes dg-boom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 70% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }

@@ -63,19 +63,36 @@ ONW.fox = { isFoxLike, curseTargets, curseNow, lateCurse, takeover, takeoverText
     }
     return plan.map((e) => ({ id: e.id, label: ONW.deathMarkOf(e.kind, g, e.id), depth: dist[e.id] || e.depth }));
   }
-  /** 呪殺のあとで連鎖して死ぬ人のカードが、同じ深さごとに同時に「心中」「後追い」の面にめくれて灰色になる（妖狐のカードが🦊でめくれたあと）。base: 妖狐のカードがめくれ終わる時刻(ms) */
+  /** カードを face の面に表にめくる。すでに表になっているカード(❤・💘など、恋人の印で開いたまま)は、表のまま中身だけ切り替えず、
+   *  いったん裏返してから(800ms)めくり直す（点滅にしない）。めくれた直後に done を呼ぶ（灰色にする処理など）。
+   *  このカードは SK.held に入れる（酔い覚め・昼の公開などの「あとで自動で伏せる」処理が、灰色になる前に勝手に裏返さないように） */
+  function flipUp(SK, k, face, done) {
+    if (SK.held) SK.held[k] = true;   // (簡易の道具箱でも動くように)
+    const go = () => { SK.up[k] = face; SK.glow[k] = true; SK.paint(SK.G()); if (done) done(); };
+    if (SK.up[k] && SK.up[k] !== face) { delete SK.up[k]; delete SK.glow[k]; SK.paint(SK.G()); SK.later(go, 800); } else go();
+  }
+  /** 呪殺のあとで連鎖して死ぬ人のカードが、同じ深さごとに同時に「心中」「後追い」の面にめくれて灰色になる（妖狐のカードが🦊でめくれたあと）。base: 妖狐のカードがめくれ終わる時刻(ms)
+   *  すでに表の❤のカードは、いったん裏返してから「心中」「後追い」でめくれる（その分、深さの間隔を少し広げてある） */
   function playChain(chain, base, SK) {
     const depths = [...new Set(chain.map((e) => e.depth))].sort((a, b) => a - b);
     depths.forEach((d, n) => {
-      const t = base + n * 1900;
+      const t = base + n * 2200;
       chain.filter((e) => e.depth === d).forEach((e, i) => {
         const k = `p:${e.id}`;
-        SK.later(() => { SK.up[k] = SK.deadMark(e.label); SK.glow[k] = true; SK.paint(SK.G()); }, t + i * 120);
-        SK.later(() => { SK.curse[k] = e.label; SK.badge[k] = e.label; delete SK.glow[k]; SK.paint(SK.G()); }, t + 1300 + i * 120);
+        SK.later(() => flipUp(SK, k, SK.deadMark(e.label), () => SK.later(() => { SK.curse[k] = e.label; SK.badge[k] = e.label; delete SK.glow[k]; SK.paint(SK.G()); }, 1300)), t + i * 120);
       });
     });
   }
-  ONW.fox.chainView = chainView; ONW.fox.playChain = playChain;
+  /** 呪殺の演出: 妖狐のカードが🦊に裏返って光り、1.4秒後に灰色(札「呪殺」)。全員が灰色になった380ms後に、連鎖で死ぬ人(心中・後追い)の演出が始まる。d: 始まるまでの待ち(ms) */
+  function playCurse(ids, chain, d, SK) {
+    let left = ids.length;
+    const next = () => { if (--left <= 0) playChain(chain || [], 380, SK); };
+    ids.forEach((id, i) => {
+      const k = `p:${id}`;
+      SK.later(() => flipUp(SK, k, SK.FOX_MARK, () => SK.later(() => { SK.curse[k] = true; SK.badge[k] = "呪殺"; delete SK.glow[k]; SK.paint(SK.G()); next(); }, 1400)), d + 700 + i * 380);
+    });
+  }
+  ONW.fox.chainView = chainView; ONW.fox.playChain = playChain; ONW.fox.playCurse = playCurse; ONW.fox.flipUp = flipUp;
 
   /** 昼の開始時に呪殺する(マイクラ版 processFoxAndFanaticAtDayStart と同じタイミング)。
    *  待機時間(settlePre)で決めた席 g.foxPending を、昼中死亡(net.killPlayer)として死なせる。
@@ -123,24 +140,13 @@ ONW.fox = { isFoxLike, curseTargets, curseNow, lateCurse, takeover, takeoverText
     stageFlash: {
       field: "dayFox", when: "late",
       run(ids, SK) {
-        const d = (SK.G().dayFoxDelay || 0);
-        playChain(SK.G().dayFoxChain || [], d + 700 + ids.length * 380 + 1400, SK);   // 呪殺された妖狐のあと、連鎖で死ぬ人（心中・後追い）
-        ids.forEach((id, i) => {
-          const k = `p:${id}`;
-          SK.later(() => { SK.up[k] = SK.FOX_MARK; SK.glow[k] = true; SK.paint(SK.G()); }, d + 700 + i * 380);
-          SK.later(() => { SK.curse[k] = true; SK.badge[k] = "呪殺"; delete SK.glow[k]; SK.paint(SK.G()); }, d + 700 + i * 380 + 1400);
-        });
+        playCurse(ids, SK.G().dayFoxChain || [], SK.G().dayFoxDelay || 0, SK);   // 呪殺された妖狐 → そのあと、連鎖で死ぬ人（心中・後追い）。表の❤のカードはいったん裏返してから
       },
     },
     stageSettle: {
       field: "settleFox", shown: "settleFoxShown",
       run: { order: 38, run(ids, SK) {
-        playChain(SK.G().settleFoxChain || [], 700 + ids.length * 380 + 1400, SK);   // 呪殺された妖狐のあと、連鎖で死ぬ人（心中・後追い）が同じ深さごとに同時にめくれる
-        ids.forEach((id, i) => {
-          const k = `p:${id}`;
-          SK.later(() => { SK.up[k] = SK.FOX_MARK; SK.glow[k] = true; SK.paint(SK.G()); }, 700 + i * 380);   // カードが裏返って🦊
-          SK.later(() => { SK.curse[k] = true; SK.badge[k] = "呪殺"; delete SK.glow[k]; SK.paint(SK.G()); }, 700 + i * 380 + 1400);   // 灰色に呪殺された見た目へ（昼の議論中も、結果発表までそのまま）
-        });
+        playCurse(ids, SK.G().settleFoxChain || [], 0, SK);   // カードが裏返って🦊 → 灰色に呪殺された見た目へ（昼の議論中も、結果発表までそのまま）→ 連鎖で死ぬ人（心中・後追い）が同じ深さごとに同時にめくれる
       } },
     },
     /** 昼になった瞬間に呪殺（昼中死亡 → 霊界チャット・後追い心中）。net.js の toDay から呼ばれる */

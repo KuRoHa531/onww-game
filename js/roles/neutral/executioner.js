@@ -35,14 +35,14 @@
       const h = document.createElement("div"); h.className = `gl-half ${c}`;
       const f = front.cloneNode(true); f.classList.add("gl-face"); h.appendChild(f); card.appendChild(h); return h;
     });
-    const inner = card.querySelector(".tb-inner"); if (inner) inner.style.visibility = "hidden";   // 元のカードは隠し、同じ見た目の2枚(上下)に置き換える
+    const inner = card.querySelector(".tb-inner"); if (inner) inner.style.display = "none";   // 元のカードは消し(visibility だと .tb-seat.up .tb-front の visible に負けて後ろに残るので display:none)、同じ見た目の2枚(上下)に置き換える
     return hs;
   }
   function glFinal(SK, k) { const hs = glHalves(SK, k); if (hs) hs.forEach((h) => h.classList.add("split")); }   // スキップ時: 最初から割れた状態
   function glClear(SK) {
     const el = SK.$t(); if (!el) return;
     el.querySelectorAll(".gl-half,.gl-blade").forEach((n) => n.remove());
-    el.querySelectorAll(".tb-inner").forEach((n) => { n.style.visibility = ""; });
+    el.querySelectorAll(".tb-inner").forEach((n) => { n.style.visibility = ""; n.style.display = ""; });
     el.querySelectorAll(".gl-shake").forEach((n) => n.classList.remove("gl-shake"));
   }
   function glSeq(R, x, at) {   // x: res.execs の1件（ターゲットが追放された処刑人）。at: ターゲットのカードがめくれる時刻
