@@ -77,6 +77,8 @@
     stagePick: {},
     cpuLie: { role: "visitor", weight: 5, order: 7, claim: lieClaim },
     cpuClaim,
+    /** 墓荒らし・ドッペルゲンガーで訪問者を手にしたCPUが、続けて言う結果: 朝のうちに訪問した相手 */
+    cpuChainResult(k, g, p, i) { const c = {}; return cpuClaim(k, g, p, "visitor", i, c) === false ? null : (c.result || null); },
     cpuNight: { order: 40, stage: "seer", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     cpuNotice(g, id, visitorIds, k) {   // CPU(訪問されたCPU): 待機時間に、訪問してきた人（最終盤面で訪問者のカードを持っている人）を知る
       const i = k.infoOf(g, id);

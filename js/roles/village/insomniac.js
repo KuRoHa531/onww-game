@@ -54,6 +54,16 @@
     },
     cpuClaim,
     cpuFakeGot: { kind: "insomniac", make: fakeGot },
+    /** 墓荒らし・ドッペルゲンガーで後覚者を手にしたCPUが、続けて言う結果（マイクラ版 _cpuCoOnlyMaybeInsomniacResult と同じ）:
+     *  最終的な役職が後覚者のまま → 「元々〇〇でした」(〇〇 = 手にする前の役職)、変わっていた → 「△△に役職が変わっていました」。
+     *  最終役職が人外のときは、後覚者CO(cpuClaim)と同じく本当のことは言わず、嘘の結果にする */
+    cpuChainLie: (k, g, p, i) => insomLie(k, g),   // 人外が「後覚者を手にした」と騙るときも、結果を言わないと透けるので嘘の結果を続ける
+    cpuChainResult(k, g, p, i) {
+      const fin = ONW.shownRole(g.currentRoles[p.id]), ini = ONW.shownRole(g.initialRoles[p.id]);
+      if (k.isNonVillage(fin)) return insomLie(k, g);
+      if (fin === "insomniac") return { short: `元々${k.rn(ini)}`, text: `元々${k.rn(ini)}でした。`, claim: { kind: "insomniac", role: "insomniac", orig: ini } };
+      return insomResult(k, fin);
+    },
     cpuCoFollow(k, g, p, r, i, c) { if (!c.result && (r !== "insomniac" || i.finalRole)) c.result = insomLie(k, g); },   // 後覚者を騙るのに結果を言わないと透けるので、嘘の結果開示もする
     // CPU: 最終役職を知る(酔い覚め直後 sober / 夜が終わったあと after / 昼に動いたとき notice)
     cpuSober(g, id, i, shown) { i.mode = "insomniac"; i.finalRole = shown; },

@@ -84,6 +84,8 @@
     },
     cpuLie: { role: "troublemaker", weight: 12, order: 3, claim: lieClaim },
     cpuClaim,
+    /** 墓荒らし・ドッペルゲンガーでいたずらっ子を手にしたCPUが、続けて言う結果: 朝のうちに入れ替えた2人 */
+    cpuChainResult(k, g, p, i) { if (i.mode !== "tm" || !i.pair || i.keyFail) return null; const c = {}; cpuClaim(k, g, p, "troublemaker", i, c); return c.result || null; },
     cpuNight: { order: 90, stage: "tm", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     info: { deck: 11, name: "いたずらっ子", team: ONW.TEAM.VILLAGE, wakeOrder: 60, sort: 27,
       desc: "村人陣営。自分以外2人の役職を入れ替えます。" },

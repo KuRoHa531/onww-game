@@ -31,7 +31,7 @@
     c.co = "relic_robber";
     if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }; return; }   // ロックされて交換に失敗した: 正直に言う
     if (!i.relic) return;   // 墓荒らし（交換情報なし）: COだけする
-    if (isNonVillage(i.relic.newRole)) { const lie = nonVillageLie(g, p, "relic_robber", i, i.relic.newRole); c.co = lie.co; c.result = lie.result; }
+    if (isNonVillage(i.relic.newRole) && !ONW.cpu.relicDoppelHonest(i)) { const lie = nonVillageLie(g, p, "relic_robber", i, i.relic.newRole); c.co = lie.co; c.result = lie.result; }
     else c.result = { short: `墓地${i.relic.graveIdx + 1} → ${rn(i.relic.newRole)}`, text: `墓地${i.relic.graveIdx + 1} と役職を交換して ${rn(i.relic.newRole)} になりました。`, claim: { kind: "relic", role: i.relic.newRole } };
   }
   function fakeGot(k, g, i, role) {

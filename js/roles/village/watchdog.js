@@ -143,6 +143,11 @@
       if (t && k.selfRole(g, p) === "watchdog" && k.coTruth(g, p)) { c.co = "watchdog"; c.result = { short: coShort(t.name), text: coText(t.name), claim: { kind: "watchdog", target: t.id } }; }
       else { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
     },
+    /** 墓荒らし・ドッペルゲンガーで番犬を手にしたCPUが、続けて言う結果: 朝のうちに選んだ飼い主（飼い主を決めていないときは言わない） */
+    cpuChainResult(k, g, p, i) {
+      const t = i.owner && g.players.find((q) => q.id === i.owner && q.id !== p.id);
+      return t ? { short: coShort(t.name), text: coText(t.name), claim: { kind: "watchdog", target: t.id } } : null;
+    },
     // 結果発表の演出（stage.js の startResult / skipResult が引く）
     //   extraCounts : 飼い主への票は無効だが、他の人と同じく普通に「N票」と出す（「無効」とは出さない）
     //   intro       : 番犬に守られる演出（守られていなければ追放されていた＝最多得票の飼い主だけ）。飼い主のカードがめくれそうになる(従者と同じ揺れ)→ 🦴が出てきて守る。字幕は「番犬の飼い主 ○○ は守られました」

@@ -4,11 +4,12 @@
 
   // ---- CPUの発言・投票(もとは cpu.js。中身は変更なし) ----
   function lieClaim(k, g, p, others, selfRole, co) { return { co, result: { short: "自分だけ", text: "共有者は 私だけでした。", claim: { kind: "mason" } } }; }
+  /** 共有者の結果開示（相方がいれば名前、いなければ「私だけ」） */
+  const matesResult = (mates) => ({ short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした。` : "共有者は 私だけでした。", claim: { kind: "mason" } });
   function cpuClaim(k, g, p, r, i, c) {   // 共有者: 相方の名前を開示
     const others = g.players.filter((q) => q.id !== p.id);
     c.co = "mason";
-    const mates = others.filter((q) => i.known[q.id] === "mason");
-    c.result = { short: mates.length ? `相方: ${mates.map((q) => q.name).join("、")}` : "自分だけ", text: mates.length ? `共有者は 私と ${mates.map((q) => q.name).join("、")} でした。` : "共有者は 私だけでした。", claim: { kind: "mason" } };
+    c.result = matesResult(others.filter((q) => i.known[q.id] === "mason"));
   }
 
   ONW.defineRole("mason", {
@@ -29,6 +30,8 @@
     },
     cpuLie: { role: "mason", weight: 9, order: 5, claim: lieClaim },
     cpuClaim,
+    /** 墓荒らし・ドッペルゲンガーで共有者を手にしたCPUが、続けて言う結果: 相方（人間の夜の表示 got と同じく、最初の役職が共有者だった人）。いなければ「私だけ」 */
+    cpuChainResult(k, g, p, i) { return matesResult(g.players.filter((q) => q.id !== p.id && g.initialRoles[q.id] === "mason")); },
     cpuVoteExclude: (k, g, p, q, i) => i.known[q.id] === "mason",   // 投票先候補から、共有者の相方は除く
     cpuInit: cpuMates, cpuLearn: cpuMates,   // CPU: 他の共有者を知る
     info: { deck: 13, name: "共有者", team: ONW.TEAM.VILLAGE, wakeOrder: 30, sort: 20,

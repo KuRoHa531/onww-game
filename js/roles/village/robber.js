@@ -72,6 +72,13 @@
     stageMorning: { kind: "swap", dur: () => 1050 + 700, play(r, SK) { SK.swap(r); } },
     cpuLie: { role: "robber", weight: 12, order: 4, claim: lieClaim },
     cpuClaim,
+    /** 墓荒らし・ドッペルゲンガーで怪盗を手にしたCPUが、続けて言う結果: 朝のうちに役職を奪った相手。人外を手にしたときは本当のことは言わず、怪盗の騙りの結果（村人役を奪ったという嘘）を言う */
+    cpuChainResult(k, g, p, i) {
+      if (i.mode !== "robber" || !i.target || i.keyFail || !i.newRole) return null;
+      if (k.isNonVillage(i.newRole)) { const l = lieClaim(k, g, p, g.players.filter((q) => q.id !== p.id), "robber", "robber"); return l && l.result ? l.result : null; }
+      const t = k.nameOf(g, i.target);
+      return { short: `${t} → ${k.rn(i.newRole)}`, text: `${t} の役職を奪って ${k.rn(i.newRole)} になりました。`, claim: { kind: "robber", target: i.target, role: i.newRole } };
+    },
     cpuFakeGot: { kind: "robber", make: fakeGot },   // 夜のあとに人外の役職を手にしたときの嘘(kind: 「手にした」と言える役職かの判定に使う)
     cpuNight: { order: 70, stage: "robber", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     info: { deck: 9, count: 1, name: "怪盗", team: ONW.TEAM.VILLAGE, wakeOrder: 55, sort: 25,

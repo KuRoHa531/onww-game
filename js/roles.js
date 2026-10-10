@@ -201,6 +201,16 @@ window.ONW = window.ONW || {};
       if (slot.id !== undefined) { game.initialRoles[slot.id] = role; game.currentRoles[slot.id] = role; } else game.center[slot.idx] = role;
     };
     const inPair = (s) => (s.role === ONW.ROLE.MERLIN && has(ONW.ROLE.ASSASSIN)) || (s.role === ONW.ROLE.ASSASSIN && has(ONW.ROLE.MERLIN));
+    // 支え役: 盤面にいる別の役職(trigger)の必要役職になっている枠。単体でも成り立つので、置き換えるなら先にこちらでなく「依存する側(trigger)」を使う
+    //   例: 麻婆の人狼がいるなら豆腐の人狼は支え役(麻婆は豆腐が出ていないと意味がない) / 背徳者がいるなら妖狐は支え役(背徳者はご主人の妖狐が出ていないと意味がない)
+    const supports = (s) => RULES.some((q) => q.trigger !== s.role && has(q.trigger) && q.required.includes(s.role));
+    // 置き換える枠を選ぶ: 支え役でない枠を先に使い(麻婆・背徳者など)、その中でも trigger でない枠を優先する。支え役しか無いときだけ支え役を使う
+    const pickSlot = (cands) => {
+      const free = cands.filter((s) => !supports(s));
+      const pool = free.length ? free : cands;
+      const c = pool.filter((s) => !triggers.has(s.role));
+      return ONW.utils.randomChoice(c.length ? c : pool);
+    };
     // 優先度高めのシナジー(rule.priority の役職): 他のシナジーより先に確保する。空いている枠が無いときは、他のシナジーの枠を置き換えてでも出す
     //   (置き換えるのは、固定していない・変化役から変化した枠のうち、この優先シナジーの trigger/必要役職・アサシン↔マーリンでないもの。先に「どのルールの必要役職でもない枠」を使う)
     {
@@ -218,11 +228,11 @@ window.ONW = window.ONW || {};
           const movable = (s) => can(s) && s.role !== req && !prioTrig.has(s.role) && !prioReq.has(s.role) && !inPair(s);
           let cands = slots.filter((s) => !kept.has(s.key) && can(s));
           if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && movable(s) && !triggers.has(s.role) && !neededByOthers(s.role));
+          if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && movable(s) && !supports(s));   // 支え役(豆腐の人狼・妖狐など)より先に、依存する側(麻婆の人狼・背徳者など)を置き換える
           if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && movable(s) && !triggers.has(s.role));
           if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && movable(s));
           if (!cands.length) return;
-          const c = cands.filter((s) => !triggers.has(s.role));
-          set(ONW.utils.randomChoice(c.length ? c : cands), req);
+          set(pickSlot(cands), req);
         });
       });
     }
@@ -239,8 +249,7 @@ window.ONW = window.ONW || {};
         if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && !locked.has(s.key) && triggers.has(s.role) && s.role !== rule.trigger && !inPair(s) && can(s));   // アサシン↔マーリンが揃っているときは、その2枚は他のシナジーの置き換えに使わない
         // 固定した枠(デバッグの役職固定)はシナジーより優先: 置き換え先が無ければ、必要役職は足さない（固定を絶対に動かさない）
         if (!cands.length) return;
-        const c = cands.filter((s) => !triggers.has(s.role));
-        set(ONW.utils.randomChoice(c.length ? c : cands), req);
+        set(pickSlot(cands), req);
       });
     });
     // 個数ルール: 対象役職(anyOf のどれでもよい)が合計で min 枚以上、盤面に出るようにする。足りない分は、変化役から変化した枠を置き換えて足す
@@ -265,8 +274,7 @@ window.ONW = window.ONW || {};
           }
         }
         if (!cands.length) break;   // 固定した枠は置き換えない（役職固定が最優先）
-        const c = cands.filter((s) => !triggers.has(s.role));
-        const slot = ONW.utils.randomChoice(c.length ? c : cands);
+        const slot = pickSlot(cands);
         // 対象役職の種類が偏らないよう、盤面での枚数がいちばん少ない役職から選ぶ
         const cnt = (r) => slots.filter((s) => s.role === r).length, o = opts(slot), min = Math.min(...o.map(cnt));
         set(slot, ONW.utils.randomChoice(o.filter((r) => cnt(r) === min)));

@@ -169,6 +169,8 @@
     },
     cpuLie: { role: "keymaster", weight: 6, order: 4, claim: lieClaim },
     cpuClaim,
+    /** 墓荒らし・ドッペルゲンガーで鍵師を手にしたCPUが、続けて言う結果: 朝のうちに鍵をかけた相手 */
+    cpuChainResult(k, g, p, i) { return i.keyLock ? claimOf(k, g, i.keyLock.target, i.keyLock.action) : null; },
     cpuVoteScore,
     stagePick: { self: true },   // 夜(と朝の連鎖)にカードを押して行動する: プレイヤー1人（自分も選べる）
     cpuNight: { order: 23, stage: "seer", chain: true, run: cpuRun },   // 占い師の段階(破局師22の直後)。変化役より前

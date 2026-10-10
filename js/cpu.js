@@ -23,6 +23,9 @@ window.ONW = window.ONW || {};
   };
   /** 墓荒らし・ドッペル・酔い覚めのあと、朝のうちに夜の行動を使える役職(cpuNight.chain を持つ役職)。excl は除く */
   cpu.chainRoles = (excl) => ONW.roleIds().filter((id) => id !== excl && ((ONW.roleDef(id) || {}).cpuNight || {}).chain);
+  /** 墓荒らし・ドッペルで手にしたあと、続けて「その役職の結果」を言える役職か: 朝のうちに夜の行動を使える役職(chain)か、夜の行動はなくても
+   *  夜の始まりに見える情報を持つ役職(共有者の相方・後覚者の最終役職など)で cpuChainResult を持つもの（マイクラ版 _cpuCoOnlyPostTransformNightResultIfNeeded と同じ考え方） */
+  cpu.hasChainResult = (id) => cpu.chainRoles().includes(id) || !!ONW.roleHook(id, "cpuChainResult");
   /** CPUの夜の行動の実行リスト: [{ roles, nd(=cpuNight), order, idx }]（同じ run を共有する役職は1組にまとまる） */
   const nightSteps = () => {
     const steps = [];
@@ -65,7 +68,7 @@ window.ONW = window.ONW || {};
       cpus.filter((p) => s.roles.includes(role(p))).forEach((p) => s.nd.run(n, p, rn(role(p)), false, role(p)));
     });
     // 朝: 墓荒らしが交換した後の役職の能力を即座に使う（朝の時点の実際のカードが対象。いたずらっ子の入れ替えは呼び出し側で反映）
-    if (on("morning") || stage === "late") for (let pass = 0; pass < (stage === "late" ? 2 : 1); pass++) cpus.forEach((p) => {   // 昼に墓地と交換した先に能力があれば、もう1回（pass 2）続けて使う
+    if (on("morning") || stage === "late") for (let pass = 0; pass < 2; pass++) cpus.forEach((p) => {   // 昼に墓地と交換した先に能力があれば、もう1回（pass 2）続けて使う
       const i = infoOf(g, p.id), got = i.pendingChain;
       if (!got) return;
       i.pendingChain = null;
@@ -334,6 +337,37 @@ window.ONW = window.ONW || {};
    * 各CPUは人間のCOボタンと同じ形（「〇〇CO」）で名乗り、その直後に結果開示を続けて言う。
    * 戻り値: [{ p, text, claim, gap(次の発言までのms) }]
    */
+  /**
+   * 墓荒らし・ドッペルゲンガーのCPUが、夜の能力がある役職(番犬・占い師・訪問者など)を手にしたとき、続けて言う「その役職の結果」。
+   *   ・本当に手にした: 各役職ファイルの cpuChainResult(その役職の夜の結果。番犬なら飼い主)
+   *   ・人外を手にして、村人役を手にしたと騙る: その役職の騙りの結果(cpuLie.claim)。結果を言わないと騙りだと透けるので、COだけで終わらせない
+   * 役職COの発言(c.result)の claim.role を見て決める。結果が作れない役職は null（COだけ）
+   */
+  /** 墓荒らしが墓地からドッペルゲンガーを引いたとき、本当に続けて言う内容: 「〇〇 をコピーして △△ になりました」→（△△の結果）。
+   *  コピーした役職が村人陣営のときだけ本当のこと（人外なら nonVillageLie で村人役を騙る）。コピーできていない（ロック失敗など）ときは言わない */
+  function relicDoppelChain(g, p, i) {
+    const d = i.doppel;
+    if (!d || i.keyFail) return null;
+    const first = { short: `${nameOf(g, d.target)} → ${rn(d.newRole)}`, text: `${nameOf(g, d.target)} をコピーして ${rn(d.newRole)} になりました。`, claim: { kind: "doppel", target: d.target, role: d.newRole } };
+    const h = cpu.chainRoles().includes(d.newRole) || ONW.roleHook(d.newRole, "cpuChainResult") ? ONW.roleHook(d.newRole, "cpuChainResult") : null;
+    const res = h ? (h(cpu.kit, g, p, i) || null) : null;
+    if (res) first.next = { text: res.text, short: res.short, claim: res.claim };
+    return first;
+  }
+  /** 墓荒らしがドッペルを引いて、コピーした先が村人陣営の役職か（そのときは人外扱いで騙らず、本当のことを言う） */
+  cpu.relicDoppelHonest = (i) => !!(i.relic && i.relic.newRole === "doppelganger" && i.doppel && !i.keyFail && ONW.roles.getInfo(i.doppel.newRole).team === "village");
+  function chainedResult(g, p, i, c, r) {
+    const cl = c.result && c.result.claim;
+    if (!cl || (cl.kind !== "doppel" && cl.kind !== "relic") || !cl.role || !cpu.hasChainResult(cl.role)) return null;
+    const real = cl.kind === "doppel" ? (i.doppel && i.doppel.newRole) : (i.relic && i.relic.newRole);
+    if (real === cl.role && cl.kind === "relic" && cl.role === "doppelganger") return relicDoppelChain(g, p, i);   // 墓荒らし → ドッペル → コピーした役職（占い師など）の順に言う
+    if (real === cl.role) { const h = ONW.roleHook(cl.role, "cpuChainResult"); return h ? (h(cpu.kit, g, p, i) || null) : null; }
+    const nd = (ONW.roleDef(cl.role) || {}).cpuLie;
+    const res = nd && nd.role === cl.role && nd.claim ? nd.claim(cpu.kit, g, p, g.players.filter((q) => q.id !== p.id), r, cl.role) : null;
+    if (res && res.result) return res.result;
+    const lh = ONW.roleHook(cl.role, "cpuChainLie");   // cpuLie を持たない役職（後覚者）の、手にしたと騙るときの嘘の結果
+    return lh ? (lh(cpu.kit, g, p, i) || null) : null;
+  }
   cpu.plan = function (g, only) {   // only: 指定すると、そのCPUだけの発言予定を作る（酔いが覚めたCPU用）
     const plan = [], spoke = [];   // spoke: COを言うCPUの { p, r, i, c }（あとで情報開示の発言を足すのに使う）
     g.players.filter((p) => p.isCpu && (!only || only.includes(p.id))).forEach((p) => {
@@ -364,10 +398,11 @@ window.ONW = window.ONW || {};
       }
       const hf = c.co ? ONW.roleHook(c.co, "cpuCoFollow") : null;   // 名乗った役職ごとの後処理（後覚者: 結果を言わないと騙りだと透けるので、嘘の結果開示もする）
       if (hf) hf(cpu.kit, g, p, r, i, c);
+      if (c.co && c.result && !c.extra && !i.keyFail) c.extra = chainedResult(g, p, i, c, r);   // 墓荒らし・ドッペルで手にした役職の結果も続けて言う（番犬なら飼い主）
       if (!c.co) return;                                              // COしない
       plan.push({ p, text: coText(c.co), co: c.co, claim: c.result ? null : { kind: "villager" }, gap: c.result ? 1200 : 3500 });
       if (c.result) plan.push({ p, text: c.result.text, short: c.result.short, result: true, claim: c.result.claim, gap: c.extra ? 1200 : 3500 });
-      if (c.result && c.extra) plan.push({ p, text: c.extra.text, short: c.extra.short, result: true, claim: c.extra.claim, gap: 3500 });
+      if (c.result) for (let e = c.extra; e; e = e.next) plan.push({ p, text: e.text, short: e.short, result: true, claim: e.claim, gap: e.next ? 1200 : 3500 });   // 2つ目以降（墓荒らし→ドッペル→占い師なら、コピー → 占い結果の順）
       spoke.push({ p, r, i, c });
     });
     // 情報開示（本家 _cpuCoOnlyMaybeInboundInfo）: 全員のCOが出そろったあとに、1人1回だけ。訪問された話をした人は、そちらが先（本家は1回だけ）
