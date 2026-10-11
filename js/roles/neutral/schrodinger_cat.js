@@ -7,12 +7,17 @@
   const catFlips = (res, id) => { const c = catOf(res).get(id); return !!c && (c.votes >= 1 || c.fixed) && c.team !== "lover"; };
   const catFixed = (res, id) => { const c = catOf(res).get(id); return !!(c && c.fixed); };   // 保安官に撃たれて村人陣営に固定された猫: 裏返さず、めくれたときから直接陣営の色（緑）で見せる   // 2回目に裏返る猫か（恋人の猫は恋人陣営なので裏返らない）
   const catFace = (c) => ({ team: c.team, sfx: c.team === "third" && c.finalRole ? `(+${ONW.roles.getInfo(c.finalRole).name})` : "" });
-  const catLine = (c, esc) => c.team === "village" ? `<span class="t-village">村人陣営</span>になりました` : c.team === "wolf" ? `<span class="t-wolf">人狼陣営</span>になりました` : c.team === "third" ? `<span class="t-third">第三陣営（${esc(ONW.roles.getInfo(c.finalRole || "villager").name)}）</span>になりました` : "どの陣営にもなれませんでした";
+  const catLine = (c, esc) => c.team === "village" ? `${c.bitRandom ? "同時に噛まれたため、ランダムで" : ""}<span class="t-village">村人陣営</span>になりました` : c.team === "wolf" ? `${c.bitRandom ? "同時に噛まれたため、ランダムで" : ""}<span class="t-wolf">人狼陣営</span>になりました` : c.team === "third" ? `<span class="t-third">第三陣営（${esc(ONW.roles.getInfo(c.finalRole || "villager").name)}）</span>になりました` : "どの陣営にもなれませんでした";
   /** めくれた猫のカード id を at の時刻に裏へ戻し、少しあとでもう一度めくる。noFlip: 演出が重なる（処刑人のギロチンなど）ので、裏返さずに最初から陣営の色で見せる */
   function catFlip2(R, id, at, noFlip) {
     const { later, setCap, esc, paint, G, P } = R, c = catOf(R.res).get(id), k = P(id);
     if (!c) return;
-    if (noFlip) { R.catv[k] = catFace(c); return; }
+    if (noFlip) {
+      R.catv[k] = catFace(c);
+      // 番犬・模倣番犬などに【同時に】噛まれて、陣営をランダムで決めた猫: めくれたあとに字幕で知らせる（噛殺の字幕のあと）
+      if (c.bitRandom) later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} は ${catLine(c, esc)}</div>`); paint(G()); }, at);
+      return;
+    }
     later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} に ${c.votes}票 入っていました…</div>`); delete R.up[k]; paint(G()); }, at);
     later(() => { R.catv[k] = catFace(c); R.up[k] = CAT; setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} は ${catLine(c, esc)}</div>`); paint(G()); }, at + CAT_EXTRA - 600);
   }

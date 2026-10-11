@@ -52,7 +52,7 @@
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞・麻婆豆腐・暴露の紙を出している間）は使えない
-    if (!g.currentRoles || g.currentRoles[id] !== R().SHERIFF) return false;
+    if (!g.currentRoles || ONW.mimic.actRole(g, id, g.currentRoles[id]) !== R().SHERIFF) return false;   // 模倣の人狼が保安官を模倣していても使える（7of9）
     if (ONW.hiddenDrunk(g, id) || isDead(g, id) || used(g, id)) return false;
     return targets(g, id).length > 0;
   }
@@ -73,6 +73,18 @@
     if (role === r.WHITE_WOLF) return false;   // 白狼は村人陣営と同じ扱い（誤爆。マイクラ版 targetIsSheriffFailureRole）
     return info.team !== ONW.TEAM.VILLAGE;
   }
+  /** 模倣保安官から見て「人狼陣営」の人か（マイクラ版 targetIsWolfSideForMimicSheriff）: カードが模倣の人狼・狼憑き、または人狼系・狂人系の役職（闇の化身は数えない）。白狼もここに入る（模倣保安官が白狼を撃つと誤爆） */
+  function isWolfSideForMimic(g, id) {
+    const r = R(), role = g.currentRoles[id], info = ONW.ROLE_INFO[role];
+    if (role === r.MIMIC_WOLF || role === r.WOLF_MARKED) return true;
+    return !!info && info.team === ONW.TEAM.WOLF && role !== r.DARK_AVATAR;
+  }
+  /** 模倣保安官が撃ったとき執行される人か（false なら誤爆）。マイクラ版: 人狼陣営でない人（村人陣営・第三陣営・狐憑き）は執行 / 恋人がいる人・シャッフラーつきは陣営に関係なく執行 / 人狼陣営（白狼・模倣の人狼・狼憑き・狂人系を含む）は誤爆 */
+  function isHitMimic(g, id) {
+    if (!g.currentRoles[id] || !ONW.ROLE_INFO[g.currentRoles[id]]) return false;
+    if (ONW.isLover(g, id) || shufflerTagged(g, id)) return true;
+    return !isWolfSideForMimic(g, id);
+  }
   /** 執行されそうな人の身代わりになる従者のID（なければ null）。従者本人を撃つときは身代わりなし。生きている・恋人でない従者だけ（追放の身代わり vote.applyServantSubstitution と同じ条件） */
   function substituteOf(g, target) {
     const r = R();
@@ -88,15 +100,18 @@
    */
   function judge(g, by, target) {
     const r = R(), role = g.currentRoles[target];
+    // 【マイクラ版に合わせて修正】模倣保安官（カードは模倣の人狼）は、人狼陣営でない人を執行し、人狼陣営（白狼・模倣の人狼・狼憑き・狂人系を含む）を撃つと誤爆する（isHitMimic）。人狼王のガード・ネコカボチャは同じ。シュレディンガーの猫は人狼陣営に固定する
+    const rev = ONW.mimic.isMimicSheriff(g, by);
     const out = { by, target, mode: "none", victims: [], tomo: [], sub: null, followIds: [], keepVictory: [] };
+    if (rev) out.rev = true;   // 模倣保安官のときだけ付ける（普通の保安官の plan の形は変えない）
     // 人狼王: 他に生きている人狼判定がいればガード（追放と同じ ONW.kingProtected）。撃っても何も起きない
     if (ONW.kingActive && ONW.kingActive(g, target) && ONW.kingProtected(g, target, new Set(g.deadIds || []), new Set([target]))) { out.mode = "guarded"; return out; }
     // ネコカボチャ: 撃つと保安官もネコカボチャも死ぬ（身代わりなし）
     // 【連鎖化】同時には死なない: ネコカボチャが撃たれて死ぬ(shot) → 保安官はネコカボチャの「道連れ」で、そのあとに死ぬ(tomo。net.js hostSheriff が段をずらして殺す)。保安官の従者はこれまでどおり後追いする
-    if (role === r.CAT_PUMPKIN && !ONW.hiddenDrunk(g, target)) { out.mode = "pumpkin"; out.victims = [target]; out.tomo = [by]; out.followIds = [target, by]; return out; }
+    if (ONW.mimic.isAs(g, target, r.CAT_PUMPKIN) && !ONW.hiddenDrunk(g, target)) { out.mode = "pumpkin"; out.victims = [target]; out.tomo = [by]; out.followIds = [target, by]; return out; }   // 模倣ネコカボチャも同じ（受動効果は模倣先で見る）
     // シュレディンガーの猫（6of6・マイクラ版 sheriffSpecialCatTeam）: 誰も死なない。1回目に撃つと、猫は村人陣営に固定される（投票した人の陣営に決まる通常の仕組みより優先。恋人の猫は恋人陣営のまま）。固定済みの猫を撃っても何も起きない
-    if (role === r.SCHRODINGER_CAT) { if (!catFixed(g, target)) { out.mode = "cat"; out.catFix = true; } return out; }
-    if (isHit(g, target)) {
+    if (role === r.SCHRODINGER_CAT) { if (!catFixed(g, target)) { out.mode = "cat"; out.catFix = true; if (rev) out.catTeam = "wolf"; } return out; }   // 模倣保安官が撃った猫は人狼陣営に固定（マイクラ版 sheriffCatTeam）
+    if (rev ? isHitMimic(g, target) : isHit(g, target)) {
       out.mode = "execute";
       const sub = substituteOf(g, target);
       if (sub) { out.sub = sub; out.victims = [sub]; out.keepVictory = [sub]; }   // 従者が身代わりに撃たれる（勝利条件は失わない）。ご主人は無傷
@@ -113,7 +128,7 @@
   function record(g, plan) {
     if (!plan || used(g, plan.by)) return null;
     (g.sheriffShots = g.sheriffShots || []).push(plan);
-    if (plan.catFix) (g.sheriffCatFix = g.sheriffCatFix || {})[plan.target] = plan.by;   // 猫の陣営固定（撃たれた猫は村人陣営）
+    if (plan.catFix) { (g.sheriffCatFix = g.sheriffCatFix || {})[plan.target] = plan.by; if (plan.catTeam) (g.sheriffCatTeam = g.sheriffCatTeam || {})[plan.target] = plan.catTeam; }   // 猫の陣営固定（撃たれた猫は村人陣営。模倣保安官なら人狼陣営）
     return plan;
   }
   /** 保安官の死に従者が後追いするか（state.js の deathFollowers が kind "shot" / ネコカボチャの道連れ "tomo" のとき呼ぶ）。誤爆の保安官・ネコカボチャで死んだ2人だけ。執行された人は身代わりが立つので後追いしない */
@@ -147,7 +162,11 @@
       const by = nm(e.by), tg = nm(e.target), sub = e.sub ? nm(e.sub) : "";
       const lose = "勝利条件と投票権を失いました";
       let info = "";
-      if (e.mode === "execute" && e.sub) info = `${tg} は村人陣営ではない人でしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
+      if (e.rev && e.mode === "execute" && e.sub) info = `${by} は模倣保安官です。${tg} は人狼陣営ではありませんでしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
+      else if (e.rev && e.mode === "execute") info = `${by} は模倣保安官です。${tg} は人狼陣営ではありませんでした。${tg} が撃たれ、${lose}。`;
+      else if (e.rev && e.mode === "misfire") info = `${by} は模倣保安官です。${tg} は人狼陣営でした。${by} が撃たれ、${lose}。`;
+      else if (e.rev && e.mode === "cat") info = `${by} は模倣保安官です。${tg} はシュレディンガーの猫でした。誰も死なず、${tg} は人狼陣営に固定されました。`;
+      else if (e.mode === "execute" && e.sub) info = `${tg} は村人陣営ではない人でしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
       else if (e.mode === "execute") info = `${tg} は村人陣営ではない人でした。${tg} が撃たれ、${lose}。`;
       else if (e.mode === "misfire") info = `${tg} は村人陣営でした。${by} が撃たれ、${lose}。`;
       else if (e.mode === "pumpkin") info = `${tg} はネコカボチャでした。${tg} が撃たれ、道連れで ${by} も死に、2人とも${lose}。`;
@@ -168,7 +187,7 @@
     if (!hit) return "執行";
     return hit.by === id ? "誤爆" : "執行";
   }
-  ONW.sheriff = { canUse, targets, used, catFixed, isHit, substituteOf, judge, record, followsShot, view, lostIds, actText, lines, flags, labelOf };
+  ONW.sheriff = { canUse, targets, used, catFixed, isHit, isHitMimic, isWolfSideForMimic, substituteOf, judge, record, followsShot, view, lostIds, actText, lines, flags, labelOf };
 
   // ======================================================================
   // 【CPU・5of6a】マイクラ版 main.js / cpu.js の保安官CPU（撃った相手を「〇〇を撃ちました」と言う）に合わせる。
@@ -189,12 +208,23 @@
     if ([r.WHITE_WOLF, r.CAT_PUMPKIN, r.SCHRODINGER_CAT, r.WOLF_KING].includes(role)) return false;
     return info.team !== ONW.TEAM.VILLAGE;
   }
+  /** 模倣保安官のCPUが、撃てば執行される「人狼陣営でない人」と役職から言えるか（村人陣営・狐憑き。狼憑きは人狼陣営なので誤爆・猫は誰も死なないので除く） */
+  function cpuKnownVillage(role) {
+    const r = R(), info = role && ONW.ROLE_INFO[role];
+    if (!info || [r.WOLF_MARKED, r.SCHRODINGER_CAT, r.CAT_PUMPKIN].includes(role)) return false;
+    return info.team === ONW.TEAM.VILLAGE || role === r.FOX_MARKED;
+  }
   /** CPUの保安官が、いま撃つ相手のID（なければ null）。撃てるか（canUse）・自分を保安官だと思っているか・確実に人外と分かっている人がいるか。人狼と分かっている人を先に狙う */
   function cpuPick(k, g, p) {
     if (!canUse(g, p.id)) return null;
+    const mimicSh = ONW.mimic.isMimicSheriff(g, p.id);   // 模倣保安官のCPUは、自分が保安官を模倣していると分かっている（夜の文）
     const me = g.drunkOverlay && g.drunkOverlay[p.id] ? ONW.shownRole(g.currentRoles[p.id]) : k.selfRole(g, p);   // 酔いが覚めたCPUは、最終役職を保安官だと分かっている
-    if (me !== R().SHERIFF) return null;
+    if (!mimicSh && me !== R().SHERIFF) return null;
     const i = k.infoOf(g, p.id), mates = ONW.loverMates(g, p.id);
+    if (mimicSh) {   // 模倣保安官は人狼陣営でない人を執行する（人狼陣営を撃つと誤爆）: 夜に知った役職が「確実に村人陣営」の人だけ狙う（人狼陣営・恋人・猫・ネコカボチャは誤爆か何も起きないので避ける）
+      const vil = targets(g, p.id).filter((t) => !mates.includes(t) && cpuKnownVillage(i.known[t]));
+      return vil.length ? k.pick(vil) : null;
+    }
     const sure = targets(g, p.id).filter((t) => !mates.includes(t) && cpuKnownHit(i.known[t]));   // 恋人の相方は撃たない（自分の勝利条件に響く）
     if (!sure.length) return null;
     const wolves = sure.filter((t) => k.isWolf(i.known[t]));
@@ -261,7 +291,7 @@
 
   ONW.defineRole("sheriff", {
     info: { deck: 67, name: "保安官", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.97,
-      desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外の1人を撃ちます。村人陣営でない人を撃つと、その人は死に、勝利条件と投票権を失います。村人陣営を撃ってしまうと、死ぬのは保安官自身です。どちらの場合も、昼のあいだは周りからは同じ「撃たれた」としか見えません（カードには銃痕とひびだけ）。結果発表で「執行」か「誤爆」かが分かります。シュレディンガーの猫を撃っても誰も死にませんが、その猫は村人陣営に固定されます（人狼王にガードされた場合などは何も起きません）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に保安官を持っている人が使えます。" },
+      desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外の1人を撃ちます。村人陣営でない人を撃つと、その人は死に、勝利条件と投票権を失います。村人陣営を撃ってしまうと、死ぬのは保安官自身です。（模倣の人狼が模倣したときは逆で、人狼陣営でない人を撃つと執行され、人狼陣営を撃つと自分が死にます。）どちらの場合も、昼のあいだは周りからは同じ「撃たれた」としか見えません（カードには銃痕とひびだけ）。結果発表で「執行」か「誤爆」かが分かります。シュレディンガーの猫を撃っても誰も死にませんが、その猫は村人陣営に固定されます（人狼王にガードされた場合などは何も起きません）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に保安官を持っている人が使えます。" },
     groups: { "transform:light_apostle": 28 },   // 光の使徒の変化先（村人系）
     // CPU（5of6a）: 本物は必ず「保安官CO」。騙りは低い確率で「保安官CO」だけ（結果なし。claim を書かないと、村人が配役にいるとき「村人CO」に置き換わってしまう）
     cpuClaim(k, g, p, r, i, c) { c.co = "sheriff"; },

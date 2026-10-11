@@ -95,6 +95,7 @@
     ONW.pureLover.seen(g, p.id, t.id);
     i.mode = "pure_lover"; i.target = t.id;
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を恋人に選びました。`);
+    n.hold(p.id, `${t.name} を恋人に選びました。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }

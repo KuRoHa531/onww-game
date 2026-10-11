@@ -3,7 +3,7 @@
   /** 朝が終わった直後に、後覚者へ最終的な役職を伝える（id → 通知文） */
   function results(c) {
     const g = c.g, out = {};
-    g.players.filter((p) => !p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]) && (g.initialRoles[p.id] === "insomniac" || g.currentRoles[p.id] === "insomniac")).forEach((p) => {
+    g.players.filter((p) => !p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]) && (ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]) === "insomniac" || ONW.mimic.eff(g, p.id) === "insomniac")).forEach((p) => {
       // 元々の後覚者 / 後から後覚者になった人（怪盗・いたずらっ子などで最終役職が後覚者）の両方に、そのときの最終的な役職を伝える
       out[p.id] = `夜の行動がすべて終わりました。あなたの最終的な役職は「${c.rn(ONW.shownRole(g.currentRoles[p.id]))}」です。`;
     });
@@ -80,10 +80,10 @@
     dayShift(c, before) {
       const g = c.g;
       g.players.forEach((p) => {
-        const b = before[p.id], a = g.currentRoles[p.id];
+        const b = ONW.mimic.beforeEff(before, p.id), a = ONW.mimic.eff(g, p.id);   // 模倣の人狼は模倣先に読み替えた役職で見る（9of9）
         if (b === a || (b !== "insomniac" && a !== "insomniac")) return;
         if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id)) return;   // 酔いが覚める前の人は、覚めたときに最終役職を知る
-        const shown = ONW.shownRole(a);
+        const shown = ONW.shownRole(g.currentRoles[p.id]);   // 本人に見せる最終役職はカードそのもの（模倣の人狼なら「模倣の人狼」）
         if (p.isCpu) { ONW.cpu.notifyInsom(g, p.id); return; }
         const text = `後覚者の能力が発動しました。昼に役職が入れ替わり、あなたの最終的な役職は「${c.rn(shown)}」になりました。`;
         c.hold(p.id, text);

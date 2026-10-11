@@ -55,6 +55,7 @@
     seen(g, p.id, h, k);
     i.mode = "evil_woman"; i.honmei = h; i.keep = k;
     g.nightLogsAll.push(`${label} ${p.name} は 本命=${nm(g, h)} キープ=${nm(g, k)} を選びました。`);
+    n.hold(p.id, `本命は ${nm(g, h)}、キープは ${nm(g, k)} です。`);
     n.ob(p.id, [h, k]);
     n.nn(rid);
   }

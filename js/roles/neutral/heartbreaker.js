@@ -81,8 +81,8 @@
       if (g.currentRoles[p.id] !== R_() || ONW.hiddenDrunk(g, p.id) || c.isDead(p.id)) return;
       const L = unseen(g, p.id); if (!L.length) return;
       L.forEach(([a, b]) => markSeen(g, p.id, a, b));
-      if (p.isCpu) return;
       const text = L.map(([a, b]) => pairText(g, a, b)).join(" "), items = [];
+      if (p.isCpu) { c.hold(p.id, text); return; }   // CPUは演出なし。人間と同じ文だけ情報確認に残す
       L.forEach(([a, b]) => [a, b].forEach((id) => { if (!items.some((x) => x.id === id)) items.push({ id, role: "__break" }); }));
       c.hold(p.id, text); c.send(p.id, { t: "jobday", id: items[0].id, text, role: "__break", items });
     });
@@ -100,6 +100,7 @@
     setTarget(g, p.id, t.id);
     i.mode = "heartbreaker"; i.target = t.id;
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を破局対象に選びました。`);
+    n.hold(p.id, `${t.name} を破局対象に選びました。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }

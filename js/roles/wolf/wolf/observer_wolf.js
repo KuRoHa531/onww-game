@@ -61,25 +61,25 @@
     dayShift(c, before) {
       const g = c.g;
       g.players.forEach((p) => {
-        if (before[p.id] === g.currentRoles[p.id] || g.currentRoles[p.id] !== ONW.ROLE.OBSERVER_WOLF) return;
+        if (ONW.mimic.beforeEff(before, p.id) === ONW.mimic.eff(g, p.id) || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF) return;   // 模倣先に読み替えた役職で見る（9of9）
         if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id)) return;
         if (g.observerSeen) delete g.observerSeen[p.id];
         const lines = deliver(g, p.id);
-        if (p.isCpu) { cpuLearn(g, p.id); return; }
         const tx = textOf(lines);
+        if (p.isCpu) { cpuLearn(g, p.id); tx.forEach((t) => c.hold(p.id, t)); return; }   // CPUも人間と同じ観測通知を情報確認に残す
         tx.forEach((t) => c.hold(p.id, t));
         if (g.soberLines && g.soberLines[p.id]) g.soberLines[p.id].push(...tx);
         c.send(p.id, { t: "observeday", lines, role: ONW.shownRole(g.currentRoles[p.id]) });
       });
     },
     /** 昼に酔いが覚めたCPUの観測の人狼も観測結果を覚える */
-    soberReveal: { order: 90, run(c, ids) { const g = c.g; ids.forEach((id) => { const p = g.players.find((q) => q.id === id); if (p && p.isCpu && g.currentRoles[id] === ONW.ROLE.OBSERVER_WOLF) { deliver(g, id); cpuLearn(g, id); } }); } },
+    soberReveal: { order: 90, run(c, ids) { const g = c.g; ids.forEach((id) => { const p = g.players.find((q) => q.id === id); if (p && p.isCpu && ONW.mimic.eff(g, id) === ONW.ROLE.OBSERVER_WOLF) { deliver(g, id); cpuLearn(g, id); } }); } },
     /** 待機時間: CPUの観測の人狼も観測結果を覚える */
     settlePost: { order: 25, run(c) { const g = c.g; ONW.observerHolders(g).forEach((p) => { if (p.isCpu) { deliver(g, p.id); cpuLearn(g, p.id); } }); } },
     /** 待機時間: 最終盤面で酔いが覚めている観測の人狼に、観測結果を伝える（再入室では、すでに伝えた分だけ同じ内容を返す） */
     settleMsg: { order: 25, run(c, p, mode) {
       const g = c.g;
-      if (p.isCpu || g.currentRoles[p.id] !== ONW.ROLE.OBSERVER_WOLF || ONW.hiddenDrunk(g, p.id)) return {};
+      if (p.isCpu || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF || ONW.hiddenDrunk(g, p.id)) return {};
       if (mode === "resync" && !(g.observerSeen || {})[p.id]) return {};
       const lines = deliver(g, p.id);
       return { logs: textOf(lines), observe: { lines } };

@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null };
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -70,6 +70,11 @@ window.ONW = window.ONW || {};
     if (!game.debugOn || !game.dbg || !game.dbg.rand) return [];
     const ok = (id) => game.players.some((p) => p.id === id);
     return (game.dbg.rand.lover || []).filter((pr) => Array.isArray(pr) && pr.length === 2 && pr[0] !== pr[1] && ok(pr[0]) && ok(pr[1]));
+  };
+  /** 模倣の人狼の模倣先の指定（持ち主のID → 役職ID。指定なしなら null。8of9。mimic_wolf.js の choose が見る。模倣できない役職は choose 側で無視される） */
+  debug.mimicRole = function (game, id) {
+    if (!game.debugOn || !game.dbg) return null;
+    return (game.dbg.mimic || {})[id] || null;
   };
   /** CPUの夜の能力先指定 { player?, graves? } */
   debug.cpuTarget = function (game, id) {
@@ -216,9 +221,12 @@ window.ONW = window.ONW || {};
     const d = data(), r = d.roles[key];
     if (!r) return null;
     const grp = ONW.TRANSFORM_GROUPS[r];
-    if (grp) return d.tf[key] ? [d.tf[key]] : grp.slice();
-    return [r];
+    let out = grp ? (d.tf[key] ? [d.tf[key]] : grp.slice()) : [r];
+    if (out.includes("mimic_wolf") && (d.mimic || {})[key]) out = [...out, d.mimic[key]];   // 模倣の人狼: 指定した模倣先の能力先（占う相手・墓地・口封じ先など）も同じパネルで指定できる
+    return out;
   }
+  /** 模倣の人狼を固定した人か（模倣先が未指定でも、能力先の行は出して案内する） */
+  const isMimicFixed = (key) => { const d = data(); return d.roles[key] === "mimic_wolf" || (!!d.roles[key] && d.tf[key] === "mimic_wolf"); };
   function cpuKinds(key) {
     const rs = cpuRoles(key), k = { seer: false, rob: false, tm: false, rel: false, gr: false };
     if (!rs) return k;   // 固定なし: 能力先は指定できない
@@ -234,14 +242,16 @@ window.ONW = window.ONW || {};
       const t = d.cpu[s.key] || {}, role = d.roles[s.key], k = cpuKinds(s.key), rs = cpuRoles(s.key);
       const rk = rs ? RAND_KINDS.filter((x) => x.roles.some((r) => rs.includes(r)) && (!x.cpuOnly || s.cpu)) : [];   // 従者のご主人など（人間もCPUも）
       if (!rs) return "";   // 固定役がない人は出さない
-      if (!rk.length && (!s.cpu || !Object.values(k).some(Boolean))) return "";   // 指定できるものがない人も出さない
+      const mimicHint = isMimicFixed(s.key) && !(d.mimic || {})[s.key];   // 模倣の人狼で模倣先が未指定
+      if (!mimicHint && !rk.length && (!s.cpu || !Object.values(k).some(Boolean))) return "";   // 指定できるものがない人も出さない
       const parts = [];
       if (t.player) parts.push(esc(nameOfKey(t.player)));
       if ((t.players || []).length) parts.push(t.players.map((id) => esc(nameOfKey(id))).join(k.gr && !k.tm ? " → " : " と "));
       if ((t.graves || []).length) parts.push(t.graves.map((i) => `墓地${i + 1}`).join("・"));
       rk.forEach((x) => { const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null; if (cur) parts.push(`${esc(x.label)}: ${esc(nameOfKey(cur))}`); });
       const lab = parts.length ? parts.join(" / ") : "指定なし";
-      const fixed = role ? ` <small class="dbg-dim">(${esc(rn(role))}${d.tf[s.key] ? " → " + esc(rn(d.tf[s.key])) : ""}固定)</small>` : "";
+      const mimT = isMimicFixed(s.key) ? (d.mimic || {})[s.key] : null;
+      const fixed = role ? ` <small class="dbg-dim">(${esc(rn(role))}${d.tf[s.key] ? " → " + esc(rn(d.tf[s.key])) : ""}固定${mimT ? " / 模倣先: " + esc(rn(mimT)) : ""})</small>` : "";
       let h = row(esc(s.name) + (s.cpu ? cpuBadge : "") + fixed, `<span class="dbg-val">${lab}</span> ${b("変更", "pick", ["c:" + s.key])}`);
       if (ui.pick === "c:" + s.key) {
         const others = players.filter((o) => o.key !== s.key);
@@ -251,6 +261,7 @@ window.ONW = window.ONW || {};
         const gb = Array.from({ length: g.graveCount || 0 }, (_, i) => b(`墓地${i + 1}`, "cpuGrave", [s.key, String(i)], (t.graves || []).includes(i) ? "dbg-on" : "")).join("");
         let body = "";
         if (!s.cpu) body = "";
+        else if (mimicHint) body = hint("模倣先を指定すると、その役職の能力先（占う相手・墓地・ご主人など）を指定できます。下の「模倣先の固定」で選んでください。");
         else if (rs && !Object.values(k).some(Boolean) && !rk.length) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
         else if (s.cpu) {
           if (k.seer || k.rob) body += sec(k.seer && k.rob ? "プレイヤー（占う相手 / 交換・一目惚れの相手）" : k.seer ? "プレイヤー（占う相手）" : "プレイヤー（交換・一目惚れの相手）", pb("cpuPlayer", (id) => t.player === id));
@@ -269,6 +280,19 @@ window.ONW = window.ONW || {};
     return (rows || hint("役職を固定した人がいると、ここに出ます。"));
   }
 
+  // ---- 模倣先の固定（固定した役職が模倣の人狼の人だけ。人間もCPUも）。盤面・墓地に無い役職も指定できる ----
+  function mimicPart() {
+    const d = data(), { players } = slots();
+    const M = ONW.mimic, ok = (r) => ONW.ROLE_INFO[r] && !M.NON_MIMICABLE.has(r) && [ONW.TEAM.VILLAGE, ONW.TEAM.WOLF].includes(ONW.ROLE_INFO[r].team);
+    const list = ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO).filter(ok));
+    const rows = players.filter((s) => d.roles[s.key] === "mimic_wolf" || (d.roles[s.key] && d.tf[s.key] === "mimic_wolf")).map((s) => {
+      const cur = (d.mimic || {})[s.key] || "";
+      const opts = `<option value="">指定なし（ランダム）</option>` + list.map((r) => `<option value="${r}"${r === cur ? " selected" : ""}>${esc(rn(r))}</option>`).join("");
+      return row(esc(s.name) + (s.cpu ? cpuBadge : "") + ' <small class="dbg-dim">(模倣の人狼固定)</small>', `<select onchange="ONW.debug.mimicSet(${attr(s.key)}, this.value)">${opts}</select>`);
+    }).join("");
+    return rows ? `<div class="dbg-h">模倣先の固定</div>${rows}` : "";
+  }
+
   // ---- ランダムに決まる対象の指定（固定した役職が従者・黒猫などの人だけ。人間もCPUも） ----
   const RAND_KINDS = [   // 役職 → 指定できる対象の種類
     { kind: "master", roles: ["servant"], label: "ご主人" },
@@ -281,16 +305,21 @@ window.ONW = window.ONW || {};
   ];
   function tabCpu() {
     if (!inLobby()) return hint("能力先・ランダム対象はルーム（ロビー）で設定します。次の試合に反映されます。");
-    return `<div class="dbg-h">夜の能力先・ランダムに決まる対象</div>` + cpuPart();
+    return `<div class="dbg-h">夜の能力先・ランダムに決まる対象</div>` + cpuPart() + mimicPart();
   }
 
   // ---- 昼能力（CPUをリアルタイムで発動する）----
   /** 昼の議論中に、CPUの昼能力（独裁・交換・保安官・再就職）を「いま」使わせる。事前指定ではなく、押した瞬間に発動する（マイクラ版の能力先指定の昼版と同じ） */
   const DAY_KINDS = [
+    { kind: "dictate", role: "dictator", label: "独裁", can: (g, id) => ONW.dictator.canUse(g, id), targets: (g, id) => ONW.dictator.targets(g, id) },
+    { kind: "exchange", role: "exchanger", label: "交換", two: true, can: (g, id) => ONW.exchanger.canUse(g, id), targets: (g, id) => ONW.exchanger.targets(g, id) },
+    { kind: "sheriff", role: "sheriff", label: "撃つ", can: (g, id) => ONW.sheriff.canUse(g, id), targets: (g, id) => ONW.sheriff.targets(g, id) },
+    { kind: "rejob", role: "freeter", label: "再就職", can: (g, id) => ONW.freeter.canRejob(g, id), targets: (g, id) => ONW.freeter.targets(g, id) },
+    { kind: "mind", role: "mind_wolf", label: "見抜く", can: (g, id) => ONW.mindWolf.canUse(g, id), targets: (g, id) => ONW.mindWolf.targets(g, id) },
   ];
   function tabDay() {
     const g = G();
-    if (!inGame() || g.phase !== PH().ONLINE_DAY) return hint("昼の議論中に使えます。CPUの昼能力（独裁・交換・保安官・フリーターの再就職）を、押した瞬間に発動します。");
+    if (!inGame() || g.phase !== PH().ONLINE_DAY) return hint("昼の議論中に使えます。CPUの昼能力（独裁・交換・保安官・フリーターの再就職・心眼の人狼）を、押した瞬間に発動します。");
     const nm = (id) => (g.players.find((p) => p.id === id) || {}).name || "?";
     const rows = g.players.filter((p) => p.isCpu).map((p) => {
       const k = DAY_KINDS.find((x) => g.currentRoles[p.id] === x.role);
@@ -305,7 +334,7 @@ window.ONW = window.ONW || {};
       }
       return h;
     }).join("");
-    return rows || hint("昼能力を使えるCPU（独裁者・交換者・保安官・再就職できるフリーター）がいません。役職を固定したCPUに配ると出ます。");
+    return rows || hint("昼能力を使えるCPU（独裁者・交換者・保安官・再就職できるフリーター・心眼の人狼）がいません。役職を固定したCPUに配ると出ます。");
   }
 
   // ---- その他（CPU議論発言 / 夜ログ）----
@@ -394,6 +423,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.dayCancel = () => { ui.pick = null; ui.dayFirst = null; refresh(); };
+  debug.mimicSet = (key, role) => { const d = data(); if (role) d.mimic[key] = role; else delete d.mimic[key]; refresh(); };   // 模倣の人狼の模倣先の指定
   debug.masterSet = (key, t) => { const d = data(); if (t) d.master[key] = t; else delete d.master[key]; ui.pick = null; refresh(); };
   debug.randSet = (kind, key, t) => {   // kind: master / freeter / cat / straw / exec / muzzle（持ち主ごとに1人）
     const d = data(), store = kind === "master" ? d.master : d.rand[kind];
@@ -415,7 +445,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; refresh(); };
-  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
+  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.mimic = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
 
   // 指定を書き換える（空になったら項目ごと消す）
   const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };

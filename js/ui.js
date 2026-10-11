@@ -164,6 +164,8 @@ window.ONW = window.ONW || {};
     document.body.classList.toggle("pseudo-fs");
   };
 
+  /** 模倣の人狼のカードの下に出す、模倣先の枠（2of9）。role が模倣の人狼で、模倣先が決まっているときだけ */
+  ui.mimicTag = (role, target) => role === "mimic_wolf" && target && ONW.ROLE_INFO[target] ? `<span class="tb-mimic dl-mimic">${esc(ONW.ROLE_INFO[target].name)}</span>` : "";
   ui.toggleGroup = function (key) { const g = ONW.game; g.roleOpen = { ...(g.roleOpen || {}), [key]: !(g.roleOpen || {})[key] }; ONW.ui.render(g); };
   ui.toggleInvite = function () {
     const g = ONW.game;
@@ -194,7 +196,7 @@ window.ONW = window.ONW || {};
         <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
       </button>`;
     const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "watchdog", "sheriff"]);
-    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"]), dark = ["dark_avatar"];
+    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman"]), dark = ["dark_avatar"];
     const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic"]);
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
@@ -475,7 +477,9 @@ window.ONW = window.ONW || {};
       const live = info.night && info.sels.length ? `<div class="si-h">夜の選択（朝に実行）</div>${info.sels.map((x) => row(`${esc(x.name)} <small class="rs-dim">${esc(ONW.roles.getInfo(x.role).name)}</small>`, esc(x.text))).join("")}` : "";
       const votes = info.dict ? `<div class="si-h">独裁処刑</div>${row(esc(info.dict.by), `→ <strong>${esc(info.dict.target)}</strong>`)}` : info.vote ? `<div class="si-h">投票状況（変更あり）</div>${info.votes.map((v) => row(esc(v.from), v.to ? `→ <strong>${esc(v.to)}</strong>${v.w > 1 ? ` <span class="rs-dim">(${v.w}票)</span>` : ""}` : v.x ? '<span class="rs-dead">投票無効</span>' : '<span class="rs-dim">未投票</span>')).join("")}` : "";
       const log = info.log.length ? `<div class="si-h">夜の行動ログ</div>${info.log.map((t) => `<div class="si-log">${esc(t)}</div>`).join("")}` : "";
-      body = live + votes + log || `<div class="si-log">まだ記録はありません。</div>`;
+      const mimicInfo = (info.mimicInfo || []).length ? `<div class="si-h">役職情報</div>${info.mimicInfo.map((x) => `<div class="si-log">模倣の人狼 ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。</div>`).join("")}` : "";
+      const mind = (info.mind || []).length ? `<div class="si-h">昼の行動（心眼の人狼）</div>${info.mind.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.role ? `最終役職: <strong>${esc(ONW.roles.getInfo(x.role).name)}</strong>` : "")).join("")}` : "";
+      body = live + votes + mind + log + mimicInfo || `<div class="si-log">まだ記録はありません。</div>`;
     }
     const html = `<div class="night-info__head"><span>夜ログ</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
       (open && info ? `<div class="si-body">${body}</div>` : "");
@@ -534,7 +538,7 @@ window.ONW = window.ONW || {};
   /** 廃村: 試合を打ち切って全員をルームへ戻す（押し間違い防止に、もう一度確認する） */
   ui.confirmAbandon = function () {
     const g = ONW.game, same = ui._skipPhase === g.phase;
-    if (!window.confirm("廃村にしますか？\nこの試合は結果なしで終わり、全員がルームに戻ります。")) return;
+    if (!window.confirm("廃村にしますか？\nこの試合は勝者も敗者もなしで終わり、最終結果（廃村）が表示されます。")) return;
     ui.closeSkip();
     if (same && canSkip(g)) ONW.net.abandonGame();
   };
@@ -602,8 +606,8 @@ window.ONW = window.ONW || {};
           ${me
             ? `<div class="dl-card dl-fly dl-big dl-hasflip" data-fly style="${D(pStart + pStep * idx)}">
                  <div class="dl-flipper" style="${D(flip1)}">
-                   <div class="dl-face dl-face--a dl-team-${(from || info).team}${(from ? game.myFrom : game.myRole) === "drunk" ? " dl-face--drunk" : ""}" style="${from ? D(flip2 - 0.2) : lover ? D(flipL - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b></div>
-                   ${from ? `<div class="dl-face dl-face--b dl-team-${info.team}${game.myRole === "drunk" ? " dl-face--drunk" : ""}" style="${lover ? `animation:dl-in .25s ease-out both,dl-out .25s ease-in forwards;animation-delay:${(flip2 - elapsed).toFixed(2)}s,${(flipL - 0.2 - elapsed).toFixed(2)}s;` : D(flip2)}">${ui.roleIcon(game.myRole, "role-icon--face")}<b>${esc(info.name)}</b></div>` : ""}
+                   <div class="dl-face dl-face--a dl-team-${(from || info).team}${(from ? game.myFrom : game.myRole) === "drunk" ? " dl-face--drunk" : ""}" style="${from ? D(flip2 - 0.2) : lover ? D(flipL - 0.2) : ""}">${ui.roleIcon(from ? game.myFrom : game.myRole, "role-icon--face")}<b>${esc(from ? from.name : info.name)}</b>${from ? "" : ui.mimicTag(game.myRole, game.myMimic)}</div>
+                   ${from ? `<div class="dl-face dl-face--b dl-team-${info.team}${game.myRole === "drunk" ? " dl-face--drunk" : ""}" style="${lover ? `animation:dl-in .25s ease-out both,dl-out .25s ease-in forwards;animation-delay:${(flip2 - elapsed).toFixed(2)}s,${(flipL - 0.2 - elapsed).toFixed(2)}s;` : D(flip2)}">${ui.roleIcon(game.myRole, "role-icon--face")}<b>${esc(info.name)}</b>${ui.mimicTag(game.myRole, game.myMimic)}</div>` : ""}
                    ${lover ? `<div class="dl-face dl-face--b dl-face--love dl-team-third" style="${D(flipL)}"><span class="dl-love-mark">❤</span><b>恋人</b></div>` : ""}
                  </div>
                </div>`
@@ -649,8 +653,8 @@ window.ONW = window.ONW || {};
       const a = o.from || o.ini, ia = ONW.roles.getInfo(a), ib = ONW.roles.getInfo(o.ini);
       const flipL = o.from ? flip2 + 1.6 : flip2;   // 恋人にめくれる時刻（役職のカードのあと）
       return `<div class="dl-card dl-fly dl-hasflip" data-fly style="${D(fly)}"><div class="dl-flipper" style="${D(flip1)}">
-        <div class="dl-face dl-face--a dl-team-${ia.team}${a === "drunk" ? " dl-face--drunk" : ""}" style="${o.from ? D(flip2 - 0.2) : o.lover ? D(flipL - 0.2) : ""}"><b>${esc(ia.name)}</b></div>
-        ${o.from ? `<div class="dl-face dl-face--b dl-team-${ib.team}${o.ini === "drunk" ? " dl-face--drunk" : ""}" style="${o.lover ? `animation:dl-in .25s ease-out both,dl-out .25s ease-in forwards;animation-delay:${(flip2 - elapsed).toFixed(2)}s,${(flipL - 0.2 - elapsed).toFixed(2)}s;` : D(flip2)}"><b>${esc(ib.name)}</b></div>` : ""}
+        <div class="dl-face dl-face--a dl-team-${ia.team}${a === "drunk" ? " dl-face--drunk" : ""}" style="${o.from ? D(flip2 - 0.2) : o.lover ? D(flipL - 0.2) : ""}"><b>${esc(ia.name)}</b>${o.from ? "" : ui.mimicTag(o.ini, ((game.specInfo || {}).mimicMap || {})["p:" + o.id])}</div>
+        ${o.from ? `<div class="dl-face dl-face--b dl-team-${ib.team}${o.ini === "drunk" ? " dl-face--drunk" : ""}" style="${o.lover ? `animation:dl-in .25s ease-out both,dl-out .25s ease-in forwards;animation-delay:${(flip2 - elapsed).toFixed(2)}s,${(flipL - 0.2 - elapsed).toFixed(2)}s;` : D(flip2)}"><b>${esc(ib.name)}</b>${ui.mimicTag(o.ini, ((game.specInfo || {}).mimicMap || {})["p:" + o.id])}</div>` : ""}
         ${o.lover ? `<div class="dl-face dl-face--b dl-face--love dl-team-third" style="${D(flipL)}"><b>❤恋人</b></div>` : ""}
       </div></div>`;
     };
@@ -737,7 +741,7 @@ window.ONW = window.ONW || {};
     const g = ONW.game, flash = (t) => { g.abilityMsg = t; ui.render(g); setTimeout(() => { if (g.abilityMsg === t) { g.abilityMsg = ""; ui.render(g); } }, 4000); };
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.isDead || g.isSpectator) return;
     if (kind === "day") {   // 昼能力: 独裁者だけが使える。押すとホストに確認し、使える人にだけカード選択が開く（使えない人は押しても何も起きない = 誰が独裁者か透けない）。もう一度押すと閉じる
-      if (g.dictOpen || g.rejobOpen || g.exchOpen || g.sheriffOpen) { g.dictOpen = false; g.rejobOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
+      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen) { g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
       ONW.net.dictOpen();
       return;
     }
@@ -787,6 +791,33 @@ window.ONW = window.ONW || {};
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
       <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.rejobConfirm()">再就職する</button><button class="btn" onclick="ONW.ui.rejobCancel()">キャンセル</button></div>
+    </div>`;
+  };
+  /** 心眼の人狼: 選んだ相手の最終役職を見抜く（確定） */
+  ui.mindConfirm = function () {
+    const g = ONW.game, id = g.nightSel && g.nightSel.players && g.nightSel.players[0];
+    if (!g.mindOpen || !id) return;
+    g.mindOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.net.mind(id);
+    ONW.stage.sync(g); ui.render(g);
+  };
+  ui.mindCancel = function () {
+    const g = ONW.game;
+    g.mindOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 心眼の人狼の昼能力の操作欄（昼能力ボタンで開いたとき）。上のテーブルから1人選んで「見抜く」。見抜いたあとは何も出さない（結果は情報確認に載る） */
+  ui.mindBlock = function (game) {
+    if (!game.mindOpen || game.isDead || game.isSpectator) return "";
+    const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
+    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    return `<div class="sober-box dict-box">
+      ${ui.abHelpStart(game)}
+      <p class="night-step__hint"><strong>心眼の人狼の昼能力</strong>: 上のテーブルから、<strong>最終役職を見抜く相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
+      <p class="night-step__hint">「見抜く」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）がわかります。使えるのは1回だけで、取り消せません。妖狐を見抜いても呪殺しません。</p>
+      </details>
+      <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.mindConfirm()">見抜く</button><button class="btn" onclick="ONW.ui.mindCancel()">キャンセル</button></div>
     </div>`;
   };
   /** 交換者: 選んだ2人の票数を入れ替える（確定）。確定すると取り消せない。議論は続く */
@@ -1151,6 +1182,7 @@ window.ONW = window.ONW || {};
         ${ui.exchBlock(game)}
         ${ui.sheriffBlock(game)}
         ${ui.rejobBlock(game)}
+        ${ui.mindBlock(game)}
         ${game.abilityMsg ? `<p class="night-step__hint"><strong>${esc(game.abilityMsg)}</strong></p>` : ""}
         ${(ui.logsHeld(game) ? [] : game.dayLines || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("")}
         ${ui.chatTabs(game)}
@@ -1280,7 +1312,7 @@ window.ONW = window.ONW || {};
     const sep = `<hr class="rs-sep">`;
     const seg = (s) => `<span class="t-${s.team}">${esc(s.name)}</span>${s.sfx ? `<span class="t-wolf">${esc(s.sfx)}</span>` : ""}${(s.tags || []).map((t) => `<span class="rs-tag-${t.k}">${esc(t.t)}</span>`).join("")}`;
     const chain = (segs) => segs.map(seg).join(' <span class="rs-dim">→</span> ');
-    const winTeam = res.title.startsWith("村人") ? "village" : res.title.startsWith("人狼") ? "wolf" : "third";
+    const winTeam = res.abandoned ? "none" : res.title.startsWith("村人") ? "village" : res.title.startsWith("人狼") ? "wolf" : "third";
     const none = (t) => L(`<span class="rs-dim">${t}</span>`);
     const chainRows = ONW.chainRows(res);
     const chainSec = chainRows.length ? `${sep}${H("道連れ・後追い")}${chainRows.map((r) => r.k === "sub" ? L(`<span class="rs-info">従者:</span> ${esc(r.name)} が ${esc(r.master)} の身代わりになりました。`) : r.k === "chainSub" ? L(`<span class="rs-info">従者:</span> ${esc(r.name)} が ${esc(r.master)} の道連れの身代わりになりました。`) : L(`${r.by ? `${esc(r.by)} <span class="rs-dim">→</span> ` : ""}${esc(r.name)} <span class="rs-dead">${r.label}</span>`)).join("")}` : "";
@@ -1301,9 +1333,9 @@ window.ONW = window.ONW || {};
         ${chainSec}
         ${sep}
         <div class="rs-win t-${winTeam}">${esc(res.title)}</div>
-        ${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}
+        ${res.abandoned ? none("ホストが廃村にしました。勝者も敗者もいません。") : `${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}
         ${L(`<span class="rs-good">勝者:</span> ${res.winners.map((n) => esc(n)).join("、") || "なし"}`)}
-        ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map((n) => esc(n)).join("、") || "なし"}`)}
+        ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map((n) => esc(n)).join("、") || "なし"}`)}`}
         ${sep}${H("役職履歴")}
         ${res.history.map((h) => L(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead || h.day ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
         ${sep}
@@ -1320,10 +1352,11 @@ window.ONW = window.ONW || {};
           const rows = [
             ...(res.bounty || []).map((x) => L(`<span class="rs-info">賞金稼ぎ:</span> ${esc(x.by)} は ${esc(x.target)} を人狼判定だと選びました。${x.hit ? "人狼判定だったので成功です。" : "人狼判定ではなかったので失敗です。"}`)),
             ...(res.execs || []).map((x) => L(`<span class="rs-info">処刑人:</span> ${esc(x.exec)} のターゲットは ${esc(x.target)} でした。${x.win ? (x.late ? "ターゲットの賞金稼ぎが追放され、人狼判定を外したので処刑人の勝利です。" : "ターゲットが追放（処刑）されたので処刑人の勝利です。") : x.dead ? "ターゲットが追放以外で死亡したので処刑人は敗北です。" : "ターゲットは追放されませんでした。"}`)),
-            ...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`)),
+            ...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`)),
             ...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`)),
             ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`)),
             ...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`)),
+            ...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`)),   // 何を模倣したかは夜行動結果ではなく役職情報
           ];
           return rows.length ? `${sep}${H("役職情報")}${ONW.utils.tintHtml(rows.join(""), res)}` : "";
         })()}

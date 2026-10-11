@@ -1,7 +1,7 @@
 /** スター: 村人陣営。最終盤面でスターを持っている人のカードは、朝のあとの待機時間に全員の画面で表になる */
 (function (ONW) {
   /** 最終盤面でスターを持っているプレイヤーのID（スター公開の対象） */
-  const holders = (g) => g.players.filter((p) => g.currentRoles[p.id] === ONW.ROLE.STAR && !ONW.hiddenDrunk(g, p.id)).map((p) => p.id);   // 酔いが覚めていない人は、覚めた瞬間に公開される
+  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.STAR && !ONW.hiddenDrunk(g, p.id)).map((p) => p.id);   // 酔いが覚めていない人は、覚めた瞬間に公開される
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
 
   ONW.defineRole("star", {
@@ -33,7 +33,7 @@
     dayCheck(c, before) {
       const g = c.g;
       if (g.phase !== c.PH.ONLINE_DAY) return;
-      const ids = holders(g).filter((id) => before[id] !== ONW.ROLE.STAR);
+      const ids = holders(g).filter((id) => ONW.mimic.beforeEff(before, id) !== ONW.ROLE.STAR);
       if (!ids.length) return;
       const m = { t: "starup", ids, names: nameList(g, holders(g)) };
       c.sendAll(m); c.sendSpec(m);
@@ -41,7 +41,7 @@
     /** 酔いが覚めた瞬間に全員へ公開（全員の画面でカードがめくれて裏に戻る） */
     soberReveal: { order: 10, run(c, ids) {
       const g = c.g;
-      const newStars = ids.filter((id) => g.currentRoles[id] === ONW.ROLE.STAR);
+      const newStars = ids.filter((id) => ONW.mimic.eff(g, id) === ONW.ROLE.STAR);
       if (newStars.length) { const m = { t: "starup", ids: newStars, names: nameList(g, holders(g)) }; c.sendAll(m); c.sendSpec(m); }
     } },
   });

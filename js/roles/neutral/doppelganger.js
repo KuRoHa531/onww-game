@@ -10,15 +10,18 @@
     if (!t) return;
     if (ONW.keymaster.gate(g, p.id, [])) {   // 鍵師のロック: 自分の席がロック中ならコピーに失敗（選ばれた人の役職はコピーするだけで動かないので、相手がロック中でもコピーできる）
       i.mode = "doppel"; i.target = t.id; i.keyFail = { kind: "self", target: t.id };
-      ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${label} ${p.name}`);
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${label} ${p.name}`));
       return;
     }
     const seen = g.currentRoles[t.id], got = ONW.copyRole(g, t.id, p.id), shown = ONW.shownRole(got);
     i.mode = "doppel"; i.target = t.id; i.newRole = shown; i.known[p.id] = shown; i.known[t.id] = ONW.shownRole(seen);
     i.doppel = { target: t.id, newRole: shown };
     g.nightLogsAll.push(`${n.rn("doppelganger")} ${p.name} は ${t.name} をコピーし、${n.rn(got)} になりました。`);
+    n.hold(p.id, `${t.name} をコピーしました。あなたの新しい役職は「${n.rn(shown)}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
     ONW.cpu.learnInfo(g, p.id, got);
-    i.pendingChain = ONW.cpu.chainRoles("doppelganger").includes(got) ? got : null;
+    const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼をコピーしたら、模倣先の能力を使う
+    i.pendingChain = ONW.cpu.chainRoles("doppelganger").includes(ga) ? ga : null;
+    if (i.pendingChain) n.hold(p.id, `新しい役職（${n.rn(ga)}）の能力を、朝のうちに使えます。`);
     n.ob(p.id, [t.id]);
     n.nn("doppelganger");
   }
@@ -88,7 +91,7 @@
           ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
           later(() => {
             A.cancel(); ghost.remove();
-            delete SK.up[theirs]; delete SK.glow[theirs];              // 選ばれた人のカードは伏せて元のまま
+            delete SK.up[theirs]; delete SK.glow[theirs];              // 選ばれた人のカードは伏せて元のまま（その人が相方・ご主人などなら、この後の peek で相方として改めてめくれる）
             SK.show(mine, r.role);                                  // 自分のカードが、コピーした役職で表になる
           }, 950);
         }, 900);
@@ -114,9 +117,10 @@
         ONW.newsNote(g, "doppelganger");
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${nameOf(t)} をコピーし、${rn(got)} になりました。`);
         c.hold(p.id, `${nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
-        if (ONW.roleIsActive(got)) { g.morningAct[p.id] = got; c.hold(p.id, `新しい役職（${rn(got)}）の能力を、朝のうちに使えます。`); }
-        rev[p.id] = { kind: "doppel", target: t, seen: ONW.shownRole(seen), role: ONW.shownRole(got) };   // 選ばれた人のカードがめくれ、自分のところにコピーされていく
-        c.gotInfo(g, p, got, rev, { skipGrave: null, both: false, skipKey: `p:${t}`, via: "コピーした従者" });
+        const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼をコピーしたら、模倣先の能力を朝のうちに使える（「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
+        if (ONW.roleIsActive(ga)) { g.morningAct[p.id] = ga; c.hold(p.id, `新しい役職（${rn(ga)}）の能力を、朝のうちに使えます。`); }
+        rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "doppel", target: t, seen: ONW.shownRole(seen), role: ONW.shownRole(got) });   // 選ばれた人のカードがめくれ、自分のところにコピーされていく
+        c.gotInfo(g, p, got, rev, { skipGrave: null, both: false, via: "コピーした従者" });
       },
     },
     morning: {
@@ -127,9 +131,10 @@
         const seen = g.currentRoles[t], got = ONW.copyRole(g, t, id);
         const lines = [`${c.nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} をコピーし、${rn(got)} になりました。`);
-        lines.push(...c.soberInfoLines(g, id, got));
-        const reveal = { kind: "doppel", target: t, seen: ONW.shownRole(seen), role: ONW.shownRole(got) };   // コピー演出（朝も、昼に酔いが覚めたときも出す）
-        return { lines, reveal, nextChain: ONW.roleIsActive(got) ? got : null };
+        lines.push(...c.soberInfoLines(g, id, got));   // 模倣の人狼をコピーしたら「〜を模倣しています。」もここに入る（mimic_wolf.soberLines）
+        const reveal = ONW.mimic.tag(g, id, got, { kind: "doppel", target: t, seen: ONW.shownRole(seen), role: ONW.shownRole(got) });   // コピー演出（朝も、昼に酔いが覚めたときも出す）
+        const ga = ONW.mimic.gotAct(g, id, got);   // 模倣の人狼をコピーしたら、模倣先の能力を使える
+        return { lines, reveal, nextChain: ONW.roleIsActive(ga) ? ga : null };
       },
       peek: (c) => c.soberPeek(c.g, c.id, c.g.currentRoles[c.id]),   // 昼に使った(墓荒らしが引いたドッペルを昼にコピーした)とき: コピーして手にした役職の演出（口封じの狂人なら対象のカードにミュートマーク など）
       after(c, res) {

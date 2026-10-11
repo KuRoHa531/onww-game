@@ -23,8 +23,9 @@ window.ONW = window.ONW || {};
   function done(text, claim, setRole, flag, short) { ONW.net.sendCo(text, claim, setRole, flag, short); set(null); }   // short: 一覧に出す短い結果（「対象 → 結果」）
 
   co.open = () => { if (G().muzzled) { set(null); return; } set(G().co ? null : { step: "menu" }); };   // 口封じされている人はCOボタンが使えない
-  co.close = () => set(null);
-  co.back = () => set({ step: "menu" });
+  const releaseIfChain = () => { const s = G().co; if (s && s.chain && ONW.net.releaseCoHold) ONW.net.releaseCoHold(); };   // 役職COのあと結果開示の途中で抜けたら、CPUを待たせない
+  co.close = () => { releaseIfChain(); set(null); };
+  co.back = () => { releaseIfChain(); set({ step: "menu" }); };
 
   co.sendChat = function () {
     const el = document.getElementById("chat-in-big") || document.getElementById("chat-in");   // 大きいチャットが開いていればそちらを優先
@@ -53,6 +54,24 @@ window.ONW = window.ONW || {};
     if (kindOf(my)) return startResult(kindOf(my));
     set({ step: "msg", msg: "あなたがCOしている役職には結果開示が必要ありません。" });
   };
+  // 墓荒らし・ドッペルで手にした役職の結果開示（続けて言う）。手にした役職に結果開示があれば、今の結果を「続きあり」で送り、そのまま次の結果開示へ進む（その間CPUは割り込まない）
+  //   墓荒らし/ドッペル自身は、ステップ3（ドッペル→墓荒らし→役職 / 墓荒らし→ドッペル→役職）で扱う。結果を伏せたとき・撃つ前でよい保安官(noChain)は続けない
+  // via: どちらの結果開示から来たか。墓荒らし(relic)で墓地から手にした役職は roleCanChain の役職だけ続く(墓荒らし自身は続かない=ドッペルだけ)。
+  //      ドッペル(doppel)でコピーした役職は、墓荒らしなら続く(ドッペル→墓荒らし→役職)。ドッペルをコピーすると村人になるので続かない
+  const chainKindOf = (role, via) => {
+    if (!role || role === "hide") return null;
+    const c = coOf(role);
+    if (!c || c.noChain) return null;
+    if (c.kind === "relic") return via === "doppel" ? c.kind : null;
+    if (c.kind === "doppel") return via === "relic" ? c.kind : null;
+    return ONW.cpu && ONW.cpu.hasChainResult && ONW.cpu.hasChainResult(role) ? c.kind : null;
+  };
+  function doneChain(args, role, via) {   // args: done と同じ [text, claim, setRole, flag, short]。手にした役職 role の結果開示があれば続ける
+    const k = chainKindOf(role, via);
+    if (!k) return done(...args);
+    ONW.net.sendCo(args[0], args[1], args[2], "holddisclose", args[4]);
+    return startResult(k, true);
+  }
   /** 結果開示の最初の画面（種類ごと）。seer/robber: 相手を選ぶ / relic: 墓地を選ぶ / tm: 2人選ぶ / insom: 最終役職を選ぶ */
   function startResult(kind, chain) {
     if (kind === "relic") return set({ step: "rgrave", kind, chain });
@@ -63,9 +82,9 @@ window.ONW = window.ONW || {};
     return set({ step: "target", kind, chain });
   }
   co.pickLove = (id) => done(...hookOfKind("love").pickLove(id, K));
-  co.pickRelicGrave = (i) => set({ step: "rrole", kind: "relic", idx: i });
+  co.pickRelicGrave = (i) => set({ step: "rrole", kind: "relic", idx: i, chain: (G().co || {}).chain });
   co.relicRole = function (role) {
-    done(...hookOfKind("relic").relicRole(role, G().co, K));
+    doneChain(hookOfKind("relic").relicRole(role, G().co, K), role, "relic");   // 墓荒らし → 手にした役職の結果（占い師なら占い結果 など）
   };
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
@@ -100,6 +119,7 @@ window.ONW = window.ONW || {};
     const s = G().co, who = nameOf(s.target);
     const h = hookOfKind(s.kind) || hookOfKind("robber");   // 結果役職の文言は種類ごと(占い師・ドッペル・フリーター)。それ以外は怪盗と同じ形
     if (!h.pickRole) return done(...hookOfKind("robber").pickRole(role, who, s, K));
+    if (s.kind === "doppel") return doneChain(h.pickRole(role, who, s, K), role, "doppel");   // ドッペル → コピーして手にした役職の結果
     return done(...h.pickRole(role, who, s, K));
   };
   co.graveRole = function (role) {

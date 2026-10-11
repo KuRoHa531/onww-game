@@ -24,7 +24,7 @@
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞・麻婆豆腐・暴露の紙を出している間）は使えない
-    if (!g.currentRoles || g.currentRoles[id] !== R().EXCHANGER) return false;
+    if (!g.currentRoles || ONW.mimic.actRole(g, id, g.currentRoles[id]) !== R().EXCHANGER) return false;   // 模倣の人狼が交換者を模倣していても使える
     if (ONW.hiddenDrunk(g, id) || isDead(g, id) || used(g, id)) return false;
     return targets(g, id).length >= 2;
   }

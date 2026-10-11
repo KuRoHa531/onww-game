@@ -32,6 +32,7 @@
     ONW.setRoleBound(g, "freeterTargets", p.id, t.id);
     i.mode = "freeter"; i.target = t.id; i.known[t.id] = g.initialRoles[t.id];
     g.nightLogsAll.push(`${label} ${p.name} は ${n.rn(g.initialRoles[t.id])} の ${t.name} に就職しました。`);
+    n.hold(p.id, `${t.name} の初期役職は「${n.rn(g.initialRoles[t.id])}」でした。${t.name} に就職しました。就職先が勝利すると、あなたも追加で勝利します。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -125,10 +126,10 @@
     const g = c.g, r = rejob(g, id, target), me = c.byId(id), tp = c.byId(target);
     const nm = c.nameOf;
     (g.dayLogsAll = g.dayLogsAll || []).push(`${c.rn("freeter")} ${me.name} は ${nm(r.prev)} の死亡により、${c.rn(r.role)} の ${tp.name} に再就職しました（${r.n}回目の再就職）。`);
-    if (!me.isCpu) {
+    {
       const text = `${tp.name} の最終役職は「${c.rn(r.role)}」でした。${tp.name} に再就職しました（${r.n}回目の再就職）。新しい就職先が勝利すると、あなたも追加で勝利します。`;
-      c.hold(id, text);
-      c.send(id, { t: "jobday", id: target, text, role: r.role, items: [{ id: target, role: r.role }] });
+      c.hold(id, text);   // CPUも人間と同じ文を情報確認に残す（演出の送信は人間だけ）
+      if (!me.isCpu) c.send(id, { t: "jobday", id: target, text, role: r.role, items: [{ id: target, role: r.role }] });
     }
     if (!ONW.hiddenDrunk(g, target)) {
       if (!tp.isCpu) { const text = logs(g, [id])[0]; c.hold(target, text); c.send(target, { t: "jobday", id, text, role: ONW.shownRole(g.currentRoles[id]) }); }

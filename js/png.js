@@ -35,11 +35,14 @@ window.ONW = window.ONW || {};
     const cr = ONW.chainRows(res);
     if (cr.length) { sep(); head("道連れ・後追い"); cr.forEach((r) => r.k === "sub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の身代わりになりました。`)) : r.k === "chainSub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の道連れの身代わりになりました。`)) : add(...(r.by ? [T(r.by), T(" → ", C.dim)] : []), T(r.name), T(" "), T(r.label, C.dead))); }
     sep();
-    const wt = res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
+    const wt = res.abandoned ? C.dim : res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
     L.push({ segs: [{ t: res.title, c: wt, b: true }], big: true });
-    add(T("勝利陣営: ", C.info), T(res.teams.join("＆") || "なし"));
-    add(T("勝者: ", C.good), T(res.winners.join("、") || "なし"));
-    add(T("敗者: ", C.dead), T(res.losers.join("、") || "なし"));
+    if (res.abandoned) add(T("ホストが廃村にしました。勝者も敗者もいません。", C.dim));
+    else {
+      add(T("勝利陣営: ", C.info), T(res.teams.join("＆") || "なし"));
+      add(T("勝者: ", C.good), T(res.winners.join("、") || "なし"));
+      add(T("敗者: ", C.dead), T(res.losers.join("、") || "なし"));
+    }
     sep(); head("役職履歴");
     res.history.forEach((h) => {
       const segs = [T(h.name + " ", C.ink)];
@@ -60,10 +63,11 @@ window.ONW = window.ONW || {};
     const info = [
       ...(res.bounty || []).map((x) => [T("賞金稼ぎ: ", C.info), T(`${x.by} は ${x.target} を人狼判定だと選びました。${x.hit ? "成功です。" : "失敗です。"}`)]),
       ...(res.execs || []).map((x) => [T("処刑人: ", C.info), T(`${x.exec} のターゲットは ${x.target} でした。${x.win ? (x.late ? "賞金稼ぎが追放され、人狼判定を外したので処刑人の勝利です。" : "追放されたので処刑人の勝利です。") : "追放されませんでした。"}`)]),
-      ...(res.watchdogs || []).map((x) => [T("番犬: ", C.info), T(`${x.by} の飼い主は ${x.owner} です。${x.bite ? `${x.by} が ${x.owner} を噛み殺しました。` : x.votes ? `${x.owner} への ${x.votes}票は無効でした。` : ""}${x.back ? "ネコカボチャに噛み返されました。" : ""}`)]),
+      ...(res.watchdogs || []).map((x) => [T("番犬: ", C.info), T(`${x.by} の飼い主は ${x.owner} です。${x.bite ? `${x.by} が ${x.owner} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${x.owner} への ${x.votes}票は無効でした。` : ""}${x.back ? "ネコカボチャに噛み返されました。" : ""}`)]),
       ...(res.sheriffs || []).filter((x) => x.info).map((x) => [T("保安官: ", C.info), T(`${x.by} が ${x.target} を撃った結果: ${x.info}`)]),
       ...(res.servants || []).map((q) => [T("従者: ", C.info), T(`${q[0]} のご主人は ${q[1]} です。`)]),
       ...(res.muzzles || []).map((x) => [T("口封じの狂人: ", C.info), T(`${x.by} は ${x.target} を口封じしました。`)]),
+      ...(res.mimics || []).map((x) => [T("模倣の人狼: ", C.info), T(`${x.by} は ${x.grave ? "墓地から引いたあと " : ""}${x.role} の能力を模倣していました。`)]),
     ];
     if (info.length) { sep(); head("役職情報"); info.forEach((r) => addTint(...r)); }
     return L;

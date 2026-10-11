@@ -41,7 +41,7 @@
   function picks(g) {
     const out = [];
     g.players.forEach((p) => {
-      if (g.currentRoles[p.id] !== R_()) return;
+      if (ONW.mimic.eff(g, p.id) !== R_()) return;   // 模倣の人狼が鍵師を模倣していてもロックが効く（9of9）
       const t = ONW.getRoleBound(g, "keyTargets", p.id);
       if (!t || !g.players.some((q) => q.id === t)) return;
       out.push([p.id, t]);
@@ -95,6 +95,7 @@
     if (!cur) { i.mode = "keymaster"; i.target = t; }
     i.keyLock = { target: t, action: act };   // 発言(4of4)・投票判断が使う
     g.nightLogsAll.push(`${label} ${p.name} は ${lineOf(g, t, act)}`);
+    n.hold(p.id, lineOf(g, t, act));
     n.ob(p.id, [t]);
     n.nn(rid);
   }

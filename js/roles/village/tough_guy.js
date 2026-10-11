@@ -1,7 +1,7 @@
 /** タフガイ: 村人陣営。最多得票でも追放されず、票をはじき返して次点の人にとばっちりさせる(マイクラ版 applyToughGuyAndWolfKingToExecuted と同じ考え方) */
 (function (ONW) {
   /** 効果が働いているタフガイか（酔いが覚めていない酔っ払いは、まだタフガイの能力を使えない） */
-  const active = (g, id) => g.currentRoles[id] === ONW.ROLE.TOUGH_GUY && !ONW.hiddenDrunk(g, id);
+  const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.TOUGH_GUY && !ONW.hiddenDrunk(g, id);   // 模倣の人狼がタフガイを模倣していても働く（受動効果は模倣先で見る）
 
   ONW.defineRole("tough_guy", {
     info: { deck: 47, name: "タフガイ", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.5,

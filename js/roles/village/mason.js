@@ -1,6 +1,6 @@
 /** 共有者: 他の共有者を確認できる */
 (function (ONW) {
-  const cpuMates = (g, id, k) => g.players.forEach((q) => { if (q.id !== id && g.initialRoles[q.id] === "mason") k.infoOf(g, id).known[q.id] = "mason"; });
+  const cpuMates = (g, id, k) => g.players.forEach((q) => { if (q.id !== id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason") k.infoOf(g, id).known[q.id] = "mason"; });
 
   // ---- CPUの発言・投票(もとは cpu.js。中身は変更なし) ----
   function lieClaim(k, g, p, others, selfRole, co) { return { co, result: { short: "自分だけ", text: "共有者は 私だけでした。", claim: { kind: "mason" } } }; }
@@ -31,7 +31,7 @@
     cpuLie: { role: "mason", weight: 9, order: 5, claim: lieClaim },
     cpuClaim,
     /** 墓荒らし・ドッペルゲンガーで共有者を手にしたCPUが、続けて言う結果: 相方（人間の夜の表示 got と同じく、最初の役職が共有者だった人）。いなければ「私だけ」 */
-    cpuChainResult(k, g, p, i) { return matesResult(g.players.filter((q) => q.id !== p.id && g.initialRoles[q.id] === "mason")); },
+    cpuChainResult(k, g, p, i) { return matesResult(g.players.filter((q) => q.id !== p.id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason")); },
     cpuVoteExclude: (k, g, p, q, i) => i.known[q.id] === "mason",   // 投票先候補から、共有者の相方は除く
     cpuInit: cpuMates, cpuLearn: cpuMates,   // CPU: 他の共有者を知る
     info: { deck: 13, name: "共有者", team: ONW.TEAM.VILLAGE, wakeOrder: 30, sort: 20,
@@ -39,27 +39,27 @@
     groups: { "transform:light_apostle": 7 },
     nightMsg(c, p) {
       const g = c.g;
-      const mates = g.players.filter((q) => q.id !== p.id && g.initialRoles[q.id] === "mason").map((q) => q.name);
+      const mates = g.players.filter((q) => q.id !== p.id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason").map((q) => q.name);
       const text = mates.length ? `もう一人の共有者: ${mates.join("、")}` : "他の共有者はいません。";
-      const mateIds = g.players.filter((q) => q.id !== p.id && g.initialRoles[q.id] === "mason").map((q) => q.id);
+      const mateIds = g.players.filter((q) => q.id !== p.id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason").map((q) => q.id);
       return { text, masonMates: mateIds.length ? mateIds : null };   // 夜の始まりに、仲間の共有者のカードが表になる（夜が終わるまで出続ける）
     },
     got(c, p, got, rev, opts) {
       const t = ONW.roleKit.gotTools(c, p, rev, opts), g = c.g;
       // 共有者: 初期役職時点で共有者だった人が相方として表になる
-      const ids = g.players.filter((q) => q.id !== p.id && g.initialRoles[q.id] === "mason").map((q) => q.id);
+      const ids = g.players.filter((q) => q.id !== p.id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason").map((q) => q.id);
       c.hold(p.id, ids.length ? `もう一人の共有者: ${t.names(ids)}` : "他の共有者はいません。");
       t.both(t.eff());
       t.setPeek(ids.map((id) => ({ k: `p:${id}`, role: "mason" })), 380);
     },
     soberLines(c, id) {
       const g = c.g;
-      const m = g.players.filter((q) => q.id !== id && g.initialRoles[q.id] === "mason").map((q) => q.name);
+      const m = g.players.filter((q) => q.id !== id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason").map((q) => q.name);
       return [m.length ? `もう一人の共有者: ${m.join("、")}` : "もう一人の共有者はいません。"];
     },
     soberPeek(c, id) {
       const g = c.g, pk = {};
-      const ids = g.players.filter((q) => q.id !== id && g.initialRoles[q.id] === "mason").map((q) => q.id);
+      const ids = g.players.filter((q) => q.id !== id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === "mason").map((q) => q.id);
       if (ids.length) pk.masons = ids;
       return pk;
     },

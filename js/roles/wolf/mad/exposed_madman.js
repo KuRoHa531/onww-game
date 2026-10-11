@@ -21,6 +21,7 @@
     if (g.exposeAnnounced) delete g.exposeAnnounced[p.id];
     i.mode = "expose"; i.target = t.id;
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を暴露の対象に選びました。`);
+    n.hold(p.id, `${t.name} を暴露の対象に選びました。昼の始まりに、その人の最終役職が全員に公開されます。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -32,7 +33,7 @@
     const rows = [];
     g.players.forEach((p) => {
       const t = g.exposeTargets[p.id];
-      if (!t || g.exposeAnnounced[p.id] || g.currentRoles[p.id] !== ONW.ROLE.EXPOSED_MADMAN || ONW.hiddenDrunk(g, p.id) || c.isDead(p.id)) return;
+      if (!t || g.exposeAnnounced[p.id] || ONW.mimic.eff(g, p.id) !== ONW.ROLE.EXPOSED_MADMAN || ONW.hiddenDrunk(g, p.id) || c.isDead(p.id)) return;
       if (!g.players.some((q) => q.id === t)) return;
       g.exposeAnnounced[p.id] = true;
       const extras = [];

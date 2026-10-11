@@ -6,11 +6,11 @@
 (function (ONW) {
   const K = ONW.wolfKit;
   /** 最終盤面で人狼王を持っている人のID（酔いが覚めていない人は、覚めた瞬間に公開されるので除く） */
-  const holders = (g) => g.players.filter((p) => g.currentRoles[p.id] === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, p.id)).map((p) => p.id);
+  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, p.id)).map((p) => p.id);   // 模倣の人狼が人狼王を模倣していても人狼王として公開・ガードされる
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
   ONW.kingHolders = holders;
   /** 効果が働いている人狼王か（酔いが覚めていない酔っ払いは、まだ人狼王の能力を使えない） */
-  const active = (g, id) => g.currentRoles[id] === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, id);
+  const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, id);
   ONW.kingActive = active;
   /**
    * 人狼王が「追放・道連れ・とばっちり」で死なずにすむか（ガードされるか）。
@@ -161,7 +161,7 @@
     dayCheck(c, before) {
       const g = c.g;
       if (g.phase !== c.PH.ONLINE_DAY) return;
-      const ids = holders(g).filter((id) => before[id] !== ONW.ROLE.WOLF_KING);
+      const ids = holders(g).filter((id) => ONW.mimic.beforeEff(before, id) !== ONW.ROLE.WOLF_KING);
       if (!ids.length) return;
       const m = { t: "kingup", ids, names: nameList(g, holders(g)) };
       cpuLearn(g, ids);
@@ -170,7 +170,7 @@
     /** 酔いが覚めた瞬間に全員へ公開（全員の画面でカードがめくれて裏に戻る） */
     soberReveal: { order: 15, run(c, ids) {
       const g = c.g;
-      const nk = ids.filter((id) => g.currentRoles[id] === ONW.ROLE.WOLF_KING);
+      const nk = ids.filter((id) => ONW.mimic.eff(g, id) === ONW.ROLE.WOLF_KING);
       if (nk.length) cpuLearn(g, nk);
       if (nk.length) { const m = { t: "kingup", ids: nk, names: nameList(g, holders(g)) }; c.sendAll(m); c.sendSpec(m); }
     } },

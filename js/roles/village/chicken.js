@@ -4,7 +4,7 @@
     // 結果発表の演出(stage.js の startResult が引く): チキンの逆転 — 逆転前の勝敗を先に発表 → チキンが飛び出して覆す
     stageResult: {
       reverse: { order: 10, run(R) {
-        const { later, setCap, esc, paint, G, gx, P } = R, rv = R.res.reverse;
+        const { later, setCap, esc, paint, G, gx, P } = R, rv = R.res.reverse, toWolf = !!(rv && rv.toWolf);   // toWolf: 模倣チキン（人狼陣営の敗北 → 人狼陣営の勝ち）
         if (!(rv && (rv.ids || []).length)) return;
         later(() => setCap(`<div class="rs-win t-${rv.fromTitle.startsWith("村人") ? "village" : rv.fromTitle.startsWith("人狼") ? "wolf" : "third"}">${esc(rv.fromTitle)}</div>`), R.t);
         R.t += 1000;
@@ -21,7 +21,7 @@
       } },
     },
     info: { deck: 42, name: "チキン", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 11,
-      desc: "村人陣営。夜の能力はありません。1票でも入るとショック死（追放扱い）します。最後まで生き残っていると、村人陣営以外が勝つはずの結果を、村人陣営の逆転勝利に変えます（恋人になっている場合は逆転できません）。" },
+      desc: "村人陣営。夜の能力はありません。1票でも入るとショック死（追放扱い）します。最後まで生き残っていると、村人陣営以外が勝つはずの結果を、村人陣営の逆転勝利に変えます（恋人になっている場合は逆転できません）。人狼陣営が「模倣の人狼」でチキンを模倣したときは逆向きで、人狼陣営が負けるはずの結果を人狼陣営の逆転勝利に変えます。" },
     groups: { "transform:light_apostle": 15 },
   });
 })(window.ONW);

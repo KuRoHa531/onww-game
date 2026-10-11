@@ -547,6 +547,7 @@ body {
 .result-sheet .t-village { color: #55ff55; }
 .result-sheet .t-wolf { color: #ff5555; }
 .result-sheet .t-third { color: #aaaaaa; }
+.result-sheet .t-none, .rs-win.t-none { color: #aaaaaa; }   /* 廃村: 勝利陣営がないので灰色 */
 
 /* チャット枠は画面の空きいっぱいに広げる（議論・投票） */
 .chat-log:not(.result-chat) { height: calc(100vh - 430px); height: calc(var(--app-h, 100dvh) - 430px); min-height: 240px; }
@@ -1264,6 +1265,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-seat.queenup .tb-badge { background: #6a2fa0; border-color: #d2a6ff; color: #f6ecff; }
 .tb-seat.jobup .tb-card { filter: drop-shadow(0 0 12px rgba(90,170,255,.95)); }
 .tb-seat.jobup .tb-badge { background: #1f5f99; border-color: #7cc4ff; color: #eaf6ff; }
+/* ---- 心眼の人狼: 昼に見抜いた相手のカードがめくれ、桃紫の光と「👁 最終役職」の札が付く ---- */
+.tb-seat.mindup .tb-card { filter: drop-shadow(0 0 12px rgba(255,90,200,.95)); }
+.tb-seat.mindup .tb-badge { background: #8a1f6a; border-color: #ff9ae0; color: #fff0fa; }
 /* ---- パン屋: 昼タイマー開始時のバナー ---- */
 .bread-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(60,38,12,.94); border: 2px solid #e8b04a; color: #ffe9bf; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
 .bread-banner__icon { font-size: 1.5em; }
@@ -1762,6 +1766,11 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .dg-card.guard.out { animation: dg-out .4s ease-in both; }
 @keyframes dg-guard { 0% { opacity: 0; transform: translate(-50%, -90%) scale(.2) rotate(-30deg); } 60% { opacity: 1; transform: translate(-50%, -4%) scale(1.25) rotate(8deg); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); } }
 .dg-card.bite { animation: dg-bite .8s cubic-bezier(.5,0,.8,.4) both; }
+.dg-card.simul { left: calc(50% + var(--dx, 0%)); font-size: calc(var(--cw) * .55); }   /* 同時噛み: 犬が横に並ぶ */
 .dg-card.bite::after { content: "💥"; position: absolute; left: 50%; top: 50%; font-size: .9em; transform: translate(-50%,-50%) scale(0); animation: dg-boom .5s ease-out .45s both; }
-@keyframes dg-bite { 0% { opacity: 0; transform: translate(-170%, -90%) scale(.4) rotate(-30deg); } 55% { opacity: 1; transform: translate(-50%, 0) scale(1.3) rotate(0); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } }
+@keyframes dg-bite { 0% { opacity: 0; transform: translate(var(--bx, -170%), var(--by, -90%)) scale(.4) rotate(var(--br, -30deg)); } 55% { opacity: 1; transform: translate(-50%, 0) scale(1.3) rotate(0); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } }
 @keyframes dg-boom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 70% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+
+/* 模倣の人狼（2of9）: 役職名の下に、模倣先の役職を枠で出す（例: 模倣の人狼 ／ [保安官]）。枠の色は模倣先の陣営ではなく、人狼陣営の赤で統一 */
+.tb-front .tb-mimic { display: block; max-width: 92%; margin-top: 1px; padding: 0 4px; border: 1px solid #ff5555; border-radius: 3px; background: rgba(255,85,85,.12); color: #ffd0d0; font-size: max(7px, calc(var(--cw) * .15)); font-weight: 700; line-height: 1.25; text-align: center; overflow-wrap: anywhere; letter-spacing: -.02em; }
+.dl-face .tb-mimic.dl-mimic { display: block; margin: 2px auto 0; width: max-content; max-width: 92%; padding: 0 6px; border: 1px solid #ff5555; border-radius: 4px; background: rgba(255,85,85,.12); color: #ffd0d0; font-size: .72em; font-weight: 700; line-height: 1.3; text-align: center; }

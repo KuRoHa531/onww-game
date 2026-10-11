@@ -20,7 +20,7 @@
     const [a, b] = pair;
     if (ONW.keymaster.locked(g, b)) {   // 鍵師のロック: コピー先の席がロック中なら🔒に弾かれて失敗（コピーしない・追加勝利の記録もしない）
       i.mode = "gremlin"; i.keyFail = { kind: "target", from: a, to: b };
-      ONW.keymaster.fail(g, p.id, "target", "コピー", [b], `${label} ${p.name}`);
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, "target", "コピー", [b], `${label} ${p.name}`));
       return;
     }
     const seen = g.currentRoles[a], got = ONW.gremlinCopy(g, a, b), shown = ONW.shownRole(got), sa = ONW.shownRole(seen);
@@ -28,6 +28,7 @@
     i.mode = "gremlin"; i.gremlin = { from: a, to: b, role: sa };
     i.known[a] = sa; i.known[b] = shown;
     g.nightLogsAll.push(`${label} ${p.name} は ${n.nameOf(a)} の役職を ${n.nameOf(b)} にコピーしました（${n.rn(got)}）。`);
+    n.hold(p.id, `${n.nameOf(a)} の役職「${n.rn(sa)}」を ${n.nameOf(b)} にコピーしました。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
     n.ob(p.id, [a, b]);
     n.nn(rid);
   }

@@ -144,7 +144,7 @@
     if (why) {
       if (!cur) { i.mode = "shuffler"; i.target = t; }
       i.keyFail = { kind: why, target: t };
-      ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${label} ${p.name}`);
+      n.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${label} ${p.name}`));
       return;
     }
     const r = shuffle(g, holderOf(g, p.id), t), shown = ONW.shownRole(r.role);
@@ -153,6 +153,7 @@
     i.known[t] = shown;   // 引いたカードを見たので、その人の役職（いまの役職）を知っている
     if (t === p.id) i.shuffledTo = shown;   // 自分に置いたとき: 自分はもうその役職（発言・投票はその役職として行う。cpu.js の plan / selfRole）
     g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} をランダムな役職「${n.rn(r.role)}」に変化させました。`);
+    n.hold(p.id, `${nm(g, t)} をランダムな役職「${n.rn(shown)}」に変化させました。`);   // 人間なら昼の情報確認に残る文（CPUも同じ文を残す）
     n.ob(p.id, [t]);
     n.nn(rid);
   }

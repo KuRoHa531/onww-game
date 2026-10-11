@@ -9,6 +9,7 @@
     ONW.setRoleBound(g, "loveTargets", p.id, t.id);   // 役職についていく（state.js の【必読】メモ参照）。移動「あと」に選んでも現在の持ち主に予約される
     i.mode = "love"; i.target = t.id;
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を選んでいました。`);
+    n.hold(p.id, `${t.name} に一目惚れしました。あなたが追放されると、${t.name} も一緒に追放扱いになります。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }

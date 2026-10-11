@@ -48,24 +48,27 @@ window.ONW = window.ONW || {};
     // 酔っ払いが重なっているCPUは、酔いが覚める(late)までは夜の行動も情報もない
     const cpus = stage === "late" ? g.players.filter((p) => (ids || []).includes(p.id)) : g.players.filter((p) => p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]));
     const role = (p) => g.initialRoles[p.id];
+    const act = (p) => ONW.mimic.actRole(g, p.id, role(p));   // 夜に使う能力の役職（模倣の人狼は模倣先。仲間表示など「カードそのもの」は role(p) のまま）
     // 人狼系は互いを知っている（役職ごとの情報は cpuInit: 狂信者・マーリン・共有者・従者・処刑人・大狼・神）
     if (all || stage === "init") cpus.forEach((p) => {
       const vis = (r) => ONW.VISIBLE_WOLF.includes(r);   // 一匹狼は誰からも見えない
       if (vis(role(p)) && role(p) !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== p.id && vis(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
-      const h = ONW.roleHook(role(p), "cpuInit");
+      const h = ONW.roleHook(role(p), "cpuInit"), ha = act(p) !== role(p) ? ONW.roleHook(act(p), "cpuInit") : null;   // 模倣の人狼は模倣先の cpuInit（大狼の墓地・共有者・マーリンなど）も知る（9of9）
       if (h) h(g, p.id, cpu.kit);
+      if (ha) ha(g, p.id, cpu.kit);
     });
     const forced = (p) => (ONW.debug ? ONW.debug.cpuTarget(g, p.id) : null) || {};   // デバッグ: 能力先の指定
     const validPlayer = (p, id) => id && id !== p.id && g.players.some((q) => q.id === id);
     const nn = (rid) => { if (stage !== "late") ONW.newsNote(g, rid); };   // 新聞配達員の新聞: 夜に能力を使った役職を記録（昼に酔いが覚めてからの能力は、新聞には載らない）
     // 役職ファイルの cpuNight.run に渡す道具
     const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves); };   // 観測の人狼: 夜に誰が誰に能力を使ったかを記録（昼の酔い覚め後は記録しない）
-    const n = { g, stage, forced, validPlayer, nn, ob, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
+    const hold = (id, text) => { if (!text) return; g.nightResults = g.nightResults || {}; (g.nightResults[id] = g.nightResults[id] || []).push(text); };   // 人間なら net.js の hold() で預かる夜の結果を、CPUも同じ文で g.nightResults に積む（結果画面の「情報確認（全員）」に出る。CPUには届かないので画面には影響しない）
+    const n = { g, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
 
     const on = (s) => all || stage === s;
     nightSteps().forEach((s) => {
       if (!on(s.nd.stage)) return;
-      cpus.filter((p) => s.roles.includes(role(p))).forEach((p) => s.nd.run(n, p, rn(role(p)), false, role(p)));
+      cpus.filter((p) => s.roles.includes(act(p))).forEach((p) => { const go = () => s.nd.run(n, p, rn(role(p)), false, act(p)); if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); });   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
     });
     // 朝: 墓荒らしが交換した後の役職の能力を即座に使う（朝の時点の実際のカードが対象。いたずらっ子の入れ替えは呼び出し側で反映）
     if (on("morning") || stage === "late") for (let pass = 0; pass < 2; pass++) cpus.forEach((p) => {   // 昼に墓地と交換した先に能力があれば、もう1回（pass 2）続けて使う
@@ -74,9 +77,13 @@ window.ONW = window.ONW || {};
       i.pendingChain = null;
       const label = rn(got), keep = i.relic ? { ...i.relic } : null;
       const nd = (ONW.roleDef(got) || {}).cpuNight;
-      if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
-      if (nd) nd.run(n, p, label, true, got);
-      i.relic = keep;
+      const asMimic = ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id]) && ONW.mimic.roleOf(g, p.id) === got;   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
+      const exec = () => {
+        if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
+        if (nd) nd.run(n, p, label, true, got);
+        i.relic = keep;
+      };
+      if (asMimic) ONW.mimic.quiet(g, exec, p.id); else exec();
     });
   };
 
@@ -86,8 +93,9 @@ window.ONW = window.ONW || {};
     const vis = (r) => ONW.VISIBLE_WOLF.includes(r), ini = (q) => g.initialRoles[q.id];
     const i = infoOf(g, id);
     if (vis(fin) && fin !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== id && vis(ini(q))) i.known[q.id] = ini(q); });
-    const h = ONW.roleHook(fin, "cpuLearn");
+    const h = ONW.roleHook(fin, "cpuLearn"), fa = ONW.mimic.actRole(g, id, fin), ha = fa !== fin ? ONW.roleHook(fa, "cpuLearn") : null;   // 模倣先の cpuLearn も（9of9）
     if (h) h(g, id, cpu.kit);
+    if (ha) ha(g, id, cpu.kit);
   };
   /** 酔いが覚めたCPU: その時点の最終役職を知り、仲間の情報を得て、能力のある役職なら今使う */
   cpu.sober = function (g, ids) {
@@ -96,9 +104,9 @@ window.ONW = window.ONW || {};
       const i = infoOf(g, id), fin = g.currentRoles[id], shown = ONW.shownRole(fin);
       i.known[id] = shown;
       cpu.learnInfo(g, id, fin);
-      const hs = ONW.roleHook(fin, "cpuSober");
+      const fa = ONW.mimic.actRole(g, id, fin), hs = ONW.roleHook(fa, "cpuSober");   // 酔い覚めの能力は模倣先（9of9）
       if (hs) hs(g, id, i, shown);
-      i.pendingChain = cpu.chainRoles().includes(fin) ? fin : null;   // ドッペルゲンガーも酔い覚め後にコピーする
+      i.pendingChain = cpu.chainRoles().includes(fa) ? fa : null;   // ドッペルゲンガーも酔い覚め後にコピーする
     });
     cpu.lateVisits = [];
     cpu.runNight(g, "late", ids);
@@ -135,6 +143,11 @@ window.ONW = window.ONW || {};
     g.cpuInfo = g.cpuInfo || {};
     ONW.roleHook("queen", "cpuNotice")(g, id, queenIds, cpu.kit);
   };
+  /** 心眼の人狼のCPUが昼に見抜いた結果（相手の最終役職）を覚える。中身は mind_wolf.js の cpuNotice */
+  cpu.noticeMind = function (g, id, target, role) {
+    g.cpuInfo = g.cpuInfo || {};
+    ONW.roleHook("mind_wolf", "cpuNotice")(g, id, target, role, cpu.kit);
+  };
   /** 昼に役職が入れ替わって後覚者の能力が発動したCPU: 最終的な役職を知る。中身は insomniac.js の cpuNotice */
   cpu.notifyInsom = function (g, id) {
     g.cpuInfo = g.cpuInfo || {};
@@ -143,7 +156,7 @@ window.ONW = window.ONW || {};
   /** 夜が全部終わったあと（いたずらっ子の反映後）に、CPUの後覚者が最終役職を知る。中身は insomniac.js の cpuAfter */
   cpu.afterNight = function (g) {
     g.players.filter((p) => p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id])).forEach((p) => {
-      const h = ONW.roleHook(g.initialRoles[p.id], "cpuAfter");
+      const h = ONW.roleHook(ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]), "cpuAfter");   // 後覚者を模倣したCPUも最終役職を知る（9of9）
       if (h) h(g, p.id, cpu.kit);
     });
   };
@@ -404,6 +417,19 @@ window.ONW = window.ONW || {};
       if (c.result) plan.push({ p, text: c.result.text, short: c.result.short, result: true, claim: c.result.claim, gap: c.extra ? 1200 : 3500 });
       if (c.result) for (let e = c.extra; e; e = e.next) plan.push({ p, text: e.text, short: e.short, result: true, claim: e.claim, gap: e.next ? 1200 : 3500 });   // 2つ目以降（墓荒らし→ドッペル→占い師なら、コピー → 占い結果の順）
       spoke.push({ p, r, i, c });
+    });
+    // 墓荒らしCOだけで終わらせない: 女王・スターを引いた墓荒らし、名乗れる村役職が墓荒らししかない騙りなどは「墓荒らしCO」の1行で終わり、結果が出ずに議論が止まったように見える。結果（墓地N → 役職）も言う
+    const relicLie = ONW.roleHook("relic_robber", "cpuLieResult");
+    if (relicLie) [...new Set(plan.filter((e) => e.co === "relic_robber").map((e) => e.p.id))].forEach((pid) => {
+      if (plan.some((e) => e.p.id === pid && e.result)) return;
+      const pp = g.players.find((q) => q.id === pid), inf = infoOf(g, pid);
+      if (!pp || inf.keyFail) return;
+      let res = null; try { res = relicLie(cpu.kit, g, pp, null, "relic_robber"); } catch (e) { res = null; }
+      const cl = res && res.result && res.result.claim;
+      if (!res || !res.result || (cl && cl.role === "villager" && !villagerAppears(g))) return;   // 村人が配役にいないのに村人を引いたと言うと嘘がバレる
+      let at = -1; plan.forEach((e, k) => { if (e.p.id === pid && e.co === "relic_robber") at = k; });
+      plan[at].gap = 1200; plan[at].claim = null;
+      plan.splice(at + 1, 0, { p: pp, text: res.result.text, short: res.result.short, result: true, claim: res.result.claim, gap: 3500 });
     });
     // 情報開示（本家 _cpuCoOnlyMaybeInboundInfo）: 全員のCOが出そろったあとに、1人1回だけ。訪問された話をした人は、そちらが先（本家は1回だけ）
     const claimsNow = plan.filter((e) => e.claim && (e.claim.kind === "freeter" || e.claim.kind === "servant")).map((e) => ({ from: e.p.id, ...e.claim }));

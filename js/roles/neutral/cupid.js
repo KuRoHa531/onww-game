@@ -55,6 +55,7 @@
     seen(g, p.id, a, b);
     i.mode = "cupid"; i.pair = [a, b];
     g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, a)} と ${nm(g, b)} を恋人にしました。`);
+    n.hold(p.id, `${nm(g, a)} と ${nm(g, b)} を恋人にしました。`);
     n.ob(p.id, [a, b]);
     n.nn(rid);
   }

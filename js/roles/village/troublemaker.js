@@ -13,12 +13,13 @@
     const why = ONW.keymaster.gate(g, p.id, [a.id, b.id]);   // 鍵師のロック: 自分か選んだどちらかの席がロック中なら🔒に弾かれて失敗（入れ替えはキューに積まない）
     if (why) {
       i.mode = "tm"; i.keyFail = { kind: why, pair: [a.id, b.id] };
-      ONW.keymaster.fail(g, p.id, why, "入れ替え", [a.id, b.id], `${label} ${p.name}`, true);
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a.id, b.id], `${label} ${p.name}`, true));
       return;
     }
     g.tmQueue.push({ id: p.id, a: a.id, b: b.id });     // 反映は夜の終わり（net.js）
     i.mode = "tm"; i.pair = [a.id, b.id];
     g.nightLogsAll.push(`${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);
+    n.hold(p.id, `${a.name} と ${b.name} の役職を入れ替えました。`);
     n.ob(p.id, [a.id, b.id]);
     n.nn(rid);
   }

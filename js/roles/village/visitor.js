@@ -3,10 +3,10 @@
   // ---- 役職固有の補助関数(もとは state.js にあったもの。中身は変更なし) ----
   /** 訪問者の訪問先(プレイヤーID)。最終盤面でその人が訪問者を持っていて、訪問先が決まっているときだけ。なければ null。
    *  訪問先は「役職の持ち主」に記録されている(g.visitorTargets[持ち主ID] = 訪問先のID)ので、訪問者のカードが動けば、訪問先もカードについて動く */
-  ONW.visitorTarget = (g, id) => (g && g.currentRoles && g.currentRoles[id] === ONW.ROLE.VISITOR && (g.visitorTargets || {})[id]) || null;
+  ONW.visitorTarget = (g, id) => (g && g.currentRoles && ONW.mimic.eff(g, id) === ONW.ROLE.VISITOR && (g.visitorTargets || {})[id]) || null;   // 模倣の人狼が訪問者を模倣していても、訪問先はカードについて動く
   /** 最終盤面で訪問者を持っていて、訪問先が id の人たち（持ち主IDの配列）。訪問先が自分自身になった訪問者（入れ替わりの結果）は数えない。
    *  訪問された人の待機時間の演出・通知に使う。酔いが覚めていない人には届けない */
-  ONW.visitorsOf = (g, id) => (!g || !g.players || ONW.hiddenDrunk(g, id)) ? [] : g.players.filter((q) => q.id !== id && g.currentRoles[q.id] === ONW.ROLE.VISITOR && (g.visitorTargets || {})[q.id] === id).map((q) => q.id);
+  ONW.visitorsOf = (g, id) => (!g || !g.players || ONW.hiddenDrunk(g, id)) ? [] : g.players.filter((q) => q.id !== id && ONW.mimic.eff(g, q.id) === ONW.ROLE.VISITOR && (g.visitorTargets || {})[q.id] === id).map((q) => q.id);
   // ---- ここまで ----
 
   const logs = (g, ids) => ids.map((vid) => `あなたのところに訪問者の ${(g.players.find((q) => q.id === vid) || {}).name} が訪問してきました。`);
@@ -15,10 +15,11 @@
   function ensureOrphans(c) {
     const g = c.g;
     g.players.forEach((p) => {
-      if (g.currentRoles[p.id] !== ONW.ROLE.VISITOR) return;
+      if (ONW.mimic.eff(g, p.id) !== ONW.ROLE.VISITOR) return;
       if (ONW.hiddenDrunk(g, p.id)) return;   // 酔いが覚めていない人は、覚めたあとに自分で訪問先を選べる
       if (ONW.getRoleBound(g, "visitorTargets", p.id)) return;
       if (g.initialRoles[p.id] === ONW.ROLE.VISITOR || (g.morningAct || {})[p.id] === ONW.ROLE.VISITOR) return;
+      if (g.initialRoles[p.id] === ONW.ROLE.MIMIC_WOLF && g.currentRoles[p.id] === ONW.ROLE.MIMIC_WOLF) return;   // 模倣訪問者: 最初から持っている人は夜に自分で選んでいる
       const vid = ONW.debug ? ONW.debug.randTarget(g, "visitor", p.id) : null;   // デバッグ: 訪問先の指定
       const t = (vid && vid !== p.id && g.players.find((q) => q.id === vid)) || ONW.utils.randomChoice(g.players.filter((q) => q.id !== p.id));
       if (!t) return;
@@ -38,6 +39,7 @@
     i.mode = "visitor"; i.target = t.id;
     if (n.stage === "late") (ONW.cpu.lateVisits = ONW.cpu.lateVisits || []).push({ from: p.id, to: t.id });   // 昼（酔い覚め後）の訪問: 訪問された人への通知用
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を訪問しました。`);
+    n.hold(p.id, `${t.name} を訪問しました。相手の役職は分かりません。訪問されたことは、朝のあとの待機時間に ${t.name} へ知らされます。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -114,7 +116,7 @@
       dayNotify(c) {   // 昼に訪問: 訪問された人の画面でも、その時点の訪問者のカードが表になって、数秒後に閉じる
         if (!c.players.length) return;
         const g = c.g, id = c.id, me = c.me, t = c.players[0], tp = c.byId(t);
-        if (tp && !tp.isCpu && !ONW.hiddenDrunk(g, t)) { const text = logs(g, [id])[0]; g.nightLogsAll.push(`${c.rn("visitor")} ${me.name} が ${tp.name} を訪問しました。`); c.hold(t, text); c.send(t, { t: "jobday", id, text, role: ONW.shownRole(g.currentRoles[id]) }); }
+        if (tp && !tp.isCpu && !ONW.hiddenDrunk(g, t)) { const text = logs(g, [id])[0]; g.nightLogsAll.push(`${c.rn("visitor")} ${me.name} が ${tp.name} を訪問しました。`); c.hold(t, text); c.send(t, { t: "jobday", id, text, role: ONW.shownRole(ONW.mimic.eff(g, id)) }); }
         else if (tp && tp.isCpu && ONW.cpu.noticeVisitors) ONW.cpu.noticeVisitors(g, t, [id]);
       },
     },
@@ -128,11 +130,11 @@
     cpuLateVisits(c) {
       const g = c.g;
       (ONW.cpu.lateVisits || []).forEach(({ from, to }) => {
-        // ※既存の挙動を保持: 元のコード(net.js soberUp)では byId がこの場所に定義されておらず、訪問が発生すると ReferenceError になる。仕様変更しないためそのまま残す
+        const byId = (x) => g.players.find((q) => q.id === x);   // 席IDからプレイヤーを引く（これが未定義だと、酔い覚めCPUの訪問が起きた瞬間に ReferenceError になり、酔い覚めCPUの発言（COなど）が丸ごと出なくなって議論が止まる）
         const tp = byId(to), me = byId(from);
         if (!tp || !me || ONW.hiddenDrunk(g, to)) return;
         if (tp.isCpu) { if (ONW.cpu.noticeVisitors) ONW.cpu.noticeVisitors(g, to, [from]); return; }
-        const text = logs(g, [from])[0]; g.nightLogsAll.push(`${c.rn("visitor")} ${me.name} が ${tp.name} を訪問しました。`); c.hold(to, text); c.send(to, { t: "jobday", id: from, text, role: ONW.shownRole(g.currentRoles[from]) });
+        const text = logs(g, [from])[0]; g.nightLogsAll.push(`${c.rn("visitor")} ${me.name} が ${tp.name} を訪問しました。`); c.hold(to, text); c.send(to, { t: "jobday", id: from, text, role: ONW.shownRole(ONW.mimic.eff(g, from)) });
       });
     },
   });

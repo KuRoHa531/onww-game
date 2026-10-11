@@ -9,13 +9,14 @@
     const why = ONW.keymaster.gate(g, p.id, [t.id]);   // 鍵師のロック: 自分の席か相手の席がロック中なら🔒に弾かれて失敗（役職は動かない）
     if (why) {
       i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]); i.keyFail = { kind: why, target: t.id };
-      ONW.keymaster.fail(g, p.id, why, "交換", [t.id], `${label} ${p.name}`);
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t.id], `${label} ${p.name}`));
       return;
     }
     ONW.swapPlayers(g, p.id, t.id);
     i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]);
     i.known[p.id] = i.newRole; i.known[t.id] = "robber";
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} と役職を交換し、${n.rn(i.newRole)} になりました。`);
+    n.hold(p.id, `${t.name} と役職を交換しました。あなたの新しい役職は「${n.rn(i.newRole)}」です。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -97,7 +98,8 @@
         const got = g.currentRoles[p.id];
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);
         c.hold(p.id, `${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
-        c.rev[p.id] = { kind: "swap", target: t, role: ONW.shownRole(got) };
+        const ml = ONW.mimic.takenLine(g, p.id, got, rn); if (ml) c.hold(p.id, ml);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
+        c.rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "swap", target: t, role: ONW.shownRole(got) });
         ONW.observeNote(g, p.id, [t]);
         ONW.newsNote(g, "robber");
       },
@@ -111,9 +113,10 @@
         ONW.swapPlayers(g, id, t);
         const got = g.currentRoles[id];
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);
+        const ml = ONW.mimic.takenLine(g, id, got, rn);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
         return {
-          lines: [`${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`],
-          reveal: { kind: "swap", target: t, role: ONW.shownRole(got) }, nextChain: null,
+          lines: [`${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`, ...(ml ? [ml] : [])],
+          reveal: ONW.mimic.tag(g, id, got, { kind: "swap", target: t, role: ONW.shownRole(got) }), nextChain: null,
         };
       },
     },

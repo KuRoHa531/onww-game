@@ -10,8 +10,8 @@
 (function (ONW) {
   const K = ONW.wolfKit;
   /** 麻婆の人狼と豆腐の人狼が、どちらも最終盤面で酔いが覚めている人としているか。1試合1回だけ完成する */
-  const hasMapo = (g) => g.players.some((p) => g.currentRoles[p.id] === ONW.ROLE.MAPO_WOLF && !ONW.hiddenDrunk(g, p.id));
-  const hasTofu = (g) => g.players.some((p) => g.currentRoles[p.id] === ONW.ROLE.TOFU_WOLF && !ONW.hiddenDrunk(g, p.id));   // 豆腐の人狼も、酔いが覚めてから数える（酔い覚めの瞬間に完成の演出が出る）
+  const hasMapo = (g) => g.players.some((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.MAPO_WOLF && !ONW.hiddenDrunk(g, p.id));
+  const hasTofu = (g) => g.players.some((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.TOFU_WOLF && !ONW.hiddenDrunk(g, p.id));   // 豆腐の人狼も、酔いが覚めてから数える（酔い覚めの瞬間に完成の演出が出る）
   function announce(c) {
     const g = c.g;
     if (g.mapoAnnounced || !hasMapo(g) || !hasTofu(g)) return false;
@@ -20,7 +20,7 @@
   }
   ONW.defineRole("mapo_wolf", {
     info: { deck: 50, name: "麻婆の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.45,
-      desc: "人狼陣営。他の人狼を確認できます。盤面にいる間、豆腐の人狼は1票追放ではなく最多得票時にのみ追放され、さらに2票持ちとして数えられます。豆腐の人狼もいると、昼の始まりに麻婆豆腐が完成します。占い・判定・勝利条件は常に人狼として扱われます。" },
+      desc: "人狼陣営。他の人狼を確認できます。麻婆の人狼と豆腐の人狼が同時にいるとき、昼の始まりに麻婆豆腐が完成し、豆腐の人狼は1票ではメンタル崩壊せず（最多得票のときだけ追放）2票持ちになります。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 8.5, "transform:dark_avatar": 8.5 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,
     /** 昼の始まり(変化公開 → 新聞 のあと): 麻婆豆腐の完成演出を出す。戻り値: 演出が出終わるまでの待ち時間(ms)。出さないときは 0 */

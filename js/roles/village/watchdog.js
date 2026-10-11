@@ -28,7 +28,7 @@
   // ---- 飼い主の判定（最終盤面から） ----
   /** その人（持ち主ID）が番犬を持っていて、飼い主が決まっているときの飼い主ID。酔いが覚めていない持ち主・飼い主が不明な場合は null */
   function ownerOf(g, id) {
-    if (!g || !g.currentRoles || g.currentRoles[id] !== R_() || ONW.hiddenDrunk(g, id)) return null;
+    if (!g || !g.currentRoles || ONW.mimic.eff(g, id) !== R_() || ONW.hiddenDrunk(g, id)) return null;   // 模倣の人狼が番犬を模倣していても飼い主を守る（9of9）
     const t = ONW.getRoleBound(g, "watchdogOwners", id);
     if (!t || t === id || !g.players.some((q) => q.id === t)) return null;
     return t;
@@ -51,7 +51,8 @@
   /**
    * 番犬に噛まれたシュレディンガーの猫が所属する陣営（vote.resolveCats が見る）。by = 噛んだ人のID（game.dogBites の by）。
    *   ・いまは番犬（村人陣営）だけなので "village"。
-   *   ・【確定メモ・今後の実装】模倣番犬（模倣の人狼が番犬の能力を使う）・犬の狂人に噛まれた猫は、人狼陣営（"wolf"）に確定する。
+   *   ・模倣番犬（模倣の人狼が番犬の能力を使う）は、カードが模倣の人狼（人狼陣営）なので "wolf" になる（実装済み）。犬の狂人は未実装（【確定メモ】噛まれた猫は人狼陣営に確定。役職の陣営が人狼陣営なら、この関数のままで "wolf"）。
+   *   ・村人陣営の犬と人狼陣営の犬に【同時に】噛まれた猫は、vote.resolveCats が陣営をランダムに決める（この関数は犬1匹ごとの陣営を返すだけ）。
    *     これらの役職は役職の陣営が人狼陣営なので、噛んだ人の役職の陣営を見るこの関数のままで "wolf" になる（そのとき確認すること）。docs/シュレ猫の陣営.md を正本にする。
    */
   function biteTeam(g, by) {
@@ -72,6 +73,7 @@
     if (!cur) { i.mode = "watchdog"; i.target = t.id; }
     i.owner = t.id;   // 発言・投票判断(3of3)が使う
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を飼い主にしていました。`);
+    n.hold(p.id, ownerLine(t.name));
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -90,10 +92,23 @@
   }
 
   /** 飼い主のカードの上に、絵文字(🦴 / 噛み付く🐕 / 噛み返す🎃)を1つ出す（すでにあればそれを返す）。別のカードは出さない */
-  function dogCard(R, k, face) {
+  //   同時噛み: 犬が2匹以上のときは idx(0始まり)/n を渡すと、カードの上に横並びで(小さめに)出る。idx 省略 = 1匹だけ（従来どおり）
+  function dogCard(R, k, face, idx, n) {
     const card = R.$t().querySelector(`[data-k="${k}"] .tb-card`); if (!card) return null;
-    let c = card.querySelector(".dg-card");
-    if (!c) { c = document.createElement("div"); c.className = "dg-card"; c.textContent = face || "🦴"; card.appendChild(c); }
+    const sel = idx == null ? ".dg-card:not([data-i])" : `.dg-card[data-i="${idx}"]`;
+    let c = card.querySelector(sel);
+    if (!c) {
+      c = document.createElement("div"); c.className = "dg-card"; c.textContent = face || "🦴";
+      if (idx != null && n > 1) {
+        const m = (n - 1) / 2, side = idx < m ? -1 : idx > m ? 1 : 0;   // 左の犬は左から / 右の犬は右から / 真ん中の犬は上から飛び込む
+        c.dataset.i = String(idx); c.classList.add("simul");
+        c.style.setProperty("--dx", `${Math.round((idx - m) * 62 / Math.max(1, m))}%`);
+        c.style.setProperty("--bx", side < 0 ? "-170%" : side > 0 ? "70%" : "-50%");
+        c.style.setProperty("--by", side === 0 ? "-190%" : "-90%");
+        c.style.setProperty("--br", `${side * 30}deg`);
+      } else if (idx != null) c.dataset.i = String(idx);
+      card.appendChild(c);
+    }
     return c;
   }
   ONW.defineRole("watchdog", {
@@ -182,14 +197,20 @@
       //   ネコカボチャに噛み返されたときは、噛み返した側のカードに🎃が飛び込む
       biteFx: { order: 20, run(R, h) {
         const { later, P, G, paint } = R;
-        const w = (R.res.watchdogs || []).find((x) => (x.bite && x.ownerId === h.id) || (x.back && x.byId === h.id));
-        if (!w) return 0;
-        const k = P(h.id), face = w.back && w.byId === h.id ? "🎃" : "🐕", t0 = R.t;
+        const { setCap, esc } = R;
+        const ws = (R.res.watchdogs || []).filter((x) => x.bite && x.ownerId === h.id);   // 同時噛み: この飼い主に噛み付いた犬（番犬・模倣番犬・今後の犬の狂人）が全員
+        const back = !ws.length && (R.res.watchdogs || []).find((x) => x.back && x.byId === h.id);
+        if (!ws.length && !back) return 0;
+        const n = ws.length, simul = n > 1, k = P(h.id), face = back ? "🎃" : "🐕", t0 = R.t;
         const seat = () => R.$t().querySelector(`[data-k="${k}"]`);
+        const each = (fn) => { if (simul) ws.forEach((_, i) => fn(i)); else fn(null); };
         later(() => { const s = seat(); if (s) s.classList.add("gl-shake"); }, t0 + 200);          // 震える
-        later(() => { const c = dogCard(R, k, face); if (c) c.classList.add("bite"); }, t0 + 1300);                                  // 噛み付く
-        later(() => { const s = seat(); if (s) s.classList.remove("gl-shake"); const c = dogCard(R, k, face); if (c) c.remove(); paint(G()); }, t0 + 2100);       // 片付ける（このあと噛殺でめくれる）
-        return 2300;
+        later(() => {                                                                              // 噛み付く（同時噛みは、全員いっせいに飛び込む）
+          each((i) => { const c = dogCard(R, k, face, i, n); if (c) c.classList.add("bite"); });
+          if (simul) { setCap(`<div class="res-cap__t t-wolf">同時に噛み付く</div><div>${ws.map((x) => esc(x.by)).join("、")} → ${esc(ws[0].owner)}</div>`); paint(G()); }
+        }, t0 + 1300);
+        later(() => { const s = seat(); if (s) s.classList.remove("gl-shake"); each((i) => { const c = dogCard(R, k, face, i, n); if (c) c.remove(); }); paint(G()); }, t0 + 2100);       // 片付ける（このあと噛殺でめくれる）
+        return simul ? 2600 : 2300;   // 同時噛みは字幕を読む分だけ少し長く
       } },
       skip(R) {   // スキップ: 飼い主への票の札を最終形で出す（噛殺で死んだ人の札は、そのまま「噛殺」）
         (R.res.watchdogs || []).filter((x) => x.votes > 0).forEach((x) => { if (!R.badge[`p:${x.ownerId}`]) R.badge[`p:${x.ownerId}`] = `${x.votes}票`; });

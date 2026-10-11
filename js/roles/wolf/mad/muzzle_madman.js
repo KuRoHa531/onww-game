@@ -12,7 +12,7 @@
 (function (ONW) {
   const ROLE_ID = "muzzle_madman";
   const nameOf = (g, id) => (g.players.find((q) => q.id === id) || {}).name || "?";
-  const isMuzzler = (g, id) => g.currentRoles[id] === ROLE_ID && !ONW.hiddenDrunk(g, id);
+  const isMuzzler = (g, id) => ONW.mimic.eff(g, id) === ROLE_ID && !ONW.hiddenDrunk(g, id);   // 模倣の人狼が口封じの狂人を模倣していても口封じする（9of9）
 
   ONW.muzzle = {
     /** この口封じの狂人(ID)の対象を決める(すでにあればそのまま)。自分を含む全員からランダム。戻り値: 対象のID */
@@ -78,7 +78,7 @@
     nightStart: { order: 50, run(c) {
       const g = c.g;
       g.players.forEach((p) => {
-        if (g.initialRoles[p.id] !== ROLE_ID || ONW.hiddenDrunk(g, p.id)) return;
+        if (ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]) !== ROLE_ID || ONW.hiddenDrunk(g, p.id)) return;
         const had = (g.muzzleTargets || {})[p.id];
         const t = ONW.muzzle.assign(g, p.id);
         if (!had && t) g.nightLogsAll.push(`${c.rn(ROLE_ID)} ${p.name} は ${nameOf(g, t)} を口封じしました。`);

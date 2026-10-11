@@ -8,7 +8,7 @@
     if (!g.center.length) return;
     if (ONW.keymaster.gate(g, p.id, [])) {   // 鍵師のロック: 自分の席がロック中なら🔒に弾かれて失敗（墓地とは交換しない）
       i.mode = "relic"; i.keyFail = { kind: "self" };
-      ONW.keymaster.fail(g, p.id, "self", "交換", [], `${label} ${p.name}`);
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "交換", [], `${label} ${p.name}`));
       return;
     }
     const fg = (n.forced(p).graves || []).filter((k) => k >= 0 && k < g.center.length);   // デバッグ: 交換する墓地の指定
@@ -16,11 +16,14 @@
     ONW.swapGrave(g, p.id, idx);
     i.mode = "relic"; i.graveIdx = idx; i.newRole = seen; i.known[p.id] = seen;
     g.nightLogsAll.push(`${n.rn("relic_robber")} ${p.name} は 墓地${idx + 1} と役職を交換し、${n.rn(got)} になりました。`);
+    n.hold(p.id, `墓地${idx + 1}枚目と役職を交換しました。あなたの新しい役職は「${n.rn(seen)}」です。`);
     i.relic = { graveIdx: idx, newRole: seen };
     if (got === ONW.ROLE.EXECUTIONER) { const tid = ONW.execTarget(g, p.id); if (tid) i.execTarget = tid; }   // 墓地から引いた処刑人: 新しいターゲットが決まっていて、引いた本人は朝に知る
     if (got === ONW.ROLE.SERVANT) { const mid = ONW.servantMaster(g, p.id); if (mid) i.master = mid; }   // 墓地から引いた従者: 新しいご主人が決まっていて、引いた本人は朝に知る（怪盗で奪った場合は役職名だけ）
     // 交換後の役職に夜行動があれば、朝に使う（runNight の "morning" 段階）
-    i.pendingChain = ONW.cpu.chainRoles("relic_robber").includes(got) ? got : null;
+    const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を使う
+    i.pendingChain = ONW.cpu.chainRoles("relic_robber").includes(ga) ? ga : null;
+    if (i.pendingChain) n.hold(p.id, `新しい役職（${n.rn(ga)}）の能力を、朝のうちに使えます。`);
     n.ob(p.id, [], [idx]);
     n.nn("relic_robber");
   }
@@ -96,8 +99,9 @@
         ONW.swapGrave(g, p.id, i);
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
         hold(p.id, `墓地${i + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
-        if (ONW.roleCanChain(got)) { g.morningAct[p.id] = got; hold(p.id, `新しい役職（${rn(got)}）の能力を、朝のうちに使えます。`); }
-        rev[p.id] = { kind: "relic", target: i, role: ONW.shownRole(got) };
+        const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を朝のうちに使える（ga = 使う能力の役職。「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
+        if (ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; hold(p.id, `新しい役職（${rn(ga)}）の能力を、朝のうちに使えます。`); }
+        rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "relic", target: i, role: ONW.shownRole(got) });
         ONW.observeNote(g, p.id, [], [i]);
         ONW.newsNote(g, "relic_robber");
         c.gotInfo(g, p, got, rev, { skipGrave: i, both: true, via: `墓地${i + 1} から引いた従者` });
@@ -112,13 +116,14 @@
         const got = g.currentRoles[id];
         const lines = [`墓地${idx + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`];
         g.nightLogsAll.push(`${c.label} ${c.me.name} は 墓地${idx + 1} と役職を交換し、${rn(got)} になりました。`);
-        lines.push(...c.soberInfoLines(g, id, got));
-        const reveal = { kind: "relic", target: idx, role: ONW.shownRole(got) };   // 墓地と入れ替わる演出（朝も、昼に酔いが覚めたときも出す。昼は hostRecv が reveal.day を立て、数秒後に閉じる）
+        lines.push(...c.soberInfoLines(g, id, got));   // 模倣の人狼を引いたら「〜を模倣しています。」もここに入る（mimic_wolf.soberLines）
+        const reveal = ONW.mimic.tag(g, id, got, { kind: "relic", target: idx, role: ONW.shownRole(got) });   // 墓地と入れ替わる演出（朝も、昼に酔いが覚めたときも出す。昼は hostRecv が reveal.day を立て、数秒後に閉じる）
         return { lines, reveal, nextChain: null };
       },
       after(c, res) {   // 昼に墓地と交換した先の役職にも能力があれば、続けて1回使える
         const g = c.g, id = c.id;
-        if (ONW.roleCanChain(g.currentRoles[id])) { res.nextChain = g.currentRoles[id]; g.morningAct[id] = res.nextChain; g.morningDone[id] = false; res.lines.push("この役職の能力も、議論中に1回だけ使えます。"); }
+        const ga = ONW.mimic.gotAct(g, id, g.currentRoles[id]);   // 模倣の人狼を引いたら、模倣先の能力を使える
+        if (ONW.roleCanChain(ga)) { res.nextChain = ga; g.morningAct[id] = res.nextChain; g.morningDone[id] = false; res.lines.push("この役職の能力も、議論中に1回だけ使えます。"); }
       },
       peek: (c) => c.soberPeek(c.g, c.id, c.g.currentRoles[c.id]),   // 昼に使った墓荒らし: 交換後の役職の演出
     },
