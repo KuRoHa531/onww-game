@@ -642,11 +642,12 @@ window.ONW = window.ONW || {};
     //   t = 演出の現在時刻 / subN = 身代わりの数 / noFlip = ほかの演出が重なるので2回目の裏返しをしない席(flipped フックが書く) / restEnd = 全員めくれ終わる時刻 / noBlow = 負けた人のカードを吹き飛ばさない
     const R = Object.create(stage.kit);
     Object.assign(R, { g, res, P, exec, chain, lateDeaths, kingdom, rest, lovOn, t: 600, subN: 0, guardN: 0, noFlip: new Set(), restEnd: 0, noBlow: false });
-    // 同時にめくれた「別のアサシン・賞金稼ぎ」は、プレイヤー全員の画面で「？」のまま、その人の演出が始まるまで（または全部の演出が終わるまで）本当の役職を見せない
+    // 同時にめくれた「別のアサシン・賞金稼ぎ」は、アサシン・賞金稼ぎ本人の画面で「？」のまま、その人の演出が始まるまで（または全部の演出が終わるまで）本当の役職を見せない（関係ない人の画面は選択待ちのときから本当の役職で見えているので、そのまま）
     //   （選んだ人の画面だけ「？」だと、反応でアサシン・賞金稼ぎ本人が分かり、マーリンや人狼に透けるため。観戦者は全員の役職が見えるので対象外）
     veil = {};
     { const me = ONW.net.myId(), SP = (r) => r === ONW.ROLE.ASSASSIN || r === ONW.ROLE.BOUNTY_HUNTER;
-      if (!g.isSpectator && !hostWatching(g)) [...exec, ...chain, ...lateDeaths].forEach((h) => { if (h.id !== me && SP(h.role === "mimic_wolf" ? ((g.mimicView || {})[P(h.id)] || h.role) : h.role)) veil[P(h.id)] = true; }); }   // 模倣の人狼がアサシンを模倣していても、アサシンと同じ扱い（模倣先が分かっているときだけ。ホスト・観戦者は全員分見える）
+      const meH = res.history.find((h) => h.id === me), meSP = !!meH && SP(meH.role === "mimic_wolf" ? ((g.mimicView || {})[P(me)] || meH.role) : meH.role);   // 自分がアサシン・賞金稼ぎ（模倣含む）か。関係ない人の画面は、選択待ちのときと同じく、めくれたアサシン・賞金稼ぎを本当の役職のままにする（「アサシン」と出てから「？」に変わらない）
+      if (meSP && !g.isSpectator && !hostWatching(g)) [...exec, ...chain, ...lateDeaths].forEach((h) => { if (h.id !== me && SP(h.role === "mimic_wolf" ? ((g.mimicView || {})[P(h.id)] || h.role) : h.role)) veil[P(h.id)] = true; }); }   // 模倣の人狼がアサシンを模倣していても、アサシンと同じ扱い（模倣先が分かっているときだけ。ホスト・観戦者は全員分見える）
     const flipped = (hs, at, kind) => { R.noFlip = new Set(); return hk("flipped").reduce((n, h) => n + (h.fn(R, hs, at, kind) || 0), 0); };   // 追放・道連れでめくれた人に重なる演出(処刑人のギロチン・猫の裏返し)。返り値 = 足す待ち時間
     const opened = hk("open").reduce((o, h) => h.fn(R) || o, false);   // 独裁処刑: 投票の結果の代わりに、独裁者のカードがめくれて独裁を宣言する演出（独裁者の役職ファイル）
     if (opened) { /* 投票の字幕・票数は出さない */ } else if (res.foxVote) {   // 妖狐投票の結果を先に見せる（マイクラ版と同じ順。カードは妖狐投票のときにめくれ済み）

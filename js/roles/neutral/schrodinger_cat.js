@@ -5,7 +5,6 @@
   const CAT_UP2 = 1300, CAT_EXTRA = 2300;   // 1回目にめくれてから裏に戻るまで / 裏に戻ってからもう一度めくれるまで（ここが 0.75秒のフリップより長ければ、ちゃんと裏返って見える）
   const catOf = (res) => new Map((res.cats || []).map((c) => [c.id, c]));
   const catFlips = (res, id) => { const c = catOf(res).get(id); return !!c && (c.votes >= 1 || c.fixed) && c.team !== "lover"; };
-  const catFixed = (res, id) => { const c = catOf(res).get(id); return !!(c && c.fixed); };   // 保安官に撃たれて村人陣営に固定された猫: 裏返さず、めくれたときから直接陣営の色（緑）で見せる   // 2回目に裏返る猫か（恋人の猫は恋人陣営なので裏返らない）
   const catFace = (c) => ({ team: c.team, sfx: c.team === "third" && c.finalRole ? `(+${ONW.roles.getInfo(c.finalRole).name})` : "" });
   const catLine = (c, esc) => c.team === "village" ? `${c.bitRandom ? "同時に噛まれたため、ランダムで" : ""}<span class="t-village">村人陣営</span>になりました` : c.team === "wolf" ? `${c.bitRandom ? "同時に噛まれたため、ランダムで" : ""}<span class="t-wolf">人狼陣営</span>になりました` : c.team === "third" ? `<span class="t-third">第三陣営（${esc(ONW.roles.getInfo(c.finalRole || "villager").name)}）</span>になりました` : "どの陣営にもなれませんでした";
   /** めくれた猫のカード id を at の時刻に裏へ戻し、少しあとでもう一度めくる。noFlip: 演出が重なる（処刑人のギロチンなど）ので、裏返さずに最初から陣営の色で見せる */
@@ -18,7 +17,7 @@
       if (c.bitRandom) later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} は ${catLine(c, esc)}</div>`); paint(G()); }, at);
       return;
     }
-    later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} に ${c.votes}票 入っていました…</div>`); delete R.up[k]; paint(G()); }, at);
+    later(() => { setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} ${c.fixed ? (c.bitten ? "は犬に噛まれました…" : "は撃たれました…") : `に ${c.votes}票 入っていました…`}</div>`); delete R.up[k]; paint(G()); }, at);
     later(() => { R.catv[k] = catFace(c); R.up[k] = CAT; setCap(`<div class="res-cap__t t-third">シュレディンガーの猫</div><div>${esc(c.name)} は ${catLine(c, esc)}</div>`); paint(G()); }, at + CAT_EXTRA - 600);
   }
   ONW.defineRole("schrodinger_cat", {
@@ -27,14 +26,13 @@
     stageResult: {
       flipped: { order: 20, run(R, hs, at) {
         const cats = hs.filter((h) => h.role === CAT && catFlips(R.res, h.id));
-        cats.forEach((h) => catFlip2(R, h.id, at + CAT_UP2 + 200, R.noFlip.has(h.id) || catFixed(R.res, h.id)));   // ギロチンで割れるカードは裏返さない（最初から陣営の色）
-        return cats.some((h) => !R.noFlip.has(h.id) && !catFixed(R.res, h.id)) ? CAT_EXTRA : 0;
+        cats.forEach((h) => catFlip2(R, h.id, at + CAT_UP2 + 200, R.noFlip.has(h.id)));   // ギロチンで割れるカードは裏返さない（最初から陣営の色）。保安官に撃たれた猫・噛み殺された猫も、ふつうの猫と同じく2回目に裏返る
+        return cats.some((h) => !R.noFlip.has(h.id)) ? CAT_EXTRA : 0;
       } },
       rest(R) {
         R.rest.forEach(([k, r, hid], i) => {
           if (r !== CAT || !hid || !catFlips(R.res, hid)) return;
           const at = R.t + 500 + i * 320;
-          if (catFixed(R.res, hid)) { catFlip2(R, hid, at, true); return; }   // 保安官に撃たれた猫: めくれたときから緑
           catFlip2(R, hid, at + CAT_UP2 + 200, false);
           R.restEnd = Math.max(R.restEnd, at + CAT_UP2 + 200 + CAT_EXTRA + 400);
         });

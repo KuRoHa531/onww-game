@@ -2257,7 +2257,7 @@ window.ONW = window.ONW || {};
         const last = segs[segs.length - 1];
         const nx = { name: last.name, team: catI.team === "village" || catI.team === "wolf" ? catI.team : "third", tags: [...(last.tags || [])] };
         if (catI.team === "third" && catI.final) nx.tags.push({ t: `(+${rn(g.currentRoles[catI.final])})`, k: "cat" });
-        if (catI.fixed) last.team = nx.team; else segs.push(nx);   // 保安官に撃たれた猫は裏返らず、最初から陣営の色（緑）の1段だけ
+        segs.push(nx);   // 保安官に撃たれた猫・噛み殺された猫も、ふつうの猫と同じく「シュレディンガーの猫(灰色) → シュレディンガーの猫(陣営の色)」の2段
       }
       const execTg = !(g.chainIds || []).includes(p.id) && (g.eliminated || []).includes(p.id) && !(g.servantSubs || []).some((x) => x.servant === p.id) && !(g.mentalIds || []).includes(p.id) && !(g.toughBounces || []).some((t) => (t.to || []).includes(p.id)) && ONW.execPairs(g).some(([e, t]) => t === p.id && e !== t && (g.currentRoles[t] !== ONW.ROLE.BOUNTY_HUNTER || bntMiss(t)));   // 処刑人のターゲットが投票で追放された（死因: 処刑。賞金稼ぎがターゲットなら、人狼判定を外したときだけ有効）
       const execLate = execTg && g.currentRoles[p.id] === ONW.ROLE.BOUNTY_HUNTER;   // 賞金稼ぎのターゲット: 追放でめくれたときは「追放」のまま、賞金稼ぎの外れが出たあとで処刑人の演出（ギロチン）に入る
