@@ -1889,12 +1889,12 @@ window.ONW = window.ONW || {};
     if (d.t === "act" && d.kind === "exchange") { if (byId(id)) hostExchange(id, d.a, d.b); return; }
     if (d.t === "act" && d.kind === "shoot") { if (byId(id)) hostSheriff(id, d.target); return; }
 
-    if (d.t === "act" && d.kind === "mchain" && ((g.phase === PH().ONLINE_MORNING && !g.settling) || g.phase === PH().ONLINE_DAY) && g.morningAct[id] && !g.morningDone[id] && byId(id)) {
+    if (d.t === "act" && d.kind === "mchain" && ((g.phase === PH().ONLINE_MORNING && !g.settling) || g.phase === PH().ONLINE_DAY) && g.morningAct[id] && !g.morningDone[id] && byId(id) && !isDead(id)) {   // 死んだ人は能力を使えない
       // 朝に使う能力（墓荒らしが交換した後の役職）: 選んだ瞬間に実行して結果を返す。朝の時点の実際のカードを見る・動かす
       const before = ONW.mimic.snap(g);   // 動く前の盤面（模倣の人狼の模倣先も一緒に控える）
       const me = byId(id), ar = g.morningAct[id], sel = d.sel || {}, label = rn(ar);
       const selfOk = !!((ONW.roleDef(ar) || {}).stagePick || {}).self;   // シャッフラーは自分も選べる（stagePick.self）
-      const okP = (x) => typeof x === "string" && (x !== id || selfOk) && !!byId(x);
+      const okP = (x) => typeof x === "string" && (x !== id || selfOk) && !!byId(x) && !isDead(x);   // 昼に酔いが覚めて使う能力: すでに死んでいる人は選べない
       const okG = (x) => Number.isInteger(x) && x >= 0 && x < g.center.length;
       const players = [...new Set((sel.players || []).filter(okP))], graves = [...new Set((sel.graves || []).filter(okG))];
       // 能力の中身は js/roles/<役職>.js の morning.run（結果の文章・演出・次に使える能力を返す。選択が足りなければ null）

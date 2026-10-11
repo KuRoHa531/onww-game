@@ -57,23 +57,27 @@ window.ONW = window.ONW || {};
       if (h) h(g, p.id, cpu.kit);
       if (ha) ha(g, p.id, cpu.kit);
     });
+    // 昼に酔いが覚めたCPUの能力: すでに死んでいる人(g.deadIds)は選ばない。役職ファイルは n.g.players から相手を選ぶので、死んでいる人を除いた見え方の g を渡す（夜・朝は deadIds が空なのでそのまま）
+    const deadSet = new Set(g.deadIds || []);
+    const gv = deadSet.size ? new Proxy(g, { get: (t, k) => (k === "players" ? t.players.filter((q) => !deadSet.has(q.id)) : Reflect.get(t, k, t)) }) : g;
+    const noTarget = (p) => deadSet.size > 0 && gv.players.filter((q) => q.id !== p.id).length === 0;   // 選べる生きている人がいなければ、能力は使わない
     const forced = (p) => (ONW.debug ? ONW.debug.cpuTarget(g, p.id) : null) || {};   // デバッグ: 能力先の指定
-    const validPlayer = (p, id) => id && id !== p.id && g.players.some((q) => q.id === id);
+    const validPlayer = (p, id) => id && id !== p.id && !deadSet.has(id) && g.players.some((q) => q.id === id);
     const nn = (rid) => { if (stage !== "late") ONW.newsNote(g, rid); };   // 新聞配達員の新聞: 夜に能力を使った役職を記録（昼に酔いが覚めてからの能力は、新聞には載らない）
     // 役職ファイルの cpuNight.run に渡す道具
     const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves); };   // 観測の人狼: 夜に誰が誰に能力を使ったかを記録（昼の酔い覚め後は記録しない）
     const hold = (id, text) => { if (!text) return; g.nightResults = g.nightResults || {}; (g.nightResults[id] = g.nightResults[id] || []).push(text); };   // 人間なら net.js の hold() で預かる夜の結果を、CPUも同じ文で g.nightResults に積む（結果画面の「情報確認（全員）」に出る。CPUには届かないので画面には影響しない）
-    const n = { g, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
+    const n = { g: gv, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
 
     const on = (s) => all || stage === s;
     nightSteps().forEach((s) => {
       if (!on(s.nd.stage)) return;
-      cpus.filter((p) => s.roles.includes(act(p))).forEach((p) => { const go = () => s.nd.run(n, p, rn(role(p)), false, act(p)); if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); });   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
+      cpus.filter((p) => s.roles.includes(act(p)) && !noTarget(p) && !deadSet.has(p.id)).forEach((p) => { const go = () => s.nd.run(n, p, rn(role(p)), false, act(p)); if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); });   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
     });
     // 朝: 墓荒らしが交換した後の役職の能力を即座に使う（朝の時点の実際のカードが対象。いたずらっ子の入れ替えは呼び出し側で反映）
     if (on("morning") || stage === "late") for (let pass = 0; pass < 2; pass++) cpus.forEach((p) => {   // 昼に墓地と交換した先に能力があれば、もう1回（pass 2）続けて使う
       const i = infoOf(g, p.id), got = i.pendingChain;
-      if (!got) return;
+      if (!got || noTarget(p) || deadSet.has(p.id)) return;   // 死んだCPUは能力を使わない
       i.pendingChain = null;
       const label = rn(got), keep = i.relic ? { ...i.relic } : null;
       const nd = (ONW.roleDef(got) || {}).cpuNight;

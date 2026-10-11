@@ -419,7 +419,7 @@ window.ONW = window.ONW || {};
           asks.push({ id, cands: c, kind: "straw" });
         } else if (role === R.ASSASSIN) {
           // アサシン: めくれたその場で、自分を除く全プレイヤー（すでにめくれた人も含む）から1人を選ぶ。選んだ相手は死なない（マーリンかどうかだけが勝敗に関わる）
-          const c = allIds.filter((x) => x !== id);
+          const c = allIds.filter((x) => x !== id && !gone.has(x));   // 昼中にすでに死んでいる人(game.deadIds)は選べない（この投票でめくれた人は、誰がめくれたか伏せるため候補に残す）
           if (!c.length) return;
           const t = game.assassinTargets[id];
           if (t && c.includes(t)) return;
@@ -428,7 +428,7 @@ window.ONW = window.ONW || {};
         } else if (role === R.BOUNTY_HUNTER) {
           // 賞金稼ぎ: めくれたその場で、自分を除く全プレイヤー（すでにめくれた人も含む）から人狼判定だと思う人を1人選ぶ（選んだ相手は死なない。人狼判定かどうかだけが勝敗に関わる）。心中・無理心中・タフガイのとばっちりでは選ばない
           if (bouncedIds.has(id)) return;
-          const c = allIds.filter((x) => x !== id);
+          const c = allIds.filter((x) => x !== id && !gone.has(x));   // 昼中にすでに死んでいる人は選べない
           if (!c.length) return;
           const t = game.bountyTargets[id];
           if (t && c.includes(t)) return;
