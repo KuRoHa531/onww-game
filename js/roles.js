@@ -51,13 +51,13 @@ window.ONW = window.ONW || {};
   };
 
   /**
-   * CPU は昼能力（独裁者・交換者）を自分では使わないので、固定していない CPU がこれらを引いたら、人間の参加者と役職を入れ替える（マイクラ版 avoidUnfixedCpuDayRoles と同じ）。
+   * CPU は昼能力（独裁者・交換者・狂った交換者・盗賊）を自分では使わないので、固定していない CPU がこれらを引いたら、人間の参加者と役職を入れ替える（マイクラ版 avoidUnfixedCpuDayRoles と同じ）。
    * 「固定している」= デバッグの固定役で指定した席。昼能力はデバッグの「昼能力」タブで、リアルタイムに発動する（ONW.net.debugDayAbility。事前の対象指定は廃止）。
    * 光の使徒などの変化で昼能力の役職になった CPU も同じ（変化前の記録 transformFrom は人間のほうへ付け替える）。人間が1人もいない（全員 CPU）ときは入れ替えない。
-   * 入れ替え先の人間は、独裁者・交換者を持っていない人から選ぶ（昼能力の役職を別の CPU へ移さないため）。
+   * 入れ替え先の人間は、独裁者・交換者・狂った交換者・盗賊を持っていない人から選ぶ（昼能力の役職を別の CPU へ移さないため）。
    */
   roles.avoidCpuDictator = function avoidCpuDictator(game) {
-    const DAY = [[ONW.ROLE.DICTATOR], [ONW.ROLE.EXCHANGER]];   // CPU が自分では使わない昼能力の役職
+    const DAY = [[ONW.ROLE.DICTATOR], [ONW.ROLE.EXCHANGER], [ONW.ROLE.MAD_EXCHANGER], [ONW.ROLE.THIEF]];   // CPU が自分では使わない昼能力の役職
     const dbg = game.debugOn && game.dbg ? game.dbg : null;
     const fixed = (id) => !!(dbg && (dbg.roles || {})[id]);
     const isDay = (id) => DAY.some(([r]) => game.initialRoles[id] === r);
@@ -116,6 +116,27 @@ window.ONW = window.ONW || {};
     return (ONW.TRANSFORM_GROUPS[base] || []).filter((t) => !off.includes(`${base}:${t}`));
   };
 
+  // ---- 前の試合の変化先を避ける（連戦で同じ役職が続かないように）----
+  // 直近 TF_HIST_GAMES 試合ぶんの「変化して出た役職」を覚えておき、次の試合の変化先では、たまにだけ(TF_REPEAT_RATE)被りを許して、あとは避ける。
+  // 覚える場所: このブラウザ(ホスト)の localStorage と、画面を開いている間のメモリ。ルームを作り直しても、同じブラウザなら続く。
+  const TF_HIST_GAMES = 2, TF_REPEAT_RATE = 0.2, TF_HIST_KEY = "onw.tfhist.v1";
+  roles.tfHistory = null;   // [[役職ID, ...], ...] 古い順。最後が直前の試合
+  roles.loadTfHistory = function () {
+    if (roles.tfHistory) return roles.tfHistory;
+    let a = null;
+    try { a = JSON.parse(localStorage.getItem(TF_HIST_KEY)); } catch (e) { a = null; }
+    roles.tfHistory = (Array.isArray(a) ? a : []).filter(Array.isArray).map((x) => x.filter((r) => typeof r === "string")).slice(-TF_HIST_GAMES);
+    return roles.tfHistory;
+  };
+  /** 試合の変化結果を記録する（変化して出た役職だけ。シナジーで置き換わったあとの最終の役職） */
+  roles.recordTfHistory = function (game) {
+    const out = [];
+    game.players.forEach((p) => { if (game.transformFrom && game.transformFrom[p.id]) out.push(game.initialRoles[p.id]); });
+    (game.center || []).forEach((r, i) => { if (game.centerTransformFrom && game.centerTransformFrom[i]) out.push(r); });
+    const h = roles.loadTfHistory(); h.push(out); while (h.length > TF_HIST_GAMES) h.shift();
+    try { localStorage.setItem(TF_HIST_KEY, JSON.stringify(h)); } catch (e) { /* 保存できなくてもメモリには残る */ }
+  };
+
   roles.applyTransforms = function applyTransforms(game) {
     const pick = ONW.utils.randomChoice, G = ONW.TRANSFORM_GROUPS;
     const pool = (b) => ONW.roles.enabledTargets(game, b);
@@ -127,6 +148,7 @@ window.ONW = window.ONW || {};
     const VILLAGE_DUP_RATE = 0.15;   // 光の使徒の変化先が、盤面にすでに多い役職と被るのを許す確率
     const used = {};
     const mark = (r) => { used[r] = (used[r] || 0) + 1; };
+    const recent = new Set(roles.loadTfHistory().flat());   // 直近の試合で変化して出た役職
     game.players.forEach((p) => { const r = game.initialRoles[p.id]; if (!G[r]) mark(r); });
     game.center.forEach((r) => { if (!G[r]) mark(r); });
     const pickTarget = (base) => {
@@ -142,6 +164,10 @@ window.ONW = window.ONW || {};
         const min = Math.min(...all.map((t) => used[t] || 0));
         const least = all.filter((t) => (used[t] || 0) === min);
         if (least.length && Math.random() >= VILLAGE_DUP_RATE) list = least;
+      }
+      if (recent.size && Math.random() >= TF_REPEAT_RATE) {   // 直近の試合の変化先は避ける（たまにだけ被りを許す）。避けると候補が無くなるときは避けない
+        const fresh2 = list.filter((t) => !recent.has(t)), fresh3 = all.filter((t) => !recent.has(t));
+        if (fresh2.length) list = fresh2; else if (fresh3.length) list = fresh3;
       }
       const t = pick(list);
       mark(t);
@@ -166,10 +192,12 @@ window.ONW = window.ONW || {};
       return pickTarget(before);
     });
     ONW.roles.applySynergy(game, lockedKeys);
+    roles.recordTfHistory(game);
   };
 
   /** 変化の結果に闇鍋シナジー(SYNERGY_RULES)を適用する */
   roles.applySynergy = function applySynergy(game, lockedKeys) {
+    game.synergyLog = [];
     const slots = [];
     const RULES = roles.synergyRules();   // SYNERGY_RULES + 自認村人の役職の自動ルール
     game.players.forEach((p) => slots.push({ key: `p:${p.id}`, id: p.id, role: game.initialRoles[p.id], from: game.transformFrom[p.id] || null }));
@@ -180,24 +208,39 @@ window.ONW = window.ONW || {};
     // 役職固定が最優先: 固定した席(変化先まで指定した枠 + 固定役が変化役でない席)は、シナジーで一切動かさない
     const dbgLocks = (game.debugOn && game.dbg) ? (game.dbg.roles || {}) : {};
     slots.forEach((s) => { if (dbgLocks[s.id !== undefined ? s.id : `center:${s.idx}`] && (!s.from || locked.has(s.key))) locked.add(s.key); });
-    const kept = new Set(locked);
-    // すでに条件を満たしている枠は、置き換えで壊さないよう守る
-    RULES.forEach((r) => {
-      slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });
-      if (!has(r.trigger)) return;   // trigger がいないルールの必要役職は守らない（別のルールの置き換え先にできるように）
-      const need = {}; r.required.forEach((q) => { need[q] = (need[q] || 0) + 1; });
-      Object.keys(need).forEach((q) => { slots.filter((s) => s.role === q).slice(0, need[q]).forEach((f) => kept.add(f.key)); });   // 必要役職は必要な枚数だけ守る(余りは他の必要役職に回せる)
-    });
-    // 個数ルール(SYNERGY_COUNT_RULES): trigger がいるとき、すでにいる対象役職の枠(必要枚数まで)は置き換えで壊さないよう守る
+    const placed = new Set();   // シナジーで置いた枠（以降も守る）
+    const countTriggers = new Set(ONW.SYNERGY_COUNT_RULES.map((r) => r.trigger).filter(Boolean));
     const hasLover = Object.keys(game.loverOf || {}).length > 0;
     const active = (r) => (r.always || has(r.trigger)) && !(r.unlessLover && hasLover);
-    ONW.SYNERGY_COUNT_RULES.forEach((r) => {
-      if (!active(r)) return;
-      if (r.trigger) slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });   // 後覚者そのものは置き換えない
-      slots.filter((s) => r.anyOf.includes(s.role)).slice(0, r.min).forEach((f) => kept.add(f.key));
-    });
+    // 守る枠を（今の盤面から）計算する。trigger が置き換えで消えたシナジーの必要役職は、守らなくなる
+    const computeKept = () => {
+      const kept = new Set(locked);
+      placed.forEach((k) => kept.add(k));
+      // すでに条件を満たしている枠は、置き換えで壊さないよう守る
+      RULES.forEach((r) => {
+        slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });
+        if (!has(r.trigger)) return;   // trigger がいないルールの必要役職は守らない（別のルールの置き換え先にできるように）
+        const need = {}; r.required.forEach((q) => { need[q] = (need[q] || 0) + 1; });
+        Object.keys(need).forEach((q) => { slots.filter((s) => s.role === q).slice(0, need[q]).forEach((f) => kept.add(f.key)); });   // 必要役職は必要な枚数だけ守る(余りは他の必要役職に回せる)
+      });
+      // 個数ルール(SYNERGY_COUNT_RULES): trigger がいるとき、すでにいる対象役職の枠(必要枚数まで)は置き換えで壊さないよう守る
+      ONW.SYNERGY_COUNT_RULES.forEach((r) => {
+        if (!active(r)) return;
+        if (r.trigger) slots.forEach((s) => { if (s.role === r.trigger) kept.add(s.key); });   // 後覚者そのものは置き換えない
+        slots.filter((s) => r.anyOf.includes(s.role)).slice(0, r.min).forEach((f) => kept.add(f.key));
+      });
+      return kept;
+    };
+    let kept = computeKept();
+    // ---- デバッグ用のシナジー記録（game.synergyLog。結果画面の「シナジー情報」に出す）----
+    const rname = (r) => (ONW.ROLE_INFO[r] || {}).name || r;
+    const lbl = (s) => (s.id !== undefined ? ((game.players.find((q) => q.id === s.id) || {}).name || "?") : `墓地${s.idx + 1}`);
+    const slog = [];   // 置き換えの記録 { kind: req | count | cap, rule, role, from, base, slot }
+    let cur = null;    // いま処理しているルール { kind, rule }
+    const note = (slot, role) => { if (cur) slog.push({ kind: cur.kind, rule: cur.rule, role, from: slot.role, base: slot.from, slot: lbl(slot) }); };
     const set = (slot, role) => {
-      slot.role = role; kept.add(slot.key);
+      note(slot, role);
+      slot.role = role; kept.add(slot.key); placed.add(slot.key);
       if (slot.id !== undefined) { game.initialRoles[slot.id] = role; game.currentRoles[slot.id] = role; } else game.center[slot.idx] = role;
     };
     const inPair = (s) => (s.role === ONW.ROLE.MERLIN && has(ONW.ROLE.ASSASSIN)) || (s.role === ONW.ROLE.ASSASSIN && has(ONW.ROLE.MERLIN));
@@ -211,6 +254,24 @@ window.ONW = window.ONW || {};
       const c = pool.filter((s) => !triggers.has(s.role));
       return ONW.utils.randomChoice(c.length ? c : pool);
     };
+    // 上限を先に適用する個数ルール(early: true。マーリン1人まで): 他のシナジーより前に余りを減らして、空いた枠を他のシナジー（独裁者など）に使えるようにする
+    //   （アサシンがいるときマーリンは「アサシン↔マーリン」の組として守られ、他のシナジーの置き換えに使えないので、余ったマーリンの枠は先に空けておく）
+    ONW.SYNERGY_COUNT_RULES.filter((r) => r.early && r.max && active(r)).forEach((rule) => {
+      cur = { kind: "cap", rule };
+      const trigAll = new Set([...RULES.map((r) => r.trigger), ...ONW.SYNERGY_COUNT_RULES.map((r) => r.trigger)].filter(Boolean));
+      let guard = 8;
+      while (slots.filter((s) => rule.anyOf.includes(s.role)).length > rule.max && guard-- > 0) {
+        const cands = slots.filter((s) => rule.anyOf.includes(s.role) && s.from && !locked.has(s.key) && ONW.roles.enabledTargets(game, s.from).some((t) => !rule.anyOf.includes(t) && !trigAll.has(t)));
+        if (!cands.length) break;
+        const slot = ONW.utils.randomChoice(cands);
+        const o = ONW.roles.enabledTargets(game, slot.from).filter((t) => !rule.anyOf.includes(t) && !trigAll.has(t));
+        const cnt = (r) => slots.filter((s) => s.role === r).length, min = Math.min(...o.map(cnt));
+        const pickR = ONW.utils.randomChoice(o.filter((r) => cnt(r) === min));
+        note(slot, pickR);
+        slot.role = pickR; kept.delete(slot.key); placed.delete(slot.key);   // 変え直した枠は、他のシナジーが使える空き枠にする
+        if (slot.id !== undefined) { game.initialRoles[slot.id] = pickR; game.currentRoles[slot.id] = pickR; } else game.center[slot.idx] = pickR;
+      }
+    });
     // 優先度高めのシナジー(rule.priority の役職): 他のシナジーより先に確保する。空いている枠が無いときは、他のシナジーの枠を置き換えてでも出す
     //   (置き換えるのは、固定していない・変化役から変化した枠のうち、この優先シナジーの trigger/必要役職・アサシン↔マーリンでないもの。先に「どのルールの必要役職でもない枠」を使う)
     {
@@ -219,6 +280,7 @@ window.ONW = window.ONW || {};
       const prioReq = new Set(prio.flatMap((r) => r.priority));
       const neededByOthers = (role) => RULES.some((q) => has(q.trigger) && q.required.includes(role));
       prio.forEach((rule) => {
+        cur = { kind: "req", rule };
         const seen = {};
         rule.priority.forEach((req) => {
           seen[req] = (seen[req] || 0) + 1;
@@ -238,23 +300,41 @@ window.ONW = window.ONW || {};
     }
     RULES.forEach((rule) => {
       if (!has(rule.trigger)) return;
+      cur = { kind: "req", rule };
       const seen = {};
       rule.required.forEach((req) => {
+        if (!has(rule.trigger)) return;   // trigger が置き換えられて消えたシナジーは、もう満たさなくてよい
         seen[req] = (seen[req] || 0) + 1;   // この役職を何枚必要とするか（共有者2枚など）
         if (slots.filter((s) => s.role === req).length >= seen[req]) return;
         const can = (s) => s.from && ONW.roles.enabledTargets(game, s.from).includes(req);
         let cands = slots.filter((s) => !kept.has(s.key) && can(s));
         // 置き換えられる枠がないときだけ、別の変化役の trigger 枠（この rule の trigger は除く）を置き換える
         // 例: 闇の化身が2枚とも忘却の人狼などに変化していて、狼夢人のための人狼を置く枠がない
-        if (!cands.length) cands = slots.filter((s) => kept.has(s.key) && !locked.has(s.key) && triggers.has(s.role) && s.role !== rule.trigger && !inPair(s) && can(s));   // アサシン↔マーリンが揃っているときは、その2枚は他のシナジーの置き換えに使わない
+        let viaTrigger = false;
+        if (!cands.length) { cands = slots.filter((s) => kept.has(s.key) && !locked.has(s.key) && (triggers.has(s.role) || countTriggers.has(s.role)) && s.role !== rule.trigger && !inPair(s) && can(s)); viaTrigger = cands.length > 0; }   // 個数ルールの trigger（封印の狂人など）も置き換えてよい   // アサシン↔マーリンが揃っているときは、その2枚は他のシナジーの置き換えに使わない
         // 固定した枠(デバッグの役職固定)はシナジーより優先: 置き換え先が無ければ、必要役職は足さない（固定を絶対に動かさない）
-        if (!cands.length) return;
+        if (!cands.length) {
+          // 最後の手段: 必要役職の枠がどうしても取れないときは、自分の trigger を別の役職に置き換えて、このシナジー自体を消す
+          //   （trigger がいなくなれば「いなければいけない」条件も消える。他のシナジーの必要役職になっている trigger・固定・アサシン↔マーリンは動かさない）
+          const neededElsewhere = (r) => RULES.some((q) => q !== rule && has(q.trigger) && q.required.includes(r));
+          const own = slots.filter((s) => s.role === rule.trigger && s.from && !locked.has(s.key) && !inPair(s) && !neededElsewhere(s.role));
+          const alt = (s) => roles.enabledTargets(game, s.from).filter((t) => t !== rule.trigger && !triggers.has(t) && !countTriggers.has(t));
+          const ownOk = own.filter((s) => alt(s).length);
+          if (!ownOk.length) return;
+          const slot = ONW.utils.randomChoice(ownOk), o = alt(slot);
+          const cnt = (r) => slots.filter((s) => s.role === r).length, min = Math.min(...o.map(cnt));
+          set(slot, ONW.utils.randomChoice(o.filter((r) => cnt(r) === min)));
+          kept = computeKept();
+          return;
+        }
         set(pickSlot(cands), req);
+        if (viaTrigger) kept = computeKept();   // trigger を置き換えたので、そのシナジーが守っていた枠（封印の狂人の対象役職・麻婆の豆腐など）を空き枠に戻す
       });
     });
     // 個数ルール: 対象役職(anyOf のどれでもよい)が合計で min 枚以上、盤面に出るようにする。足りない分は、変化役から変化した枠を置き換えて足す
     ONW.SYNERGY_COUNT_RULES.forEach((rule) => {
       if (!active(rule)) return;
+      cur = { kind: "count", rule };
       let guard = 8;
       while (slots.filter((s) => rule.anyOf.includes(s.role)).length < rule.min && guard-- > 0) {
         const opts = (s) => s.from ? ONW.roles.enabledTargets(game, s.from).filter((t) => rule.anyOf.includes(t)) : [];
@@ -289,10 +369,41 @@ window.ONW = window.ONW || {};
         const o = ONW.roles.enabledTargets(game, slot.from).filter((t) => !rule.anyOf.includes(t) && !trig.has(t));
         const cnt = (r) => slots.filter((s) => s.role === r).length, min = Math.min(...o.map(cnt));
         const pickR = ONW.utils.randomChoice(o.filter((r) => cnt(r) === min));
+        cur = { kind: "cap", rule }; note(slot, pickR);
         slot.role = pickR;
         if (slot.id !== undefined) { game.initialRoles[slot.id] = pickR; game.currentRoles[slot.id] = pickR; } else game.center[slot.idx] = pickR;
       }
     });
+    cur = null;
+    // ---- 最終の盤面でシナジーを判定して記録する（デバッグモードの結果画面「シナジー情報」用）----
+    const present = (r) => slots.filter((s) => s.role === r).length;
+    const canMake = (list) => slots.some((s) => s.from && roles.enabledTargets(game, s.from).some((t) => list.includes(t)));
+    const why = () => null;   // 理由の文章は出さない（✘ だけで伝わる）
+    const addsOf = (list) => list.map((e) => ({ slot: e.slot, from: rname(e.from), base: e.base ? rname(e.base) : null, role: rname(e.role) }));
+    const out = [];
+    RULES.forEach((rule) => {
+      if (!has(rule.trigger)) return;
+      const need = {}; rule.required.forEach((q) => { need[q] = (need[q] || 0) + 1; });
+      const items = Object.keys(need).map((q) => {
+        const mine = slog.filter((e) => e.rule === rule && e.kind === "req" && e.role === q), have = present(q);
+        const other = !mine.length && slog.some((e) => e.kind === "req" && e.role === q);
+        return { role: rname(q), need: need[q], have, state: have < need[q] ? "fail" : mine.length ? "added" : other ? "shared" : "already", adds: addsOf(mine), reason: have < need[q] ? why([q]) : null };
+      });
+      out.push({ trigger: rname(rule.trigger), holders: slots.filter((s) => s.role === rule.trigger).map(lbl), items });
+    });
+    ONW.SYNERGY_COUNT_RULES.forEach((rule) => {
+      if (!active(rule)) return;
+      const adds = slog.filter((e) => e.rule === rule && e.kind === "count"), caps = slog.filter((e) => e.rule === rule && e.kind === "cap");
+      const found = slots.filter((s) => rule.anyOf.includes(s.role)), have = found.length;
+      const over = !!rule.max && have > rule.max;
+      if (!rule.min && !caps.length && !over) return;   // 上限だけのルールで何も起きていないなら出さない
+      const state = have < rule.min ? "fail" : over ? "over" : adds.length ? "added" : caps.length ? "capped" : "already";
+      out.push({
+        trigger: rule.trigger ? rname(rule.trigger) : "（常時）", holders: rule.trigger ? slots.filter((s) => s.role === rule.trigger).map(lbl) : [],
+        count: { label: rule.label || "", n: rule.anyOf.length, anyOf: rule.anyOf.map(rname), min: rule.min || 0, max: rule.max || null, have, found: found.map((s) => rname(s.role)), state, adds: addsOf(adds), caps: addsOf(caps), reason: state === "fail" ? why(rule.anyOf) : state === "over" ? "減らせる枠がありませんでした（最初から配役に入れた枠・役職固定は動かしません）" : null },
+      });
+    });
+    game.synergyLog = out;
   };
 
   /**
@@ -309,6 +420,10 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF], priority: [ONW.ROLE.VILLAGER] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
+    { trigger: ONW.ROLE.MIRAGE_WOLF,    required: [ONW.ROLE.SEER] },                             // 蜃気狼が出る闇鍋には、占い師も最低1枚出す（占われてランダムな役職に見えるのが活きる盤面。マイクラ版 YAMINABE の蜃気狼シナジー: 占い師・偽占い師・感覚の占い師・指読みのどれか。Web版にあるのは占い師）
+    { trigger: ONW.ROLE.REBEL_MADMAN,   required: [ONW.ROLE.DICTATOR] },                       // 反逆の狂人が出る闇鍋には、独裁者も最低1枚出す（反転させるクーデターの相手がいないと活きない。マイクラ版 YAMINABE の反逆の狂人シナジー）
+    { trigger: ONW.ROLE.BLACK_WOLF_MADMAN, required: [ONW.ROLE.WEREWOLF, ONW.ROLE.SEER] },   // 黒子の狂人が出る闇鍋には、人狼と占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面。マイクラ版 YAMINABE の黒子の狂人シナジー）
+    { trigger: ONW.ROLE.MAD_QUEEN,      required: [ONW.ROLE.QUEEN] },                            // 狂った女王が出る闇鍋には、女王も最低1枚出す（村人陣営に「女王」と通知される相手がいないと狂った女王が活きない。マイクラ版 YAMINABE の狂った女王シナジー）
     { trigger: ONW.ROLE.FOX,            required: [ONW.ROLE.SEER] },                             // 妖狐が出る闇鍋には、占い師も最低1枚出す（妖狐は占われて呪殺されるため。マイクラ版 YAMINABE の妖狐シナジー）
     { trigger: ONW.ROLE.FOX_MARKED,     required: [ONW.ROLE.SEER, ONW.ROLE.FOX, ONW.ROLE.VILLAGER], priority: [ONW.ROLE.VILLAGER] },   // 狐憑きが出る闇鍋には、占い師・妖狐・村人も最低1枚ずつ出す（占われて「妖狐」と出る相手と、本物の妖狐。自分を村人だと思い込む狐憑きに、本物の村人が1人は並ぶように）
     { trigger: ONW.ROLE.FANATIC,        required: [ONW.ROLE.FOX, ONW.ROLE.SEER] },               // 背徳者が出る闇鍋には、ご主人の妖狐と占い師も最低1枚ずつ出す（妖狐を呪殺できる占い師がいる盤面にする）
@@ -332,12 +447,16 @@ window.ONW = window.ONW || {};
    * 今後候補を足すときは、ここに役職を1つ足すだけ（光の使徒の変化先である役職に限る）。
    */
   ONW.MAPO_COUNTER_ROLES = [ONW.ROLE.MAYOR, ONW.ROLE.WATCHDOG, ONW.ROLE.SHERIFF, ONW.ROLE.EXCHANGER, ONW.ROLE.DICTATOR];
+  /** 封印の効果を受ける役職（マイクラ版 YAMINABE_SEAL_TARGET_ROLES のうち、このWeb版にある役職。復讐者・愉快犯を足して44役職）。封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足すときは、マイクラ版の一覧に入っている役職をここにも足す */
+  ONW.SEAL_TARGET_ROLES = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker", "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "keymaster", "watchdog", "mind_wolf", "mimic_wolf", "eraser_wolf", "assassin", "wolf_king", "mayor", "mad_mayor", "mapo_wolf", "observer_wolf", "newspaper", "chicken", "queen", "mad_queen", "black_cat", "cat_pumpkin", "cat_sidhe", "insomniac", "tough_guy", "baker", "dictator", "sheriff", "exchanger", "mad_exchanger", "thief", "avenger", "prankster"];
   ONW.SYNERGY_COUNT_RULES = [
-    { trigger: ONW.ROLE.INSOMNIAC, anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
-    { trigger: ONW.ROLE.KEYMASTER, anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリン）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
-    { trigger: ONW.ROLE.HEARTBREAKER, anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
-    { trigger: ONW.ROLE.MAPO_WOLF, get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
-    { always: true, anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
+    { trigger: ONW.ROLE.INSOMNIAC, label: "役職を変える役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
+    { trigger: ONW.ROLE.KEYMASTER, label: "ロック対象の役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリン）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
+    { trigger: ONW.ROLE.HEARTBREAKER, label: "恋人系役職", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
+    { trigger: ONW.ROLE.MAPO_WOLF, label: "麻婆対抗役", get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
+    { trigger: ONW.ROLE.SEAL_MADMAN, label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES; }, min: 3 },   // 封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE の封印の狂人シナジー: YAMINABE_SEAL_TARGET_ROLES を3枚。Web版にある役職の分）
+    { always: true, label: "悪女・純愛者・キューピッド", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
+    { always: true, label: "マーリン", anyOf: [ONW.ROLE.MERLIN], min: 0, max: 1, early: true },   // マーリンは1人まで（光の使徒などの変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）
   ];
   /**
    * 本人に見せる「変化前」の役職。思い込み系（忘却の人狼・狼憑き・狼夢人）は、本当の変化前ではなく

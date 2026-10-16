@@ -53,6 +53,7 @@
     if (!g || g.allDeadSkip || g.dictator) return false;
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞・麻婆豆腐・暴露の紙を出している間）は使えない
     if (!g.currentRoles || ONW.mimic.actRole(g, id, g.currentRoles[id]) !== R().SHERIFF) return false;   // 模倣の人狼が保安官を模倣していても使える（7of9）
+    if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false;   // 封印の狂人に封印されている: 昼能力は使えない（2of4）
     if (ONW.hiddenDrunk(g, id) || isDead(g, id) || used(g, id)) return false;
     return targets(g, id).length > 0;
   }
@@ -62,7 +63,7 @@
   }
 
   /** シャッフラーのカードが乗っている人か（マイクラ版 hasShufflerBadge。シャッフラーつきの村人陣営は執行される） */
-  const shufflerTagged = (g, id) => !!(g.shufflerMarks && g.shufflerMarks[ONW.cardAt(g, id)]);
+  const shufflerTagged = (g, id) => !!(ONW.shuffler && ONW.shuffler.tagged(g, id));   // 有効な印が残っているときだけ（変化させたシャッフラーが上書きされて印が消えていれば、シャッフラーつきではない）
   /** 撃たれたら執行される「人外」か（false なら誤爆）。順番はマイクラ版どおり: 狼憑き・狐憑き → 恋人がいる人 → シャッフラーつきの村人陣営 → 白狼は村人陣営扱い → 村人陣営でなければ人外 */
   function isHit(g, id) {
     const r = R(), role = g.currentRoles[id], info = ONW.ROLE_INFO[role];
@@ -89,7 +90,7 @@
   function substituteOf(g, target) {
     const r = R();
     if (g.currentRoles[target] === r.SERVANT) return null;
-    const pair = ONW.servantPairs(g).find(([s, m]) => m === target && s !== target && !isDead(g, s) && !ONW.isLover(g, s));
+    const pair = ONW.servantSubPairs(g).find(([s, m]) => m === target && s !== target && !isDead(g, s) && !ONW.isLover(g, s));
     return pair ? pair[0] : null;
   }
 
@@ -108,7 +109,7 @@
     if (ONW.kingActive && ONW.kingActive(g, target) && ONW.kingProtected(g, target, new Set(g.deadIds || []), new Set([target]))) { out.mode = "guarded"; return out; }
     // ネコカボチャ: 撃つと保安官もネコカボチャも死ぬ（身代わりなし）
     // 【連鎖化】同時には死なない: ネコカボチャが撃たれて死ぬ(shot) → 保安官はネコカボチャの「道連れ」で、そのあとに死ぬ(tomo。net.js hostSheriff が段をずらして殺す)。保安官の従者はこれまでどおり後追いする
-    if (ONW.mimic.isAs(g, target, r.CAT_PUMPKIN) && !ONW.hiddenDrunk(g, target)) { out.mode = "pumpkin"; out.victims = [target]; out.tomo = [by]; out.followIds = [target, by]; return out; }   // 模倣ネコカボチャも同じ（受動効果は模倣先で見る）
+    if (ONW.mimic.isAs(g, target, r.CAT_PUMPKIN) && !ONW.hiddenDrunk(g, target) && !ONW.seal.is(g, target)) { out.mode = "pumpkin"; out.victims = [target]; out.tomo = [by]; out.followIds = [target, by]; return out; }   // 模倣ネコカボチャも同じ（受動効果は模倣先で見る）
     // シュレディンガーの猫（6of6・マイクラ版 sheriffSpecialCatTeam）: 誰も死なない。1回目に撃つと、猫は村人陣営に固定される（投票した人の陣営に決まる通常の仕組みより優先。恋人の猫は恋人陣営のまま）。固定済みの猫を撃っても何も起きない
     if (role === r.SCHRODINGER_CAT) { if (!catFixed(g, target)) { out.mode = "cat"; out.catFix = true; if (rev) out.catTeam = "wolf"; } return out; }   // 模倣保安官が撃った猫は人狼陣営に固定（マイクラ版 sheriffCatTeam）
     if (rev ? isHitMimic(g, target) : isHit(g, target)) {

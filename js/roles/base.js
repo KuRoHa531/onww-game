@@ -6,7 +6,7 @@
  *   2) index.html の「役職ファイル」の並びに <script src="js/roles/<陣営>/<役職ID>.js"></script> を1行足す
  *   これだけで、夜の能力・夜の画面の説明・朝/昼の通知が net.js から呼ばれる(net.js は触らなくてよい)。
  *
- * 【役職の処理順】ユーザー指定の全順序(まだない役職も含む)は _wip/役職の処理順.txt。night.kind / night.order を決めるときは必ず参照すること。
+ * 【役職の処理順】ユーザー指定の全順序(まだない役職も含む)は docs/role-process-order.md。night.kind / night.order を決めるときは必ず参照すること。
  *
  * 定義できるもの(すべて省略可):
  *   like: "seer"                他の役職の定義を土台にする(足りない項目だけ自分で上書き)
@@ -24,7 +24,7 @@
  *   hiddenWolf: true            人狼系だが夜に仲間から見えない(一匹狼)。ONW.VISIBLE_WOLF から外れる
  *   descFor(desc, g)            説明文をルーム設定などで差し替えたいとき(メイヤーの票数)。ONW.roleDesc から呼ばれる
  *   night: {                    夜に自分で能力を使う役職
- *     kind:  "seer"|"relic"|"doppel"|"shuffler"|"gremlin"|"robber"|"tm"   夜が明けるときに実行される段階(net.js の NIGHT_STAGES)
+ *     kind:  "seal"|"seer"|"relic"|"doppel"|"shuffler"|"gremlin"|"robber"|"tm"   夜が明けるときに実行される段階(net.js の NIGHT_STAGES。"seal" は封印の狂人(とエルフリンデ)だけの最初の段階)
  *     order: 数字              同じ段階の中の順番(小さいほど先)
  *     chain: false             墓荒らしの交換後/ドッペルのコピー後に「朝のうちに使える」役職から外す(墓荒らし自身)
  *     complete(np, ng)         選択が完了しているか(np=選んだ人数, ng=選んだ墓地の枚数)
@@ -32,6 +32,7 @@
  *     resolve(c, p)            夜の終わりの実行(p = 能力を使う人間のプレイヤー)
  *   }
  *   morning: { run(c) -> {lines, reveal, nextChain}|null, after(c, res), peek(c), dayNotify(c) }   朝/昼に使う能力
+ *   noDayChain: true           昼に入ってから（酔い覚めの議論中）は使えない役職（役職の直下に書く）。抹消の人狼（昼になる前に実行する能力）。朝のうちの連鎖(墓荒らし・ドッペル)は使える
  *   nightMsg(c, p, r)          夜の始まりに本人へ出す内容(text/text2/lines/godPeek/bigGraves/cultWolves/masonMates/master)
  *   got(c, p, got, rev, opts)  墓荒らし/ドッペルでこの役職を手にしたときの夜の情報
  *   soberLines(c, id, fin) / soberPeek(c, id, fin) / soberExtra(c, id, fin)   酔いが覚めたときの情報
@@ -41,7 +42,7 @@
  *   dayStart(c) / dayAnnounce(c) / soberReveal(c, ids) / resyncDay(c, seat) / cpuLateVisits(c)
  *   dayCurse(c) 昼になった瞬間の呪殺(妖狐: 待機時間に決めた席を昼中死亡に) / daySober(c) 昼に酔いが覚めたとき(妖狐: 酔い覚めの呪殺) / dayCheck(c) 昼に役職が動いた・占ったとき(妖狐: 新しく占われた席に妖狐が来たら呪殺)
  *   stageNight / stageMorning / stagePick: stage.js の夜・朝の演出とカードの選び方(stage.kit を使う)
- *   stageResult: { execExclude(res), intro, flipUp, flipped, kingdom, assassin, bounty, restUp, rest, afterRest, reverse, skip, clear }   結果発表の演出(stage.js の startResult / skipResult)
+ *   stageResult: { execExclude(res), intro, flipUp, flipped, kingdom, assassin, bounty, restUp, rest, afterRest, balancer, reverse, skip, clear }   結果発表の演出(stage.js の startResult / skipResult)
  *   stageSettle: { field, shown, run, end } / stageFlash: { field, when, run }   朝の待機時間・昼の公開演出(スター・女王・フリーター・訪問者)
  *   stageSober: { list, listLate }   昼に酔いが覚めたときにめくれるカードの並び(stage.js の soberPeek)
  *   フックは関数、または { order: 数字, run: 関数 } で書ける(order が小さいほど先に呼ばれる。省略は100)

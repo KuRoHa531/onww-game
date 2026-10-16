@@ -3,7 +3,7 @@
   /** 最終盤面でフリーターを持っていて、就職先がこの人(id)の人たち（待機時間にこの人の画面でカードが表になる） */
   const employers = (g, id) => ONW.hiddenDrunk(g, id) ? [] : g.players.filter((q) => g.currentRoles[q.id] === ONW.ROLE.FREETER && ONW.getRoleBound(g, "freeterTargets", q.id) === id).map((q) => q.id);
   /** 「フリーターに就職されている」の文言（人間の情報開示ボタンとCPUの発言で完全に一致させる。誰がフリーターかも言うほう） */
-  ONW.freeterInfoText = (name) => `フリーターに就職されています。フリーターは${name}です。`;
+  ONW.freeterInfoText = (name) => `フリーターに就職されています。フリーターは ${name} です。`;
   ONW.freeterInfoShort = (name) => `フリーター: ${name}`;
   const logs = (g, ids) => ids.map((fid) => `あなたのところにフリーターの ${(g.players.find((q) => q.id === fid) || {}).name} が就職しました。`);
 
@@ -13,6 +13,7 @@
     g.players.forEach((p) => {
       if (g.currentRoles[p.id] !== ONW.ROLE.FREETER) return;
       if (ONW.hiddenDrunk(g, p.id)) return;   // 酔いが覚めていない人は、覚めたあとに自分で就職先を選べる
+      if (ONW.seal.is(g, p.id)) return;   // 封印されている人は、就職先も決まらない（2of4）
       if (ONW.getRoleBound(g, "freeterTargets", p.id)) return;
       if (g.initialRoles[p.id] === ONW.ROLE.FREETER || (g.morningAct || {})[p.id] === ONW.ROLE.FREETER) return;
       const fid = ONW.debug ? ONW.debug.randTarget(g, "freeter", p.id) : null;   // デバッグ: 就職先の指定
@@ -66,6 +67,7 @@
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞などの紙が出ている間）は使えない
     if (!g.currentRoles || g.currentRoles[id] !== R_().FREETER) return false;
     if (ONW.hiddenDrunk(g, id) || dead(g, id)) return false;
+    if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false;   // 封印の狂人に封印されている: 昼能力は使えない（2of4）
     if (!jobDead(g, id)) return false;
     return targets(g, id).length > 0;
   }

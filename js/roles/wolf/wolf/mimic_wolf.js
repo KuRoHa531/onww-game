@@ -18,7 +18,7 @@
  * 【段階的に有効化する仕組み】ONW.mimic.SUPPORTED に入っている役職だけが模倣先の候補になる。
  *   各段階で、能力の模倣がつながった役職をここに足していった。9of9 で全部の役職がつながったので制限は外してある（state.all = true が既定。disableAll() で SUPPORTED だけに戻せる＝テスト用）。
  *
- * 勝敗の優先度: 人狼系の基本勝敗のまま（docs/勝利優先度.md に「模倣チキン」の行は 7of9 で扱う）。占われたときは「模倣の人狼」と出る（seerSees の既定）。
+ * 勝敗の優先度: 人狼系の基本勝敗のまま（docs/victory-priority.md に「模倣チキン」の行は 7of9 で扱う）。占われたときは「模倣の人狼」と出る（seerSees の既定）。
  */
 (function (ONW) {
   const K = ONW.wolfKit;
@@ -29,12 +29,12 @@
     "mimic_wolf", "light_apostle", "dark_avatar", "silver_shadow", "villager", "werewolf", "madman", "cultist", "jester_madman", "spy",
     "princess", "fox_marked", "black_wolf_madman", "wolf_marked", "cursed_one", "carmen", "knight", "priest", "mad_priest", "clone",
     "magician", "hayatochiri", "screw_gum",
-  ]);
+  ]);   // 抹消の人狼は模倣できる（マイクラ版 NON_MIMICABLE_ROLES に無い。抹消の人狼 5of5 で解禁）
   /** 模倣先として有効になっている役職（段階ごとに足す。ALL=true で制限なし） */
   const SUPPORTED = new Set(["seer", "robber", "troublemaker", "mason", "merlin", "dictator", "exchanger", "mind_wolf",
     "straw_doll", "cat_sidhe", "black_cat", "cat_pumpkin", "tough_guy", "chicken", "wolf_king", "tofu_wolf", "mapo_wolf", "assassin", "baker", "star", "mayor", "queen", "visitor", "newspaper",
     "sheriff", "white_wolf", "forgetful_wolf", "wolf_dreamer",
-    "big_wolf", "lone_wolf", "observer_wolf", "mad_seer", "exposed_madman", "muzzle_madman", "watchdog", "keymaster", "relic_robber", "insomniac"]);   // 9of9: 残りの10役職   // 7of9: 保安官（模倣保安官は村人陣営を執行）/ 判定が違う役（白狼・忘却の人狼・狼夢人）   // 3of9: 夜にカードを選ぶ能力（占い師・怪盗・いたずらっ子）/ 4of9: 夜の情報（共有者・マーリン）/ 5of9: 昼能力（独裁者・交換者・心眼の人狼。保安官は判定が違うので 7of9）/ 6of9: 受動効果（わら人形・猫又・黒猫・ネコカボチャ・タフガイ・チキン・人狼王・豆腐/麻婆・アサシン・パン屋・スター・メイヤー・女王・訪問者・新聞配達員）。段階ごとに足す
+    "big_wolf", "lone_wolf", "observer_wolf", "mad_seer", "exposed_madman", "muzzle_madman", "watchdog", "keymaster", "relic_robber", "insomniac", "eraser_wolf", "mirage_wolf", "mad_queen"]);   // 狂った女王: 模倣先に入る（模倣した人は、村人陣営には「女王」・人狼陣営には「狂った女王」として通知される。王国滅亡は起きない。mad_queen.js） / 蜃気狼: 模倣先に入る（占われると蜃気狼と同じランダムな役職に見える。mirage_wolf.js） / 9of9: 残りの10役職 / 抹消の人狼 5of5: 抹消の人狼（模倣の人狼が夜に選んだ相手の役職を、昼になる前に抹消する）   // 7of9: 保安官（模倣保安官は村人陣営を執行）/ 判定が違う役（白狼・忘却の人狼・狼夢人）   // 3of9: 夜にカードを選ぶ能力（占い師・怪盗・いたずらっ子）/ 4of9: 夜の情報（共有者・マーリン）/ 5of9: 昼能力（独裁者・交換者・心眼の人狼。保安官は判定が違うので 7of9）/ 6of9: 受動効果（わら人形・猫又・黒猫・ネコカボチャ・タフガイ・チキン・人狼王・豆腐/麻婆・アサシン・パン屋・スター・メイヤー・女王・訪問者・新聞配達員）。段階ごとに足す
   const state = { all: true };   // 9of9: 全部の役職がつながったので、模倣先の制限（SUPPORTED）は外した。disableAll() で段階的な制限に戻せる（テスト用）
 
   const isSupported = (role) => state.all || SUPPORTED.has(role);
@@ -79,6 +79,7 @@
   const notWolfJudge = (g, id) => !!(g && g.currentRoles && g.currentRoles[id] === R_().MIMIC_WOLF && NOT_WOLF_JUDGE.has(roleOf(g, id)));
   /** 占い師に占われたとき、カード role（席キー key = p の持ち主ID / "g:墓地番号"）が見える役職。模倣の人狼でなければ ONW.seerSees(role) と同じ */
   function seerSeen(g, role, key) {
+    if (ONW.mirage && ONW.mirage.isMirageCard(g, role, key)) { ONW.mirage.noteInspect(g, key, "seer"); return ONW.mirage.seerRole(g); }   // 蜃気狼（模倣先が蜃気狼の模倣の人狼も）: 盤面にあり得るランダムな役職（1回の占いで1回だけ呼ぶこと）
     if (role !== R_().MIMIC_WOLF) return ONW.seerSees(role);
     const mr = roleOf(g, key);
     if (mr === "wolf_dreamer") return "werewolf";                          // 狼夢人を模倣 → 占いは人狼
@@ -219,8 +220,8 @@
     /** 模倣先の役職名（本人への文・結果用） */
     nameOf: (g, id) => { const r = roleOf(g, id); return r && ONW.ROLE_INFO[r] ? ONW.ROLE_INFO[r].name : null; },
     /** 本人に出す文（夜の始まり・酔い覚め・情報確認で完全に一致させる） */
-    text: (rn, role) => `あなたは${rn(role)}の能力を模倣しました。`,
-    textNow: (rn, role) => `あなたは${rn(role)}の能力を模倣しています。`,
+    text: (rn, role) => `あなたは ${rn(role)} の能力を模倣しました。`,
+    textNow: (rn, role) => `あなたは ${rn(role)} の能力を模倣しています。`,
   };
 
   /** 模倣先の夜・酔い覚めの文を合流させない役職: 人狼系共通の文（模倣の人狼自身が出すので二重になる）・「村人だと思い込む／人狼だと思い込む」系（模倣の人狼は自分の正体を知っている） */

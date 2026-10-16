@@ -14,15 +14,16 @@
       i.mode = "grave";
       const idxs = fg.slice(0, lim);
       ONW.utils.shuffle([...g.center.keys()].filter((k) => !idxs.includes(k))).forEach((k) => { if (idxs.length < lim) idxs.push(k); });
-      idxs.slice(0, lim).forEach((k) => i.grave.push({ idx: k, role: ONW.mimic.seerSeen(g, graveNow[k], "g:" + k) }));   // 墓地の白狼も村人と出る
+      idxs.slice(0, lim).forEach((k) => i.grave.push({ idx: k, role: ONW.mimic.seerSeen(g, graveNow[k], "g:" + k) }));   // 墓地の白狼も村人と出る（墓地の蜃気狼はランダム。1枚につき1回だけ引く）
       i.grave.forEach((x) => { g.nightLogsAll.push(`${label} ${p.name} は 墓地${x.idx + 1} を確認し、${n.rn(x.role)} でした。`); n.hold(p.id, `墓地${x.idx + 1}枚目は「${n.rn(x.role)}」でした。`); });
       n.ob(p.id, [], i.grave.map((x) => x.idx));
     } else {
       const t = fp ? g.players.find((q) => q.id === fp) : n.pick(g.players.filter((q) => q.id !== p.id));
-      i.mode = "player"; i.target = t.id; i.known[t.id] = ONW.mimic.seerSeen(g, rolesNow[t.id], t.id);
+      const seen = ONW.mimic.seerSeen(g, rolesNow[t.id], t.id);   // 蜃気狼はランダムなので、1回の占いで1回だけ引く（ログ・本人の文・CPUの記憶を同じ結果にそろえる）
+      i.mode = "player"; i.target = t.id; i.known[t.id] = seen;
       if (ONW.foxInspect) ONW.foxInspect(g, t.id);   // 妖狐: 占われた席を記録（呪殺の判定は最終盤面で）
-      g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${n.rn(ONW.mimic.seerSeen(g, rolesNow[t.id], t.id))} でした。`);
-      n.hold(p.id, `${t.name} の役職は「${n.rn(ONW.mimic.seerSeen(g, rolesNow[t.id], t.id))}」でした。`);
+      g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${n.rn(seen)} でした。`);
+      n.hold(p.id, `${t.name} の役職は「${n.rn(seen)}」でした。`);
       n.ob(p.id, [t.id]);
     }
     n.nn(rid);
@@ -89,7 +90,7 @@
         const g = c.g, rn = c.rn, hold = c.hold, nameOf = c.nameOf, rev = c.rev;
         const sel = c.selOf(p), label = rn(c.eff(p));
         if (sel.players.length === 1) {
-          const t = sel.players[0], r = ONW.mimic.seerSeen(g, g.initialRoles[t], t);
+          const t = sel.players[0], r = ONW.mimic.seerSeen(g, g.initialRoles[t], t);   // 蜃気狼はランダム（1回だけ引く）
           if (ONW.foxInspect) ONW.foxInspect(g, t);   // 妖狐: 占われた席を記録
           g.nightLogsAll.push(`${label} ${p.name} は ${nameOf(t)} を占い、${rn(r)} でした。`);
           hold(p.id, `${nameOf(t)} の役職は「${rn(r)}」でした。`);
@@ -112,9 +113,10 @@
         let graves = c.graves, lines = null, reveal = null;
         if (graves.length) {
           graves = graves.slice(0, ONW.seerGraveMax(g)).sort((x, y) => x - y);
-          lines = graves.map((i) => `墓地${i + 1}枚目は「${rn(ONW.mimic.seerSeen(g, g.center[i], "g:" + i))}」でした。`);   // 墓地の白狼も村人と出る
-          graves.forEach((i) => g.nightLogsAll.push(`${label} ${me.name} は 墓地${i + 1} を確認し、${rn(ONW.mimic.seerSeen(g, g.center[i], "g:" + i))} でした。`));
-          reveal = { kind: "peek", items: graves.map((i) => ({ k: `g:${i}`, role: ONW.mimic.seerSeen(g, g.center[i], "g:" + i) })) };
+          const seenG = graves.map((i) => ({ i, role: ONW.mimic.seerSeen(g, g.center[i], "g:" + i) }));   // 墓地の白狼も村人と出る（墓地の蜃気狼はランダム。1枚につき1回だけ引く）
+          lines = seenG.map((x) => `墓地${x.i + 1}枚目は「${rn(x.role)}」でした。`);
+          seenG.forEach((x) => g.nightLogsAll.push(`${label} ${me.name} は 墓地${x.i + 1} を確認し、${rn(x.role)} でした。`));
+          reveal = { kind: "peek", items: seenG.map((x) => ({ k: `g:${x.i}`, role: x.role })) };
         } else if (players.length) {
           const t = players[0], r = ONW.mimic.seerSeen(g, g.currentRoles[t], t);
           if (ONW.foxInspect) ONW.foxInspect(g, t);   // 妖狐: 占われた席を記録（朝・昼のうちの占い）

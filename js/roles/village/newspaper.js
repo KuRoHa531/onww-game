@@ -1,7 +1,7 @@
 /** 新聞配達員: 最終盤面にいると、昼になって変化公開のあと、昨夜能力を使った役職の名前が新聞として全員に知らされる */
 (function (ONW) {
   /** 新聞配達員（最終盤面で、酔いが覚めている人）がいるか */
-  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.NEWSPAPER && !ONW.hiddenDrunk(g, p.id));
+  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.NEWSPAPER && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id));
 
   /** 新聞: 昨夜能力を使った役職の名前（誰が使ったかは載らない）。戻り値: 役職名の配列（空 = 目立った動きなし）。新聞配達員がいない・すでに出したときは null */
   function announce(c) {

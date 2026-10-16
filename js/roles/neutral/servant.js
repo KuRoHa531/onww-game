@@ -6,13 +6,15 @@
   ONW.servantMaster = (g, id) => (g && g.currentRoles && g.currentRoles[id] === ONW.ROLE.SERVANT && (g.servantMasters || {})[id]) || null;
   /** 従者を持っている人(持ち主ID)とご主人の組 [[従者の持ち主, ご主人], ...]（ご主人が決まっているものだけ） */
   ONW.servantPairs = (g) => (g.players || []).map((p) => [p.id, ONW.servantMaster(g, p.id)]).filter(([, m]) => m);
+  /** 身代わり・後追いが働く従者の組（封印の狂人に封印されている従者は除く。通知・勝利・情報は servantPairs のまま。2of4b） */
+  ONW.servantSubPairs = (g) => ONW.servantPairs(g).filter(([s]) => !(ONW.seal && ONW.seal.is(g, s)));
   /** 従者のCO・結果開示の文言（人間のCOボタンとCPUの発言で完全に一致させるため、ここ1か所だけで作る。本家: 「ご主人は〇〇です」） */
-  ONW.servantCoText = (name) => `ご主人は${name}です。`;
+  ONW.servantCoText = (name) => `ご主人は ${name} です。`;
   ONW.servantCoShort = (name) => `ご主人: ${name}`;
   /** 「自分の従者がいる」の文言（人間の情報開示ボタンとCPUの発言で一致させる）。本家のCPUが騙りで話を合わせるときは「〇〇が自分の従者のようです。」と名前も言う */
   ONW.servantInfoText = "自分の従者がいます。";
   ONW.servantInfoShort = "従者がいる";
-  ONW.servantFakeInfoText = (name) => `${name}が自分の従者のようです。`;
+  ONW.servantFakeInfoText = (name) => `${name} が自分の従者のようです。`;
   /** 役職が動いたあとの従者の整合を取る（本家の clearServantData / syncSingleRoleLinkedData / assignNewServantMaster 相当）
    *   ・墓地に入った従者はご主人を失う（墓地の役職に主従関係は残らない）
    *   ・従者でない人についたご主人の記録は消す

@@ -12,7 +12,7 @@
 (function (ONW) {
   const ROLE_ID = "muzzle_madman";
   const nameOf = (g, id) => (g.players.find((q) => q.id === id) || {}).name || "?";
-  const isMuzzler = (g, id) => ONW.mimic.eff(g, id) === ROLE_ID && !ONW.hiddenDrunk(g, id);   // 模倣の人狼が口封じの狂人を模倣していても口封じする（9of9）
+  const isMuzzler = (g, id) => ONW.mimic.eff(g, id) === ROLE_ID && !ONW.hiddenDrunk(g, id) && !ONW.seal.is(g, id);   // 模倣の人狼が口封じの狂人を模倣していても口封じする（9of9）
 
   ONW.muzzle = {
     /** この口封じの狂人(ID)の対象を決める(すでにあればそのまま)。自分を含む全員からランダム。戻り値: 対象のID */
@@ -60,7 +60,7 @@
       return g.players.filter((p) => isMuzzler(g, p.id) && t[p.id] && g.players.some((q) => q.id === t[p.id])).map((p) => [p.id, t[p.id]]);
     },
     /** 口封じの狂人本人が、自分の対象を知るための文章 */
-    lineOf(g, id) { const t = (g.muzzleTargets || {})[id]; return t ? `あなたは${nameOf(g, t)}を口封じしました。` : ""; },
+    lineOf(g, id) { const t = (g.muzzleTargets || {})[id]; return t ? `あなたは ${nameOf(g, t)} を口封じしました。` : ""; },
   };
 
   ONW.defineRole(ROLE_ID, {
@@ -87,13 +87,13 @@
     /** 夜の始まり(本人の画面): 対象を伝え、対象のカードがめくれてミュートマーク(muzzle)が出る */
     nightMsg(c, p, r) {
       const g = c.g, t = ONW.muzzle.assign(g, p.id);
-      return { text: t ? `あなたは${nameOf(g, t)}を口封じしました。` : "", text2: "口封じされた人は、昼のチャットとCOボタンが使えません。", muzzle: t || null };
+      return { text: t ? `あなたは ${nameOf(g, t)} を口封じしました。` : "", text2: "口封じされた人は、昼のチャットとCOボタンが使えません。", muzzle: t || null };
     },
     /** 墓荒らし・ドッペルゲンガーで口封じの狂人を手にしたとき: 朝のうちに対象がランダムで決まる。本人に伝え、朝の演出で対象のカードがミュートマークでめくれる(rev.muzzle) */
     got(c, p, got, rev, opts) {
       const g = c.g, t = ONW.muzzle.assign(g, p.id);   // すでに対象がカードについてきていればそのまま、なければランダム
       if (!t) return;
-      c.hold(p.id, `あなたは${nameOf(g, t)}を口封じしました。`);
+      c.hold(p.id, `あなたは ${nameOf(g, t)} を口封じしました。`);
       g.nightLogsAll.push(`${c.rn(ROLE_ID)} ${p.name} は ${nameOf(g, t)} を口封じしました。`);
       if (rev && rev[p.id]) rev[p.id].muzzle = t;
     },

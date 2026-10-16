@@ -8,9 +8,11 @@
  *     自分自身も選べる: 自分のカードの上に置く（by = そのカード自身）。役職は変わるのでシャッフラーではなくなるが、カードの印で「自分を変化させたシャッフラー」と分かる。
  *     上書きされた（ドッペル・グレムリンのコピー・別のシャッフラーが上に置いた）カードの印は消える。陣営の乗っ取りは 3of4。
  *     結果画面の「(+シャッフラー)」は g.shufflerStamp（置かれた段階と、印の付いたカードが動いたあとの段階。state.js ONW.shufflerStamp）で付く。印の記録には置かれる前の役職(from)と置かれた時点の持ち主(to)も残す。
- *   ・処理順（_wip/役職の処理順.txt）: … → ドッペルゲンガー → シャッフラー → グレムリン → (マティアス) → 怪盗 → いたずらっ子 …。Web版の夜の段階は seer → relic → doppel → shuffler → gremlin → robber → tm。
+ *   ・処理順（docs/role-process-order.md）: … → ドッペルゲンガー → シャッフラー → グレムリン → (マティアス) → 怪盗 → いたずらっ子 …。Web版の夜の段階は seer → relic → doppel → shuffler → gremlin → robber → tm。
  *   ・夜の能力なので新聞に載る（ONW.newsNote）。墓荒らし・ドッペルで手にした場合は朝のうちに選べる（morning）。
  *   ・夜の能力は「夜に配られた役職の持ち主(人間)」が使う。そのときカードが怪盗などで別の人に移っていても、記録は「いまそのカードを持っている人」に書く（ONW.shuffler.holderOf）。
+ *  ・複数のシャッフラー（2026-10-16）: 同じカードに複数のシャッフラーが置くと印は重なって全部残る（g.shufflerMarks[カードID] は配列）。判定は最終盤面の役職で、同じ人のシャッフラーどうし・村人陣営/人狼陣営に変化させた組どうしは運命共同体（groupsOf。1組でも失敗したらグループ全員失敗）。変化させたシャッフラーが上書きされた印は無効（残りの有効な印があれば消えない）。
+ *  ・同じ役職の夜の順番は人間もCPUもランダム（net.js の runNightStage）。
  * 実装の進み具合は _wip/シャッフラー_依頼文.txt を参照。
  *  1of4: 登録・夜の選択(自分も可)・山札から引いて上に置く確定ロジック・役職移動への追従・ルールコード・処理順メモ【済】 / 2of4: 朝の演出(山札→めくる→カードの上に置く)・情報確認・再入室・結果画面の「(+シャッフラー)」【済。選ばれた人への通知と演出(待機時間)は、マイクラ版に合わせて廃止】 / 3of4: 酔い(覚めたあと)・昼のうち(昼に選ぶ演出)・陣営の乗っ取りと勝敗(失敗条件)【済。選ばれた人への通知は廃止】 / 4of4: CPU(発言/CO・投票判断。選ばれたときの認識は廃止＝元の役職のつもりのまま)・COボタンの結果開示・闇鍋シナジー(後覚者)・wiki・総合テスト【済】
  */
@@ -27,15 +29,21 @@
     "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman",
     "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler",
     "assassin", "merlin", "mason", "cultist",
-    "muzzle_madman", "watchdog",
+    "muzzle_madman", "watchdog", "seal_madman",
+    "eraser_wolf",   // 抹消の人狼（夜に対象を選ぶ・昼になる前に実行する能力の役職。マイクラ版 shufflerEligibleRoles でも除外）
+    "avenger",   // 復讐者（夜に復讐対象を選ぶ役職。マイクラ版 shufflerEligibleRoles の除外どおり）
+    "prankster",   // 愉快犯（夜に対象を選ぶ役職。復讐者と同じ扱いで山札から外す。※マイクラ版 shufflerEligibleRoles の確認は 4of4）
+    "mimic_wolf", "mirage_wolf",   // 模倣の人狼・蜃気楼の人狼（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
   function pool() {
     return Object.keys(ONW.ROLE_INFO || {}).filter((r) => !BLOCKED.includes(r) && r !== ONW.ROLE.DRUNK && r !== ONW.ROLE.LOVER);
   }
-  /** 山札から1枚引く（乱数は ONW.utils.randomChoice。テストでは差し替える） */
-  function draw() {
-    const p = pool();
+  /** 山札から1枚引く（乱数は ONW.utils.randomChoice。テストでは差し替える）。
+   *  裏ルール（2026-10-16）: ①変化させる人の「いまの役職」と同じ役職は引かない（from）。②自分自身を変化させるときは、人狼陣営の役職は引かない（自分が人狼陣営になると人狼陣営の負けが確定してしまうため）。
+   *  いたずらっ子などで、置いたあとに役職が動いた場合はこの制限の対象外（引くときだけの制限） */
+  function draw(from, self) {
+    const p = pool().filter((r) => r !== from && !(self && teamOfRole(r) === ONW.TEAM.WOLF));
     return p.length ? ONW.utils.randomChoice(p) : ONW.ROLE.VILLAGER;
   }
   /** カードID("P:ID" / 墓地 "G:番号")を、いま持っている人（墓地にあるなら "g:番号"）。役職が動いていなければ本人 */
@@ -46,15 +54,30 @@
   }
   /** 夜に配られた役職(人間 id が最初に持っていたカード)を、いま持っている人 */
   const holderOf = (g, id) => holderOfCard(g, "P:" + id);
-  /** 最終盤面のシャッフラーの [持ち主, 対象(置かれたカードをいま持っている人), 引いた役職, 自分自身か]。
+  /** カードの上の印の一覧（重ね置きで複数。旧形式の単体オブジェクトも配列として扱う） */
+  const marksOf = (g, card) => { const x = (g.shufflerMarks || {})[card]; return Array.isArray(x) ? x : x ? [x] : []; };
+  /** 印 e（card の上に置かれたもの）が有効か。他人に置いたシャッフラーは、最終盤面でシャッフラーのカードが役職「シャッフラー」のままのときだけ有効（上書きされたら、その人が置いた印は無効）。自分に置いた印は印があるかぎり有効 */
+  function markValid(g, card, e) {
+    const sh = holderOfCard(g, e.by);
+    if (!g.players.some((q) => q.id === sh)) return false;
+    return card === e.by || g.currentRoles[sh] === R_();
+  }
+  /** いま id のカードに「有効なシャッフラーの印」が1つでも残っているか。複数のシャッフラーが同じ人を変化させたときは、片方が上書きされても、もう片方が有効なら印は消えない */
+  function tagged(g, id) {
+    const card = ONW.cardAt(g, id);
+    return marksOf(g, card).some((e) => markValid(g, card, e));
+  }
+  /** 最終盤面のシャッフラーの [持ち主, 対象(置かれたカードをいま持っている人), 引いた役職, 自分自身か]。有効な印1つにつき1組（同じ人を複数のシャッフラーが変化させていれば、同じ対象の組が複数並ぶ）。
    *  他人に置いたシャッフラーは、最終盤面でシャッフラーのカードが役職「シャッフラー」のままのときだけ（上書きされたら無効）。自分に置いたシャッフラーは印があるかぎり有効 */
   function picks(g) {
     const out = [], m = g.shufflerMarks || {}, isP = (id) => g.players.some((q) => q.id === id);
     Object.keys(m).forEach((card) => {
-      const e = m[card], th = holderOfCard(g, card), sh = holderOfCard(g, e.by), self = card === e.by;
-      if (!isP(th) || !isP(sh)) return;
-      if (!self && g.currentRoles[sh] !== R_()) return;
-      out.push([sh, th, e.role || null, self]);
+      const th = holderOfCard(g, card);
+      if (!isP(th)) return;
+      marksOf(g, card).forEach((e) => {
+        if (!markValid(g, card, e)) return;
+        out.push([holderOfCard(g, e.by), th, e.role || null, card === e.by]);
+      });
     });
     return out;
   }
@@ -63,7 +86,7 @@
   /** 実行: 山札から1枚引いて、t のカードの上に置く（t の役職が引いた役職になる）。holder = いまシャッフラーのカードを持っている人。戻り値 = { target, role, from }
    *  元の役職(from)は結果画面の役職の流れ（roleTrail）にも残る。 */
   function shuffle(g, holder, t) {
-    const role = draw(), by = ONW.cardAt(g, holder), from = g.currentRoles[t];
+    const by = ONW.cardAt(g, holder), from = g.currentRoles[t], role = draw(from, t === holder);
     ONW.shufflerPlace(g, t, role, by);
     return { target: t, role, from };
   }
@@ -93,12 +116,25 @@
     if ([ONW.TEAM.VILLAGE, ONW.TEAM.WOLF].includes(teamOfRole(asg)) && dead.has(sh)) return true;
     return dead.has(th) && !allowDeath;
   }
-  /** 勝者の集合 w（追加勝利を足す前）に対して、失敗した組の シャッフラー・対象 を返す（勝ち組の対象は除く）。game.shufflerBan に残す */
+  /** 組を「運命共同体」にまとめる（2026-10-16 ユーザー指定）。次の組は1つのグループになり、1組でも失敗したらグループ全員が失敗する。
+   *   ① 同じ人を変化させたシャッフラーどうし（最終盤面のその人の役職で判定。重ね置きの途中の役職は見ない）
+   *   ② 村人陣営の役職に変化させた組どうし／人狼陣営の役職に変化させた組どうし（変化先の役職が違っても、陣営が同じなら連動）。第三陣営の役職・勝ち組は陣営では連動しない
+   *  異なる陣営の組（村人陣営と人狼陣営など）は、それぞれ別に判定する。戻り値: [ [picks の添字, ...], ... ] */
+  function groupsOf(g, ps) {
+    const par = ps.map((_, i) => i), find = (i) => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+    const join = (a, b) => { par[find(a)] = find(b); };
+    const sideOf = (pk) => { const r = g.currentRoles[pk[1]], t = teamOfRole(r); return r !== ONW.ROLE.WINNER && (t === ONW.TEAM.VILLAGE || t === ONW.TEAM.WOLF) ? t : null; };
+    ps.forEach((pk, i) => ps.forEach((qk, j) => { if (j <= i) return; if (pk[1] === qk[1] || (sideOf(pk) && sideOf(pk) === sideOf(qk))) join(i, j); }));
+    const m = new Map(); ps.forEach((_, i) => { const k = find(i); if (!m.has(k)) m.set(k, []); m.get(k).push(i); });
+    return [...m.values()];
+  }
+  /** 勝者の集合 w（追加勝利を足す前）に対して、失敗した組の シャッフラー・対象 を返す（勝ち組の対象は除く）。game.shufflerBan に残す。
+   *  グループ（groupsOf）の中に失敗した組が1つでもあれば、そのグループのシャッフラーと対象は全員失敗 */
   function failed(g, w, dead) {
-    const ban = new Set();
-    picks(g).forEach((pk) => {
-      if (!pairFails(g, pk, w, dead)) return;
-      ban.add(pk[0]); if (!pk[3] && g.currentRoles[pk[1]] !== ONW.ROLE.WINNER) ban.add(pk[1]);
+    const ban = new Set(), ps = picks(g);
+    groupsOf(g, ps).forEach((idx) => {
+      if (!idx.some((i) => pairFails(g, ps[i], w, dead))) return;
+      idx.forEach((i) => { const pk = ps[i]; ban.add(pk[0]); if (!pk[3] && g.currentRoles[pk[1]] !== ONW.ROLE.WINNER) ban.add(pk[1]); });
     });
     g.shufflerBan = [...ban];
     return ban;
@@ -133,7 +169,7 @@
   }
   function failText(g, ban) { return ban.length ? `シャッフラーの陣営の ${ban.map((id) => nm(g, id)).join("、")} は、死亡条件を満たせず勝利できませんでした。` : ""; }
 
-  ONW.shuffler = { BLOCKED, pool, draw, holderOf, holderOfCard, picks, picksOf, shuffle, tagSegs, failed, takeover, addWinnerPairs, takeoverText, failText };
+  ONW.shuffler = { BLOCKED, pool, draw, holderOf, holderOfCard, picks, picksOf, tagged, groupsOf, shuffle, tagSegs, failed, takeover, addWinnerPairs, takeoverText, failText };
 
   // ---- CPUの夜の行動: 自分を含む1人をランダムに選ぶ（デバッグの指定があればそれ。自分も指定できる） ----
   function cpuRun(n, p, label, cur, rid) {
@@ -171,7 +207,7 @@
 
   ONW.defineRole("shuffler", {
     info: { deck: 58, name: "シャッフラー", team: ONW.TEAM.THIRD, wakeOrder: 55, sort: 40.5,
-      desc: "第三陣営。夜に自分を含むプレイヤーを1人選びます。朝に山札から1枚引いてめくり、選んだ人のカードの上に置きます（その人の役職が、引いたカードの役職に変わります）。引いた役職はあなたに分かります。山札には、変化役・夜に誰かを選ぶ役職・マーリン・アサシン・共有者・狂信者などは入っていません。変化させられた人には知らされません（本人は元の役職のつもりのままです）。自分を変化させたときは変化後の役職として勝利すれば単独勝利、他人を変化させたときは変化させた人が変化後の役職として勝利すれば、シャッフラーと一緒に乗っ取り勝利です。ただし、追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）以外に変化させたのに対象が死亡すると失敗、村人陣営・人狼陣営の役職に変化させたときはシャッフラー本人が死亡しても失敗です。（処理順: 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子）" },
+      desc: "第三陣営。夜に自分を含むプレイヤーを1人選びます。朝に山札から1枚引いてめくり、選んだ人のカードの上に置きます（その人の役職が、引いたカードの役職に変わります）。引いた役職はあなたに分かります。山札には、変化役・夜に誰かを選ぶ役職・マーリン・アサシン・共有者・狂信者などは入っていません。変化させられた人には知らされません（本人は元の役職のつもりのままです）。自分を変化させたときは変化後の役職として勝利すれば単独勝利、他人を変化させたときは変化させた人が変化後の役職として勝利すれば、シャッフラーと一緒に乗っ取り勝利です。ただし、追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）以外に変化させたのに対象が死亡すると失敗、村人陣営・人狼陣営の役職に変化させたときはシャッフラー本人が死亡しても失敗です。複数のシャッフラーがいるときは、同じ人を変化させた全員が、その人の最終的な役職で判定され、1人でも失敗すると全員失敗です。村人陣営の役職どうし・人狼陣営の役職どうしに変化させた組も同じ運命で、1組でも失敗すると、その陣営に変化させた組は全員失敗です（陣営が違う組は別々に判定）。（処理順: 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子）" },
     groups: { "transform:silver_shadow": 18 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）
     uiNight: {
       action(X) {

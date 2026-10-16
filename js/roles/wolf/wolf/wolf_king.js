@@ -6,11 +6,11 @@
 (function (ONW) {
   const K = ONW.wolfKit;
   /** 最終盤面で人狼王を持っている人のID（酔いが覚めていない人は、覚めた瞬間に公開されるので除く） */
-  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, p.id)).map((p) => p.id);   // 模倣の人狼が人狼王を模倣していても人狼王として公開・ガードされる
+  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id)).map((p) => p.id);   // 模倣の人狼が人狼王を模倣していても人狼王として公開・ガードされる
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
   ONW.kingHolders = holders;
   /** 効果が働いている人狼王か（酔いが覚めていない酔っ払いは、まだ人狼王の能力を使えない） */
-  const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, id);
+  const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, id) && !(ONW.seal && ONW.seal.is(g, id));   // 封印されている人狼王はガードできない（追放・道連れ・保安官のどれも。2of4b）
   ONW.kingActive = active;
   /**
    * 人狼王が「追放・道連れ・とばっちり」で死なずにすむか（ガードされるか）。
@@ -23,7 +23,7 @@
    */
   ONW.kingProtected = function kingProtected(g, kid, gone, dying) {
     const R = ONW.ROLE, blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER];
-    const subbed = (w) => !blocked.includes(g.currentRoles[w]) && ONW.servantPairs(g).some(([s, m]) => m === w && s !== w && !dying.has(s) && !gone.has(s) && !ONW.isLover(g, s));
+    const subbed = (w) => !blocked.includes(g.currentRoles[w]) && ONW.servantSubPairs(g).some(([s, m]) => m === w && s !== w && !dying.has(s) && !gone.has(s) && !ONW.isLover(g, s));
     const others = ONW.vote.wolfJudgeIds(g).filter((w) => w !== kid && !gone.has(w));
     if (others.some((w) => !dying.has(w) || subbed(w))) return true;                       // 同時に死なない人狼判定が生き残る
     // 生き残る人がいないとき: 人狼王どうしが同時に追放・道連れにされるだけなら、互いを守り合って死なない。人狼王以外の人狼判定も同時に死ぬなら、全員死ぬ

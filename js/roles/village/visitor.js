@@ -17,6 +17,7 @@
     g.players.forEach((p) => {
       if (ONW.mimic.eff(g, p.id) !== ONW.ROLE.VISITOR) return;
       if (ONW.hiddenDrunk(g, p.id)) return;   // 酔いが覚めていない人は、覚めたあとに自分で訪問先を選べる
+      if (ONW.seal.is(g, p.id)) return;   // 封印されている人は、訪問先も決まらない（2of4）
       if (ONW.getRoleBound(g, "visitorTargets", p.id)) return;
       if (g.initialRoles[p.id] === ONW.ROLE.VISITOR || (g.morningAct || {})[p.id] === ONW.ROLE.VISITOR) return;
       if (g.initialRoles[p.id] === ONW.ROLE.MIMIC_WOLF && g.currentRoles[p.id] === ONW.ROLE.MIMIC_WOLF) return;   // 模倣訪問者: 最初から持っている人は夜に自分で選んでいる

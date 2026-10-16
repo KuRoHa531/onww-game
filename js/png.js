@@ -22,11 +22,12 @@ window.ONW = window.ONW || {};
     const head = (t) => L.push({ segs: [{ t, c: C.head, b: true }] });
     const sep = () => L.push({ sep: true });
     if (res.dictator) {
-      head("独裁処刑");
-      add(T(res.dictator.by), T(" → ", C.dim), T(res.dictator.target, C.vote), T("（投票は行いませんでした）", C.dim));
+      head(res.dictator.coup ? "クーデター" : "独裁処刑");
+      add(T(res.dictator.by), T(" → ", C.dim), T(res.dictator.chosen || res.dictator.target, C.vote), T("（投票は行いませんでした）", C.dim));
+      if (res.dictator.coup) add(T("反逆の狂人 ", C.dim), T((res.dictator.rebels || []).join("、")), T(" がいたため独裁が反転し、", C.dim), T(res.dictator.by, C.vote), T(" が処刑されました", C.dim));
     } else {
       head("投票結果");
-      res.votes.forEach((v) => add(T(v.from), T(" → ", C.dim), v.x ? T("投票無効", C.dead) : v.to ? T(v.to, C.vote) : T("未投票", C.dim), ...(v.to ? [T(`(${v.w || 1})`, C.dim)] : [])));
+      res.votes.forEach((v) => add(T(v.from), T(" → ", C.dim), ...(v.x ? [T("投票無効", C.dead)] : v.to ? [...(v.sw ? [T(`${v.to}${ONW.vote.wLabel(v.w)}`, C.dim), T(" ⇒ ", C.head)] : []), T(v.sw || v.to, C.vote)] : [T("未投票", C.dim)]), ...(v.to ? [T(ONW.vote.wLabel(v.w), v.w === 0 ? C.dead : C.dim)] : [])));
       sep(); head("得票数");
       if (res.counts.length) res.counts.forEach((c) => add(T(c.name), T(" : ", C.dim), T(`${c.c}票`, C.vote)));
       else add(T("得票はありません。", C.dim));
@@ -56,20 +57,28 @@ window.ONW = window.ONW || {};
     sep(); head("夜行動結果");
     if (res.nightLogs.length) res.nightLogs.forEach((t) => addTint(T(t))); else add(T("夜行動ログはありません。", C.dim));
     // 【昼行動結果】夜行動結果の下。昼能力（独裁者など）の結果はここに1行ずつ並べる
-    if (res.dictator || (res.dayLogs || []).length) { sep(); head("昼行動結果"); if (res.dictator) addTint(T(`独裁者 ${res.dictator.by} は ${res.dictator.target} を独裁処刑対象にしていました。`)); (res.dayLogs || []).forEach((t) => addTint(T(t))); }
+    if (res.dictator || (res.dayLogs || []).length) { sep(); head("昼行動結果"); if (res.dictator) addTint(T(res.dictator.coup ? `独裁者 ${res.dictator.by} は ${res.dictator.chosen || res.dictator.target} を独裁処刑対象にしましたが、反逆の狂人 ${(res.dictator.rebels || []).join("、")} のクーデターで、${res.dictator.by} が処刑されました。` : `独裁者 ${res.dictator.by} は ${res.dictator.target} を独裁処刑対象にしていました。`)); (res.dayLogs || []).forEach((t) => addTint(T(t))); }
     // 【昇格情報】昼行動結果と役職情報の間。今後「姫君 → 女王」などの昇格を足すときも、ここ（昇格情報）に1行ずつ並べる
     if (res.promoted.length) { sep(); head("昇格情報"); add(T("[狂人昇格] 今回は ", C.dim), T(res.promoted.join("、")), T(" が人狼判定になっていました。", C.dim)); }
     // 【役職情報】夜行動結果・昼行動結果・昇格情報の下。賞金稼ぎ・処刑人・従者・口封じの狂人の情報を1つの欄に並べる（画面の最終結果と同じ並び）。1行も無い試合は欄ごと出さない
-    const info = [
-      ...(res.bounty || []).map((x) => [T("賞金稼ぎ: ", C.info), T(`${x.by} は ${x.target} を人狼判定だと選びました。${x.hit ? "成功です。" : "失敗です。"}`)]),
-      ...(res.execs || []).map((x) => [T("処刑人: ", C.info), T(`${x.exec} のターゲットは ${x.target} でした。${x.win ? (x.late ? "賞金稼ぎが追放され、人狼判定を外したので処刑人の勝利です。" : "追放されたので処刑人の勝利です。") : "追放されませんでした。"}`)]),
-      ...(res.watchdogs || []).map((x) => [T("番犬: ", C.info), T(`${x.by} の飼い主は ${x.owner} です。${x.bite ? `${x.by} が ${x.owner} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${x.owner} への ${x.votes}票は無効でした。` : ""}${x.back ? "ネコカボチャに噛み返されました。" : ""}`)]),
-      ...(res.sheriffs || []).filter((x) => x.info).map((x) => [T("保安官: ", C.info), T(`${x.by} が ${x.target} を撃った結果: ${x.info}`)]),
-      ...(res.servants || []).map((q) => [T("従者: ", C.info), T(`${q[0]} のご主人は ${q[1]} です。`)]),
-      ...(res.muzzles || []).map((x) => [T("口封じの狂人: ", C.info), T(`${x.by} は ${x.target} を口封じしました。`)]),
-      ...(res.mimics || []).map((x) => [T("模倣の人狼: ", C.info), T(`${x.by} は ${x.grave ? "墓地から引いたあと " : ""}${x.role} の能力を模倣していました。`)]),
+    const info = [   // 役職ごとの組（同じ役職で別の人の行は同じ組。組と組のあいだに薄い区切りを入れる。画面の最終結果と同じ区切り方）
+      [...(res.bounty || []).map((x) => [T("賞金稼ぎ: ", C.info), T(`${x.by} は ${x.target} を人狼判定の人として選びました。${x.hit ? "人狼判定だったので成功です。" : "人狼判定ではなかったので失敗です。"}`)])],
+      [...(res.execs || []).map((x) => [T("処刑人: ", C.info), T(`${x.exec} のターゲットは ${x.target} でした。${x.win ? (x.late ? "ターゲットの賞金稼ぎが追放され、人狼判定を外したので処刑人の勝利です。" : "ターゲットが追放（処刑）されたので処刑人の勝利です。") : x.dead ? "ターゲットが追放以外で死亡したので処刑人は敗北です。" : "ターゲットは追放されませんでした。"}`)])],
+      [...((res.foxVote && res.foxVote.slides) || []).map((x) => [T("ペンギン（妖狐投票）: ", C.info), T(`${x.by} に投票した ${(x.voters || []).join("・")} の${x.w}票は、${x.to} へ滑りました。`)]),   // 妖狐投票でも票は滑る（画面と同じ組）
+        ...(res.slides || []).map((x) => [T("ペンギン: ", C.info), T(`${x.by} に投票した ${(x.voters || []).join("・")} の${x.w}票は、${x.to} へ滑りました。`)])],
+      [...(res.watchdogs || []).map((x) => [T("番犬: ", C.info), T(`${x.by} の飼い主は ${x.owner} です。${x.bite ? `${x.by} が ${x.owner} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${x.owner} への ${x.votes}票は無効でした。` : ""}${x.back ? "ネコカボチャに噛み返されました。" : ""}`)])],
+      [...(res.sheriffs || []).filter((x) => x.info).map((x) => [T("保安官: ", C.info), T(`${x.by} が ${x.target} を撃った結果: ${x.info}`)])],
+      [...(res.prankster ? [[T("愉快犯: ", C.info), T(`適用された愉快犯は ${res.prankster.name} です。選んだ人は ${res.prankster.target} でした。`)], [T("愉快犯の条件: ", C.info), T(`${res.prankster.label}（${res.prankster.success ? "成立" : "不成立"}）`)]] : [])],
+      [...(res.servants || []).map((q) => [T("従者: ", C.info), T(`${q[0]} のご主人は ${q[1]} です。`)])],
+      [...(res.muzzles || []).map((x) => [T("口封じの狂人: ", C.info), T(`${x.by} は ${x.target} を口封じしました。`)])],
+      [...(res.mimics || []).map((x) => [T("模倣の人狼: ", C.info), T(`${x.by} は ${x.grave ? "墓地から引いたあと " : ""}${x.role} の能力を模倣していました。`)])],
+      ...((res.detective && res.detective.boards) || []).map((b) => {   // 名探偵情報（マイクラ版と同じ。名探偵ごとに1組）
+        const nmOf = (id) => ((res.detective.seats || []).find((q) => q.id === id) || {}).name || "?", rn = (r) => (ONW.roles.getInfo(r) || {}).name || r;
+        return [[T("名探偵: ", C.info), T(`${b.name} は初期役職について`)], ...b.cells.filter(Boolean).map((c) => [T(`${nmOf(c.id)} を ${rn(c.guess)}`)]), [T(`と推測し、${b.success ? "成功" : "失敗"}していました。`)]];
+      }),
     ];
-    if (info.length) { sep(); head("役職情報"); info.forEach((r) => addTint(...r)); }
+    const gs = info.filter((g) => g.length);
+    if (gs.length) { sep(); head("役職情報"); gs.forEach((g, i) => { if (i) L.push({ gsep: true }); g.forEach((r) => addTint(...r)); }); }
     return L;
   };
 
@@ -104,6 +113,7 @@ window.ONW = window.ONW || {};
     });
     lines.forEach((ln) => {
       if (ln.sep) return rows.push({ sep: true, h: 18 });
+      if (ln.gsep) return rows.push({ gsep: true, h: 12 });   // 役職ごとの薄い区切り
       wrap(probe, ln.segs, W - PAD * 2, (s) => fontFor(s, ln.big)).forEach((segs) => rows.push({ segs, center: ln.center, big: ln.big, h: ln.big ? 44 : LH }));
     });
     const H = PAD + rows.reduce((a, r) => a + r.h, 0) + 56;
@@ -115,6 +125,7 @@ window.ONW = window.ONW || {};
     ctx.textBaseline = "middle";
     let y = PAD;
     rows.forEach((r) => {
+      if (r.gsep) { ctx.globalAlpha = 0.45; ctx.fillStyle = C.sep; ctx.fillRect(PAD, y + r.h / 2, W - PAD * 2, 1); ctx.globalAlpha = 1; y += r.h; return; }
       if (r.sep) { ctx.fillStyle = C.sep; ctx.fillRect(PAD, y + r.h / 2, W - PAD * 2, 1); y += r.h; return; }
       let total = 0;
       r.segs.forEach((s) => { ctx.font = fontFor(s, r.big); total += ctx.measureText(s.t).width; });
@@ -179,6 +190,7 @@ window.ONW = window.ONW || {};
     if ((pp.stars || []).length) pub.push([T("スター: "), ...pp.stars.flatMap((n, i) => [...(i ? [T("、")] : []), T(n, C.player)])]);
     if ((pp.kings || []).length) pub.push([T("人狼王: "), ...pp.kings.flatMap((n, i) => [...(i ? [T("、")] : []), T(n, C.player)])]);
     (pp.expose || []).forEach((r) => pub.push([T("暴露通知: 暴露された人の最終役職は "), { t: r.role, c: C.head, b: true }, T(`${r.extras && r.extras.length ? `（${r.extras.join("・")}）` : ""} です`)]));
+    if (pp.prankster) pub.push([T("愉快な笑い声が聞こえました。")]);
     if (pp.mapo) pub.push([T("麻婆豆腐が完成しました")]);
     if (pp.bread > 0) pub.push([T(pp.bread > 1 ? `パンが${pp.bread}個焼けました` : "パンが焼けました")]);
     (pp.deaths || []).forEach((t) => pub.push(tint(t)));

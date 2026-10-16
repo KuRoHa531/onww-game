@@ -9,9 +9,10 @@
  *   ・使った瞬間に議論・投票は終わり、結果発表へ（妖狐投票もしない）。票は「独裁者 → 対象」の1票だけが入った扱い（マイクラ版の game.votes[独裁者] = 対象）。
  *   ・処刑されるのは対象だけ。タフガイ(はじき返す・次点はいないので誰も死なない)・人狼王(他に人狼判定の人がいればガード)は通常の追放と同じ。従者は身代わりにならない（連鎖の道連れでは従者の身代わりは従来どおり）。
  *   ・処刑後の連鎖（道連れ・恋人の心中・アサシン・賞金稼ぎなど）と勝敗は、通常の追放と同じ。
- *   ・マイクラ版の「反逆の狂人」(独裁を反転させてクーデター)は、WEB版にまだ役職がないので未実装（ONW.dictator.declare に差し込める形にしてある）。
+ *   ・反逆の狂人（js/roles/wolf/mad/rebel_madman.js）がいるとクーデターになる: 独裁を宣言した瞬間、選んだ相手ではなく独裁者本人が処刑される（ONW.rebel.coupFor が判定。選ばれたのが反逆の狂人本人のときは反転しない）。
+ *     g.dictator.target は「実際に処刑される人」（クーデターなら独裁者本人）、g.dictator.chosen は独裁者が選んだ相手。
  *
- * 状態: g.dictator = null | { by: 独裁者のID, target: 処刑する人のID }（試合ごとに net.startGame が null に戻す）
+ * 状態: g.dictator = null | { by: 独裁者のID, target: 実際に処刑される人のID, chosen: 独裁者が選んだ人のID, coup: クーデターか, rebels: クーデターを起こした反逆の狂人のID[] }（試合ごとに net.startGame が null に戻す）
  * 呼び出し: net.js の hostDictate(ホスト) → ONW.dictator.canUse / targets / declare。vote.js の resolveElimination は g.dictator を見て従者の身代わりを飛ばす。
  */
 (function (ONW) {
@@ -23,6 +24,7 @@
     if (!g || g.dictator || g.allDeadSkip) return false;
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞・麻婆豆腐・暴露の紙を出している間）は使えない
     if (!g.currentRoles || ONW.mimic.actRole(g, id, g.currentRoles[id]) !== R().DICTATOR) return false;   // 模倣の人狼が独裁者を模倣していても使える
+    if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false;   // 封印の狂人に封印されている: 昼能力は使えない（2of4）
     if (ONW.hiddenDrunk(g, id) || isDead(g, id)) return false;
     return targets(g, id).length > 0;
   }
@@ -35,8 +37,10 @@
    * 戻り値: 記録した { by, target }
    */
   function declare(g, id, target) {
-    g.dictator = { by: id, target };
-    g.votes = { [id]: target };   // マイクラ版: game.votes[独裁者] = 対象。ほかの人の票は入らない（議論を打ち切るので投票は行われない）
+    const cp = ONW.rebel ? ONW.rebel.coupFor(g, id, target) : null;   // 反逆の狂人がいればクーデター（独裁の反転）
+    const forced = cp ? cp.forced : target;                           // 実際に処刑される人: 通常は選んだ相手 / クーデターなら独裁者本人
+    g.dictator = { by: id, target: forced, chosen: target, coup: !!cp, rebels: cp ? cp.ids.slice() : [] };
+    g.votes = { [id]: forced };   // マイクラ版: game.votes[独裁者] = 対象（クーデターのときは処刑される人 = 独裁者本人。追放の集計は votes を見るため）。ほかの人の票は入らない（議論を打ち切るので投票は行われない）
     return g.dictator;
   }
 
@@ -54,7 +58,7 @@
     stageResult: {
       open: { order: 1, run(R) {
         const d = R.res.dictator;
-        if (!d) return false;
+        if (!d || d.coup) return false;   // クーデターのときは反逆の狂人の役職ファイル（rebel_madman.js）の open が演出する
         const { P, later, setCap, esc, paint, G, up, gx, badge } = R;
         const k = P(d.byId), tk = P(d.targetId), t0 = R.t;
         const h = R.res.history.find((q) => q.id === d.byId), role = (h && h.role) || d.role || "dictator";
@@ -68,7 +72,7 @@
       } },
       skip(R) {
         const d = R.res.dictator;
-        if (!d) return;
+        if (!d || d.coup) return;   // クーデターのときは反逆の狂人の役職ファイル(rebel_madman.js)の skip と、履歴の「クーデター」の札に任せる
         R.badge[`p:${d.byId}`] = "独裁";
         const h = R.res.history.find((q) => q.id === d.targetId);
         if (h && !h.dead && !R.badge[`p:${d.targetId}`]) R.badge[`p:${d.targetId}`] = "処刑対象";

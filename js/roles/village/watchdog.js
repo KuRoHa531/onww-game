@@ -38,14 +38,16 @@
     return (g.players || []).map((p) => [p.id, ownerOf(g, p.id)]).filter(([, o]) => o);
   }
   /** 追放されなくなる人（番犬の飼い主）の集合 */
-  function protectedIds(g) { return [...new Set(pairs(g).map(([, o]) => o))]; }
+  /** 守る・噛む番犬の組（封印されている番犬は守らず噛まない。情報・CO用の pairs は変えない。2of4b） */
+  function activePairs(g) { return pairs(g).filter(([w]) => !(ONW.seal && ONW.seal.is(g, w))); }
+  function protectedIds(g) { return [...new Set(activePairs(g).map(([, o]) => o))]; }
 
   /** 飼い主を決める（夜・朝のうち共通）。holderId = 番犬のカードの持ち主 */
   function setOwner(g, holderId, t) { ONW.setRoleBound(g, "watchdogOwners", holderId, t); }
 
   /** 文言（人間のCO・CPUの発言・情報確認で一致させる。マイクラ版: 「〇〇を飼い主にしました。」） */
   const ownerLine = (name) => `${name} を飼い主にしました。`;
-  const coText = (name) => `${name}を飼い主にしていました。`;
+  const coText = (name) => `${name} を飼い主にしていました。`;
   const coShort = (name) => `飼い主: ${name}`;
 
   /**
@@ -53,7 +55,7 @@
    *   ・いまは番犬（村人陣営）だけなので "village"。
    *   ・模倣番犬（模倣の人狼が番犬の能力を使う）は、カードが模倣の人狼（人狼陣営）なので "wolf" になる（実装済み）。犬の狂人は未実装（【確定メモ】噛まれた猫は人狼陣営に確定。役職の陣営が人狼陣営なら、この関数のままで "wolf"）。
    *   ・村人陣営の犬と人狼陣営の犬に【同時に】噛まれた猫は、vote.resolveCats が陣営をランダムに決める（この関数は犬1匹ごとの陣営を返すだけ）。
-   *     これらの役職は役職の陣営が人狼陣営なので、噛んだ人の役職の陣営を見るこの関数のままで "wolf" になる（そのとき確認すること）。docs/シュレ猫の陣営.md を正本にする。
+   *     これらの役職は役職の陣営が人狼陣営なので、噛んだ人の役職の陣営を見るこの関数のままで "wolf" になる（そのとき確認すること）。docs/schrodinger-cat-team.md を正本にする。
    */
   function biteTeam(g, by) {
     const role = g && g.currentRoles ? g.currentRoles[by] : null;
@@ -61,7 +63,7 @@
     const info = ONW.ROLE_INFO[role];
     return info && info.team === ONW.TEAM.WOLF ? "wolf" : "village";
   }
-  ONW.watchdog = { ownerOf, pairs, protectedIds, setOwner, ownerLine, coText, coShort, nm, biteTeam };
+  ONW.watchdog = { ownerOf, pairs, activePairs, protectedIds, setOwner, ownerLine, coText, coShort, nm, biteTeam };
 
   // ---- CPUの夜の行動: 自分以外の1人をランダムに選ぶ（デバッグの指定があればそれ） ----
   function cpuRun(n, p, label, cur, rid) {

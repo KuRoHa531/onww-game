@@ -146,13 +146,39 @@ window.ONW = window.ONW || {};
 
   // 役職が変わっていることを伝える（本家 openChangedRoleInfoCoMenu のうち、Web版にある役職の分。文言は本家のまま）
   const CHANGED_LINES = [
+    ["eraser_wolf", "抹消に消されていそうです。", "抹消に消された"],   // マイクラ版の並びは先頭が抹消
     ["robber", "怪盗に交換されていそうです。", "怪盗に交換された"],
     ["troublemaker", "いたずらっ子に交換されていそうです。", "いたずらっ子に交換された"],
     ["shuffler", "シャッフラーに変えられていそうです。", "シャッフラーに変えられた"],
     ["gremlin", "グレムリンに上書きされていそうです。", "グレムリンに上書きされた"],
   ];
   co.changedInfo = () => set({ step: "chg" });
-  co.lockFailed = () => done("役職がロックされていて、能力に失敗しました。", null, null, "disclose", "ロックされて失敗");   // 鍵師のロックで変化役の能力が弾かれた（怪盗・いたずらっ子・墓荒らし・ドッペル・シャッフラー・グレムリン）
+  // 鍵師のロックで変化役の能力が弾かれた（怪盗・いたずらっ子・墓荒らし・ドッペル・シャッフラー・グレムリン・抹消の人狼）。
+  //   「誰を選んで失敗したか」も言える: 墓荒らし(墓地を選ぶだけ)は従来どおり1回で送る / 1人を選ぶ役職は lock1 / 2人を選ぶ役職(いたずらっ子・グレムリン)は lock2 で選ぶ。
+  //   文言はCPUの発言(robber.js / troublemaker.js)と同じ形。相手を言わずに失敗とだけ伝えることもできる(co.lockPlain)
+  const LOCK_VERB = { robber: "交換", doppel: "コピー", shuffler: "交換", eraser: "抹消", tm: "入れ替え", gremlin: "上書き" };
+  co.lockPlain = () => done("役職がロックされていて、能力に失敗しました。", null, null, "disclose", "ロックされて失敗");
+  co.lockFailed = function () {
+    const s = G().co || {}, kind = s.kind;
+    if (kind === "relic") return co.lockPlain();   // 墓地を選ぶだけで、ロックされるのは自分の役職だけ
+    if (kind === "tm" || kind === "gremlin") return set({ step: "lock2", kind, chain: s.chain, sel: [] });
+    set({ step: "lock1", kind, chain: s.chain });
+  };
+  co.lockBack = () => { const s = G().co || {}; startResult(s.kind, s.chain); };   // 選び直す（相手を選ぶ画面に戻る）
+  co.lockPick1 = function (id) {
+    const s = G().co, who = nameOf(id), v = LOCK_VERB[s.kind] || "変更";
+    const text = s.kind === "eraser" ? `${who} を抹消対象にしましたが、役職がロックされていたため抹消できませんでした。` : `${who} を選びましたが、役職がロックされていたため${v}できませんでした。`;
+    done(text, null, null, "disclose", `${who} → ロックで失敗`);
+  };
+  co.lockPick2 = function (id) {
+    const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
+    if (sel.length < 2) return set({ ...s, sel });
+    const a = nameOf(sel[0]), b = nameOf(sel[1]), v = LOCK_VERB[s.kind] || "変更";
+    if (s.kind === "gremlin") return done(`${a} → ${b} を選びましたが、どちらかの役職がロックされていたため${v}できませんでした。`, null, null, "disclose", `${a} → ${b} ロックで失敗`);   // グレムリン: 1人目がコピー元・2人目がコピー先
+    done(`${a} と ${b} を選びましたが、どちらかの役職がロックされていたため${v}できませんでした。`, null, null, "disclose", `${a} ⇄ ${b} ロックで失敗`);
+  };
+  // 封印の狂人に封印されていたことを伝える（情報開示。封印された人のCO）。封印の狂人のCOは役職CO → 結果開示（封印した相手）
+  co.sealedInfo = () => done("封印されていました。", { kind: "sealed" }, null, "disclose", "封印されていた");   // 4of4: claim を付けて、CPUの投票判断が真偽を見られるようにする
   co.pickChanged = (i) => { const x = CHANGED_LINES[i]; if (x) done(x[1], null, null, "disclose", x[2]); };
 
   // 情報開示のページは、戻るボタンを上（見出しの横）に置く。下まで押し下げてスクロールしなくても戻れる
@@ -160,7 +186,7 @@ window.ONW = window.ONW || {};
   const infoBackFn = (step) => ({ back: "ONW.co.back()", info: "ONW.co.info()", freeterInfo: "ONW.co.freeterInfo()" }[INFO_BACK[step]]);
 
   // ---- 描画 ----
-  const LOCKABLE = ["robber", "relic", "tm", "doppel", "shuffler", "gremlin"];   // 鍵師のロックで能力が弾かれることがある役職（結果開示の最初の画面に「ロックされて失敗」を出す）
+  const LOCKABLE = ["robber", "relic", "tm", "doppel", "shuffler", "gremlin", "eraser"];   // 鍵師のロックで能力が弾かれることがある役職（結果開示の最初の画面に「ロックされて失敗」を出す）
   const lockBtn = (kind) => (LOCKABLE.includes(kind) ? btn("ロックされて失敗", "ONW.co.lockFailed()") : "");
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
@@ -207,6 +233,18 @@ window.ONW = window.ONW || {};
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).twoHint || "入れ替えた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
         (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.pickTm('${p.id}')`)).join("") + (s.sel.length ? "" : lockBtn(s.kind)) + back;
+    } else if (s.step === "lock1") {
+      title = "ロックされて失敗";
+      const sf = (hookOfKind(s.kind) || {}).self;   // 自分も選べる結果開示（シャッフラー）
+      body = `<p class="night-step__hint">ロックされて失敗したとき、選んでいた相手を選んでください。</p>` +
+        (sf ? btn("自分", `ONW.co.lockPick1('${ONW.net.myId()}')`) : "") +
+        (G().others || []).map((p) => btn(pn(p.name), `ONW.co.lockPick1('${p.id}')`)).join("") +
+        btn("相手は言わずに失敗とだけ伝える", "ONW.co.lockPlain()") + btn("戻る", "ONW.co.lockBack()");
+    } else if (s.step === "lock2") {
+      title = "ロックされて失敗";
+      body = `<p class="night-step__hint">${s.kind === "gremlin" ? "ロックされて失敗したとき、選んでいた2人を選んでください（1人目がコピー元・2人目がコピー先）。" : "ロックされて失敗したとき、選んでいた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
+        (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.lockPick2('${p.id}')`)).join("") +
+        btn("相手は言わずに失敗とだけ伝える", "ONW.co.lockPlain()") + btn("戻る", "ONW.co.lockBack()");
     } else if (s.step === "mason") {
       title = "結果開示";
       body = `<p class="night-step__hint">他に共有者がいたら選んでください。いなければそのまま確定します。${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
@@ -217,7 +255,7 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedInfo()");
     } else if (s.step === "visited") {
       title = "訪問された";
       body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("");

@@ -20,9 +20,10 @@ window.ONW = window.ONW || {};
       const me = result.history.find((h) => h.id === ONW.net.myId());
       if (!me || !me.ini) return;                       // 観戦中などで自分の行が無ければ保存しない
       done.add(key);
+      const turned = (result.cursed || []).some((c) => c.id === me.id);   // 呪われし者: 吊られて人狼陣営になった人の戦績は、最終役職（村人陣営）ではなく人狼陣営で数える
       const row = {
         user_id: A.user.id, match_key: String(key).slice(0, 64), initial_role: me.ini, final_role: me.role,
-        team: teamOf(me.role), won: !!me.win, executed: !!me.dead, players: Math.max(1, Math.min(30, result.history.length)),
+        team: turned ? "wolf" : teamOf(me.role), won: !!me.win, executed: !!me.dead, players: Math.max(1, Math.min(30, result.history.length)),
       };
       const { error } = await A.sb.from("match_results").insert(row);
       if (error && error.code !== "23505") done.delete(key);   // 重複(23505)以外の失敗は次回また試せる

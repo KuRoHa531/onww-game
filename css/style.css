@@ -826,6 +826,14 @@ body.chat-mode .tb-players { gap: 6px 8px; }
 .tb-back::after { content: "☾"; font-size: calc(var(--cw) * .42); }
 .tb-front { transform: rotateY(180deg); border: 1px solid var(--gold); background: #1b1d2b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 3px; text-align: center; overflow: hidden; }
 .tb-front b { font-size: max(8px, calc(var(--cw) * .2)); line-height: 1.1; font-weight: 700; overflow-wrap: anywhere; letter-spacing: -.02em; }
+/* 役職名が5〜6文字のカード: 改行せず1行に収める（4文字以下の文字サイズは上のまま。7文字以上は折り返す）。stage.js の nameTag が tb-n5 / tb-n6 を付ける */
+.tb-front b.tb-n5 { font-size: max(6px, calc(var(--cw) * .165)); white-space: nowrap; }
+.tb-front b.tb-n6 { font-size: max(6px, calc(var(--cw) * .135)); white-space: nowrap; }
+/* 7文字以上の役職名: 指定の場所で改行し、各行を中央に揃える（stage.js の NAME_BREAKS）。最長行が5文字なら tb-n5 の文字サイズ */
+.tb-front b.tb-br { white-space: nowrap; text-align: center; }
+/* シュレディンガーの猫: 名前は本体の役職名より小さめ。第三陣営のときは、参照先の役職を模倣の人狼と同じような枠で出す（枠の中も小さめ・改行あり） */
+.tb-front b.tb-cat { font-size: max(6px, calc(var(--cw) * .14)); }
+.tb-front .tb-catframe { display: block; max-width: 92%; margin-top: 1px; padding: 0 4px; border: 1px solid #d7d7dc; border-radius: 3px; background: rgba(215,215,220,.12); color: #e6e6ea; font-size: max(6px, calc(var(--cw) * .12)); font-weight: 700; line-height: 1.2; text-align: center; white-space: nowrap; letter-spacing: -.02em; }
 .tb-front .role-icon--face { flex: 1 1 auto; min-height: 0; width: 100%; border-radius: 4px; }
 .tb-front.tb-team-village { border-color: #55ff55; } .tb-front.tb-team-village b { color: #55ff55; }
 .tb-front.tb-team-wolf    { border-color: #ff5555; } .tb-front.tb-team-wolf b    { color: #ff5555; }
@@ -962,6 +970,9 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
 #skip-confirm .sc-q { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--gold); }
 #skip-confirm .sc-btns { display: flex; gap: 10px; justify-content: center; }
 #skip-confirm .sc-btns .btn { flex: 1 1 0; }
+#skip-confirm .sc-jump { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+#skip-confirm .sc-jump .btn { padding: 8px 2px; font-size: 13px; }
+#skip-confirm .sc-jump .btn:disabled { opacity: .35; }
 .res-dock { padding: 0 8px 16px; }   /* スマホ: 従来どおり結果の下に並べる（固定は PC のみ） */
 .stage-col { display: contents; }           /* スマホでは包みを無かったことにする */
 .big-timer { display: none; }
@@ -1211,6 +1222,12 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 #rinfo-overlay .rinfo-name { font-weight: 700; font-size: 15px; }
 #rinfo-overlay .rinfo-cpu { margin-left: 6px; padding: 0 5px; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; color: #cfcfd6; }
 #rinfo-overlay .night-step__hint { margin: 5px 0; }
+/* デバッグの結果確認に出す「情報確認（全員）」（最終結果の情報確認と同じ見た目） */
+.dbg-rinfo .rinfo-card { margin-bottom: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.18); }
+.dbg-rinfo .rinfo-name { font-weight: 700; font-size: 15px; }
+.dbg-rinfo .rinfo-cpu { margin-left: 6px; padding: 0 5px; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; color: #cfcfd6; }
+.dbg-rinfo .night-step__hint { margin: 5px 0; }
+.dbg-rinfo .t-village { color: #55ff55; } .dbg-rinfo .t-wolf { color: #ff5555; } .dbg-rinfo .t-third { color: #cfcfd6; }
 #rinfo-overlay .t-village { color: #55ff55; } #rinfo-overlay .t-wolf { color: #ff5555; } #rinfo-overlay .t-third { color: #cfcfd6; }
 .chat-ghost { color: #2f7bff; -webkit-text-stroke: 3px #fff; paint-order: stroke fill; }   /* 霊界チャット: 白縁の青文字（縁を文字の外側に描く） */
 .chat-ghost__tag { margin-right: 4px; }
@@ -1276,12 +1293,13 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* ---- ロビー: 名前を押したときの操作メニュー（ホストのみ） ---- */
 #pm-overlay { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
 .pm-card { width: min(320px, 100%); display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #22253a; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
-.pm-title { color: var(--gold); font-size: 17px; font-weight: 700; text-align: center; overflow-wrap: anywhere; padding-bottom: 4px; }
+.pm-title { color: var(--gold); font-size: 17px; font-weight: 700; text-align: center; white-space: nowrap; overflow-wrap: anywhere; padding-bottom: 4px; }
 .pm-btn { width: 100%; }
 .pm-btn--danger { border-color: var(--blood); color: #ff8a80; }
 .pm-btn--close { margin-top: 4px; }
 .info-sep { border: 0; border-top: 1px solid var(--line); margin: 10px 0 6px; }
 #skip-confirm .sc-abandon { width: 100%; margin-top: 12px; border-color: var(--blood); color: #ff8a80; }
+#skip-confirm .sc-tolobby { margin-top: 8px; }
 
 
 /* ---- アサシンの演出: 暗殺者が紫に脈打ち、狙われた相手に照準 → 斬撃 → 当たりは赤い閃光 / 外れは静かに ---- */
@@ -1413,6 +1431,11 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-front .tb-wolfmark.tb-target { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,138,61,.95)); }
 .tb-front .tb-wolfmark.tb-target small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffc08f; line-height: 1.1; letter-spacing: -.02em; }
 
+/* ---- 復讐者: 復讐対象の印（朝、復讐者本人の画面で、選んだ対象のカードが🔪でめくれる） ---- */
+.tb-front.tb-team-avenger { border-color: #e0455a; }
+.tb-front .tb-wolfmark.tb-avenger { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(224,69,90,.95)); }
+.tb-front .tb-wolfmark.tb-avenger small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffb3bd; line-height: 1.1; letter-spacing: -.02em; }
+
 /* ---- 処刑人: ターゲットが追放されたとき、揺れる → ギロチンの刃 → カードが真っ二つ ---- */
 .tb-seat.gl-shake .tb-card { animation: gl-shake .9s linear both; }
 @keyframes gl-shake {
@@ -1453,7 +1476,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ横スクロールを出さない */
 .tb-seat.gx-blow:nth-child(even) .tb-card { animation-name: gx-blow2; }
 /* カードがあった場所には、点々でカードの形だけ残す（プレイヤー名・札はそのまま） */
-.tb-seat.gx-blow::before { content: attr(data-ghost); position: absolute; top: 0; left: 50%; width: var(--cw); height: var(--ch); transform: translateX(-50%); box-sizing: border-box; border: 2px dotted rgba(217,196,143,.75); border-radius: 6px; pointer-events: none; display: flex; align-items: center; justify-content: center; text-align: center; padding: 3px; font-size: calc(var(--cw) * .2); line-height: 1.2; color: rgba(217,196,143,.8); }   /* カードの真下に最初から置き、カードが飛んだらそのまま見える（一度何もない状態にならない） */
+.tb-seat.gx-blow::before { content: attr(data-ghost); position: absolute; top: 0; left: 50%; width: var(--cw); height: var(--ch); transform: translateX(-50%); box-sizing: border-box; border: 2px dotted rgba(217,196,143,.75); border-radius: 6px; pointer-events: none; display: flex; align-items: center; justify-content: center; text-align: center; white-space: pre; padding: 3px; font-size: calc(var(--cw) * .2); line-height: 1.2; color: rgba(217,196,143,.8); }   /* カードの真下に最初から置き、カードが飛んだらそのまま見える（一度何もない状態にならない） */
+.tb-seat.gx-blow[data-gn="5"]::before { font-size: max(6px, calc(var(--cw) * .165)); }
+.tb-seat.gx-blow[data-gn="6"]::before { font-size: max(6px, calc(var(--cw) * .135)); }   /* 点線カードの役職名も、通常のカードと同じ改行・文字サイズの決まり */
 @keyframes gx-blow { 0% { transform: none; opacity: 1; } 100% { transform: translate(90vw, -130vh) rotate(520deg) scale(.4); opacity: 1; } }   /* 透明にはならず、画面の外まで飛んでいく */
 @keyframes gx-blow2 { 0% { transform: none; opacity: 1; } 100% { transform: translate(-90vw, -130vh) rotate(-520deg) scale(.4); opacity: 1; } }
 /* 祝福で勝つ人のカードは金色に光る */
@@ -1536,6 +1561,37 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .dc-burst .dc-ring { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,215,120,.95); box-shadow: 0 0 12px rgba(255,200,90,.9); animation: dc-ring .8s ease-out both; }
 .dc-burst .dc-ring2 { animation-delay: .15s; border-color: rgba(255,120,100,.9); }
 @keyframes dc-ring { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(7); opacity: 0; } }
+
+/* ---- 反逆の狂人の演出: 反逆の狂人のカードがめくれて独裁を跳ね返す（クーデター） ---- */
+.tb-seat.gx-rebelflip .tb-card { animation: rb-flip 1.3s ease-out both; }
+.tb-seat.gx-rebelflip .tb-front { border-color: #ff6a5a; box-shadow: 0 0 22px rgba(255,70,60,.95), inset 0 0 12px rgba(255,255,255,.5); }
+.tb-seat.gx-rebelflip .tb-badge { background: #7a1d1d; border-color: #ff8a80; color: #fff6dd; }
+@keyframes rb-flip {
+  0% { transform: scale(1.3); filter: brightness(2.6) drop-shadow(0 0 28px rgba(255,80,70,1)); }
+  18% { transform: translate(-4px, 2px) rotate(-3deg) scale(1.12); }
+  36% { transform: translate(4px, -2px) rotate(3deg) scale(1.1); }
+  100% { transform: none; filter: brightness(1.1) drop-shadow(0 0 12px rgba(255,80,70,.9)); }
+}
+.tb-seat.gx-rebelhit .tb-card { animation: rb-hit 1.3s ease-out both; }
+.tb-seat.gx-rebelhit .tb-front { border-color: #ff3b30; box-shadow: 0 0 24px rgba(255,40,30,1), inset 0 0 14px rgba(255,120,110,.6); }
+.tb-seat.gx-rebelhit .tb-badge { background: #8a1111; border-color: #ff8a80; color: #fff; }
+@keyframes rb-hit {
+  0% { transform: scale(1.25); filter: brightness(2.8) drop-shadow(0 0 30px rgba(255,50,40,1)); }
+  12% { transform: translate(-7px, 3px) rotate(-4deg); }
+  24% { transform: translate(7px, -3px) rotate(4deg); }
+  36% { transform: translate(-5px, 2px) rotate(-3deg); }
+  48% { transform: translate(4px, -2px) rotate(2deg); }
+  100% { transform: none; filter: brightness(.95) drop-shadow(0 0 12px rgba(255,50,40,.9)); }
+}
+.rb-burst { position: fixed; z-index: 9998; width: 0; height: 0; pointer-events: none; }
+.rb-burst .rb-ring { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,215,120,.95); box-shadow: 0 0 12px rgba(255,200,90,.9); animation: rb-ring .8s ease-out both; }
+.rb-burst .rb-ring2 { animation-delay: .15s; border-color: rgba(255,120,100,.9); }
+.rb-burst.rb-red .rb-ring { border-color: rgba(255,80,70,.95); box-shadow: 0 0 14px rgba(255,60,50,.95); }
+.rb-burst.rb-red .rb-ring2 { border-color: rgba(255,200,190,.9); }
+@keyframes rb-ring { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(7); opacity: 0; } }
+.rb-orb { position: fixed; z-index: 9999; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; pointer-events: none; transition: left .65s cubic-bezier(.5,0,.9,.6), top .65s cubic-bezier(.5,0,.9,.6); }
+.rb-orb.rb-gold { background: radial-gradient(circle, #fff7d6 0%, #ffd36b 45%, rgba(255,170,40,0) 75%); box-shadow: 0 0 16px 6px rgba(255,200,90,.9); }
+.rb-orb.rb-red { background: radial-gradient(circle, #ffe3df 0%, #ff5a4a 45%, rgba(220,30,20,0) 75%); box-shadow: 0 0 18px 8px rgba(255,60,50,.95); }
 
 /* ---- 麻婆の人狼: 麻婆豆腐の完成演出（変化公開 → 新聞 → 麻婆豆腐 → 昼タイマー開始） ---- */
 .mpo-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: default; animation: mpo-out .4s ease 3.4s forwards; }
@@ -1644,7 +1700,7 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 body.ovl-open .top-right { visibility: hidden; pointer-events: none; }   /* JS(debug.js)が付ける。:has非対応の古いスマホ用 */
 body:has(.settings-modal) .top-right { visibility: hidden; pointer-events: none; }   /* 最新ブラウザ用（セレクタを分けているのは、:hasが分からない端末でも上の行を有効にするため） */
 body:has(.dbg-sheet) .top-right { visibility: hidden; pointer-events: none; }
-.dbg-sheet { z-index: 850; }
+.dbg-sheet { z-index: 10000; }   /* 結果発表の演出(9998)・投票の画面より上。投票中・結果発表中でも結果確認が見られるように */
 .x-bar .x-close, .x-bar .x-back, .dbg-head .btn { position: relative; z-index: 6; touch-action: manipulation; }
 
 
@@ -1772,5 +1828,179 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 @keyframes dg-boom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 70% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
 
 /* 模倣の人狼（2of9）: 役職名の下に、模倣先の役職を枠で出す（例: 模倣の人狼 ／ [保安官]）。枠の色は模倣先の陣営ではなく、人狼陣営の赤で統一 */
-.tb-front .tb-mimic { display: block; max-width: 92%; margin-top: 1px; padding: 0 4px; border: 1px solid #ff5555; border-radius: 3px; background: rgba(255,85,85,.12); color: #ffd0d0; font-size: max(7px, calc(var(--cw) * .15)); font-weight: 700; line-height: 1.25; text-align: center; overflow-wrap: anywhere; letter-spacing: -.02em; }
-.dl-face .tb-mimic.dl-mimic { display: block; margin: 2px auto 0; width: max-content; max-width: 92%; padding: 0 6px; border: 1px solid #ff5555; border-radius: 4px; background: rgba(255,85,85,.12); color: #ffd0d0; font-size: .72em; font-weight: 700; line-height: 1.3; text-align: center; }
+.tb-front .tb-mimic { display: block; max-width: 92%; margin-top: 1px; padding: 0 4px; border: 1px solid #ff5555; border-radius: 3px; background: rgba(255,85,85,.12); color: #ffd0d0; font-size: max(6px, calc(var(--cw) * .12)); font-weight: 700; line-height: 1.2; text-align: center; overflow-wrap: anywhere; letter-spacing: -.02em; }
+.dl-face .tb-mimic.dl-mimic { display: block; margin: 2px auto 0; width: max-content; max-width: 92%; padding: 0 6px; border: 1px solid #ff5555; border-radius: 4px; background: rgba(255,85,85,.12); color: #ffd0d0; font-size: .72em; font-weight: 700; line-height: 1.3; text-align: center; white-space: nowrap; }
+
+/* 抹消の人狼: 真っ白のカード（抹消された相手のカードが、役職名も印もない白紙でめくれる） */
+.tb-front.tb-team-blank { background: #fbfbfd; border-color: #ffffff; box-shadow: 0 0 16px rgba(255,255,255,.9), inset 0 0 18px rgba(255,255,255,1); }
+.tb-front.tb-team-blank .tb-wolfmark.tb-blank { width: 100%; height: 100%; min-height: 1.4em; }
+
+
+/* ---- 封印の狂人: 封印のお札（失敗の演出 / 待機時間の封印マーク / 封印した相手のカード）---- */
+.tb-front.tb-team-seal { border-color: #c0392b; background: #2a1d1d; }
+.tb-front .tb-wolfmark.tb-seal { filter: drop-shadow(0 0 8px rgba(255,70,50,.9)); }
+/* お札: 白い縦長の紙・赤い太枠・黒の「封印」・下に赤い丸に×の判（縦書きの2文字を縦に積む） */
+.tb-front .tb-wolfmark.tb-seal .tb-ofuda { display: flex; flex-direction: column; align-items: center; justify-content: space-between; box-sizing: border-box; flex: 0 0 auto; width: calc(var(--cw) * .4); height: calc(var(--cw) * .86); padding: calc(var(--cw) * .05) 0; background: #fffdf8; border: max(1.5px, calc(var(--cw) * .045)) solid #d8321f; border-radius: 3px 2px 4px 2px; box-shadow: 0 0 0 1px #e9e4d8; transform: rotate(-6deg); animation: sealSlap .5s cubic-bezier(.3,1.6,.5,1); }
+.tb-front .tb-wolfmark.tb-seal .tb-ofuda i { font-style: normal; font-weight: 900; font-family: "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: calc(var(--cw) * .21); color: #111; line-height: 1; text-shadow: 0 0 .5px #111; }
+.tb-front .tb-wolfmark.tb-seal .tb-ofuda s { position: relative; display: block; flex: 0 0 auto; width: calc(var(--cw) * .17); height: calc(var(--cw) * .17); border: max(1.5px, calc(var(--cw) * .035)) solid #d8321f; border-radius: 50%; text-decoration: none; }
+.tb-front .tb-wolfmark.tb-seal .tb-ofuda s::before, .tb-front .tb-wolfmark.tb-seal .tb-ofuda s::after { content: ""; position: absolute; left: 50%; top: 50%; width: 70%; height: max(1px, calc(var(--cw) * .025)); margin: calc(max(1px, calc(var(--cw) * .025)) / -2) 0 0 -35%; background: #d8321f; transform: rotate(45deg); }
+.tb-front .tb-wolfmark.tb-seal .tb-ofuda s::after { transform: rotate(-45deg); }
+@keyframes sealSlap { 0% { transform: rotate(-6deg) scale(2.2); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(-6deg) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tb-front .tb-wolfmark.tb-seal .tb-ofuda { animation: none; } }
+
+/* ---- ペンギンの滑り（結果発表。js/roles/village/penguin.js の stageResult。交換者の .ex-* と同じ要領で、画面の上に重ねる） ---- */
+.tb-seat.gx-pgsel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(140,205,255,.95)); }
+.pg-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
+.pg-peng { position: absolute; left: 0; top: 0; width: 64px; height: 34px; opacity: 0; will-change: transform; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+.pg-peng svg, .pg-peng img { width: 100%; height: 100%; display: block; }
+.pg-fly { position: absolute; left: 0; top: 0; min-width: 28px; padding: 2px 9px; border-radius: 999px; background: #1d4f7a; border: 1px solid #8fd3ff; color: #fff; font-size: clamp(12px, 1vw, 16px); font-weight: 700; text-align: center; white-space: nowrap; opacity: 0; box-shadow: 0 0 14px rgba(120,200,255,.95), 0 0 4px rgba(255,255,255,.8); will-change: transform; }
+.pg-puff { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #f4fbff; box-shadow: 0 0 6px 2px rgba(170,225,255,.9); animation: pg-puff .7s ease-out both; }
+@keyframes pg-puff { 0% { transform: scale(0); opacity: 0; } 30% { transform: scale(1.3); opacity: .95; } 100% { transform: scale(.3) translateY(-6px); opacity: 0; } }
+.pg-ring { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid rgba(190,230,255,.95); box-shadow: 0 0 10px rgba(120,200,255,.9); animation: pg-ring .75s ease-out both; }
+@keyframes pg-ring { 0% { transform: scale(.3); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(3.2); opacity: 0; } }
+
+/* ---- 盗賊: 結果発表で、盗賊のカードから棒人間が出てきて投票用紙を盗み、カードへ戻る（js/roles/village/thief.js の stageResult.preCounts。出てくる作りはペンギンと同じ） ---- */
+.tb-seat.gx-thsel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(255,215,106,.95)); }
+.th-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
+.th-fig-wrap { position: absolute; left: 0; top: 0; width: 40px; height: 60px; opacity: 0; transform-origin: 50% 100%; will-change: transform, opacity; filter: drop-shadow(0 0 3px rgba(0,0,0,.95)); }
+.th-fig { display: block; overflow: visible; }
+.th-fig line { stroke: #f3e9d2; stroke-width: 3; stroke-linecap: round; }
+.th-fig .th-head { fill: #1b1b24; stroke: #f3e9d2; stroke-width: 2.6; }
+.th-fig .th-mask { fill: #000; }
+.th-fig g { transform-box: view-box; }
+.th-armL, .th-armR { transform-origin: 20px 21px; }
+.th-legL, .th-legR { transform-origin: 20px 38px; }
+.th-body { transform-box: view-box; transform-origin: 20px 30px; }
+.th-run .th-body { animation: th-bob .16s ease-in-out infinite alternate; }
+.th-run .th-legL, .th-run .th-armR { animation: th-swingA .32s ease-in-out infinite; }
+.th-run .th-legR, .th-run .th-armL { animation: th-swingB .32s ease-in-out infinite; }
+.th-grab .th-armR { animation: th-reach .5s ease-out forwards; }
+.th-hold .th-armR { animation: none; transform: rotate(-95deg); }
+.th-throw .th-armR { animation: th-throw .45s ease-out forwards; }
+.th-search .th-armR { animation: th-pokeR .3s ease-in-out infinite alternate; }
+.th-search .th-armL { animation: th-pokeL .3s ease-in-out infinite alternate; }
+.th-shrug .th-armR { animation: th-shrugR 1s ease-out forwards; }
+.th-shrug .th-armL { animation: th-shrugL 1s ease-out forwards; }
+.th-shrug .th-body { animation: th-shrugBody .5s ease-in-out 2 alternate; }
+@keyframes th-bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes th-swingA { 0%, 100% { transform: rotate(-32deg); } 50% { transform: rotate(32deg); } }
+@keyframes th-swingB { 0%, 100% { transform: rotate(32deg); } 50% { transform: rotate(-32deg); } }
+@keyframes th-reach { from { transform: rotate(0); } to { transform: rotate(-95deg); } }
+@keyframes th-throw { from { transform: rotate(-150deg); } to { transform: rotate(15deg); } }
+@keyframes th-pokeR { from { transform: rotate(18deg); } to { transform: rotate(42deg); } }
+@keyframes th-pokeL { from { transform: rotate(-26deg); } to { transform: rotate(-4deg); } }
+@keyframes th-shrugR { 0% { transform: rotate(0); } 25%, 100% { transform: rotate(-62deg); } }
+@keyframes th-shrugL { 0% { transform: rotate(0); } 25%, 100% { transform: rotate(62deg); } }
+@keyframes th-shrugBody { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+.th-ballot { position: absolute; left: 0; top: 0; padding: 2px 8px; border-radius: 3px; background: #fff8e0; color: #3a2a12; border: 1px solid #c9b27a; font-size: clamp(11px, .9vw, 15px); font-weight: 700; white-space: nowrap; opacity: 0; box-shadow: 0 0 12px rgba(255,220,140,.95); will-change: transform; }
+.th-pop { position: absolute; font-size: clamp(14px, 1.2vw, 20px); font-weight: 800; white-space: nowrap; text-shadow: 0 0 6px #000, 0 0 2px #000; opacity: 0; animation: th-pop 1.1s ease-out forwards; }
+.th-pop--minus { color: #ff7a70; }
+.th-pop--plus { color: #ffd76a; }
+.th-pop--q { color: #fff; }
+@keyframes th-pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -80%) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -200%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .th-fx * { animation: none !important; } }
+
+/* ---- バランサー: 結果発表のシーソーの天秤（js/roles/neutral/balancer.js の stageResult.balancer / runBalance） ---- */
+.bl-fx { position: fixed; inset: 0; z-index: 9997; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; background: rgba(7,8,18,.84); animation: bl-in .4s ease both; }
+.bl-fx.bl-out { animation: bl-out .45s ease forwards; }
+@keyframes bl-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bl-out { from { opacity: 1; } to { opacity: 0; } }
+.bl-stage { width: var(--bw); max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bl-cap { min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-family: var(--font-display); font-size: 18px; text-align: center; color: var(--ink, #eee); }
+.bl-cap .res-cap__t { font-size: 22px; }
+.bl-scale { position: relative; width: 100%; }
+.bl-hook { position: absolute; left: 50%; top: 0; width: 2px; height: var(--by); margin-left: -1px; background: linear-gradient(#0000, #cbbd8f); }
+.bl-ring { position: absolute; left: 50%; top: 0; width: 12px; height: 12px; margin-left: -6px; border: 2px solid #cbbd8f; border-radius: 50%; }
+.bl-knob { position: absolute; left: 50%; top: calc(var(--by) - 11px); width: 16px; height: 16px; margin-left: -8px; border-radius: 50% 50% 3px 3px; background: radial-gradient(circle at 40% 35%, #f6edcb, #a78f55); box-shadow: 0 0 6px rgba(0,0,0,.6); }
+.bl-beam { position: absolute; left: 50%; top: var(--by); width: var(--beamw); height: 8px; margin-left: calc(var(--beamw) / -2); border-radius: 4px; background: linear-gradient(#f3e9c6, #a99256); box-shadow: 0 2px 6px rgba(0,0,0,.6); transform-origin: 50% 50%; transition: transform var(--bt, .5s) cubic-bezier(.3,1.35,.5,1); }
+.bl-hang { position: absolute; top: 4px; width: 0; height: 0; transform-origin: 0 0; transition: transform var(--bt, .5s) cubic-bezier(.3,1.35,.5,1); }
+.bl-load { position: absolute; left: 0; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+.bl-string { display: block; width: 2px; height: 46px; background: #cbbd8f; }
+.bl-drop { animation: bl-drop .52s cubic-bezier(.35,0,.6,1.25) both; }
+@keyframes bl-drop { 0% { transform: translate(-50%, -150px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+.bl-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 3px; box-sizing: border-box; border: 1.5px solid #d7d7dc; border-radius: 6px; background: #1b1d2b; overflow: hidden; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,.55); }
+.bl-card .role-icon--face { flex: 1 1 auto; min-height: 0; width: 100%; border-radius: 4px; }
+.bl-card b { max-width: 100%; font-size: 1em; line-height: 1.1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-card .bl-n { position: absolute; right: 0; top: 0; padding: 1px 4px; border-radius: 0 4px 0 6px; background: #e7c75a; color: #2b2208; font-style: normal; font-weight: 800; font-size: 1.05em; line-height: 1.2; }
+.bl-team-village { border-color: #55ff55; } .bl-team-village b { color: #55ff55; }
+.bl-team-wolf { border-color: #ff5555; } .bl-team-wolf b { color: #ff5555; }
+.bl-team-third { border-color: #d7d7dc; } .bl-team-third b { color: #cfcfd6; }
+.bl-strain { animation: bl-strain .14s linear infinite alternate; }
+@keyframes bl-strain { from { transform: translateX(-1.5px); } to { transform: translateX(1.5px); } }
+.bl-fly { position: absolute; pointer-events: none; will-change: transform; }
+.bl-ok .bl-beam { box-shadow: 0 0 18px 4px rgba(255,214,102,.85); animation: bl-glow 1.1s ease-in-out infinite alternate; }
+.bl-ok .bl-card { box-shadow: 0 0 14px rgba(255,214,102,.9); }
+@keyframes bl-glow { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+@media (prefers-reduced-motion: reduce) { .bl-fx, .bl-fx * { animation: none !important; transition: none !important; } }
+
+/* 愉快犯: 「愉快犯の笑い声が聞こえました。」のバナー（パン屋・従者のバナーと同じ位置。見た目は仮） */
+.prk-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(52,26,64,.94); border: 2px solid #d28bf0; color: #f6e3ff; font-weight: 800; font-size: clamp(16px, 4.2vw, 26px); letter-spacing: .05em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: prk-in 3.4s ease both; }
+@keyframes prk-in { 0% { opacity: 0; transform: translate(-50%, -14px) scale(.9); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1.04); } 16% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -8px) scale(1); } }
+
+/* 名探偵の推理画面（js/roles/neutral/detective.js の openAsk） */
+.dt-ask { position: fixed; inset: 0; z-index: 900; background: rgba(8,9,16,.88); display: flex; align-items: center; justify-content: center; padding: 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.dt-ask__box { display: flex; flex-direction: column; background: #1d1f2b; color: #eee; border: 1px solid #3a3d52; border-radius: 12px; padding: 14px 12px; max-width: 760px; width: 100%; height: min(94vh, 680px); height: min(94dvh, 680px); overflow: hidden; box-sizing: border-box; touch-action: pan-y; }   /* 枠の大きさはカードの枚数で変えない（固定。山が多いときは山の中だけスクロール） */
+.dt-ask__box h2, .dt-hint { flex: 0 0 auto; }
+.dt-ask__box h2 { margin: 0 0 4px; font-size: 1.1em; }
+.dt-hint { margin: 0 0 10px; font-size: .85em; color: #b9bccd; line-height: 1.5; }
+.dt-board { flex: 0 0 auto; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.dt-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.dt-slot { box-sizing: border-box; border: 2px dashed #7c8099; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.dt-slot--blank { border-color: transparent; }
+.dt-slot--on { border-style: solid; border-color: #565a73; }
+.dt-slot--ready { border-color: #e7c75a; background: rgba(231,199,90,.08); }
+.dt-name { font-size: .72em; max-width: 72px; text-align: center; line-height: 1.2; word-break: break-all; }
+.dt-name small { display: block; color: #e7c75a; }
+.dt-pool { flex: 1 1 auto; min-height: 70px; overflow-y: auto; align-content: flex-start; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 10px 6px; border-top: 1px solid #3a3d52; border-radius: 0 0 8px 8px; }
+.dt-grab { cursor: grab; touch-action: none; }
+.dt-hold .dt-card { box-shadow: 0 0 0 2px #e7c75a, 0 0 12px rgba(231,199,90,.8); }
+.dt-lift { opacity: .25; }
+.dt-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: .92; transform: scale(1.06); }
+.dt-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 3px; box-sizing: border-box; border: 1.5px solid #d7d7dc; border-radius: 6px; background: #1b1d2b; overflow: hidden; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.dt-face { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; }
+.dt-card .role-icon--face { flex: 1 1 auto; min-height: 0; width: 100%; border-radius: 4px; }
+.dt-card b { flex: 0 0 auto; max-width: 100%; font-weight: 700; line-height: 1.1; white-space: nowrap; text-align: center; overflow: hidden; }
+.dt-team-village { border-color: #55ff55; } .dt-team-village b { color: #55ff55; }
+.dt-team-wolf { border-color: #ff5555; } .dt-team-wolf b { color: #ff5555; }
+.dt-team-third { border-color: #d7d7dc; } .dt-team-third b { color: #cfcfd6; }
+.dt-ask__ok { flex: 0 0 auto; display: block; margin: 12px auto 2px; min-width: 160px; }
+.dt-ask__ok:disabled { opacity: .5; }
+
+/* 名探偵の盤面（結果発表。js/roles/neutral/detective.js の runBoards） */
+.dtr-fx { position: fixed; inset: 0; z-index: 880; background: rgba(8,9,16,.9); display: flex; align-items: center; justify-content: center; padding: 10px; opacity: 0; animation: dtrIn .45s ease forwards; overflow: auto; }
+@keyframes dtrIn { to { opacity: 1; } }
+.dtr-fx.dtr-out { animation: dtrOut .45s ease forwards; }
+@keyframes dtrOut { from { opacity: 1; } to { opacity: 0; } }
+.dtr-stage { width: 100%; max-width: 760px; color: #eee; text-align: center; }
+.dtr-stage h2 { margin: 0 0 10px; font-size: 1.05em; letter-spacing: .1em; }
+.dtr-board { margin: 0 0 14px; padding: 8px 4px 6px; border: 1px solid #3a3d52; border-radius: 10px; background: rgba(29,31,43,.8); transition: box-shadow .5s, border-color .5s; }
+.dtr-board.dtr-win { border-color: #e7c75a; box-shadow: 0 0 18px rgba(231,199,90,.7); }
+.dtr-title { font-size: .85em; margin-bottom: 6px; color: #d9dcec; }
+.dtr-row { display: flex; justify-content: center; gap: 6px; }
+.dtr-colwrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.dtr-name { font-size: .68em; max-width: 64px; line-height: 1.2; word-break: break-all; color: #b9bccd; }
+.dtr-cell { position: relative; perspective: 600px; }
+.dtr-cell--blank { border: 2px dashed transparent; }
+.dtr-in { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .65s ease; }
+.dtr-flipped .dtr-in { transform: rotateY(180deg); }
+.dtr-back, .dtr-front { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 6px; }
+.dtr-back { display: flex; align-items: center; justify-content: center; box-sizing: border-box; background: var(--card-back); border: 1px solid var(--gold-dim); color: var(--gold-dim); line-height: 1; }
+.dtr-front { transform: rotateY(180deg); }
+.dtr-mark { position: absolute; left: 50%; top: 26%; transform: translate(-50%, -50%) scale(0); font-style: normal; font-size: 1.5em; pointer-events: none; text-shadow: 0 0 6px rgba(0,0,0,.8); }
+.dtr-marked .dtr-mark { animation: dtrPop .5s ease forwards; }
+.dtr-ng { color: #ff5555; font-weight: 900; }
+@keyframes dtrPop { 0% { transform: translate(-50%, -50%) scale(0); } 70% { transform: translate(-50%, -50%) scale(1.25); } 100% { transform: translate(-50%, -50%) scale(1); } }
+
+/* 配布カードの役職名: 改行表どおりに改行し、各行は折り返さない（最長行が5・6文字の改行名は小さめ） */
+.dl-face .nb { display: inline-block; white-space: nowrap; word-break: keep-all; text-align: center; }
+.dl-face .nb-s5 { font-size: .75em; } .dl-face .nb-s6 { font-size: .6em; }
+
+/* デバッグの結果確認: 最終結果のシートをそのまま入れる（枠・余白は小さめ） */
+.dbg-result .result-sheet { margin: 0; padding: 4px 2px; box-shadow: none; border: none; background: transparent; }
+
+/* デバッグ🛠: 投票・結果発表のあいだは右上の列から出して、全画面の演出より上に固定する（開いている間は隠す） */
+.dbg-fab--float { position: fixed; top: 4px; right: 66px; z-index: 10001; }
+body.ovl-open .dbg-fab--float, body:has(.dbg-sheet) .dbg-fab--float { visibility: hidden; pointer-events: none; }
+
+/* 役職情報: 役職ごとの薄い区切り（同じ役職で別の人の行は区切らない） */
+.rs-gsep { height: 0; margin: 5px 0; border-top: 1px solid var(--line); opacity: .45; }

@@ -9,6 +9,7 @@
  */
 (function (ONW) {
   const K = ONW.wolfKit;
+  const sealed = (g, id) => !!(ONW.seal && ONW.seal.is(g, id));   // 封印の狂人に封印されている席は、観測結果を受け取れない（2of4a）
   /** この人に伝える観測結果（初回に決めて保存。以降は同じものを返す） */
   function deliver(g, id) {
     g.observerSeen = g.observerSeen || {};
@@ -33,7 +34,7 @@
     groups: { wolf: 8.6, "transform:dark_avatar": 9.1 },
     nightMsg: K.nightMsg, got: K.got,
     /** 酔い覚めの演出: 仲間の人狼の🐺に加えて、観測結果(observe)を渡す。stageSober が自分のカードがめくれたあとに飛び出させる */
-    soberPeek(c, id, fin) { return Object.assign({}, K.soberPeek(c, id, fin), { observe: deliver(c.g, id) }); },
+    soberPeek(c, id, fin) { return sealed(c.g, id) ? K.soberPeek(c, id, fin) : Object.assign({}, K.soberPeek(c, id, fin), { observe: deliver(c.g, id) }); },
     // 酔い覚め(stage.js の soberPeek): 仲間の🐺・墓地がめくれたあと、観測結果が飛び出す
     stageSober: { listLate: { order: 99, run(sp, list, SK) { if (sp.observe) SK.later(() => { if (ONW.stage.observe) ONW.stage.observe(sp.observe); }, 300 + list.length * 380 + 500); } } },
     // 夜の画面: 夜の行動がない観測の人狼向けの説明（仲間の人狼の表示は共通の文言のあとに出る）
@@ -55,14 +56,14 @@
     /** 酔いが覚めた観測の人狼: 仲間の人狼に加えて、観測結果が分かる */
     soberLines(c, id, fin) {
       const g = c.g;
-      return [...K.soberLines(c, id, fin), ...textOf(deliver(g, id))];
+      return sealed(g, id) ? K.soberLines(c, id, fin) : [...K.soberLines(c, id, fin), ...textOf(deliver(g, id))];
     },
     /** 昼に役職が動いて観測の人狼になった人: 観測済みフラグを消して、その場で観測結果を伝える(酔いが覚める前の人は、覚めたときに伝わる)。CPUは結果を覚える */
     dayShift(c, before) {
       const g = c.g;
       g.players.forEach((p) => {
         if (ONW.mimic.beforeEff(before, p.id) === ONW.mimic.eff(g, p.id) || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF) return;   // 模倣先に読み替えた役職で見る（9of9）
-        if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id)) return;
+        if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id)) return;   // 封印されている席には観測結果を渡さない（2of4a）
         if (g.observerSeen) delete g.observerSeen[p.id];
         const lines = deliver(g, p.id);
         const tx = textOf(lines);
@@ -73,13 +74,13 @@
       });
     },
     /** 昼に酔いが覚めたCPUの観測の人狼も観測結果を覚える */
-    soberReveal: { order: 90, run(c, ids) { const g = c.g; ids.forEach((id) => { const p = g.players.find((q) => q.id === id); if (p && p.isCpu && ONW.mimic.eff(g, id) === ONW.ROLE.OBSERVER_WOLF) { deliver(g, id); cpuLearn(g, id); } }); } },
+    soberReveal: { order: 90, run(c, ids) { const g = c.g; ids.forEach((id) => { const p = g.players.find((q) => q.id === id); if (p && p.isCpu && ONW.mimic.eff(g, id) === ONW.ROLE.OBSERVER_WOLF && !sealed(g, id)) { deliver(g, id); cpuLearn(g, id); } }); } },
     /** 待機時間: CPUの観測の人狼も観測結果を覚える */
     settlePost: { order: 25, run(c) { const g = c.g; ONW.observerHolders(g).forEach((p) => { if (p.isCpu) { deliver(g, p.id); cpuLearn(g, p.id); } }); } },
     /** 待機時間: 最終盤面で酔いが覚めている観測の人狼に、観測結果を伝える（再入室では、すでに伝えた分だけ同じ内容を返す） */
     settleMsg: { order: 25, run(c, p, mode) {
       const g = c.g;
-      if (p.isCpu || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF || ONW.hiddenDrunk(g, p.id)) return {};
+      if (p.isCpu || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id)) return {};   // 封印されている観測の人狼には、観測結果が出ない（2of4a）
       if (mode === "resync" && !(g.observerSeen || {})[p.id]) return {};
       const lines = deliver(g, p.id);
       return { logs: textOf(lines), observe: { lines } };

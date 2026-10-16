@@ -8,8 +8,10 @@
  *   ・選べるのは、生きている人2人（自分を含めてよい）。確定すると取り消せない。議論は続く（独裁者と違い、投票もある）。
  *   ・交換は投票を集計するときに働く: 「Aに入った票はBへ、Bに入った票はAへ」。得票数が入れ替わるので、追放されるのも入れ替わった後の最多得票者。
  *   ・交換者が複数いれば、使った順に1つずつ交換する（同じ人が何度も入れ替わることもある）。
+ *   ・使ったあとに入れ替える2人（a・b）のどちらかが昼中に死亡したら、その交換はキャンセル（票数は入れ替わらない）。使用済みは変わらない（もう一度は使えない）。vote.exchangeLive が判定し、vote.tally / tallySteps / view（結果発表の演出）が有効な交換だけを扱う。キャンセルされたことは結果発表の「昼行動結果」に出る（net.js finalizeResult）。
  *   ・使ったことは、結果発表まで本人以外にはわからない。結果発表で、得票数が出たあとに票数が入れ替わる演出（stage.js / 2of3）と「昼行動結果」の文章（dayLogsAll）が出る。
- *   ・マイクラ版の「狂った交換者」(人狼陣営)は、WEB版にまだ役職がないので未実装（同じ ONW.exchanger.apply をそのまま使える）。
+ *   ・マイクラ版の「狂った交換者」(人狼陣営・狂人系。js/roles/wolf/mad/mad_exchanger.js)も同じ昼能力: canUse / targets / apply / view をそのまま共有する（違うのは陣営と役職名だけ）。
+ *     どちらの役職として使ったかは ONW.exchanger.roleOf(g, id)（模倣の人狼が模倣しているときは模倣先）。結果発表の字幕・昼行動結果・昼能力の画面の名前に使う。
  *
  * 状態: g.exchanges = [{ by: 交換者のID, a: 1人目のID, b: 2人目のID }, ...]（使った順。試合ごとに net.startGame が [] に戻す）
  * 呼び出し: net.js の hostExchange(ホスト) → ONW.exchanger.canUse / targets / apply。票の入れ替えは vote.js の vote.tally が g.exchanges を見て行う。
@@ -17,14 +19,19 @@
 (function (ONW) {
   const R = () => ONW.ROLE;
   const isDead = (g, id) => (g.deadIds || []).includes(id);
+  /** 昼の交換の能力を持つ役職か（交換者 / 狂った交換者。同じ能力） */
+  const isEx = (r) => r === R().EXCHANGER || r === R().MAD_EXCHANGER;
+  /** その人がいま使える交換の役職（交換者 or 狂った交換者）。模倣の人狼が模倣していれば模倣先。どちらでもなければ null */
+  const roleOf = (g, id) => { const r = g && g.currentRoles ? ONW.mimic.actRole(g, id, g.currentRoles[id]) : null; return isEx(r) ? r : null; };
 
   /** この人が（もう）使ったか */
   const used = (g, id) => (g.exchanges || []).some((e) => e.by === id);
-  /** 交換者の昼能力を使える人か（最終盤面の役職が交換者・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている・選べる人が2人以上いる） */
+  /** 交換者・狂った交換者の昼能力を使える人か（最終盤面の役職が交換者または狂った交換者・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている・選べる人が2人以上いる） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞・麻婆豆腐・暴露の紙を出している間）は使えない
-    if (!g.currentRoles || ONW.mimic.actRole(g, id, g.currentRoles[id]) !== R().EXCHANGER) return false;   // 模倣の人狼が交換者を模倣していても使える
+    if (!roleOf(g, id)) return false;   // 模倣の人狼が交換者・狂った交換者を模倣していても使える
+    if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false;   // 封印の狂人に封印されている: 昼能力は使えない（2of4）
     if (ONW.hiddenDrunk(g, id) || isDead(g, id) || used(g, id)) return false;
     return targets(g, id).length >= 2;
   }
@@ -46,10 +53,16 @@
   }
   /** 結果発表用: 使った順の交換 [{byId, by, aId, a, bId, b, role}] */
   function view(g, nm) {
-    return (g.exchanges || []).map((e) => ({ byId: e.by, by: nm(e.by), aId: e.a, a: nm(e.a), bId: e.b, b: nm(e.b), role: (g.currentRoles || {})[e.by] || "exchanger" }));
+    return (g.exchanges || []).filter((e) => ONW.vote.exchangeLive(g, e)).map((e) => ({ byId: e.by, by: nm(e.by), aId: e.a, a: nm(e.a), bId: e.b, b: nm(e.b), role: (g.currentRoles || {})[e.by] || "exchanger" }));
   }
 
-  ONW.exchanger = { canUse, targets, apply, used, view };
+  /** キャンセルされた交換（入れ替える2人のどちらかが、使ったあとに昼中に死亡した）: [{ e, role, deadNames }]。使用済みは変わらない（used はそのまま true） */
+  function cancelled(g, nm) {
+    return (g.exchanges || []).filter((e) => !ONW.vote.exchangeLive(g, e)).map((e) => ({ e, role: roleOfAt(g, e.by), deadNames: [e.a, e.b].filter((x) => isDead(g, x)).map(nm) }));
+  }
+  const roleOfAt = (g, id) => roleOf(g, id) || (g.currentRoles || {})[id] || "exchanger";
+
+  ONW.exchanger = { canUse, targets, apply, used, view, cancelled, roleOf, isEx, run: (R, ex, steps, cap) => runSwaps(R, ex, steps, cap), ms: (ex) => swapsMs(ex) };
 
   ONW.defineRole("exchanger", {
     info: { deck: 65, name: "交換者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.9,
@@ -62,29 +75,7 @@
     //            （演出の目安: マイクラ版の入れ替え演出のAI生成動画。動画は何周もするが、ここは一周だけ）。使うデータは res.exchanges / res.countSteps（net.js が作る）。
     //   skip   : スキップ時の最終形（票数は入れ替え後） / clear: 演出の部品を片付ける
     stageResult: {
-      counts: { order: 10, run(R) {
-        const ex = R.res.exchanges || [], steps = R.res.countSteps || [];
-        if (!ex.length || steps.length < ex.length + 1) return;
-        const { P, later, setCap, esc, paint, gx, badge } = R;
-        const val = (st, id) => ((st || []).find((c) => c.id === id) || { c: 0 }).c;
-        const txt = (c) => (c > 0 ? `${c}票` : "");
-        ex.forEach((e, i) => {
-          const t0 = R.t, ka = P(e.aId), kb = P(e.bId), ca = val(steps[i], e.aId), cb = val(steps[i], e.bId);   // ca / cb = 入れ替える前の2人の票数
-          const nm = (ONW.roles.getInfo(e.role) || {}).name || "交換者";
-          later(() => {
-            setCap(`<div class="res-cap__t t-village">${esc(nm)}${ex.length > 1 ? ` (${i + 1}/${ex.length})` : ""}</div><div>${esc(e.by)}: ${esc(e.a)} ⇔ ${esc(e.b)}</div>`);
-            gx[ka] = "exsel"; gx[kb] = "exsel"; paint(R.G());
-          }, t0);
-          later(() => fly(R, ka, kb, ca, cb), t0 + LIFT_MS);
-          later(() => {   // 着地: 入れ替わった票数が、それぞれのカードのバッジになる
-            if (txt(cb)) badge[ka] = txt(cb); else delete badge[ka];
-            if (txt(ca)) badge[kb] = txt(ca); else delete badge[kb];
-            paint(R.G());
-          }, t0 + LIFT_MS + FLY_MS);
-          later(() => { delete gx[ka]; delete gx[kb]; paint(R.G()); }, t0 + LIFT_MS + FLY_MS + 800);
-          R.t = t0 + LIFT_MS + FLY_MS + 1100;
-        });
-      } },
+      counts: { order: 10, run(R) { runSwaps(R, R.res.exchanges || [], R.res.countSteps || [], true); } },
       skip(R) {   // スキップ: 入れ替え後の票数を最終形として出す（途中で止まって入れ替え前の票数が残らないように、票数のバッジだけ作り直す）
         const ex = R.res.exchanges || [], steps = R.res.countSteps || [];
         if (!ex.length || !steps.length) return;
@@ -100,6 +91,31 @@
       clear(R) { removeFx(); if (R && R.gx) Object.keys(R.gx).forEach((k) => { if (R.gx[k] === "exsel") delete R.gx[k]; }); },
     },
   });
+
+  /** 交換の時間割（結果発表の counts フックと、妖狐投票の演出が共有）。R = stage.kit を元にした道具箱 / ex = 使った順の交換 / steps = 入れ替えの途中経過の得票数 / cap = 字幕を出すか */
+  function runSwaps(R, ex, steps, cap) {
+    if (!ex.length || steps.length < ex.length + 1) return;
+    const { P, later, setCap, esc, paint, gx, badge } = R;
+    const val = (st, id) => ((st || []).find((c) => c.id === id) || { c: 0 }).c;
+    const txt = (c) => (c > 0 ? `${c}票` : "");
+    ex.forEach((e, i) => {
+      const t0 = R.t, ka = P(e.aId), kb = P(e.bId), ca = val(steps[i], e.aId), cb = val(steps[i], e.bId);   // ca / cb = 入れ替える前の2人の票数
+      const inf = ONW.roles.getInfo(e.role) || {}, nm = inf.name || "交換者", tc = `t-${inf.team || "village"}`;   // 字幕の役職名の色は、その役職の陣営の色（交換者=村人 / 狂った交換者・模倣の人狼=人狼）
+      later(() => {
+        if (cap) setCap(`<div class="res-cap__t ${tc}">${esc(nm)}${ex.length > 1 ? ` (${i + 1}/${ex.length})` : ""}</div><div>${esc(e.by)}: ${esc(e.a)} ⇔ ${esc(e.b)}</div>`);
+        gx[ka] = "exsel"; gx[kb] = "exsel"; paint(R.G());
+      }, t0);
+      later(() => fly(R, ka, kb, ca, cb), t0 + LIFT_MS);
+      later(() => {   // 着地: 入れ替わった票数が、それぞれのカードのバッジになる
+        if (txt(cb)) badge[ka] = txt(cb); else delete badge[ka];
+        if (txt(ca)) badge[kb] = txt(ca); else delete badge[kb];
+        paint(R.G());
+      }, t0 + LIFT_MS + FLY_MS);
+      later(() => { delete gx[ka]; delete gx[kb]; paint(R.G()); }, t0 + LIFT_MS + FLY_MS + 800);
+      R.t = t0 + LIFT_MS + FLY_MS + 1100;
+    });
+  }
+  const swapsMs = (ex) => (ex || []).length * (600 + 1500 + 1100);   // 妖狐投票の演出用: 入れ替えにかかる時間(ms)
 
   // ================================================================
   //  入れ替え演出の部品（結果発表。stage.js には依存せず、画面の上に重ねる）

@@ -3,7 +3,7 @@
   /** 朝が終わった直後に、後覚者へ最終的な役職を伝える（id → 通知文） */
   function results(c) {
     const g = c.g, out = {};
-    g.players.filter((p) => !p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]) && (ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]) === "insomniac" || ONW.mimic.eff(g, p.id) === "insomniac")).forEach((p) => {
+    g.players.filter((p) => !p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]) && !ONW.seal.is(g, p.id) && (ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]) === "insomniac" || ONW.mimic.eff(g, p.id) === "insomniac")).forEach((p) => {
       // 元々の後覚者 / 後から後覚者になった人（怪盗・いたずらっ子などで最終役職が後覚者）の両方に、そのときの最終的な役職を伝える
       out[p.id] = `夜の行動がすべて終わりました。あなたの最終的な役職は「${c.rn(ONW.shownRole(g.currentRoles[p.id]))}」です。`;
     });

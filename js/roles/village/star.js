@@ -1,7 +1,7 @@
 /** スター: 村人陣営。最終盤面でスターを持っている人のカードは、朝のあとの待機時間に全員の画面で表になる */
 (function (ONW) {
   /** 最終盤面でスターを持っているプレイヤーのID（スター公開の対象） */
-  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.STAR && !ONW.hiddenDrunk(g, p.id)).map((p) => p.id);   // 酔いが覚めていない人は、覚めた瞬間に公開される
+  const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.STAR && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id)).map((p) => p.id);   // 酔いが覚めていない人は、覚めた瞬間に公開される
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
 
   ONW.defineRole("star", {

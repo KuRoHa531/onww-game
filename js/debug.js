@@ -1,6 +1,6 @@
 /**
  * debug.js — 本家(マイクラ版)の「デバッグ」メニュー相当（ホスト専用）
- *   役職確認 / 投票先指定 / 固定役(参加者・墓地・変化後) / CPUの能力先指定 / CPU議論発言ON/OFF / 夜ログ
+ *   結果確認(その時点の最終結果・リアルタイム) / 投票先指定 / 固定役(参加者・墓地・変化後) / CPUの能力先指定 / CPU議論発言ON/OFF / 夜ログ
  * ルーム設定の「デバッグモード」をONにすると有効。ONの間は全員に「デバッグモード中」と表示する。
  * 固定役とCPU能力先は「次の試合」に反映され、「一斉解除」するまで残る（本家と同じ）。
  */
@@ -122,17 +122,64 @@ window.ONW = window.ONW || {};
     return { players: [...humans, ...cpus], graves };
   }
 
-  // ---- 役職確認 ----
-  function tabRoles() {
+  // ---- 結果確認（その時点での最終結果。試合中は状態が変わるたびに更新される）----
+  /** 役職の流れ（最初の役職 → 入れ替わるたびの役職 → いまの役職）。最終結果の「役職の流れ」と同じ並び */
+  function roleFlow(g, id) {
+    const seg = (r, last) => `<span class="${teamCls(r)}">${esc(rn(r))}</span>`;
+    const ini = g.initialRoles[id], fin = g.currentRoles[id], from = g.transformFrom && g.transformFrom[id];
+    const trail = ((g.roleTrail || {})[id] || []).slice();
+    const flow = [];
+    if (from) flow.push(from);
+    flow.push(ini);
+    trail.forEach((r) => flow.push(r));
+    if (flow[flow.length - 1] !== fin) flow.push(fin);
+    let h = flow.map((r) => seg(r)).join(" → ");
+    const tags = [];
+    if (g.drunkOverlay && g.drunkOverlay[id]) tags.push("酔っ払い");
+    if (ONW.isLover && ONW.isLover(g, id)) tags.push("恋人");
+    if ((g.promotedWolfIds || []).includes(id)) tags.push("人狼");
+    if (tags.length) h += ` <small class="dbg-val">(+${esc(tags.join("・"))})</small>`;
+    return h;
+  }
+  /** その時点で試合を終えたとしたときの勝敗（試合の状態は書き換えず、コピーで判定する。投票が始まってから） */
+  function previewWinners(g) {
+    if (g.winTitle && g.phase === PH().ONLINE_RESULT) return { title: g.winTitle, winners: (g.winnerIds || []) };
+    if (![PH().ONLINE_VOTE].includes(g.phase) || !Object.keys(g.votes || {}).length) return null;
+    try {
+      const c = JSON.parse(JSON.stringify(g));
+      ONW.vote.determineWinners(c);
+      return { title: c.winTitle, winners: c.winnerIds || c.players.filter((p) => (c.winners || []).includes(ONW.roles.getInfo(c.currentRoles[p.id]).team)).map((p) => p.id) };
+    } catch (e) { return { error: true }; }
+  }
+  function tabResults() {
     const g = G();
-    if (!inGame() || !Object.keys(g.initialRoles || {}).length) return hint("試合中に、全員の役職と墓地が表示されます。");
-    const label = (ini, fin, from) => {
-      const a = from ? `${rn(from)}(${rn(ini)})` : rn(ini);
-      return `<span class="${teamCls(ini)}">${esc(a)}</span>` + (ini !== fin ? ` → <span class="${teamCls(fin)}">${esc(rn(fin))}</span>` : "");
-    };
-    const ps = g.players.map((p) => row(esc(p.name) + (p.isCpu ? cpuBadge : ""), label(g.initialRoles[p.id], g.currentRoles[p.id], g.transformFrom[p.id]))).join("");
-    const cs = (g.center || []).map((r, i) => row(`墓地${i + 1}`, label(r, r, g.centerTransformFrom[i]))).join("");
-    return ps + cs;
+    if (!inGame() || !Object.keys(g.initialRoles || {}).length) return hint("試合中に、その時点での最終結果（全員の役職の流れ・生死・墓地）がリアルタイムで表示されます。");
+    // 最終結果と同じシート（勝敗・役職履歴・墓地・夜行動結果・昼行動結果・役職情報）を、いまの状態で試合が終わったとしたときのデータで出す。投票結果の欄は出さない
+    let res = null;
+    try { res = ONW.net.previewResult(); } catch (e) { res = null; }
+    if (res) return `<p class="night-step__hint">いま試合が終わったとしたときの最終結果です（勝敗・投票結果は出していません。自動で更新されます。投票・選択がまだのところは、投票なし・ランダムで仮に決めています）。</p><div class="dbg-result">${ONW.ui.resultSheetHtml(g, res, { preview: true })}</div>${(res.info || []).length ? `<div class="dbg-h">情報確認（全員）</div><div class="dbg-rinfo">${ONW.ui.resultInfoHtml(res)}</div>` : ""}`;
+    // 作れなかったとき（簡易表示。原因も出す）
+    const why = ONW.net.previewError ? `<p class="night-step__hint">最終結果を作れなかったので簡易表示です（${esc(ONW.net.previewError)}）。</p>` : "";
+    const dead = new Set([...(g.deadIds || []), ...(g.executed || []), ...(g.eliminated || [])]);
+    const tally = (() => { try { return ONW.vote.tally(g) || {}; } catch (e) { return {}; } })();
+    const pw = previewWinners(g), winSet = new Set(pw && pw.winners || []);
+    const head = pw ? (pw.error ? hint("勝敗の仮判定はできませんでした。") : `<div class="dbg-h">勝敗（その時点）: ${esc(pw.title || "未定")}</div>`) : hint("勝敗は、投票が始まると仮判定が出ます。");
+    const ps = g.players.map((p) => {
+      const mark = dead.has(p.id) ? ' <span class="t-wolf">✕</span>' : "";
+      const v = tally[p.id] ? ` <small class="dbg-val">${tally[p.id]}票</small>` : "";
+      const win = pw && !pw.error ? (winSet.has(p.id) ? ' <span class="t-village">勝</span>' : ' <small class="dbg-val">負</small>') : "";
+      return row(esc(p.name) + (p.isCpu ? cpuBadge : "") + mark + v + win, roleFlow(g, p.id));
+    }).join("");
+    const cs = (g.center || []).map((r, i) => {
+      const from = (g.centerTransformFrom || [])[i];
+      return row(`墓地${i + 1}`, (from ? `<span class="${teamCls(from)}">${esc(rn(from))}</span> → ` : "") + `<span class="${teamCls(r)}">${esc(rn(r))}</span>`);
+    }).join("");
+    return why + head + ps + cs;
+  }
+  let liveTimer = null;
+  function liveTick() {
+    clearTimeout(liveTimer); liveTimer = null;
+    if (ui.open && ui.tab === "roles" && ONW.net && ONW.net.isHost) { debug.render(); liveTimer = setTimeout(liveTick, 1000); }   // 結果確認を開いている間は1秒ごとに見直す（中身が同じなら描き直さない）
   }
 
   // ---- 投票先指定 ----
@@ -216,7 +263,7 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", gremlin: "gr" };
+  const ABILITY = { seer: "seer", mad_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era" };   // era: 抹消の人狼（抹消する相手を1人）
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
@@ -228,7 +275,7 @@ window.ONW = window.ONW || {};
   /** 模倣の人狼を固定した人か（模倣先が未指定でも、能力先の行は出して案内する） */
   const isMimicFixed = (key) => { const d = data(); return d.roles[key] === "mimic_wolf" || (!!d.roles[key] && d.tf[key] === "mimic_wolf"); };
   function cpuKinds(key) {
-    const rs = cpuRoles(key), k = { seer: false, rob: false, tm: false, rel: false, gr: false };
+    const rs = cpuRoles(key), k = { seer: false, rob: false, tm: false, rel: false, gr: false, era: false };
     if (!rs) return k;   // 固定なし: 能力先は指定できない
     rs.forEach((r) => { if (ABILITY[r]) k[ABILITY[r]] = true; });
     return k;
@@ -257,14 +304,16 @@ window.ONW = window.ONW || {};
         const others = players.filter((o) => o.key !== s.key);
         const maxG = k.seer ? ONW.seerGraveMax(g) : 1;   // eslint-disable-line
         const sec = (title, inner) => `<div class="dbg-sub">${title}</div>${inner}`;
-        const pb = (fn, sel) => others.map((o) => b(esc(o.name), fn, [s.key, o.key], sel(o.key) ? "dbg-on" : "")).join("");
+        const selfOk = !!rs && rs.some((r) => ((ONW.roleDef(r) || {}).stagePick || {}).self);   // 自分も対象にできる役職（鍵師・シャッフラー: stagePick.self）。変化後の候補に1つでもあれば自分も出す
+        const pb = (fn, sel, list = others) => list.map((o) => b(esc(o.name) + (o.key === s.key ? "（自分）" : ""), fn, [s.key, o.key], sel(o.key) ? "dbg-on" : "")).join("");
         const gb = Array.from({ length: g.graveCount || 0 }, (_, i) => b(`墓地${i + 1}`, "cpuGrave", [s.key, String(i)], (t.graves || []).includes(i) ? "dbg-on" : "")).join("");
         let body = "";
         if (!s.cpu) body = "";
         else if (mimicHint) body = hint("模倣先を指定すると、その役職の能力先（占う相手・墓地・ご主人など）を指定できます。下の「模倣先の固定」で選んでください。");
         else if (rs && !Object.values(k).some(Boolean) && !rk.length) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
         else if (s.cpu) {
-          if (k.seer || k.rob) body += sec(k.seer && k.rob ? "プレイヤー（占う相手 / 交換・一目惚れの相手）" : k.seer ? "プレイヤー（占う相手）" : "プレイヤー（交換・一目惚れの相手）", pb("cpuPlayer", (id) => t.player === id));
+          if (k.seer || k.rob) body += sec(k.seer && k.rob ? "プレイヤー（占う相手 / 交換・一目惚れの相手）" : k.seer ? "プレイヤー（占う相手）" : "プレイヤー（交換・一目惚れの相手）", pb("cpuPlayer", (id) => t.player === id, selfOk ? players : others));   // 自分も選べる役職は、自分も指定できる
+          if (k.era) body += sec("プレイヤー（抹消する相手）", pb("cpuPlayer", (id) => t.player === id));
           if (k.tm) body += sec("プレイヤー2人（入れ替える2人）", pb("cpuPlayers", (id) => (t.players || []).includes(id)));
           if (k.gr) body += sec("プレイヤー2人（コピー元 → コピー先の順に押す）", others.map((o) => { const ix = (t.players || []).indexOf(o.key); return b((ix >= 0 ? (ix === 0 ? "①元 " : "②先 ") : "") + esc(o.name), "cpuPlayers", [s.key, o.key], ix >= 0 ? "dbg-on" : ""); }).join(""));
           if (k.seer || k.rel) body += sec(k.seer ? `墓地（${ONW.seerGraveMax(g)}枚まで）` : "墓地（交換する1枚）", gb);
@@ -313,7 +362,9 @@ window.ONW = window.ONW || {};
   const DAY_KINDS = [
     { kind: "dictate", role: "dictator", label: "独裁", can: (g, id) => ONW.dictator.canUse(g, id), targets: (g, id) => ONW.dictator.targets(g, id) },
     { kind: "exchange", role: "exchanger", label: "交換", two: true, can: (g, id) => ONW.exchanger.canUse(g, id), targets: (g, id) => ONW.exchanger.targets(g, id) },
+    { kind: "exchange", role: "mad_exchanger", label: "交換", two: true, can: (g, id) => ONW.exchanger.canUse(g, id), targets: (g, id) => ONW.exchanger.targets(g, id) },
     { kind: "sheriff", role: "sheriff", label: "撃つ", can: (g, id) => ONW.sheriff.canUse(g, id), targets: (g, id) => ONW.sheriff.targets(g, id) },
+    { kind: "steal", role: "thief", label: "盗む", can: (g, id) => ONW.thief.canUse(g, id), targets: (g, id) => ONW.thief.targets(g, id) },
     { kind: "rejob", role: "freeter", label: "再就職", can: (g, id) => ONW.freeter.canRejob(g, id), targets: (g, id) => ONW.freeter.targets(g, id) },
     { kind: "mind", role: "mind_wolf", label: "見抜く", can: (g, id) => ONW.mindWolf.canUse(g, id), targets: (g, id) => ONW.mindWolf.targets(g, id) },
   ];
@@ -349,7 +400,7 @@ window.ONW = window.ONW || {};
       `<div class="dbg-h">昼中に死亡させる（霊界チャットの確認用）</div>${kill}<div class="dbg-h">夜ログ（GM用）</div>${logs}`;
   }
 
-  const TABS = [["roles", "役職確認", tabRoles], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "能力先", tabCpu], ["day", "昼能力", tabDay], ["misc", "その他", tabMisc]];
+  const TABS = [["roles", "結果確認", tabResults], ["votes", "投票先", tabVotes], ["locks", "固定役", tabLocks], ["cpu", "能力先", tabCpu], ["day", "昼能力", tabDay], ["misc", "その他", tabMisc]];
 
   /** 🛠ボタンは右上の縦並び(アカウント・📖ガイドと同じ列)に置く。重ならないよう、固定位置ではなく列の中に入れる */
   function placeFab(show) {
@@ -361,7 +412,9 @@ window.ONW = window.ONW || {};
       fab.setAttribute("aria-label", "デバッグ"); fab.title = "デバッグ"; fab.textContent = "🛠";
       fab.addEventListener("click", () => ONW.debug.toggleOpen());
     }
-    const slot = document.getElementById("top-right") || document.body;
+    const ph = G().phase, float = ph === PH().ONLINE_VOTE || ph === PH().ONLINE_RESULT;   // 投票・結果発表は全画面の演出が上に出るので、🛠は右上の列から出して一番上に置く
+    fab.classList.toggle("dbg-fab--float", float);
+    const slot = float ? document.body : (document.getElementById("top-right") || document.body);
     if (fab.parentNode !== slot) slot.appendChild(fab);
     fab.classList.toggle("dbg-fab--open", ui.open);
   }
@@ -392,8 +445,8 @@ window.ONW = window.ONW || {};
 
   // ---- 操作 ----
   const refresh = () => debug.render();
-  debug.toggleOpen = () => { ui.open = !ui.open; ui.pick = null; refresh(); };
-  debug.tab = (t) => { ui.tab = t; ui.pick = null; refresh(); };
+  debug.toggleOpen = () => { ui.open = !ui.open; ui.pick = null; refresh(); liveTick(); };
+  debug.tab = (t) => { ui.tab = t; ui.pick = null; refresh(); liveTick(); };
   debug.pick = (k) => { ui.pick = ui.pick === k ? null : k; refresh(); };
   debug.talkToggle = () => { const d = data(); d.cpuTalkOff = !d.cpuTalkOff; refresh(); };
 

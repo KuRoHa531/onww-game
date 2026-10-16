@@ -33,7 +33,7 @@
     const rows = [];
     g.players.forEach((p) => {
       const t = g.exposeTargets[p.id];
-      if (!t || g.exposeAnnounced[p.id] || ONW.mimic.eff(g, p.id) !== ONW.ROLE.EXPOSED_MADMAN || ONW.hiddenDrunk(g, p.id) || c.isDead(p.id)) return;
+      if (!t || g.exposeAnnounced[p.id] || ONW.mimic.eff(g, p.id) !== ONW.ROLE.EXPOSED_MADMAN || ONW.hiddenDrunk(g, p.id) || ONW.seal.is(g, p.id) || c.isDead(p.id)) return;
       if (!g.players.some((q) => q.id === t)) return;
       g.exposeAnnounced[p.id] = true;
       const extras = [];

@@ -6,7 +6,7 @@
  *   ・ロックされた人を対象にした変化も、「🔒に弾かれて」失敗する。
  *   ・同じ人に鍵師が2人（奇数・偶数）かけると、2回目は「ロック解除」になる（マイクラ版 lockRoleTarget と同じ：1回目=ロック／2回目=解除…）。
  *
- * 【処理順】（_wip/役職の処理順.txt）: 純愛者 → 悪女 → キューピッド → 破局師 → 鍵師 → … → 墓荒らし → ドッペル → … → 怪盗 …
+ * 【処理順】（docs/role-process-order.md）: 純愛者 → 悪女 → キューピッド → 破局師 → 鍵師 → … → 墓荒らし → ドッペル → … → 怪盗 …
  *   鍵師は夜の「占い師の段階」(seer)で、破局師(22)の直後(23)に処理する。ほかの役職変化はすべてそのあと（relic 以降の段階）なので、
  *   ロックは役職変化の「前に」必ず完了している。Web版は夜の選択を朝にまとめて解決するので、マイクラ版のように
  *   「鍵師が終わるまで他の人の能力GUIが開かない」ことはなく、鍵師がいることは透けない。
@@ -60,7 +60,7 @@
   function failLine(kind, verb, two) {
     if (kind === "self") return `自身の役職がロックされていたため${verb}に失敗しました。`;
     if (verb === "コピー") return "選んだプレイヤーの役職がロックされていたためコピーに失敗しました。";
-    return two ? "選んだプレイヤーのどちらかの役職を変更できませんでした。" : "選んだプレイヤーの役職を変更できませんでした。";
+    return two ? `選んだプレイヤーのどちらかの役職がロックされていたため${verb}できませんでした。` : `選んだプレイヤーの役職がロックされていたため${verb}できませんでした。`;
   }
   /** 失敗を記録して、本人向けの文章を返す。g.keyFails[カードID] = { kind, verb, targets, locked }（3of4の「🔒に弾かれる」演出・結果開示が使う）。
    *  ログは g.nightLogsAll に積む（label = 「怪盗 ○○」のような名乗り） */
@@ -83,7 +83,7 @@
     return { kind: "key", mode: "fail", ids: lk.slice(), lock: true };
   }
   const verb = (act) => (act === "unlock" ? "のロックを解除" : "の役職をロック");
-  const lineOf = (g, t, act) => `${nm(g, t)}${verb(act)}しました。`;
+  const lineOf = (g, t, act) => `${nm(g, t)} ${verb(act)}しました。`;
   ONW.keymaster = { locked, lockedIds, toggle, picks, lineOf, verb, nm, gate, failLine, fail, failRev };
 
   // ---- CPUの夜の行動: 自分を含む全員からランダムに1人（デバッグの指定があればそれ。自分も指定できる） ----

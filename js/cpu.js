@@ -41,7 +41,8 @@ window.ONW = window.ONW || {};
 
   /** CPUの夜行動（占い師系 → 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子の順）。占いは初期役職を見るので順序に影響されない。
    *  役職ごとの行動は各役職ファイルの cpuNight.run（order の小さい順）。ここは「誰が・いつ使うか」の枠組みだけ */
-  cpu.runNight = function (g, stage, ids) {   // stage: "init" | "seer" | "relic" | "doppel" | "shuffler" | "gremlin" | "robber" | "tm"（省略時は全部を起床順に実行）
+  cpu.runNight = function (g, stage, ids, plan) {   // plan（配列）を渡すと、段階の行動は実行せず計画 { roles, order, idx, actors, exec } だけを積む（net.js の runNightStage が人間と混ぜて順番を決める）
+    // stage: "init" | "seer" | "relic" | "doppel" | "shuffler" | "gremlin" | "robber" | "tm"（省略時は全部を起床順に実行）
     const all = !stage;
     if (all || stage === "init") g.cpuInfo = {};
     g.cpuInfo = g.cpuInfo || {};
@@ -72,16 +73,21 @@ window.ONW = window.ONW || {};
     const on = (s) => all || stage === s;
     nightSteps().forEach((s) => {
       if (!on(s.nd.stage)) return;
-      cpus.filter((p) => s.roles.includes(act(p)) && !noTarget(p) && !deadSet.has(p.id)).forEach((p) => { const go = () => s.nd.run(n, p, rn(role(p)), false, act(p)); if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); });   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
+      const exec = (p) => {
+        if (s.nd.stage !== "seal" && ONW.seal.failIfSealed(g, p.id, act(p), { hold, mimic: ONW.mimic.isMimic(g, p.id, role(p)) })) return;   // 封印されているCPUの夜の能力は失敗（行動しない）
+        const go = () => s.nd.run(n, p, rn(role(p)), false, act(p)); if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
+      const actors = cpus.filter((p) => s.roles.includes(act(p)) && !noTarget(p) && !deadSet.has(p.id));
+      if (plan) plan.push({ roles: s.roles, order: s.order, idx: s.idx, actors, exec }); else actors.forEach(exec);
     });
     // 朝: 墓荒らしが交換した後の役職の能力を即座に使う（朝の時点の実際のカードが対象。いたずらっ子の入れ替えは呼び出し側で反映）
-    if (on("morning") || stage === "late") for (let pass = 0; pass < 2; pass++) cpus.forEach((p) => {   // 昼に墓地と交換した先に能力があれば、もう1回（pass 2）続けて使う
+    if (on("morning") || stage === "late") for (let pass = 0; pass < 2; pass++) cpus.forEach((p) => {   // 朝の連鎖・酔い覚めは任意の使用なので「使った順」（人間は選んだ順、CPUはここで即座に）。夜の同じ役職のランダム順は net.js の runNightStage だけ   // 昼に墓地と交換した先に能力があれば、もう1回（pass 2）続けて使う
       const i = infoOf(g, p.id), got = i.pendingChain;
       if (!got || noTarget(p) || deadSet.has(p.id)) return;   // 死んだCPUは能力を使わない
       i.pendingChain = null;
       const label = rn(got), keep = i.relic ? { ...i.relic } : null;
       const nd = (ONW.roleDef(got) || {}).cpuNight;
-      const asMimic = ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id]) && ONW.mimic.roleOf(g, p.id) === got;   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
+      const asMimic = ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id]) && ONW.mimic.roleOf(g, p.id) === got;
+      if (ONW.seal.failIfSealed(g, p.id, got, { hold, mimic: asMimic })) return;   // 封印されているCPUの朝の連鎖・昼の酔い覚めの能力は失敗   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
       const exec = () => {
         if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
         if (nd) nd.run(n, p, label, true, got);
@@ -147,6 +153,11 @@ window.ONW = window.ONW || {};
     g.cpuInfo = g.cpuInfo || {};
     ONW.roleHook("queen", "cpuNotice")(g, id, queenIds, cpu.kit);
   };
+  /** 狂った女王を知らされたCPU（最終盤面が人狼陣営で酔いが覚めている）: 誰が狂った女王かを知る。中身は mad_queen.js の cpuNotice */
+  cpu.noticeMadQueens = function (g, id, queenIds) {
+    g.cpuInfo = g.cpuInfo || {};
+    ONW.roleHook("mad_queen", "cpuNotice")(g, id, queenIds, cpu.kit);
+  };
   /** 心眼の人狼のCPUが昼に見抜いた結果（相手の最終役職）を覚える。中身は mind_wolf.js の cpuNotice */
   cpu.noticeMind = function (g, id, target, role) {
     g.cpuInfo = g.cpuInfo || {};
@@ -180,7 +191,7 @@ window.ONW = window.ONW || {};
   /** 騙りで名乗れる役職が1つもないときの「村人陣営CO」（COボタンの陣営COと同じ値）。co にこの値が入ったら、発言は「村人陣営CO」になる */
   const TEAM_CO = "team:village";
   /** 騙りでは名乗らない役職（マーリン: 人狼が見えている / 女王・チキン: 待機時間の扱いが特別）。これだけしか名乗れる村役職がないときは、役職COではなく村人陣営COにする */
-  const NO_LIE_ROLES = ["merlin", "queen", "chicken", "wolf_marked", "wolf_dreamer"];   // 狼憑き・狼夢人は本人が自分の役職を知らない（思い込み系）ので、騙りでも名乗らない
+  const NO_LIE_ROLES = ["merlin", "queen", "chicken", "star", "wolf_marked", "wolf_dreamer"];   // 狼憑き・狼夢人は本人が自分の役職を知らない（思い込み系）ので、騙りでも名乗らない。スターは朝の待機時間に最終盤面の持ち主が全員に公開されるので、騙るとすぐ嘘がバレて破綻する（騙りでも「スターCO」「スターを奪った」と言わない。本物のスターは star.js の cpuFirst が必ずCOする）
   const noLie = (r) => NO_LIE_ROLES.includes(r) || ONW.SELF_AS_VILLAGER.includes(r) || ONW.SELF_AS_WOLF.includes(r);   // 思い込み系の役職が増えても自動で含める
   /** COの発言文: 陣営COは「村人陣営CO」、それ以外は「〇〇CO」 */
   const coText = (co) => (String(co).startsWith("team:") ? ({ village: "村人陣営CO", wolf: "人狼陣営CO", third: "第三陣営CO" }[String(co).slice(5)] || "陣営CO") : `${rn(co)}CO`);
@@ -415,6 +426,7 @@ window.ONW = window.ONW || {};
       }
       const hf = c.co ? ONW.roleHook(c.co, "cpuCoFollow") : null;   // 名乗った役職ごとの後処理（後覚者: 結果を言わないと騙りだと透けるので、嘘の結果開示もする）
       if (hf) hf(cpu.kit, g, p, r, i, c);
+      if (c.co && ONW.seal && ONW.seal.cpuSealResult) ONW.seal.cpuSealResult(cpu.kit, g, p, r, i, c);   // 封印の狂人(4of4): 封印されているCPUは、結果のかわりに「封印されていました。」と言う（騙りが言うこともある）
       if (c.co && c.result && !c.extra && !i.keyFail) c.extra = chainedResult(g, p, i, c, r);   // 墓荒らし・ドッペルで手にした役職の結果も続けて言う（番犬なら飼い主）
       if (!c.co) return;                                              // COしない
       plan.push({ p, text: coText(c.co), co: c.co, claim: c.result ? null : { kind: "villager" }, gap: c.result ? 1200 : 3500 });
@@ -499,6 +511,7 @@ window.ONW = window.ONW || {};
     }
     if (co === "mason") s -= wolfSide ? 0.2 : 1.4;
     if (co === "tough_guy") s -= wolfSide ? 0.3 : 0.8;   // タフガイCO: 票を入れても、はじき返されて次点の人にとばっちりが行くだけなので、あまり狙わない
+    if (co === "penguin") s -= wolfSide ? 0.1 : 0.4;   // ペンギンCO: 票を入れても、ペンギンの投票先へ滑るだけで、狙った人に当たらない（マイクラ版にCPUの専用処理はない。軽く避けるだけ）
     // 占い師COの結果（この人を占ったという報告）
     claims.filter((c) => c.kind === "seer" && c.target === q.id).forEach((c) => {
       if (WOLF_LIKE().includes(c.role)) s += wolfSide ? 0.8 : 2.8;

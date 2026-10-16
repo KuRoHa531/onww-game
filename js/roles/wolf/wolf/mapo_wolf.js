@@ -10,7 +10,7 @@
 (function (ONW) {
   const K = ONW.wolfKit;
   /** 麻婆の人狼と豆腐の人狼が、どちらも最終盤面で酔いが覚めている人としているか。1試合1回だけ完成する */
-  const hasMapo = (g) => g.players.some((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.MAPO_WOLF && !ONW.hiddenDrunk(g, p.id));
+  const hasMapo = (g) => g.players.some((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.MAPO_WOLF && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id));
   const hasTofu = (g) => g.players.some((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.TOFU_WOLF && !ONW.hiddenDrunk(g, p.id));   // 豆腐の人狼も、酔いが覚めてから数える（酔い覚めの瞬間に完成の演出が出る）
   function announce(c) {
     const g = c.g;

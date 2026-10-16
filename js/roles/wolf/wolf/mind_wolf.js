@@ -24,7 +24,7 @@
  *         ・再接続: 使用済みは g.mindWolfTarget（ホスト引き継ぎ AUTH_KEYS に含む）。再入室した本人には minddone(text) で結果の文を情報確認へ戻す。選択画面(mindOpen)は戻さない（dictopen と同じ。押し直せば使える人にだけ開く）
  *         ・観戦: specInfo の mind（昼の行動欄に「A → B（最終役職）」）
  *
- * 勝敗の優先度: 人狼系は基本勝敗のまま（docs/勝利優先度.md の表に新しい行は不要）。人狼として占われ、人狼判定に数えられる。
+ * 勝敗の優先度: 人狼系は基本勝敗のまま（docs/victory-priority.md の表に新しい行は不要）。人狼として占われ、人狼判定に数えられる。
  */
 (function (ONW) {
   const K = ONW.wolfKit;
@@ -42,6 +42,7 @@
     if (!g || g.dictator || g.allDeadSkip) return false;
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.dayStartId) return false;   // 昼のタイマーが動き出す前（変化公開・新聞などの紙が出ている間）は使えない
     if (!g.currentRoles || ONW.mimic.actRole(g, id, g.currentRoles[id]) !== R_().MIND_WOLF) return false;   // 模倣の人狼が心眼の人狼を模倣していても使える
+    if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false;   // 封印の狂人に封印されている: 昼能力は使えない（2of4）
     if (ONW.hiddenDrunk(g, id) || dead(g, id) || used(g, id)) return false;
     return targets(g, id).length > 0;
   }
@@ -60,7 +61,8 @@
   function apply(c, id, target) {
     const g = c.g;
     if (!canUse(g, id) || !targets(g, id).includes(target)) return null;
-    const role = g.currentRoles[target];
+    let role = g.currentRoles[target];
+    if (ONW.mirage && ONW.mirage.isMirageCard(g, role, target)) { ONW.mirage.noteInspect(g, target, "mind_wolf"); role = ONW.mirage.dayRole(g); }   // 蜃気狼（模倣先が蜃気狼の模倣の人狼も）は、盤面にあり得るランダムな役職に見える
     g.mindWolfTarget = g.mindWolfTarget || {}; g.mindWolfSeen = g.mindWolfSeen || {};
     g.mindWolfTarget[id] = target; g.mindWolfSeen[id] = role;
     const me = c.byId(id), tp = c.byId(target), text = resultText(tp.name, c.rn(role));

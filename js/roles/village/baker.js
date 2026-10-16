@@ -1,7 +1,7 @@
 /** パン屋: 最終盤面にパン屋がいると、昼になって 変化公開 → 新聞 → 暴露 → 麻婆豆腐 のあと、昼のタイマーが始まる前に「パンが焼けました」と全員に知らされる(バナーが消えてから昼タイマー開始) */
 (function (ONW) {
   /** 最終盤面のパン屋の数（昼タイマー開始時の「パンが焼けました」の対象） */
-  const count = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.BAKER && !ONW.hiddenDrunk(g, p.id)).length;   // 模倣の人狼がパン屋を模倣していてもパンは焼ける（誰がパン屋かは分からない）
+  const count = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.BAKER && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id)).length;   // 模倣の人狼がパン屋を模倣していてもパンは焼ける（誰がパン屋かは分からない）
 
   ONW.defineRole("baker", {
     cpuClaim(k, g, p, r, i, c) { c.co = "baker"; },   // パン屋: パンが焼けたことは全員に知らされるので、必ずパン屋COする

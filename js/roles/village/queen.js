@@ -1,21 +1,24 @@
 /**
  * 女王: 村人陣営。夜の能力なし。待機時間に、最終的に村人陣営で酔っていない人にだけ女王のカードが表になる。
  * （王国滅亡の連鎖処理は vote.js の共通処理 / ここは「誰に女王を知らせるか」の通知だけ）
+ * 狂った女王(js/roles/wolf/mad/mad_queen.js)も、村人陣営には「女王」としてここで通知される（区別がつかない）。王国滅亡の引き金は本物の女王だけ。
  */
 (function (ONW) {
   // ---- 役職固有の補助関数(もとは state.js にあったもの。中身は変更なし) ----
+  /** 村人陣営に「女王」として知らされるカードか: 本物の女王と、狂った女王（村人陣営からは区別がつかない。王国滅亡の引き金は本物の女王だけ） */
+  ONW.isQueenCard = (r) => r === ONW.ROLE.QUEEN || (!!ONW.ROLE.MAD_QUEEN && r === ONW.ROLE.MAD_QUEEN);
   /** 女王を持っている人のID（最終盤面。酔いが覚めていない人は、覚めた瞬間に公開されるので除く） */
-  ONW.queenHolders = (g) => (!g || !g.players) ? [] : g.players.filter((q) => ONW.mimic.eff(g, q.id) === ONW.ROLE.QUEEN && !ONW.hiddenDrunk(g, q.id)).map((q) => q.id);   // 模倣の人狼が女王を模倣していても、村人陣営には「女王」として知らされる（王国滅亡の引き金・勝敗は本物の女王のみ。マイクラ版と同じ）
+  ONW.queenHolders = (g) => (!g || !g.players) ? [] : g.players.filter((q) => ONW.isQueenCard(ONW.mimic.eff(g, q.id)) && !ONW.hiddenDrunk(g, q.id) && !ONW.seal.is(g, q.id)).map((q) => q.id);   // 模倣の人狼が女王を模倣していても、村人陣営には「女王」として知らされる（王国滅亡の引き金・勝敗は本物の女王のみ。マイクラ版と同じ）
   /** 女王が誰か知らされる人か: 最終盤面の役職が村人陣営で、酔いが覚めている人（恋人でも最終役職が村人陣営なら対象。本人も含む） */
   ONW.isQueenViewer = (g, id) => !!g && !!g.currentRoles && !ONW.hiddenDrunk(g, id) && !!ONW.ROLE_INFO[g.currentRoles[id]] && ONW.ROLE_INFO[g.currentRoles[id]].team === ONW.TEAM.VILLAGE;
   // ---- ここまで ----
 
   /** 女王の通知文（本家の「女王通知」と同じ文言） */
-  ONW.queenNoticeText = (name) => `${name}は女王です。`;
+  ONW.queenNoticeText = (name) => `${name} は女王です。`;
 
   const logs = (g, ids) => ids.map((qid) => ONW.queenNoticeText((g.players.find((q) => q.id === qid) || {}).name));
   /** 再入室用: この人にすでに知らせた女王（今も女王のカードを持っている人だけ） */
-  const seenOf = (g, id) => ((g.queenSeen || {})[id] || []).filter((q) => ONW.mimic.eff(g, q) === ONW.ROLE.QUEEN);
+  const seenOf = (g, id) => ((g.queenSeen || {})[id] || []).filter((q) => ONW.isQueenCard(ONW.mimic.eff(g, q)));
 
   /**
    * 女王（本家 announceQueenNotificationsAtDayStart と同じ考え方）: 最終盤面が村人陣営で酔いが覚めている人にだけ、女王が誰か知らされる（人狼陣営・第三陣営には知らされない）。

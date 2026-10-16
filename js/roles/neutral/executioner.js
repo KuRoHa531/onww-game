@@ -5,7 +5,7 @@
   ONW.execTarget = (g, id) => (g && g.currentRoles && g.currentRoles[id] === ONW.ROLE.EXECUTIONER && (g.execTargets || {})[id]) || null;
   /** 処刑人を持っている人(持ち主ID)とターゲットの組 [[処刑人の持ち主, ターゲット], ...] */
   ONW.execPairs = (g) => (g.players || []).map((p) => [p.id, ONW.execTarget(g, p.id)]).filter(([, t]) => t);
-  ONW.EXEC_CO_TEXT = (name) => `ターゲットは${name}です。`;
+  ONW.EXEC_CO_TEXT = (name) => `ターゲットは ${name} です。`;
   /** 役職が動いたあとの処刑人の整合を取る（fixServants と同じ考え方）。墓地に入った処刑人はターゲットを失い、墓地から引いた/コピーした処刑人には、自分以外からランダムで新しいターゲットが決まる。新しく決まった人のIDの配列を返す */
   ONW.fixExecutioners = (g) => {
     const m = (g.execTargets = g.execTargets || {}), fresh = [], ids = (g.players || []).map((p) => p.id);

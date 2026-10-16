@@ -54,7 +54,7 @@
     setPicks(g, p.id, h, k);
     seen(g, p.id, h, k);
     i.mode = "evil_woman"; i.honmei = h; i.keep = k;
-    g.nightLogsAll.push(`${label} ${p.name} は 本命=${nm(g, h)} キープ=${nm(g, k)} を選びました。`);
+    g.nightLogsAll.push(`${label} ${p.name} は 本命に ${nm(g, h)}、キープに ${nm(g, k)} を選びました。`);
     n.hold(p.id, `本命は ${nm(g, h)}、キープは ${nm(g, k)} です。`);
     n.ob(p.id, [h, k]);
     n.nn(rid);
@@ -82,7 +82,7 @@
         const g = c.g, nameOf = c.nameOf;
         const [h, k] = c.selOf(p).players; if (!h || !k || h === k) return;
         setPicks(g, p.id, h, k);
-        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は 本命=${nameOf(h)} キープ=${nameOf(k)} を選びました。`);
+        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は 本命に ${nameOf(h)}、キープに ${nameOf(k)} を選びました。`);
         c.hold(p.id, `本命は ${nameOf(h)}、キープは ${nameOf(k)} です。`);
         ONW.observeNote(g, p.id, [h, k]);
         ONW.newsNote(g, "evil_woman");
@@ -204,7 +204,7 @@
         if (c.players.length < 2) return null;
         const g = c.g, id = c.id, [h, k] = c.players;
         setPicks(g, id, h, k);
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は 本命=${c.nameOf(h)} キープ=${c.nameOf(k)} を選びました。`);
+        g.nightLogsAll.push(`${c.label} ${c.me.name} は 本命に ${c.nameOf(h)}、キープに ${c.nameOf(k)} を選びました。`);
         seen(g, id, h, k);
         return { lines: [`本命は ${c.nameOf(h)}、キープは ${c.nameOf(k)} です。`], reveal: peekReveal(h, k), nextChain: null };
       },
