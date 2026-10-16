@@ -413,6 +413,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       // --- セットアップ内容 ---
       roleCounts: ONW.defaultRoleCounts ? ONW.defaultRoleCounts() : {},   // 初期枚数・並びは各役職ファイルの info.deck / info.count(roles/base.js)
       revealTransforms: true,         // 変化公開（昼開始時に「変化前 → 変化後」を公開）
+      revealManualRoles: false,       // 配役した役職(変化していないカード)も変化公開に出す（マイクラ版 revealManualRolesAsTransforms）。変化公開がONのときだけ有効
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）
       transformFrom: {}, centerTransformFrom: {}, winnerIds: null, // ルーム設定の配役枚数

@@ -305,6 +305,10 @@ window.ONW = window.ONW || {};
           <h3 class="set-sub">変化先の有無</h3>
           <p class="night-step__hint">陣営を押すと、変化先にする役職をON/OFFできます。OFFの役職には変化せず、COの候補にも出ません。全部OFFだとその変化役は変化しません。</p>
           ${tfRows}
+          <div class="field-row"><label>手動配役を変化公開に表示</label>
+            ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('revealManualRoles')">${game.revealManualRoles ? "ON" : "OFF"}</button>` : `<span>${game.revealManualRoles ? "ON" : "OFF"}</span>`}
+          </div>
+          <p class="night-step__hint">ON: 配役した役職（変化していないカード）も、変化公開に「光の使徒 → 占い師」のように変化先として並べます（人狼陣営は闇の化身、第三陣営は銀色の影から）。どれが本当に変化したのか分からなくなります。ガイドの「現在の配役」も、昼の開始までは変化役にまとめて表示されます。変化公開がONのときだけ働きます。</p>
           <div class="field-row"><label>デバッグモード</label>
             ${isHost ? `<button class="btn" onclick="ONW.debug.toggle()">${game.debugOn ? "ON" : "OFF"}</button>` : `<span>${game.debugOn ? "ON" : "OFF"}</span>`}
           </div>

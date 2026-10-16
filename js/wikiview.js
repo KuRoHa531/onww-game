@@ -82,7 +82,7 @@ window.ONW = window.ONW || {};
       ${sec("人数設定", line("参加人数", `${total}人${cpu ? `（CPU ${cpu}人を含む）` : ""}`) + line("墓地の枚数", `${g.graveCount ?? 0}枚`) + line("CPU人数", `${cpu}人`))}
       ${sec("タイマー設定", line("役職配布(演出のあとの待ち)", `${t.deal ?? 5}秒`) + line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("待機時間", `${t.settle ?? 5}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
       ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", g.drunkChance)) + line("恋人", dupText(g.loverCount, "組", g.loverChance)))}
-      ${sec("詳細設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("変化公開", onoff(g.revealTransforms)) + line("デバッグモード", onoff(g.debugOn)))}
+      ${sec("詳細設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("変化公開", onoff(g.revealTransforms)) + line("手動配役を変化公開に表示", onoff(g.revealManualRoles)) + line("デバッグモード", onoff(g.debugOn)))}
       ${sec("変化先の有無", tf)}`;
   }
 
@@ -100,8 +100,14 @@ window.ONW = window.ONW || {};
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
   function deckCounts() {
-    const g = ONW.game, counts = {};
+    const g = ONW.game; let counts = {};
     Object.entries(g.roleCounts || {}).forEach(([r, n]) => { if (n > 0) counts[r] = n; });
+    // 手動配役を変化公開に表示(マイクラ版 roleCountsForPreGameDisplay): 変化役でない役職は、陣営の変化役にまとめて数える。昼の開始後は変化公開の組(tfPairs)で本当の役職に数え直す
+    if (g.revealTransforms && g.revealManualRoles) {
+      const BASE = { village: "light_apostle", wolf: "dark_avatar", third: "silver_shadow" }, folded = {};
+      Object.entries(counts).forEach(([r, n]) => { const k = ONW.TRANSFORM_GROUPS[r] ? r : (BASE[info(r).team] || BASE.village); folded[k] = (folded[k] || 0) + n; });
+      counts = folded;
+    }
     const tf = g.tfView;
     if (g.revealTransforms && afterDayStart() && tf && tf.mode === "reveal" && Array.isArray(tf.pairs)) {
       tf.pairs.forEach(({ b, a }) => {
@@ -151,7 +157,7 @@ window.ONW = window.ONW || {};
         ${counts.drunk > 0 ? rowOf("drunk", `<span class="gd-n">×${counts.drunk}人</span><span class="gd-n gd-n--cand">確率${g.drunkChance ?? 100}%</span>`) : ""}${counts.lover > 0 ? rowOf("lover", `<span class="gd-n">×${counts.lover}組</span><span class="gd-n gd-n--cand">確率${g.loverChance ?? 100}%</span>`) : ""}</section>` : "";
     return `
       <p class="gd-summary">現在の配役設定 <b>${Math.max(0, totalRoles - grave)}人村 / 墓地${grave}枚 / 役職${totalRoles}枚</b></p>
-      <p class="gd-note">現在の配役に含まれる役職です。役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? "変化公開がONなので、変化後の役職は昼の開始時に反映されます。" : ""}</p>
+      <p class="gd-note">現在の配役に含まれる役職です。役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? (g.revealManualRoles ? "手動配役を変化公開に表示する設定がONなので、各役職は変化役にまとめて表示しています。本当の役職は昼の開始時に反映されます。" : "変化公開がONなので、変化後の役職は昼の開始時に反映されます。") : ""}</p>
       ${["village", "wolf", "third"].map(teamBlock).join("")}${dupBlock()}`;
   }
 

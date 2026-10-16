@@ -833,6 +833,9 @@ window.ONW = window.ONW || {};
     let ratio = 1;
     wrap.querySelectorAll(".tfp-line span").forEach((sp) => { const w = sp.offsetWidth; if (w > avail && w > 0) ratio = Math.min(ratio, avail / w); });
     paper.style.setProperty("--tfp-fs", Math.max(MIN, Math.floor(BASE * ratio * 10 * 0.95) / 10) + "px");   // 全行で同じ大きさにそろえる（文字が途切れないよう少し余裕を持たせる）
+    // 行が多いとき(配役した役職も変化公開に表示するONなど)は、紙が画面の縦に収まるまで文字を小さくする
+    let fs = Math.max(MIN, Math.floor(BASE * ratio * 10 * 0.95) / 10);
+    for (let k = 0; k < 14 && paper.offsetHeight > window.innerHeight * 0.88 && fs > MIN; k++) { fs = Math.max(MIN, Math.floor(fs * 0.93 * 10) / 10); paper.style.setProperty("--tfp-fs", fs + "px"); }
   }
   /** ホストのスキップが届いた: 紙を今すぐ下の欄へ飛ばす（まだ紙が出ていなければ、これから出さない） */
   stage.skipPaper = function () {

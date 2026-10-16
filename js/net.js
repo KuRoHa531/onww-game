@@ -138,7 +138,7 @@ window.ONW = window.ONW || {};
     if (d.t === "batch") { (d.msgs || []).forEach((m) => onMsg(m, true)); rerender(); return; }   // 再入室: 複数のメッセージをまとめて反映（途中の画面を出さない）
     if (d.t === "spectate") { if (d.phase === PH().ONLINE_ROLE) g.dealStart = Date.now(); Object.assign(g, { tfShown: true, tfIntro: false, isSpectator: true, isDead: false, specInfo: null, ghostLog: d.ghost || [], chatTab: "main", debugOn: !!d.dbg, specPhase: d.phase, chatLog: d.log || [], boardView: d.board || [], tfView: d.tf || null, remain: d.remain, phase: PH().ONLINE_SPECTATE }); }
     if (d.t === "specphase") { if (g.phase === PH().ONLINE_RESULT) return; g.specPhase = d.phase; g.remain = null; g.phase = PH().ONLINE_SPECTATE; }
-    if (d.t === "lobby") { g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.villageSize = d.vsize || 4; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.mayorVoteCount = d.mvote ?? 2; g.madMayorVoteCount = d.mmvote ?? 2; g.drunkCount = d.drunk || 0; g.drunkChance = d.drunkp ?? 100; g.loverCount = d.lover || 0; g.loverChance = d.loverp ?? 100; g.timers = { deal: 5, settle: 5, ...d.timers }; g.revealTransforms = d.reveal; g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; g.debugOn = !!d.dbg; const keepRes = g.phase === PH().ONLINE_RESULT && net.rejoinedAt && Date.now() - net.rejoinedAt < 8000 && ONW.ui.hasLastResult(g); g.phase = PH().LOBBY; g.remain = null; if (keepRes) g.viewResult = true; }   // 結果画面のまま切れて、戻ったらもうロビーだった: 結果画面を開いたままにする（「ロビーに戻る」を押すまで）
+    if (d.t === "lobby") { g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.villageSize = d.vsize || 4; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.mayorVoteCount = d.mvote ?? 2; g.madMayorVoteCount = d.mmvote ?? 2; g.drunkCount = d.drunk || 0; g.drunkChance = d.drunkp ?? 100; g.loverCount = d.lover || 0; g.loverChance = d.loverp ?? 100; g.timers = { deal: 5, settle: 5, ...d.timers }; g.revealTransforms = d.reveal; g.revealManualRoles = !!d.revm; g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; g.debugOn = !!d.dbg; const keepRes = g.phase === PH().ONLINE_RESULT && net.rejoinedAt && Date.now() - net.rejoinedAt < 8000 && ONW.ui.hasLastResult(g); g.phase = PH().LOBBY; g.remain = null; if (keepRes) g.viewResult = true; }   // 結果画面のまま切れて、戻ったらもうロビーだった: 結果画面を開いたままにする（「ロビーに戻る」を押すまで）
     if (d.t === "tfskip") { ONW.stage.skipPaper(); return; }   // ホストが変化公開をスキップした → 全員の紙を飛ばす
     if (d.t === "tick") { g.remain = d.sec; ONW.ui.updateTimer(); if (d.sec <= 1 && g.phase === PH().ONLINE_MORNING && !g.settling && ONW.stage.morningEnd) ONW.stage.morningEnd(); return; }   // 朝の残り1秒: 朝にめくれた面を裏に戻す（待機時間の演出と重ならないように）
     if (d.t === "coboard") { g.boardView = d.board || []; g.tfView = d.tf || null; ONW.ui.updateBoard(); if (g.co && g.co.step === "history" && ONW.co) ONW.co.render(); ONW.stage.sync(g); return; }
@@ -376,7 +376,7 @@ window.ONW = window.ONW || {};
     return {
       t: "lobby", code: net.code, me: humans.findIndex((p) => p.id === forId),
       players: humans.map((p) => { const m = net.meta[p.id] || {}; return { name: p.name, status: p.id === HS() ? "host" : p.off ? "offline" : p.status, spec: !!p.spectate, uid: m.uid || null, av: m.av || 0 }; }),
-      counts: g.roleCounts, fake: g.fakeWolfWhenNoWolf, vsize: g.villageSize, cpu: g.cpuCount, grave: g.graveCount, sgrave: g.seerGraveCount, mvote: g.mayorVoteCount ?? 2, mmvote: g.madMayorVoteCount ?? 2, drunk: g.drunkCount || 0, drunkp: g.drunkChance ?? 100, lover: g.loverCount || 0, loverp: g.loverChance ?? 100, timers: g.timers, reveal: g.revealTransforms, cand: g.transformCandidates, off: g.transformOff || [], cpuNames: g.cpuNames || [], dbg: !!g.debugOn,
+      counts: g.roleCounts, fake: g.fakeWolfWhenNoWolf, vsize: g.villageSize, cpu: g.cpuCount, grave: g.graveCount, sgrave: g.seerGraveCount, mvote: g.mayorVoteCount ?? 2, mmvote: g.madMayorVoteCount ?? 2, drunk: g.drunkCount || 0, drunkp: g.drunkChance ?? 100, lover: g.loverCount || 0, loverp: g.loverChance ?? 100, timers: g.timers, reveal: g.revealTransforms, revm: !!g.revealManualRoles, cand: g.transformCandidates, off: g.transformOff || [], cpuNames: g.cpuNames || [], dbg: !!g.debugOn,
     };
   }
   /** ロビーを見ている人（結果確認中の人を除く）へ送る */
@@ -418,14 +418,14 @@ window.ONW = window.ONW || {};
   };
   /** ホストだけが持つ「進行状態」。これをスナップショットにして後継者へ送る */
   const AUTH_KEYS = [
-    "roleCounts", "villageSize", "graveCount", "seerGraveCount", "mayorVoteCount", "madMayorVoteCount", "cpuCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "transformCandidates", "transformOff", "cpuNames", "debugOn", "dbg", "dbgWarn",
+    "roleCounts", "villageSize", "graveCount", "seerGraveCount", "mayorVoteCount", "madMayorVoteCount", "cpuCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "revealManualRoles", "transformCandidates", "transformOff", "cpuNames", "debugOn", "dbg", "dbgWarn",
     "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "playerCount", "selectedRoles",
     "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds", "ghostLog", "nightResolved", "dbgVotes", "dbgFoxVotes", "nightResults",
     "coBoard", "tfLines", "tfPairs", "chatLog", "deathNotes", "coState", "nightLogsAll", "mimicInfo", "eraserWolfTarget", "mirageInspections", "eraserWolfResults", "eraserWolfFailed", "dayLogsAll", "infoDay", "cpuClaims", "tmQueue", "roleTrail", "centerTrail", "cards", "morningAct", "morningDone", "morningAck", "loveTargets", "freeterTargets", "freeterHist", "freeterCutSeen", "mindWolfTarget", "mindWolfSeen", "mimicRole", "visitorTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "avengerSeen", "avengerSettle", "pranksterPicks", "watchdogOwners", "keyLocks", "sealIntent", "sealedBy", "sealTargets", "sealFails", "keyActs", "keyLog", "keyFails", "brokenKeys", "breakerShow", "breakerSuccess", "breakerSeen", "breakerBelief", "breakerApplied", "breakerSettle", "shufflerMarks", "shufflerStamp", "shufflerSettle", "shufflerTold", "loveLostD", "cupidSeen", "cupidTold", "cupidSettle", "akujoSeen", "akujoTold", "evilSettle", "fanaticConv", "fanaticLocked", "madPending", "madSettleIds", "madChainSettle", "madLate", "fanFollowPending", "foxVote", "foxInspected", "foxCursed", "foxPending", "foxSettleIds", "deadKind", "deadBy", "deadStep", "pureLoverPairs", "pureLoverSeen", "pureLoverSettle", "pureLoverTold", "pureLoverNo", "pureLoverNoU", "pureLoverGen", "loveHist", "loveLast", "executed", "chainIds", "chainBy", "chainKind", "dogBites", "chainSub", "chainLate", "mentalIds", "shockIds", "chickenReverse", "balancerFx", "detectiveGuesses", "detectiveSuccess", "detectiveDone", "detAsk", "catPicks", "catSources", "catBitePick", "catInfo", "cursedWolfIds", "strawTargets", "strawAsk", "assassinTargets", "assassinList", "assassinResult", "bountyTargets", "bountyList", "bountyResult", "toughBounces", "toughBlocks", "kingGuards", "sheriffShots", "thiefSteals", "sheriffCatFix", "sheriffCatTeam", "dictator",
     "masterPick", "masterCard", "cpuVotePlan", "cpuRealVote", "cpuInfo", "announced", "holdUntil", "remain", "settling", "promotedWolfIds", "queenSeen", "madQueenSeen", "kingdomIds", "queenFallen", "eliminated", "winners", "winnerIds", "winTitle", "winDetail", "winTeams", "dealStart", "resultObj", "drunkCount", "drunkChance", "drunkOverlay", "drunkRevealed", "drunkSober", "drunkHist", "soberLines", "loverCount", "loverChance", "loverOf", "servantMasters", "servantSubs", "servantNotified", "execTargets", "gremlinPicks", "newsRoles", "newsLines", "newsAnnounced", "mapoAnnounced", "pranksterAnnounced", "pranksterAppliedId", "pranksterResult", "pranksterFx", "observeLog", "observerSeen", "exposeTargets", "exposeAnnounced", "exposeLines", "muzzleTargets", "muzzleNotified", "exchanges",
   ];
   /** 参加者としての画面にも同じ意味で入っている項目。ホストを引き継ぐ人は、自分が見ていた最新の値を優先する */
-  const SHARED_KEYS = ["chatLog", "deathNotes", "remain", "settling", "dealStart", "debugOn", "roleCounts", "villageSize", "cpuCount", "graveCount", "seerGraveCount", "mayorVoteCount", "madMayorVoteCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "transformCandidates", "transformOff", "cpuNames"];
+  const SHARED_KEYS = ["chatLog", "deathNotes", "remain", "settling", "dealStart", "debugOn", "roleCounts", "villageSize", "cpuCount", "graveCount", "seerGraveCount", "mayorVoteCount", "madMayorVoteCount", "timers", "fakeWolfWhenNoWolf", "revealTransforms", "revealManualRoles", "transformCandidates", "transformOff", "cpuNames"];
   /** ホストをやめて参加者に戻るとき、消す項目（参加者の画面では使わないもの） */
   const HOST_ONLY_KEYS = [
     "players", "inGame", "spectators", "specNames", "specRoster", "hostSpec", "initialRoles", "currentRoles", "center", "center0", "transformFrom", "centerTransformFrom", "coDeck", "votes", "nightSels", "morningReveals", "deadIds",
@@ -1259,9 +1259,9 @@ window.ONW = window.ONW || {};
     net.returnToRoom();
   };
 
-  /** 変化公開の ON・OFF */
+  /** 変化公開・配役した役職の変化公開表示の ON・OFF */
   net.toggleOpt = function (key) {
-    if (!net.isHost || !["revealTransforms"].includes(key)) return;
+    if (!net.isHost || !["revealTransforms", "revealManualRoles"].includes(key)) return;
     G()[key] = !G()[key];
     persist(); broadcastLobby();
   };
@@ -1557,6 +1557,20 @@ window.ONW = window.ONW || {};
       ...Object.keys(g.transformFrom).map((id) => ({ b: g.transformFrom[id], a: g.initialRoles[id] })),
       ...Object.keys(g.centerTransformFrom).map((i) => ({ b: g.centerTransformFrom[i], a: (g.center0 || g.center)[i] })),   // 配役直後の墓地で見る（墓荒らしの交換後の g.center だと変化先が墓荒らしになってしまう）
     ].filter((e) => e.b !== e.a);
+    // 配役した役職も変化公開に出す設定(マイクラ版 revealManualRolesAsTransforms): 変化していないカードも「陣営の変化役 → その役職」として並べ、どれが本当に変化したか分からなくする。
+    // 配役設定の枚数(変化役を除く)ぶんだけ数える。ガイドの「現在の配役」(wikiview.js の deckCounts)は、昼の開始前は変化役にまとめ、開始後はこの tfPairs で数え直す
+    if (g.revealManualRoles) {
+      const BASE = { village: "light_apostle", wolf: "dark_avatar", third: "silver_shadow" };
+      const left = {};
+      (g.selectedRoles || []).forEach((r) => { if (!ONW.TRANSFORM_GROUPS[r]) left[r] = (left[r] || 0) + 1; });
+      const addManual = (r) => {
+        if (!r || ONW.TRANSFORM_GROUPS[r] || !(left[r] > 0)) return;
+        left[r] -= 1;
+        list.push({ b: BASE[(ONW.ROLE_INFO[r] || {}).team] || BASE.village, a: r });
+      };
+      g.players.forEach((p) => { if (!g.transformFrom[p.id]) addManual(g.initialRoles[p.id]); });
+      (g.center0 || g.center || []).forEach((r, i) => { if (!(g.centerTransformFrom || {})[i]) addManual(r); });
+    }
     if (!list.length) return;
     // 変化公開の並び: 変化役(光の使徒 → 闇の化身 → 銀色の影)の順 → 変化役の基準順 → 変化後の役職の基準順(js/roleorder.js)。乱数は使わない
     list.sort((x, y) => (order[x.b] ?? 9) - (order[y.b] ?? 9) || ONW.roleRank(x.b) - ONW.roleRank(y.b) || ONW.roleRank(x.a) - ONW.roleRank(y.a));
