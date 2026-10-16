@@ -511,7 +511,8 @@ body {
 .dbg-fab--open { background: #5b3a7a; }
 .dbg-sheet { position: fixed; left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); z-index: 400; width: calc(100% - 24px); max-width: 960px; height: 80vh; max-height: 80vh; display: flex; flex-direction: column; background: var(--bg-panel); border: 2px solid #9b5ac8; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.55); text-align: left; }   /* 画面中央に浮かぶパネル（スマホもPCも同じ）。高さは固定＝どのタブでも大きさ・位置が変わらない */
 .dbg-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; color: var(--gold); }
-.dbg-tabs { display: flex; gap: 6px; padding: 0 12px 8px; overflow-x: auto; }
+.dbg-tabs { display: flex; gap: 6px; padding: 0 12px 8px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.dbg-tabs::-webkit-scrollbar { display: none; }   /* 結果確認は1秒ごとに描き直すので、スクロールバーが出てタブが細く見えていた */
 .dbg-body { overflow-y: auto; padding: 0 12px 14px; }
 .dbg-b { padding: 6px 10px; font-size: 13px; margin: 2px; }
 .dbg-tabs .dbg-b { white-space: nowrap; }

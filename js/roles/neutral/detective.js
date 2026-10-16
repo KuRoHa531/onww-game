@@ -286,7 +286,7 @@
   //  結果発表の盤面（全員の画面）。全員のカードがめくれ終わったあと・チキンの逆転の前（バランサーの天秤の前）に出す。
   //   各名探偵の盤面（席順の列。自分の列は空白）を、カードの裏面（共通のカード裏面。推理した役職は見せない）のまま全員に見せる。複数いれば並べる。
   //   めくる順: 席の列ごと（左の列から）。同じ列にカードがある盤面は、同時にめくれる（Bの推理のAの列 → Aの推理のBの列 → AとBの推理のCの列 …）。
-  //   めくれると本当の初期役職の面になり、当たっていれば ⭕、外れていれば ✖。
+  //   めくれると、名探偵が推理した役職の面になり（正解ではなく推理の内容を見せる）、当たっていれば ⭕、外れていれば ✖。
   // ======================================================================
   const FX = { SHOW: 1500, GAP: 1300, FLIP: 650, MARK: 700, HOLD: 1900, FADE: 450, STILL: 3600 };
   const reduceMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -295,7 +295,7 @@
     const { later, setCap } = R, t0 = R.t, n = v.seats.length, reduce = reduceMotion();
     const w = Math.max(30, Math.min(60, Math.floor(((window.innerWidth || 360) - 40) / Math.max(n, 4)) - 6));
     const cellHtml = (c, ci) => (c
-      ? `<div class="dtr-cell" data-col="${ci}" style="width:${w}px;height:${Math.round(w * 1.45)}px"><div class="dtr-in"><div class="dtr-back" style="font-size:${Math.max(10, Math.round(w * 0.4))}px">☾</div><div class="dtr-front">${D.cardHtml(c.answer, w)}</div></div><i class="dtr-mark ${c.ok ? "dtr-ok" : "dtr-ng"}">${c.ok ? "⭕" : "❌"}</i></div>`
+      ? `<div class="dtr-cell" data-col="${ci}" style="width:${w}px;height:${Math.round(w * 1.45)}px"><div class="dtr-in"><div class="dtr-back" style="font-size:${Math.max(10, Math.round(w * 0.4))}px">☾</div><div class="dtr-front">${D.cardHtml(c.guess, w)}</div></div><i class="dtr-mark ${c.ok ? "dtr-ok" : "dtr-ng"}">${c.ok ? "⭕" : "❌"}</i></div>`
       : `<div class="dtr-cell dtr-cell--blank" style="width:${w}px;height:${Math.round(w * 1.45)}px"></div>`);
     later(() => setCap(""), t0);
     later(() => {

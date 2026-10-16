@@ -87,7 +87,7 @@
     /** 夜の始まり(本人の画面): 対象を伝え、対象のカードがめくれてミュートマーク(muzzle)が出る */
     nightMsg(c, p, r) {
       const g = c.g, t = ONW.muzzle.assign(g, p.id);
-      return { text: t ? `あなたは ${nameOf(g, t)} を口封じしました。` : "", text2: "口封じされた人は、昼のチャットとCOボタンが使えません。", muzzle: t || null };
+      return { text: t ? `あなたは ${nameOf(g, t)} を口封じしました。` : "", note: "口封じされた人は、昼のチャットとCOボタンが使えません。", muzzle: t || null };
     },
     /** 墓荒らし・ドッペルゲンガーで口封じの狂人を手にしたとき: 朝のうちに対象がランダムで決まる。本人に伝え、朝の演出で対象のカードがミュートマークでめくれる(rev.muzzle) */
     got(c, p, got, rev, opts) {
@@ -118,7 +118,7 @@
     settleMsg: { order: 60, run(c, p, mode) {
       const g = c.g;
       if (p.isCpu || !ONW.muzzle.isMuzzled(g, p.id)) return {};
-      return { logs: ["【口封じ通知】あなたは口封じされました。昼のチャットとCOボタンは使えません。"], muzzled: true };
+      return { logs: ["【口封じ通知】あなたは口封じされました。"], muzzled: true };
     } },
     /** 昼のうちに口封じが変わったとき(酔い覚め・昼の能力で口封じの狂人になった/やめた)、新しく口封じされた人へ演出、解かれた人へ通知（昼のタイマーは止めない） */
     dayNews: { order: 110, run(c) {
@@ -132,7 +132,7 @@
         g.muzzleNotified[id] = true;
         const p = g.players.find((q) => q.id === id);
         if (!p || p.isCpu) return;
-        const text = "【口封じ通知】あなたは口封じされました。昼のチャットとCOボタンは使えません。";
+        const text = "【口封じ通知】あなたは口封じされました。";
         c.hold(id, text);
         c.send(id, { t: "muzzle", on: true, text });
       });

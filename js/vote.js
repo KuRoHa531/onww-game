@@ -986,7 +986,7 @@ window.ONW = window.ONW || {};
    *  ・勝てない扱いの人（勝てなかった恋人・シャッフラーの失敗・撃たれた人・王国滅亡で倒れた人）は、全員勝利系・単独勝利・追加勝利でも勝者に入れない。
    *  ・愉快犯で村人陣営の勝者（恋人でない人）が減ったときだけ、生存したチキンがもう一度逆転する（マイクラ版 applyLateChickenSoloOverride。愉快犯は再適用しない）。 */
   vote.applyPrankster = function applyPrankster(game) {
-    game.pranksterResult = null;
+    game.pranksterResult = null; game.pranksterFx = null;
     const P = ONW.prankster;
     if (!P || game.abandoned) { game.pranksterAppliedId = null; return; }
     const R = ONW.ROLE, T = ONW.TEAM, ids = game.players.map((p) => p.id);
@@ -1007,20 +1007,23 @@ window.ONW = window.ONW || {};
     const targetWon = before.has(rec.t);
     const success = rec.o.startsWith("target_lose_") ? (targetIsPrankster ? true : !targetWon) : rec.o.startsWith("target_win_") ? (targetIsPrankster ? false : targetWon) : false;
     let w = new Set(before), teams = [...(game.winTeams || [])], keys = [...(game.winners || [])];
+    const chickenPre = !!game.chickenReverse;   // 愉快犯の前に（determineWinners で）もうチキンが逆転していたか
+    const fxFrom = { title: game.winTitle, teams: [...teams] };   // 愉快犯が影響する前の勝敗（演出で先に見せる）
     const ok = (id) => !noWin.has(id);
     let detail = null;
     if (success) {
       const kind = rec.o.replace(/^target_(lose|win)_/, "");
-      if (kind === "bonus") { pIds.filter(ok).forEach((id) => w.add(id)); if (!teams.includes("愉快犯")) teams.push("愉快犯"); if (!keys.includes(T.THIRD)) keys.push(T.THIRD); }
+      if (kind === "bonus") { pIds.filter(ok).forEach((id) => w.add(id)); const had = teams.includes("愉快犯"); if (!had) teams.push("愉快犯"); if (!keys.includes(T.THIRD)) keys.push(T.THIRD); if (!had && /勝利$/.test(game.winTitle || "") && game.winTitle !== "全員勝利") game.winTitle = game.winTitle.replace(/勝利$/, "＆愉快犯勝利"); }   // 追加勝利: 勝利タイトルも「村人陣営＆愉快犯勝利」にする（演出の字幕のあとに元のタイトルへ戻って見えないように）
       else if (kind === "solo") { w = new Set(pIds.filter(ok)); teams = ["愉快犯"]; keys = [T.THIRD]; game.winTitle = "愉快犯勝利"; detail = "愉快犯の条件が成立したため単独勝利しました。"; }
       else if (kind === "all_lose") { w = new Set(); teams = []; keys = []; game.winTitle = "勝者なし"; detail = "愉快犯の条件が成立したため全員敗北になりました。"; }
       else if (kind === "all_win") { w = new Set(ids.filter(ok)); teams = ["全員"]; keys = [T.VILLAGE, T.WOLF, T.THIRD]; game.winTitle = "全員勝利"; detail = "愉快犯の条件が成立したため全員勝利になりました。"; }
-      else if (kind === "only_target") { w = new Set([rec.t]); teams = [nm(rec.t)]; keys = [T.THIRD]; game.winTitle = `${nm(rec.t)}勝利`; detail = "愉快犯の条件が成立したため対象のみ勝利になりました。"; }
-      else if (kind === "others_win") { w = new Set(ids.filter((id) => id !== rec.t && ok(id))); teams = ["対象以外"]; keys = [T.VILLAGE, T.WOLF, T.THIRD]; game.winTitle = "対象以外全員勝利"; detail = "愉快犯の条件が成立したため対象以外全員勝利になりました。"; }
+      else if (kind === "only_target") { w = new Set([rec.t]); teams = [nm(rec.t)]; keys = [T.THIRD]; game.winTitle = `${nm(rec.t)}勝利`; detail = `愉快犯の条件が成立したため${nm(rec.t)}のみ勝利になりました。`; }
+      else if (kind === "others_win") { w = new Set(ids.filter((id) => id !== rec.t && ok(id))); teams = [`${nm(rec.t)}以外`]; keys = [T.VILLAGE, T.WOLF, T.THIRD]; game.winTitle = `${nm(rec.t)}以外全員勝利`; detail = `愉快犯の条件が成立したため${nm(rec.t)}以外全員勝利になりました。`; }
       else if (kind === "everyone_but_prankster") { w = new Set(ids.filter((id) => !pIds.includes(id) && ok(id))); teams = ["愉快犯以外"]; keys = [T.VILLAGE, T.WOLF, T.THIRD]; game.winTitle = "愉快犯以外全員勝利"; detail = "愉快犯の条件が成立したため愉快犯以外全員勝利になりました。"; }
       game.winDetail = `${game.winDetail || ""}${game.winDetail ? "\n" : ""}${detail ? detail + " " : ""}愉快犯が影響を及ぼしました。`;
     } else w.delete(hid);
     game.winnerIds = [...w]; game.winTeams = teams; game.winners = keys;
+    if (success) game.pranksterFx = { kind: rec.o.replace(/^target_(lose|win)_/, ""), targetId: rec.t, target: nm(rec.t), fromTitle: fxFrom.title, fromTeams: fxFrom.teams, toTitle: game.winTitle, toTeams: [...teams] };   // 成立したときだけ（失敗は勝者から外れるだけ）
     // 愉快犯で村人陣営の勝者（恋人でない人）が減ったときだけ、生存したチキンがもう一度逆転する（愉快犯は再適用しない）
     const villageLost = success && ids.some((id) => !ONW.isLover(game, id) && ONW.roles.getInfo(game.currentRoles[id]).team === T.VILLAGE && ok(id) && before.has(id) && !w.has(id));
     const chickens = villageLost ? ids.filter((id) => game.currentRoles[id] === R.CHICKEN && !dead.has(id) && !ONW.isLover(game, id) && !ONW.hiddenDrunk(game, id)) : [];
@@ -1045,6 +1048,7 @@ window.ONW = window.ONW || {};
         saved = true;
       }
     }
+    if (game.pranksterFx) game.pranksterFx.chickenFirst = chickenPre && !saved;   // 愉快犯の前にチキンが逆転していて、愉快犯のあとの逆転では上書きされなかった = 演出もチキンが先
     game.pranksterResult = { id: hid, name: nm(hid), targetId: rec.t, target: nm(rec.t), outcome: rec.o, label: P.LABELS[rec.o] || rec.o, success, chicken: saved };
   };
 

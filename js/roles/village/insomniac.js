@@ -85,7 +85,7 @@
         if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id)) return;   // 酔いが覚める前の人は、覚めたときに最終役職を知る
         const shown = ONW.shownRole(g.currentRoles[p.id]);   // 本人に見せる最終役職はカードそのもの（模倣の人狼なら「模倣の人狼」）
         if (p.isCpu) { ONW.cpu.notifyInsom(g, p.id); return; }
-        const text = `後覚者の能力が発動しました。昼に役職が入れ替わり、あなたの最終的な役職は「${c.rn(shown)}」になりました。`;
+        const text = `あなたの最終的な役職は「${c.rn(shown)}」になりました。`;
         c.hold(p.id, text);
         if (g.soberLines && g.soberLines[p.id]) g.soberLines[p.id].push(text);
         c.send(p.id, { t: "insomday", text, role: shown });

@@ -767,7 +767,10 @@ window.ONW = window.ONW || {};
     hk("afterRest").forEach((h) => h.fn(R));   // 神降臨の余韻 / 神の祝福（全員めくれたあと、負けた人が吹き飛ばされ、残りの人が祝福で勝つ）
     hk("detective").forEach((h) => h.fn(R));   // 名探偵: 全員がめくれ終わったあと、名探偵の盤面（推理した役職名の裏面のカード）を全員に見せ、列ごとにめくって答え合わせ（⭕/✖）。バランサーより優先度が上なので先に出す
     hk("balancer").forEach((h) => h.fn(R));   // バランサー: 全員がめくれ終わったあと・最終結果の前に、シーソーの天秤（チキン・模倣チキンの逆転があるときは、バランサー勝利を出してから逆転するので、逆転演出の前に出す）
-    hk("reverse").forEach((h) => h.fn(R));   // チキンの逆転演出: 逆転前の勝敗を先に発表 → チキンが飛び出して覆す
+    // 愉快犯: 愉快犯が影響する前の勝敗を先に発表 → 🤗が飛び出して、影響した勝敗に変わる。チキンの逆転演出(逆転前の勝敗を先に発表 → チキンが飛び出して覆す)とは、起きた順に並べる:
+    //   愉快犯のあとにチキンが逆転した（既定。愉快犯 → チキン） / 愉快犯の前にチキンがもう逆転していた（pranksterFx.chickenFirst。チキン → 愉快犯）
+    if (res.pranksterFx && res.pranksterFx.chickenFirst) { hk("reverse").forEach((h) => h.fn(R)); hk("prankster").forEach((h) => h.fn(R)); }
+    else { hk("prankster").forEach((h) => h.fn(R)); hk("reverse").forEach((h) => h.fn(R)); }
     later(() => setCap(winHtml(res)), R.t);
     const losersN = R.noBlow ? [] : res.history.filter((h) => !h.win);   // 神の祝福以外: 結果の字幕のあと、負けた人のカードが吹き飛ぶ
     if (losersN.length) later(() => { losersN.forEach((h) => { gx[P(h.id)] = "blow"; }); paint(G()); }, R.t + 1300);

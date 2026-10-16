@@ -70,7 +70,7 @@
       const lines = g.players.map((q) => `${q.name}${q.id === p.id ? "（あなた）" : ""} = ${rn(g.initialRoles[q.id])}`);
       const godPeek = { players: Object.fromEntries(g.players.map((q) => [q.id, g.initialRoles[q.id]])), graves: g.center0.slice() };
       return {
-        text: "あなたは全員の役職と墓地を知っています。",
+        note: "あなたは全員の役職と墓地を知っています。",
         text2: `墓地: ${g.center0.map((cr, i) => `${i + 1}枚目「${rn(cr)}」`).join(" ")}`,
         lines, godPeek,
       };

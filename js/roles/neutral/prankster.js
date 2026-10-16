@@ -84,7 +84,7 @@
     if (!cur) { i.mode = "prankster"; i.target = t; }
     i.pranksterTarget = t;   // CPUの記憶: 発言（cpuClaim / cpuChainResult）で「〇〇を選びました。」と言うために覚える。条件は分からないので投票判断には使わない
     g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} を選びました。`);
-    n.hold(p.id, `対象を選びました。勝利条件の詳細はあなたにも分かりません。`);
+    n.hold(p.id, `${nm(g, t)} を対象に選びました。`);
     n.ob(p.id, [t]);
     n.nn(rid);
   }
@@ -114,6 +114,25 @@
       chainHow: () => "<strong>対象</strong>のカードを押して（自分以外）",
     },
     stagePick: {},   // 夜(と朝の連鎖)にカードを押して行動する: プレイヤー1人（自分以外）
+    // 結果発表の演出(stage.js の startResult が hk("prankster") で引く。チキンの逆転 reverse の直前): 愉快犯が勝敗に影響したとき、
+    //   愉快犯が影響する前の勝敗を先に発表 → チキンのビックリマークのように🤗が飛び出す → 愉快犯が影響した勝敗（対象は名前に置き換え済み）に変わる。
+    //   res.pranksterFx = { kind, target, fromTitle, toTitle, ... }（js/vote.js の applyPrankster が条件成立のときだけ作る）。失敗のとき・影響がないときは何も出さない
+    stageResult: {
+      prankster: { order: 5, run(R) {
+        const { later, setCap, esc } = R, fx = R.res.pranksterFx;
+        if (!(fx && fx.toTitle)) return;
+        const cls = (t) => (String(t).startsWith("村人") ? "village" : String(t).startsWith("人狼") ? "wolf" : String(t).startsWith("恋人") ? "lover" : "third");
+        const cap = (t, sub) => `<div class="rs-win t-${cls(t)}">${esc(t)}</div>${sub ? `<div class="res-cap__t t-third">${esc(sub)}</div>` : ""}`;
+        if (fx.fromTitle) {
+          later(() => setCap(cap(fx.fromTitle)), R.t);
+          R.t += 1800;
+        }
+        later(() => setCap(`<svg class="rv-burst" viewBox="0 0 100 100" width="150" height="150"><polygon points="50.0,2.0 56.7,20.8 70.8,6.8 68.7,26.5 87.5,20.1 77.0,37.0 96.8,39.3 80.0,50.0 96.8,60.7 77.0,63.0 87.5,79.9 68.7,73.5 70.8,93.2 56.7,79.2 50.0,98.0 43.3,79.2 29.2,93.2 31.3,73.5 12.5,79.9 23.0,63.0 3.2,60.7 20.0,50.0 3.2,39.3 23.0,37.0 12.5,20.1 31.3,26.5 29.2,6.8 43.3,20.8" fill="#ffe14d" stroke="#222" stroke-width="3" stroke-linejoin="miter"/><text x="50" y="66" text-anchor="middle" font-size="46">\u{1F917}</text></svg>`), R.t);
+        R.t += 1500;
+        later(() => setCap(cap(fx.toTitle, fx.kind === "bonus" ? "愉快犯が勝利に加わった！" : "愉快犯が勝敗を変えた！")), R.t);
+        R.t += 2200;
+      } },
+    },
     /** CPUの発言: 本物の愉快犯は、確率（k.coTruth）で本当にCOして「〇〇を選びました。」と言う。それ以外は他の役職を騙る（第三陣営は名乗らない決まり）。選んだ相手の記憶 i.pranksterTarget は cpuRun が入れる。投票への影響は付けない（依頼どおり） */
     cpuClaim(k, g, p, r, i, c) {
       const t = i.pranksterTarget && g.players.find((q) => q.id === i.pranksterTarget && q.id !== p.id);
@@ -137,7 +156,7 @@
         const t = c.selOf(p).players[0]; if (!t || t === p.id) return;   // 自分自身は選べない
         setPick(g, p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を選びました。`);
-        c.hold(p.id, "対象を選びました。勝利条件の詳細はあなたにも分かりません。");
+        c.hold(p.id, `${nameOf(t)} を対象に選びました。`);
         ONW.observeNote(g, p.id, [t]);
         ONW.newsNote(g, "prankster");
       },
@@ -167,7 +186,7 @@
         if (t === id) return null;   // 自分自身は選べない
         setPick(g, id, t);
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を選びました。`);
-        return { lines: ["対象を選びました。勝利条件の詳細はあなたにも分かりません。"], reveal: null, nextChain: null };
+        return { lines: [`${c.nameOf(t)} を対象に選びました。`], reveal: null, nextChain: null };
       },
     },
     // COボタン（co.js が kind で呼ぶ）: 選んだ相手を1人選んでCO・結果を言う（条件は言えない）

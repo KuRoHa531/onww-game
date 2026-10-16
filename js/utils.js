@@ -157,7 +157,8 @@ window.ONW = window.ONW || {};
         case "ack": add(d.lines || []); break;
         case "muzzle": add(d.text); break;
         case "observeday": add("【観測通知】", (d.lines && d.lines.length) ? d.lines : ["観測できる夜能力はありませんでした。"]); break;
-        case "sealday": case "insomday": case "jobcut": case "servantday": case "jobday": case "mindday": add(d.text); break;   // mindday: 心眼の人狼が昼に見抜いた結果
+        case "sealday": case "insomday": case "jobcut": case "servantday": case "jobday": case "mindday": case "sheriffdone": case "thiefdone": add(d.text); break;
+        case "exchdone": if (d.a && d.b) add(`${d.a} と ${d.b} の票数を入れ替えます。`); break;   // mindday: 心眼の人狼が昼に見抜いた結果
         default: break;
       }
     });

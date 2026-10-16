@@ -40,7 +40,7 @@
     i.mode = "visitor"; i.target = t.id;
     if (n.stage === "late") (ONW.cpu.lateVisits = ONW.cpu.lateVisits || []).push({ from: p.id, to: t.id });   // 昼（酔い覚め後）の訪問: 訪問された人への通知用
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を訪問しました。`);
-    n.hold(p.id, `${t.name} を訪問しました。相手の役職は分かりません。訪問されたことは、朝のあとの待機時間に ${t.name} へ知らされます。`);
+    n.hold(p.id, `${t.name} を訪問しました。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -101,7 +101,7 @@
         const t = c.selOf(p).players[0]; if (!t) return;
         ONW.setRoleBound(g, "visitorTargets", p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を訪問しました。`);
-        c.hold(p.id, `${nameOf(t)} を訪問しました。相手の役職は分かりません。訪問されたことは、朝のあとの待機時間に ${nameOf(t)} へ知らされます。`);
+        c.hold(p.id, `${nameOf(t)} を訪問しました。`);
         ONW.observeNote(g, p.id, [t]);
         ONW.newsNote(g, "visitor");
       },
@@ -112,7 +112,7 @@
         const g = c.g, id = c.id, t = c.players[0];
         ONW.setRoleBound(g, "visitorTargets", id, t);   // 朝に選んだ訪問先も、その時点の持ち主に予約され、以降の移動にもついていく
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を訪問しました。`);
-        return { lines: [`${c.nameOf(t)} を訪問しました。相手の役職は分かりません。訪問されたことは、${c.nameOf(t)} に知らされます。`], reveal: null, nextChain: null };
+        return { lines: [`${c.nameOf(t)} を訪問しました。`], reveal: null, nextChain: null };
       },
       dayNotify(c) {   // 昼に訪問: 訪問された人の画面でも、その時点の訪問者のカードが表になって、数秒後に閉じる
         if (!c.players.length) return;

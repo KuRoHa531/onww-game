@@ -730,7 +730,7 @@ window.ONW = window.ONW || {};
   ui.renderOnlineNight = function renderOnlineNight(game) {
     const info = ONW.roles.getInfo(game.myRole);
     const held = ui.logsHeld(game);   // 夜の始まりのカードがめくれ終わるまで、文章は出さない
-    const logs = (held ? [] : [...(game.nightLogs || []), ...(game.nightAck || [])]).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
+    const logs = (held ? [] : [...(game.nightLogs || []), ...(game.nightNotes || []), ...(game.nightAck || [])]).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
     let action = "";
     const ar = game.actRole, canAct = !game.nightDone && ar;
     const nm = (id) => ((game.others || []).find((p) => p.id === id) || {}).name || "?";
@@ -1423,7 +1423,7 @@ window.ONW = window.ONW || {};
             ...(res.slides || []).map((x) => L(`<span class="rs-info">ペンギン:</span> ${esc(x.by)} に投票した ${(x.voters || []).map(esc).join("・")} の${x.w}票は、${esc(x.to)} へ滑りました。`))],   // ペンギンは昼能力ではないので、昼行動結果ではなく役職情報に出す（滑らせた順。処理の順番はペンギン → 交換者 → 番犬）
             [...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`))],
             [...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
-            [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> 適用された愉快犯は ${esc(res.prankster.name)} です。選んだ人は ${esc(res.prankster.target)} でした。`), L(`<span class="rs-info">愉快犯の条件:</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : [])],
+            [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : [])],
             [...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
             [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`))],
             [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報

@@ -90,7 +90,7 @@
       const tid = ONW.execTarget(g, p.id), tp = tid && g.players.find((q) => q.id === tid);
       return {
         text: tp ? `あなたのターゲットは ${tp.name} です。` : "ターゲットが見つかりませんでした。",
-        text2: "ターゲットが追放されたら、あなたの勝利です。",
+        note: "ターゲットが追放されたら、あなたの勝利です。",
         master: (tp && tid !== p.id) ? { id: tid, mark: "__target" } : null,
       };
     },
@@ -98,7 +98,7 @@
       const t = ONW.roleKit.gotTools(c, p, rev, opts), g = c.g;
       // 処刑人: 新しい処刑人にはターゲットがランダムで決まっている(ONW.swapGrave / ONW.copyRole → fixExecutioners)。朝に自分のカードが表になり、ターゲットのカードに🎯の印が出る
       const tid = ONW.execTarget(g, p.id);
-      c.hold(p.id, tid ? `あなたのターゲットは ${t.nameOf(tid)} です。ターゲットが追放されたら、あなたの勝利です。` : "ターゲットが見つかりませんでした。");
+      c.hold(p.id, tid ? `あなたのターゲットは ${t.nameOf(tid)} です。` : "ターゲットが見つかりませんでした。");
       if (tid) g.nightLogsAll.push(`処刑人 ${p.name} のターゲットは ${t.nameOf(tid)} になりました（${t.o.via || "引いた処刑人"}）。`);
       t.both(t.eff());
       if (tid && tid !== p.id) t.setPeek([{ k: `p:${tid}`, role: "__target" }], 380);
@@ -106,7 +106,7 @@
     soberLines(c, id) {
       const g = c.g, nm = (x) => (g.players.find((q) => q.id === x) || {}).name || "?";
       const tid = ONW.execTarget(g, id);
-      return [tid ? `あなたのターゲットは ${nm(tid)} です。ターゲットが追放されたら、あなたの勝利です。` : "ターゲットが見つかりませんでした。"];
+      return [tid ? `あなたのターゲットは ${nm(tid)} です。` : "ターゲットが見つかりませんでした。"];
     },
     soberPeek(c, id) {
       const pk = {}, tid = ONW.execTarget(c.g, id);

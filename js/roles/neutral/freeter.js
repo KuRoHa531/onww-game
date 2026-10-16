@@ -33,7 +33,7 @@
     ONW.setRoleBound(g, "freeterTargets", p.id, t.id);
     i.mode = "freeter"; i.target = t.id; i.known[t.id] = g.initialRoles[t.id];
     g.nightLogsAll.push(`${label} ${p.name} は ${n.rn(g.initialRoles[t.id])} の ${t.name} に就職しました。`);
-    n.hold(p.id, `${t.name} の初期役職は「${n.rn(g.initialRoles[t.id])}」でした。${t.name} に就職しました。就職先が勝利すると、あなたも追加で勝利します。`);
+    n.hold(p.id, `${t.name} の初期役職は「${n.rn(g.initialRoles[t.id])}」でした。${t.name} に就職しました。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -129,7 +129,7 @@
     const nm = c.nameOf;
     (g.dayLogsAll = g.dayLogsAll || []).push(`${c.rn("freeter")} ${me.name} は ${nm(r.prev)} の死亡により、${c.rn(r.role)} の ${tp.name} に再就職しました（${r.n}回目の再就職）。`);
     {
-      const text = `${tp.name} の最終役職は「${c.rn(r.role)}」でした。${tp.name} に再就職しました（${r.n}回目の再就職）。新しい就職先が勝利すると、あなたも追加で勝利します。`;
+      const text = `${tp.name} の最終役職は「${c.rn(r.role)}」でした。${tp.name} に再就職しました（${r.n}回目の再就職）。`;
       c.hold(id, text);   // CPUも人間と同じ文を情報確認に残す（演出の送信は人間だけ）
       if (!me.isCpu) c.send(id, { t: "jobday", id: target, text, role: r.role, items: [{ id: target, role: r.role }] });
     }
@@ -204,7 +204,7 @@
         const r = g.initialRoles[t];
         ONW.setRoleBound(g, "freeterTargets", p.id, t);
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${rn(r)} の ${nameOf(t)} に就職しました。`);
-        c.hold(p.id, `${nameOf(t)} の初期役職は「${rn(r)}」でした。${nameOf(t)} に就職しました。就職先が勝利すると、あなたも追加で勝利します。`);
+        c.hold(p.id, `${nameOf(t)} の初期役職は「${rn(r)}」でした。${nameOf(t)} に就職しました。`);
         ONW.observeNote(g, p.id, [t]);
         ONW.newsNote(g, "freeter");
         c.rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
@@ -217,7 +217,7 @@
         ONW.setRoleBound(g, "freeterTargets", id, t);   // 朝に選んだ就職先も、その時点の持ち主に予約され、以降の移動にもついていく
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${rn(r)} の ${c.nameOf(t)} に就職しました。`);
         return {
-          lines: [`${c.nameOf(t)} の初期役職は「${rn(r)}」でした。${c.nameOf(t)} に就職しました。就職先が勝利すると、あなたも追加で勝利します。`],
+          lines: [`${c.nameOf(t)} の初期役職は「${rn(r)}」でした。${c.nameOf(t)} に就職しました。`],
           reveal: { kind: "peek", items: [{ k: `p:${t}`, role: r }] }, nextChain: null,
         };
       },

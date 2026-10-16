@@ -243,10 +243,11 @@
       // 4of9: 模倣先の夜の情報（共有者の相方・マーリンの人狼など）を、模倣の人狼の夜の画面に合流させる。文は「模倣した」の文のあとに並べる
       const td = ONW.roleDef(mr);
       let tm = td && td.nightMsg && !skipMerge(td, mr) ? td.nightMsg(c, p, mr) || {} : {};   // 7of9: 人狼系共通の文（仲間の人狼）・思い込み系（狼夢人の「仲間はいません」）は合流させない
-      if (WOLFKIT_EXTRA.has(mr)) { const kt = K.nightMsg(c, p, mr); tm = { text2: kt.text2, bigGraves: kt.bigGraves }; }   // 9of9: 大狼の墓地・観測の人狼の説明だけ合流（仲間の人狼の文は二重にしない）
+      if (WOLFKIT_EXTRA.has(mr)) { const kt = K.nightMsg(c, p, mr); tm = { text2: kt.text2, note: kt.note, bigGraves: kt.bigGraves }; }   // 9of9: 大狼の墓地・観測の人狼の説明だけ合流（仲間の人狼の文は二重にしない）
       const extra = [tm.text, tm.text2, ...(tm.lines || [])].filter(Boolean);
       if (extra.length) m.lines = [...(m.lines || []), ...extra];
-      Object.keys(tm).forEach((k) => { if (!["t", "text", "text2", "lines", "act", "actRole"].includes(k) && tm[k] != null && m[k] == null) m[k] = tm[k]; });   // masonMates・cultWolves など、夜の始まりにカードが表になる指示
+      { const nt = [].concat(m.note || [], tm.note || []).filter(Boolean); if (nt.length) m.note = nt; }   // 模倣先の説明は夜の画面にだけ出す（情報確認には載せない）
+      Object.keys(tm).forEach((k) => { if (!["t", "text", "text2", "note", "lines", "act", "actRole"].includes(k) && tm[k] != null && m[k] == null) m[k] = tm[k]; });   // masonMates・cultWolves など、夜の始まりにカードが表になる指示
       return m;
     },
     // 墓荒らし・ドッペルで模倣の人狼を手にしたとき: 仲間の人狼（人狼系共通）＋ 模倣先の情報（共有者の相方・マーリンの人狼・口封じの対象・大狼の墓地・一匹狼の文）。
@@ -264,8 +265,7 @@
         const t = ONW.roleKit.gotTools(c, p, rev, opts), graves = t.seeGraves(t.i);
         c.hold(p.id, `墓地: ${graves.map(([j, cr]) => `${j + 1}枚目「${rn(cr)}」`).join(" ")}`);
         if (r) r.peek = graves.map(([j, cr]) => ({ k: `g:${j}`, role: cr }));
-      } else if (mr === "lone_wolf") {   // 一匹狼を模倣: 仲間は見えたまま、文だけ出る
-        c.hold(p.id, "あなたは一匹狼です。誰も見えず、誰からも見えません。");
+      } else if (mr === "lone_wolf") {   // 一匹狼を模倣: 仲間は見えたまま（文は出さない）
       } else if (td && td.got && td.got !== K.got && !(ONW.SELF_AS_WOLF || []).includes(mr) && !(ONW.SELF_AS_VILLAGER || []).includes(mr)) {
         quietLogs(g, () => td.got(c, p, mr, rev, opts), p.id);   // 共有者・マーリン・口封じの狂人など（模倣した能力の夜ログは夜行動結果に残す）
       }

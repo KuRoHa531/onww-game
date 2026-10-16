@@ -68,7 +68,7 @@ window.ONW = window.ONW || {};
         ...(res.slides || []).map((x) => [T("ペンギン: ", C.info), T(`${x.by} に投票した ${(x.voters || []).join("・")} の${x.w}票は、${x.to} へ滑りました。`)])],
       [...(res.watchdogs || []).map((x) => [T("番犬: ", C.info), T(`${x.by} の飼い主は ${x.owner} です。${x.bite ? `${x.by} が ${x.owner} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${x.owner} への ${x.votes}票は無効でした。` : ""}${x.back ? "ネコカボチャに噛み返されました。" : ""}`)])],
       [...(res.sheriffs || []).filter((x) => x.info).map((x) => [T("保安官: ", C.info), T(`${x.by} が ${x.target} を撃った結果: ${x.info}`)])],
-      [...(res.prankster ? [[T("愉快犯: ", C.info), T(`適用された愉快犯は ${res.prankster.name} です。選んだ人は ${res.prankster.target} でした。`)], [T("愉快犯の条件: ", C.info), T(`${res.prankster.label}（${res.prankster.success ? "成立" : "不成立"}）`)]] : [])],
+      [...(res.prankster ? [[T("愉快犯: ", C.info), T(`${res.prankster.name} が適用されました。対象は ${res.prankster.target} です。`)], [T("[条件] ", C.info), T(`${res.prankster.label}（${res.prankster.success ? "成立" : "不成立"}）`)]] : [])],
       [...(res.servants || []).map((q) => [T("従者: ", C.info), T(`${q[0]} のご主人は ${q[1]} です。`)])],
       [...(res.muzzles || []).map((x) => [T("口封じの狂人: ", C.info), T(`${x.by} は ${x.target} を口封じしました。`)])],
       [...(res.mimics || []).map((x) => [T("模倣の人狼: ", C.info), T(`${x.by} は ${x.grave ? "墓地から引いたあと " : ""}${x.role} の能力を模倣していました。`)])],

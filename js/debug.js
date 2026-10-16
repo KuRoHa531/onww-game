@@ -157,7 +157,7 @@ window.ONW = window.ONW || {};
     // 最終結果と同じシート（勝敗・役職履歴・墓地・夜行動結果・昼行動結果・役職情報）を、いまの状態で試合が終わったとしたときのデータで出す。投票結果の欄は出さない
     let res = null;
     try { res = ONW.net.previewResult(); } catch (e) { res = null; }
-    if (res) return `<p class="night-step__hint">いま試合が終わったとしたときの最終結果です（勝敗・投票結果は出していません。自動で更新されます。投票・選択がまだのところは、投票なし・ランダムで仮に決めています）。</p><div class="dbg-result">${ONW.ui.resultSheetHtml(g, res, { preview: true })}</div>${(res.info || []).length ? `<div class="dbg-h">情報確認（全員）</div><div class="dbg-rinfo">${ONW.ui.resultInfoHtml(res)}</div>` : ""}`;
+    if (res) return `<div class="dbg-result">${ONW.ui.resultSheetHtml(g, res, { preview: true })}</div>${(res.info || []).length ? `<div class="dbg-h">情報確認（全員）</div><div class="dbg-rinfo">${ONW.ui.resultInfoHtml(res)}</div>` : ""}`;
     // 作れなかったとき（簡易表示。原因も出す）
     const why = ONW.net.previewError ? `<p class="night-step__hint">最終結果を作れなかったので簡易表示です（${esc(ONW.net.previewError)}）。</p>` : "";
     const dead = new Set([...(g.deadIds || []), ...(g.executed || []), ...(g.eliminated || [])]);
@@ -438,9 +438,11 @@ window.ONW = window.ONW || {};
     // 中身が同じなら描き直さない（描き直すとボタンが入れ替わって、押している最中のタップが無効になる）。描き直すときはスクロール位置を保つ
     if (root.dataset.sheet === sheet) return;
     const bd = root.querySelector(".dbg-body"), keep = bd ? bd.scrollTop : 0, same = bd && root.dataset.tab === tab[0];
+    const tb0 = root.querySelector(".dbg-tabs"), keepX = tb0 ? tb0.scrollLeft : 0;   // タブの横スクロール位置も保つ（結果確認は1秒ごとに描き直すため）
     root.dataset.sheet = sheet; root.dataset.tab = tab[0];
     root.innerHTML = sheet;
     if (same && keep) { const nb = root.querySelector(".dbg-body"); if (nb) nb.scrollTop = keep; }
+    if (keepX) { const nt = root.querySelector(".dbg-tabs"); if (nt) nt.scrollLeft = keepX; }
   };
 
   // ---- 操作 ----

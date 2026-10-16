@@ -89,7 +89,7 @@
     groups: { wolf: 8.7, "transform:dark_avatar": 9.2 },
     nightMsg: K.nightMsg, got: K.got, soberPeek: K.soberPeek,
     // 酔い覚め: 仲間の人狼（人狼系共通）＋ 昼能力が使えること（覚めたあとに使える。酔い中は canUse が弾く）
-    soberLines(c, id, fin) { return [...K.soberLines(c, id, fin), "昼の議論中に、昼能力ボタンから対象1人の最終役職を見抜けます（1回だけ）。"]; },
+    soberLines: K.soberLines,   // 昼能力が使えることの説明は出さない（心眼の人狼になった時点で昼能力があるのは自明）
     // 昼の演出(stage.js の flashes("early") が g.mindFlash を渡す): 見抜いた相手のカードが占い師のようにめくれ、最終役職の面で数秒開いて裏に戻る。観戦者には出さない
     stageFlash: {
       field: "mindFlash", when: "early",

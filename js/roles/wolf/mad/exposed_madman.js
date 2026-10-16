@@ -21,7 +21,7 @@
     if (g.exposeAnnounced) delete g.exposeAnnounced[p.id];
     i.mode = "expose"; i.target = t.id;
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を暴露の対象に選びました。`);
-    n.hold(p.id, `${t.name} を暴露の対象に選びました。昼の始まりに、その人の最終役職が全員に公開されます。`);
+    n.hold(p.id, `${t.name} を暴露の対象に選びました。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
   }
@@ -95,7 +95,7 @@
         g.exposeTargets[p.id] = t;
         delete (g.exposeAnnounced || {})[p.id];
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} を暴露の対象に選びました。`);
-        c.hold(p.id, `${c.nameOf(t)} を暴露の対象に選びました。昼の始まりに、その人の最終役職が全員に公開されます。`);
+        c.hold(p.id, `${c.nameOf(t)} を暴露の対象に選びました。`);
         ONW.observeNote(g, p.id, [t]);
         ONW.newsNote(g, "exposed_madman");
       },
@@ -109,7 +109,7 @@
         g.exposeTargets[id] = t;
         delete (g.exposeAnnounced || {})[id];
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を暴露の対象に選びました。`);
-        return { lines: [`${c.nameOf(t)} を暴露の対象に選びました。昼の始まりに、その人の最終役職が全員に公開されます。`], reveal: null, nextChain: null };
+        return { lines: [`${c.nameOf(t)} を暴露の対象に選びました。`], reveal: null, nextChain: null };
       },
     },
   });

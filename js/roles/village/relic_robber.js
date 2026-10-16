@@ -23,7 +23,6 @@
     // 交換後の役職に夜行動があれば、朝に使う（runNight の "morning" 段階）
     const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を使う
     i.pendingChain = ONW.cpu.chainRoles("relic_robber").includes(ga) ? ga : null;
-    if (i.pendingChain) n.hold(p.id, `新しい役職（${n.rn(ga)}）の能力を、朝のうちに使えます。`);
     n.ob(p.id, [], [idx]);
     n.nn("relic_robber");
   }
@@ -100,7 +99,7 @@
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
         hold(p.id, `墓地${i + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
         const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を朝のうちに使える（ga = 使う能力の役職。「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
-        if (ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; hold(p.id, `新しい役職（${rn(ga)}）の能力を、朝のうちに使えます。`); }
+        if (ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; }
         rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "relic", target: i, role: ONW.shownRole(got) });
         ONW.observeNote(g, p.id, [], [i]);
         ONW.newsNote(g, "relic_robber");

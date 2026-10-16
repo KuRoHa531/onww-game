@@ -46,7 +46,7 @@
       const ids = sees(g, p.id), names = ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
       return {
         text: ids.length ? `人狼: ${names.join("、")}` : "人狼はいません。",
-        text2: "あなたがアサシンに選ばれると、人狼陣営の逆転勝利になります。マーリンCOはしないでください。",
+        note: "あなたがアサシンに選ばれると、人狼陣営の逆転勝利になります。マーリンCOはしないでください。",
         cultWolves: ids.length ? ids : null,   // 夜の始まりに、そのカードが表になって🐺が出る
       };
     },
