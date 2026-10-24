@@ -100,7 +100,7 @@
         c.hold(p.id, `${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
         const ml = ONW.mimic.takenLine(g, p.id, got, rn); if (ml) c.hold(p.id, ml);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
         c.rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "swap", target: t, role: ONW.shownRole(got) });
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "robber");
         ONW.newsNote(g, "robber");
       },
     },

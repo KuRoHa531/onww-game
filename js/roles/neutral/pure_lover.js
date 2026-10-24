@@ -124,7 +124,7 @@
         ONW.setRoleBound(g, "pureLoverTargets", p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を恋人に選びました。`);
         c.hold(p.id, `${nameOf(t)} を恋人に選びました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "pure_lover");
         ONW.newsNote(g, "pure_lover");
         ONW.pureLover.seen(g, p.id, t);
         c.rev[p.id] = heartReveal(t);   // 朝、選んだ人のカードがハートでめくれる

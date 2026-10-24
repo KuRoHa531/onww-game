@@ -66,7 +66,7 @@
   function overwrite(g, t, role) {
     const card = ONW.cardAt(g, t), changed = g.currentRoles[t] !== role;
     g.currentRoles[t] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen"].forEach((k) => { if (g[k]) delete g[k][t]; });
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen", "senseSeerTarget", "senseSeerSeen"].forEach((k) => { if (g[k]) delete g[k][t]; });
     if (g.shufflerMarks) delete g.shufflerMarks[card];   // シャッフラーの印も消える
     if (g.drunkOverlay) delete g.drunkOverlay[t];        // 酔っ払い(重複役職)も消える
     if (g.drunkRevealed) delete g.drunkRevealed[t];
@@ -234,7 +234,7 @@
         g.eraserWolfTarget[p.id] = t;
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} を抹消対象にしました。`);
         c.hold(p.id, `${c.nameOf(t)} を抹消対象にしました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, c.eff(p));
         ONW.newsNote(g, c.eff(p));
       },
     },

@@ -157,7 +157,7 @@
         setPick(g, p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を選びました。`);
         c.hold(p.id, `${nameOf(t)} を対象に選びました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "prankster");
         ONW.newsNote(g, "prankster");
       },
     },

@@ -16,6 +16,11 @@
   /** 女王の通知文（本家の「女王通知」と同じ文言） */
   ONW.queenNoticeText = (name) => `${name} は女王です。`;
 
+  /** 女王が夜の始まりに知る姫君（初期役職の時点で姫君だった人。共有者の相方と同じ考え方。模倣の人狼は模倣先で見る）。id 自身は除く */
+  const princessIds = (g, id) => g.players.filter((q) => q.id !== id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === ONW.ROLE.PRINCESS).map((q) => q.id);
+  const princessText = (g, ids, none) => ids.length ? `姫君: ${ids.map((i) => (g.players.find((q) => q.id === i) || {}).name || "?").join("、")}` : none;
+  const cpuPrincess = (g, id, k) => princessIds(g, id).forEach((q) => { k.infoOf(g, id).known[q] = "princess"; });   // CPU: 姫君を知る
+
   const logs = (g, ids) => ids.map((qid) => ONW.queenNoticeText((g.players.find((q) => q.id === qid) || {}).name));
   /** 再入室用: この人にすでに知らせた女王（今も女王のカードを持っている人だけ） */
   const seenOf = (g, id) => ((g.queenSeen || {})[id] || []).filter((q) => ONW.isQueenCard(ONW.mimic.eff(g, q)));
@@ -52,6 +57,28 @@
   ONW.defineRole("queen", {
     // 結果発表の演出(stage.js の startResult が引く): 王国滅亡 — 女王が追放・道連れで倒れたあと、他の村人陣営のカードが全員同時にめくれる
     stageResult: {
+      // 先代女王（姫君が昇格して女王でなくなった席。docs/princess.md）: 昼中に継承済み・待機時間の昇格で墓地にいた女王は、最初から「先代女王」の面でめくれる（res.former の direct / graves）
+      intro: { order: 30, run(R) {
+        const f = R.res.former || {};
+        (f.direct || []).forEach((id) => { R.fqv[R.P(id)] = (f.labels || {})[id] || true; });
+        (f.graves || []).forEach((i) => { R.fqv[`g:${i}`] = true; });
+      } },
+      // 結果発表で倒れて姫君が継承した女王（res.former.two）: 女王の面でめくれたあと、呪われし者・猫のように一度裏へ戻り、もう一度めくれて「先代女王」になる
+      flipped: { order: 22, run(R, hs, at) {
+        const two = new Set((R.res.former || {}).two || []), cs = hs.filter((h) => h.role === "queen" && two.has(h.id));
+        const { later, setCap, esc, paint, G, P } = R, CAP = (n, line) => `<div class="res-cap__t t-village">先代女王</div><div>${esc(n)} ${line}</div>`;
+        let extra = 0;
+        cs.forEach((h) => {
+          const k = P(h.id);
+          const lab = ((R.res.former || {}).labels || {})[h.id] || "先代女王";
+          if (R.noFlip.has(h.id)) { R.fqv[k] = lab; return; }   // ギロチンなどで割れるカードは裏返さず、最初から先代女王で見せる
+          extra = 2300;
+          later(() => { setCap(CAP(h.name, "のカードが…")); delete R.up[k]; paint(G()); }, at + 1500);
+          later(() => { R.fqv[k] = lab; R.up[k] = "queen"; setCap(CAP(h.name, `は姫君に王位を継ぎ、${lab}になりました`)); paint(G()); }, at + 1500 + 1700);
+        });
+        return extra;
+      } },
+      skip(R) { const f = R.res.former || {}; [...(f.direct || []), ...(f.two || [])].forEach((id) => { R.fqv[R.P(id)] = (f.labels || {})[id] || true; }); (f.graves || []).forEach((i) => { R.fqv[`g:${i}`] = true; }); },   // スキップ時は最終形（先代女王の面）
       kingdom: { order: 10, run(R) {
         const { res, P, kingdom, later, setCap, esc, paint, G, dead, shin, badge, up, lovOn } = R;
         if (!kingdom.length) return;
@@ -77,6 +104,7 @@
     },
     // 昼に酔いが覚めた村人陣営: 女王のカードが表になる（♛女王の札つき）。stage.js の soberPeek の並び: 共有者 → 処刑人 → 従者 → 女王
     stageSober: { list: { order: 40, run(sp, list, SK, fx) {
+      (sp.princesses || []).forEach((id) => list.push([`p:${id}`, "princess", true]));   // 酔いが覚めた女王: 姫君のカードがめくれる
       (sp.queens || []).forEach((id) => list.push([`p:${id}`, "queen", true]));
       const qset = new Set((sp.queens || []).map((id) => `p:${id}`));
       fx.push({
@@ -92,6 +120,27 @@
       return out;
     },
     cpuNotice(g, id, queenIds, k) { const i = k.infoOf(g, id); queenIds.forEach((q) => { i.known[q] = "queen"; }); },   // CPU: 女王を知らされた(村人陣営として、女王には投票しない)
+    // 夜の演出(stage.js が g.princessReveal を受け取って 700ms 後に呼ぶ): 夜の始まりに姫君のカードが順に表になる → 夜時間の間ずっと開いたまま（共有者の相方と同じ形）
+    stageNight: {
+      order: 45, field: "princessReveal",
+      run(ids, SK) {
+        const { later, paint, G } = SK;
+        ids.forEach((id, i) => later(() => { const k = `p:${id}`; if (G().phase !== ONW.PHASE.ONLINE_NIGHT) return; SK.up[k] = "princess"; SK.glow[k] = true; if (SK.loveMate && id === SK.loveMate.id) SK.lov[k] = true; if (!SK.nightKeys.includes(k)) SK.nightKeys.push(k); paint(G()); }, i * 380));
+      },
+    },
+    cpuInit: cpuPrincess, cpuLearn: cpuPrincess,   // CPU: 夜に姫君を知る（女王で始まったとき / 酔い覚め・墓荒らし・ドッペルで女王を手にしたとき）
+    nightMsg(c, p) {
+      const g = c.g, ids = princessIds(g, p.id);
+      return { text: princessText(g, ids, "姫君はいません。"), princessMates: ids.length ? ids : null };   // 夜の始まりに、姫君のカードが表になる（夜が終わるまで出続ける）
+    },
+    got(c, p, got, rev, opts) {
+      const t = ONW.roleKit.gotTools(c, p, rev, opts), g = c.g, ids = princessIds(g, p.id);
+      c.hold(p.id, princessText(g, ids, "姫君はいません。"));   // 墓荒らし・ドッペル: 夜の始まりに見えるはずだった姫君が朝に分かる
+      t.both(t.eff());
+      t.setPeek(ids.map((id) => ({ k: `p:${id}`, role: "princess" })), 380);
+    },
+    soberLines(c, id) { return [princessText(c.g, princessIds(c.g, id), "姫君はいません。")]; },
+    soberPeek(c, id) { const ids = princessIds(c.g, id); return ids.length ? { princesses: ids } : {}; },
     info: { deck: 46, name: "女王", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17,
       desc: "村人陣営。夜の能力はありません。朝のあとの待機時間に、最終盤面で村人陣営になっていて酔いが覚めている人にだけ、女王のカードが表になって誰が女王か知らされます（人狼陣営・第三陣営には知らされません。恋人でも最終役職が村人陣営なら知らされます）。女王が追放または道連れで倒れると「王国滅亡」: 他の村人陣営（チキン・恋人になっている人も含む）のカードが一斉にめくれ、勝利条件を失います。女王と人狼判定の者が同時に倒れたときは勝者なし、人狼判定の者が倒れていなければ人狼陣営の勝利です。" },
     groups: { "transform:light_apostle": 19 },

@@ -1,7 +1,7 @@
 /**
  * 蜃気狼（マイクラ版 MIRAGE_WOLF を参考）: 人狼陣営の「人狼系」。白狼と同じ作りで、占われたときの見え方だけが「村人」ではなく「ランダムな役職」になる。
  *   夜は人狼と同じく仲間の人狼が分かり、人狼判定・勝利条件・追放・保安官の判定なども人狼と同じ（白狼のように村人扱いにはならない。マイクラ版と同じ）。
- *   占い師・狂った占い師（占い師と同じ処理）・心眼の人狼からは「盤面にあり得るランダムな役職」に見える。自分が何に見えるかは本人にも分からない。
+ *   占い師・狂った占い師（占い師と同じ処理）・心眼の人狼・感覚の占い師からは「盤面にあり得るランダムな役職」（感覚の占い師には、その役職の気配）に見える。自分が何に見えるかは本人にも分からない。
  *   墓地にあっても発動する（墓地の蜃気狼を占っても、ランダムな役職に見える）。模倣の人狼が蜃気狼を模倣しているときも同じ。
  *
  * ランダムの出し方（マイクラ版と同じ）:
@@ -9,15 +9,16 @@
  *     占い師が盤面に1枚しかないときだけ、占い師は出ない（占い師の結果に「占い師」と出ると占い師本人が分かってしまうため。2枚以上あるときは出る）。
  *     墓地を複数枚占っても、蜃気狼の枚ごとに別々に引く。同じ1回の占いの中で結果が変わらないよう、1回の占いにつき1回だけ引く（seer.js）。
  *   ・心眼の人狼（昼・最終役職を見抜く）: 配役直後・最終盤面・墓地に出てくる役職の種類から等確率で1つ引く。光の使徒・闇の化身・銀色の影は出ない（マイクラ版 randomMirageVisibleRole）。
- *   ・「占い師・指読み・心眼の人狼・感覚の占い師・偽占い師」のうち、Web版にあるのは 占い師・狂った占い師・心眼の人狼。偽占い師は Web版に無いので「必ず蜃気狼に見える」は未対応。
+ *   ・「占い師・指読み・心眼の人狼・感覚の占い師・偽占い師」のうち、Web版にあるのは 占い師・狂った占い師・心眼の人狼・感覚の占い師。偽占い師は Web版に無いので「必ず蜃気狼に見える」は未対応。
  *
  * 実装の場所:
  *   ・占われ方の差し替え: ONW.mimic.seerSeen（mimic_wolf.js）が ONW.mirage.isMirageCard で判定 → ONW.mirage.seerRole で引く
  *   ・心眼の人狼: mind_wolf.js の apply が ONW.mirage.dayRole で引く
+ *   ・感覚の占い師: sense_seer.js の judge が ONW.mirage.dayRole で引き、その役職の気配（村人 / 人狼 / 狂っている / 第三陣営）に見える（恋人の判定は飛ばす）
  *   ・勝敗の優先度: 人狼系は基本勝敗のまま（docs/victory-priority.md の表に新しい行は不要）
  *
  * 実績（wiki に定義済みの5種）: ONW.mirage.achievements が返す（Web版にはまだ実績を保存する仕組みが無いので、「この試合で満たした実績ID」を返すだけ）。
- *   mirage_wolf_inspected = 蜃気狼で占い師/狂った占い師/心眼の人狼に確認された（g.mirageInspections[蜃気狼の人のID] に記録）。mirage_wolf_fake_seer（偽占い師）は Web版に偽占い師が無いので出ない。
+ *   mirage_wolf_inspected = 蜃気狼で占い師/狂った占い師/心眼の人狼/感覚の占い師に確認された（g.mirageInspections[蜃気狼の人のID] に記録）。mirage_wolf_fake_seer（偽占い師）は Web版に偽占い師が無いので出ない。
  */
 (function (ONW) {
   const K = ONW.wolfKit;
@@ -43,7 +44,7 @@
       .filter((r) => r && !DAY_BLOCKED.has(r)))];
     return kinds.length ? kinds[Math.floor(Math.random() * kinds.length)] : R_().VILLAGER;
   }
-  /** 「蜃気狼に確認された」記録（実績 mirage_wolf_inspected 用）。key がプレイヤーのときだけ（墓地は記録しない）。kind: "seer" | "mind_wolf" */
+  /** 「蜃気狼に確認された」記録（実績 mirage_wolf_inspected 用）。key がプレイヤーのときだけ（墓地は記録しない）。kind: "seer" | "mind_wolf" | "sense_seer" */
   function noteInspect(g, key, kind) {
     if (!g || typeof key !== "string" || key.startsWith("g:")) return;
     g.mirageInspections = g.mirageInspections || {};
@@ -63,7 +64,7 @@
 
   ONW.defineRole("mirage_wolf", {
     info: { deck: 71, name: "蜃気狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.59,
-      desc: "人狼陣営。占い師・狂った占い師・心眼の人狼からは、盤面にあり得るランダムな役職に見えます。自分が何に見えるかは分かりません。墓地でも発動します。相方や狂信者からは人狼として見えます。" },
+      desc: "人狼陣営。占い師・狂った占い師・心眼の人狼・感覚の占い師からは、盤面にあり得るランダムな役職に見えます。自分が何に見えるかは分かりません。墓地でも発動します。相方や狂信者からは人狼として見えます。" },
     // 占われたときの見え方は固定の役職ではなくランダム（ONW.mimic.seerSeen が ONW.mirage を見て差し替える）。seerSees は書かない（書くと本当の役職＝蜃気狼が見えてしまう）
     groups: { wolf: 8.9, "transform:dark_avatar": 9.4 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek });

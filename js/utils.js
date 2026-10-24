@@ -152,12 +152,14 @@ window.ONW = window.ONW || {};
       switch (d.t) {
         case "role": out.role = d.role || null; out.from = d.from || null; break;
         case "night": add(d.text, d.text2, d.loveText, d.lines || []); break;
-        case "morning": case "settle": case "queenup": add(d.logs || []); break;
+        case "morning": case "settle": case "queenup": case "crownup": add(d.logs || []); break;
         case "sober": out.soberRole = d.role || null; add(d.lines || []); break;
         case "ack": add(d.lines || []); break;
         case "muzzle": add(d.text); break;
+        case "poetday": add("【詩人通知】", (d.lines && d.lines.length) ? d.lines : ["対象を選ぶ夜能力は使われていませんでした。"]); break;
         case "observeday": add("【観測通知】", (d.lines && d.lines.length) ? d.lines : ["観測できる夜能力はありませんでした。"]); break;
-        case "sealday": case "insomday": case "jobcut": case "servantday": case "jobday": case "mindday": case "sheriffdone": case "thiefdone": add(d.text); break;
+        case "sealday": case "insomday": case "jobcut": case "servantday": case "jobday": case "mindday": case "senseday": case "sheriffdone": case "thiefdone": add(d.text); break;
+        case "libradone": if (d.a && d.b) add(ONW.libra.doneText(d.a, d.b)); break;   // 天秤が昼に2人を選んだ結果
         case "exchdone": if (d.a && d.b) add(`${d.a} と ${d.b} の票数を入れ替えます。`); break;   // mindday: 心眼の人狼が昼に見抜いた結果
         default: break;
       }

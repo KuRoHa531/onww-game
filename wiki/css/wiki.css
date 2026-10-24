@@ -266,3 +266,36 @@ body.is-embed { min-height: 0; }
 .is-embed .onw-header__day { padding: 3px 12px; font-size: 12px; min-width: 0; }
 .is-embed .onw-app { padding: 12px 12px 40px; }
 .is-embed .wiki-controls { padding: 14px; }
+
+/* ---- 闇鍋シナジー(wiki/synergy.html) ---- */
+.syn-h { font-family: var(--font-display); font-size: 15px; color: var(--gold); margin: 0 0 8px; }
+.syn-h--sec { margin: 14px 2px 6px; font-size: 14px; color: var(--gold-dim); }
+.syn-card { padding: 12px 14px; }
+.syn-row { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.syn-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.syn-col--grow { flex: 1 1 200px; }
+.syn-label { font-size: 11px; color: var(--ink-dim); }
+.syn-arrow { align-self: center; color: var(--gold-dim); font-size: 18px; }
+.syn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.syn-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-panel-raised); font-size: 13px; color: var(--ink); }
+.syn-chip--village { border-color: var(--village); }
+.syn-chip--wolf { border-color: var(--wolf); }
+.syn-chip--third { border-color: var(--tanner); }
+.syn-pri { margin-left: 4px; padding: 0 6px; border-radius: 6px; font-size: 10px; background: var(--gold-dim); color: var(--bg-night); }
+.syn-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--ink-dim); }
+.syn-always { font-size: 13px; color: var(--ink); }
+.syn-flags { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.syn-flag { padding: 1px 8px; border: 1px dashed var(--gold-dim); border-radius: 6px; font-size: 11px; color: var(--gold-dim); }
+.syn-more summary { cursor: pointer; font-size: 12.5px; color: var(--gold-dim); margin-bottom: 6px; }
+
+/* ページ切り替え(単体表示のときだけ。ゲーム内ではタブで切り替えるので隠す) */
+.wiki-nav { display: flex; gap: 8px; padding: 10px 14px 0; max-width: 960px; margin: 0 auto; }
+.wiki-nav__link { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-panel); color: var(--ink-dim); font-size: 13px; text-decoration: none; }
+.wiki-nav__link.on { color: var(--bg-night); background: var(--gold-dim); border-color: var(--gold-dim); }
+.is-embed .wiki-nav { display: none; }
+
+/* 全シナジー: 陣営ごとの開閉 */
+details.syn-team > summary.syn-h--sec { cursor: pointer; list-style: none; padding: 6px 2px; user-select: none; }
+details.syn-team > summary.syn-h--sec::-webkit-details-marker { display: none; }
+details.syn-team > summary.syn-h--sec::before { content: "▶"; display: inline-block; margin-right: 6px; font-size: 11px; transition: transform .15s; }
+details.syn-team[open] > summary.syn-h--sec::before { transform: rotate(90deg); }

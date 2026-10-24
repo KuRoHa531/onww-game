@@ -185,7 +185,7 @@
         const act = toggle(g, p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${lineOf(g, t, act)}`);
         c.hold(p.id, lineOf(g, t, act));
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "keymaster");
         ONW.newsNote(g, "keymaster");
         void nameOf;
         c.rev[p.id] = { kind: "key", mode: act, ids: [t] };   // 朝: 選んだ人のカードが 🔓→🔑→🔒（解除は 🔒→🔑→🔓）でめくれる

@@ -138,7 +138,7 @@
         setTarget(g, p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を破局対象に選びました。`);
         c.hold(p.id, `${nameOf(t)} を破局対象に選びました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "heartbreaker");
         ONW.newsNote(g, "heartbreaker");
       },
     },

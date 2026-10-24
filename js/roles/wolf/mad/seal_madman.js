@@ -99,7 +99,7 @@
       hold(h, sealLine(g, t));
       if (rv) rv(h, ONW.seal.revealPut(t));       // 3of4d: 封印に成功した封印の狂人は、封印した相手のカードにお札が貼られる
       ONW.newsNote(g, roleOfNews(g, h));          // 新聞・観測は、封印に成功した分だけ
-      ONW.observeNote(g, h, [t]);
+      ONW.observeNote(g, h, [t], null, roleOfNews(g, h));
       done.push({ holder: h, target: t, ok: true });
     }
     return done;
@@ -158,7 +158,7 @@
     c.result = SEALED_CLAIM(); c.extra = null;
     return true;
   }
-  const RESULT_KINDS = ["seer", "robber", "relic", "doppel", "troublemaker", "watchdog", "keymaster", "mind"];   // 結果を言う申告（封印されていたら結果は出ないので、封印された人が言えば嘘）
+  const RESULT_KINDS = ["seer", "robber", "relic", "doppel", "troublemaker", "watchdog", "keymaster", "mind", "sense", "poet"];   // 結果を言う申告（封印されていたら結果は出ないので、封印された人が言えば嘘）
   /** CPUの投票の加点（cpu.js scoreVote が全員の分を足す。p=投票するCPU / q=投票先の候補）。
    *   封印の狂人CO・「〇〇を封印しました」の申告は人狼陣営の申告。自分が本当に封印されていれば、自分を封印したと言う人は本物の封印の狂人、
    *   封印されていないのに自分を封印したと言う人は嘘つき。封印の狂人が配役にいないのに「封印されていました」と言う人も嘘 */

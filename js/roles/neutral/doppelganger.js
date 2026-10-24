@@ -35,7 +35,7 @@
     if (isNonVillage(dn)) { const lie = nonVillageLie(g, p, "doppelganger", i, dn); c.co = lie.co; c.result = lie.result; }
     else {
       c.result = { short: `${dt} → ${rn(dn)}`, text: `${dt} をコピーして ${rn(dn)} になりました。`, claim: { kind: "doppel", target: i.doppel.target, role: dn } };
-      if ((dn === "seer" || dn === "mad_seer") && i.mode === "player") c.extra = { short: `${nameOf(g, i.target)} → ${rn(i.known[i.target])}`, text: `${nameOf(g, i.target)} を占って ${rn(i.known[i.target])} でした。`, claim: { kind: "seer", target: i.target, role: i.known[i.target] } };   // コピーした占い師の結果も続けて言う
+      if ((dn === "seer" || dn === "mad_seer" || dn === "fake_seer") && i.mode === "player") c.extra = { short: `${nameOf(g, i.target)} → ${rn(i.known[i.target])}`, text: `${nameOf(g, i.target)} を占って ${rn(i.known[i.target])} でした。`, claim: { kind: "seer", target: i.target, role: i.known[i.target] } };   // コピーした占い師の結果も続けて言う
     }
   }
   function fakeGot(k, g, i, role) {
@@ -112,7 +112,7 @@
         const t = c.selOf(p).players[0]; if (!t || t === p.id || !g.players.some((q) => q.id === t)) return;
         if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中ならコピー失敗。新聞・観測にも載らない
         const seen = g.currentRoles[t], got = ONW.copyRole(g, t, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "doppelganger");
         ONW.newsNote(g, "doppelganger");
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${nameOf(t)} をコピーし、${rn(got)} になりました。`);
         c.hold(p.id, `${nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);

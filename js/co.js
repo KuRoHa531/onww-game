@@ -79,8 +79,23 @@ window.ONW = window.ONW || {};
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
     if (kind === "love") return set({ step: "love", kind, chain });
+    if (kind === "poet") return set({ step: "poetrole", kind, chain });
     return set({ step: "target", kind, chain });
   }
+  // 詩人の結果開示（マイクラ版どおり: 使われていた役職を選ぶ → 対象を選ぶ（2人を対象にする役職は2人）/ 「情報がなかった」）
+  const POET_SKIP = ["poet", "relic_robber"];   // 墓荒らしは墓地だけを対象にするので詩人には伝わらない
+  const poetRoleList = () => deckList().filter((x) => !POET_SKIP.includes(x.r) && (ONW.roleDef(x.r) || {}).night);   // 夜に対象を選ぶ能力を持つ役職
+  co.poetRole = (role) => set({ step: "poettgt", kind: "poet", role, sel: [], chain: (G().co || {}).chain });
+  co.poetBack = () => set({ step: "poetrole", kind: "poet", chain: (G().co || {}).chain });
+  co.poetNone = () => { const h = hookOfKind("poet"); done(h.noneText, { kind: "poet", none: true }, null, "disclose", "能力の使用なし"); };
+  const poetName = (id) => (id && id === ONW.net.myId() ? (G().myName || "?") : nameOf(id));   // 詩人の結果開示は、自分もふつうにプレイヤー名で言う
+co.poetPick = function (id) {
+    const s = G().co, h = hookOfKind("poet"), need = h.twoRoles.includes(s.role) ? 2 : 1;
+    const sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
+    if (sel.length < need) return set({ ...s, sel });
+    const names = sel.map(poetName);
+    done(h.coText(s.role, names), { kind: "poet", role: s.role, targets: sel }, null, "disclose", `${rn(s.role)} → ${names.join("・")}`);
+  };
   co.pickLove = (id) => done(...hookOfKind("love").pickLove(id, K));
   co.pickRelicGrave = (i) => set({ step: "rrole", kind: "relic", idx: i, chain: (G().co || {}).chain });
   co.relicRole = function (role) {
@@ -219,7 +234,7 @@ window.ONW = window.ONW || {};
         Array.from({ length: G().graveCount || 0 }, (_, i) => (s.sel.includes(i) ? "" : btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`))).join("") + back;
     } else if (s.step === "prole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">${pn(nameOf(s.target))} ${(hookOfKind(s.kind) || {}).roleHint || "の結果役職"}を選んでください。</p>` + (((hookOfKind(s.kind) || {}).roleList) ? hookOfKind(s.kind).roleList().map((r) => btn(rc(r), `ONW.co.pickRole('${r}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : roleBtns("pickRole", btn("伏せる", "ONW.co.pickRole('hide')"))) + back;   // roleList: 配役ではなく、その役職固有の一覧から選ぶ結果開示（シャッフラーの山札）
+      body = `<p class="night-step__hint">${pn(nameOf(s.target))} ${(hookOfKind(s.kind) || {}).roleHint || "の結果役職"}を選んでください。</p>` + (((hookOfKind(s.kind) || {}).optionList) ? hookOfKind(s.kind).optionList().map((o) => btn(`<span class="t-${o.team}">${esc(o.label)}</span>`, `ONW.co.pickRole('${o.id}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : ((hookOfKind(s.kind) || {}).roleList) ? hookOfKind(s.kind).roleList().map((r) => btn(rc(r), `ONW.co.pickRole('${r}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : roleBtns("pickRole", btn("伏せる", "ONW.co.pickRole('hide')"))) + back;   // roleList: 配役ではなく、その役職固有の一覧から選ぶ結果開示（シャッフラーの山札）
     } else if (s.step === "grole") {
       title = "結果開示";
       body = `<p class="night-step__hint">墓地${s.sel[s.k] + 1} の役職を選んでください。</p>` + roleBtns("graveRole") + back;
@@ -250,6 +265,15 @@ window.ONW = window.ONW || {};
       body = `<p class="night-step__hint">他に共有者がいたら選んでください。いなければそのまま確定します。${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
         (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.pickMason('${p.id}')`)).join("") +
         btn(s.sel.length ? "この人たちで確定" : "自分だけで確定", "ONW.co.masonDone()") + back;
+    } else if (s.step === "poetrole") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">能力を使われていた役職を選んでください。</p>` + poetRoleList().map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.poetRole('${x.r}')`)).join("") + btn("情報がなかった", "ONW.co.poetNone()") + back;
+    } else if (s.step === "poettgt") {
+      title = "結果開示";
+      const two = (hookOfKind("poet") || { twoRoles: [] }).twoRoles.includes(s.role);
+      body = `<p class="night-step__hint">${rc(s.role)} の能力を使われていた${two ? "2人" : "対象"}を選んでください。${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(poetName(id))).join("、")}）` : ""}</p>` +
+        btn((s.sel.includes(ONW.net.myId()) ? "✓ " : "") + pn(G().myName || "自分"), `ONW.co.poetPick('${ONW.net.myId()}')`) +   // 自分に使われていた結果も言える
+        (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.poetPick('${p.id}')`)).join("") + btn("役職を選び直す", "ONW.co.poetBack()") + back;
     } else if (s.step === "love") {
       title = "結果開示";
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;

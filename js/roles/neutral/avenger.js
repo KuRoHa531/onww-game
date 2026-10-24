@@ -135,7 +135,7 @@
         setTarget(g, p.id, t); seen(g, p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を復讐対象にしました。`);
         c.hold(p.id, `${nameOf(t)} を復讐対象にしました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "avenger");
         ONW.newsNote(g, "avenger");
         c.rev[p.id] = avengerReveal(t);   // 朝、選んだ対象のカードが🔪でめくれる（復讐者本人の画面だけ）
       },

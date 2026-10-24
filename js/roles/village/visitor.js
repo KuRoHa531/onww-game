@@ -102,7 +102,7 @@
         ONW.setRoleBound(g, "visitorTargets", p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を訪問しました。`);
         c.hold(p.id, `${nameOf(t)} を訪問しました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "visitor");
         ONW.newsNote(g, "visitor");
       },
     },

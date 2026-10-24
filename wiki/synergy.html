@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>闇鍋シナジー | ワンナイト人狼ガイド 〜混沌に潜みし狼達〜</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/wiki.css">
+</head>
+<body>
+
+  <div class="moon-glow" aria-hidden="true"></div>
+
+  <header class="onw-header">
+    <h1 class="onw-header__title">
+      <span class="onw-header__title-sub">ONE NIGHT WEREWOLF GUIDE</span>
+      闇鍋シナジー
+    </h1>
+    <div class="onw-header__day" id="syn-count">―件</div>
+  </header>
+
+  <nav class="wiki-nav" aria-label="ガイドのページ">
+    <a class="wiki-nav__link" href="index.html">全役職</a>
+    <a class="wiki-nav__link on" href="synergy.html">闇鍋シナジー</a>
+  </nav>
+
+  <main class="onw-app">
+    <section class="panel wiki-controls">
+      <input
+        id="syn-search"
+        class="wiki-search"
+        type="search"
+        placeholder="役職名で検索（例: 占い師、妖狐、鍵師 …）"
+        autocomplete="off"
+      >
+      <p class="wiki-filter-note" id="syn-source"></p>
+    </section>
+
+
+    <section id="syn-list" class="wiki-list"></section>
+    <p id="syn-empty" class="wiki-empty" hidden>該当するシナジーが見つかりませんでした。</p>
+  </main>
+
+  <footer class="onw-footer">
+    <span>元データ: ゲーム本体 js/roles.js の SYNERGY_RULES / SYNERGY_COUNT_RULES</span>
+  </footer>
+
+  <script src="js/wiki-data.js"></script>
+  <script src="js/synergy-data.js"></script>
+  <script src="js/synergy.js"></script>
+</body>
+</html>

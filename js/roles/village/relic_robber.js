@@ -101,7 +101,7 @@
         const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を朝のうちに使える（ga = 使う能力の役職。「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
         if (ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; }
         rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "relic", target: i, role: ONW.shownRole(got) });
-        ONW.observeNote(g, p.id, [], [i]);
+        ONW.observeNote(g, p.id, [], [i], "relic_robber");
         ONW.newsNote(g, "relic_robber");
         c.gotInfo(g, p, got, rev, { skipGrave: i, both: true, via: `墓地${i + 1} から引いた従者` });
       },

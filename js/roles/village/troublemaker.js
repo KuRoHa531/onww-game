@@ -101,7 +101,7 @@
         const why = ONW.keymaster.gate(g, p.id, [a, b]);   // 鍵師のロック（先の段階で済んでいる）: 自分かどちらかの席がロック中なら失敗。入れ替えず、新聞・観測にも載らない
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a, b], `${rn(c.eff(p))} ${p.name}`, true)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
         g.tmQueue.push({ id: p.id, a, b });
-        ONW.observeNote(g, p.id, [a, b]);
+        ONW.observeNote(g, p.id, [a, b], null, "troublemaker");
         ONW.newsNote(g, "troublemaker");
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         c.hold(p.id, `${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);

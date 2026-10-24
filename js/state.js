@@ -48,8 +48,9 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   /** 本人が見る自分の役職(忘却の人狼・狼憑きは村人、狼夢人は人狼だと思い込んでいる。怪盗・墓荒らし・後覚者で手にしたときも同じ) */
   /** 思い込み系: 本人は別の役職だと思い込んでいる役職。今後増やすときはここに足す(配布の演出で、変化前を本人の自認の陣営の変化役に見せる判定にも使われる) */
   ONW.SELF_AS_VILLAGER = [];   // 本人は村人だと思い込む(groups.selfAsVillager: 忘却の人狼・狼憑き)
+  ONW.SELF_AS_SEER = [];       // 本人は占い師だと思い込む(groups.selfAsSeer: 偽占い師。夜の能力は占い師と同じだが、結果はランダム)
   ONW.SELF_AS_WOLF = [];                                                     // 本人は人狼だと思い込む(相方のいない一人の人狼。groups.selfAsWolf: 狼夢人)
-  ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : role);
+  ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : ONW.SELF_AS_SEER.includes(role) ? ONW.ROLE.SEER : role);
   /** 酔っ払いが重なっていて、まだ酔いが覚めていない人か */
   ONW.hiddenDrunk = (g, id) => !!(g.drunkOverlay && g.drunkOverlay[id] && !(g.drunkRevealed && g.drunkRevealed[id]));
   /** 配布時の恋人の相方のid（なければ null）。恋人(重複役職)は「人」についているので、役職が入れ替わっても相方は変わらない。夜の「〇〇と恋人です」の表示はこれだけを見る */
@@ -72,8 +73,8 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   ONW.deathFollowers = (g, id, kind) => {
     const out = [];
     ONW.loverMates(g, id).forEach((m) => out.push({ id: m, kind: "lovers" }));
-    // 王国滅亡: 女王が昼中に死んだら（死因は問わない）、その場で他の村人陣営も「王国滅亡」で死ぬ（投票のあとの結果発表まで待たない）。女王本人どうしは巻き込まない
-    if (g.currentRoles && g.currentRoles[id] === ONW.ROLE.QUEEN && !(ONW.seal && ONW.seal.is(g, id))) (g.players || []).forEach((q) => { const info = ONW.ROLE_INFO[g.currentRoles[q.id]]; if (q.id !== id && g.currentRoles[q.id] !== ONW.ROLE.QUEEN && info && info.team === ONW.TEAM.VILLAGE && !out.some((o) => o.id === q.id)) out.push({ id: q.id, kind: "queen" }); });
+    // 王国滅亡: 女王が昼中に死んだら（死因は問わない。ほかに生きている女王がいるうちは滅亡しない＝最後の女王が死んだときに滅亡）、その場で他の村人陣営も「王国滅亡」で死ぬ（投票のあとの結果発表まで待たない）。女王本人どうしは巻き込まない。ただし、生きている姫君がいて女王に昇格する（昇格済みの）ときは滅亡しない（ONW.princess.shields。docs/princess.md）
+    if (g.currentRoles && g.currentRoles[id] === ONW.ROLE.QUEEN && !(g.players || []).some((q) => q.id !== id && g.currentRoles[q.id] === ONW.ROLE.QUEEN && !(g.deadIds || []).includes(q.id)) && !(ONW.seal && ONW.seal.is(g, id)) && !(ONW.princess && ONW.princess.shields(g, id))) (g.players || []).forEach((q) => { const info = ONW.ROLE_INFO[g.currentRoles[q.id]]; if (q.id !== id && g.currentRoles[q.id] !== ONW.ROLE.QUEEN && info && info.team === ONW.TEAM.VILLAGE && !out.some((o) => o.id === q.id)) out.push({ id: q.id, kind: "queen" }); });
     if (SERVANT_FOLLOW.includes(kind) || ((kind === "shot" || kind === "tomo") && ONW.sheriff && ONW.sheriff.followsShot(g, id))) ONW.servantSubPairs(g).filter(([s, m]) => m === id && s !== id).forEach(([s]) => out.push({ id: s, kind: "follow" }));
     if (ONW.cupid) ONW.cupid.pairs(g).filter(([a, b, h]) => (a === id || b === id) && h !== id).forEach(([, , h]) => out.push({ id: h, kind: "cupid" }));
     if (ONW.fanatic && (g.currentRoles[id] === ONW.ROLE.FOX || (g.currentRoles[id] === ONW.ROLE.FOX_MARKED && kind === "fox"))) ONW.fanatic.followersOf(g).forEach((f) => out.push({ id: f, kind: "fanatic" }));
@@ -102,7 +103,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       const h = hist.find((q) => q.id === id && q.cause === "chain");
       if (!h) return;
       if (h.sub) rows.push({ k: "chainSub", name: h.name, master: h.sub });
-      else rows.push({ k: "chain", name: h.name, by: h.kind === "queen" ? null : h.by, label: h.kind === "tomo" ? "道連れ" : h.kind === "bite" ? "噛殺" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中" });
+      else rows.push({ k: "chain", name: h.name, by: h.kind === "queen" ? null : h.by, label: ((l) => ((res.bomber && res.bomber.bombers.some((x) => x.id === h.id)) ? `[${l}]→[自爆]` : l))(h.kind === "tomo" ? "道連れ" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : "無理心中") });
     });
     return rows;
   };
@@ -280,6 +281,17 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (ONW.pureLover) ONW.pureLover.note(g, [toId]);
     return role;
   };
+  /** 役職の昇格（姫君→女王）: そのカードの上で役職だけが書き換わる（カードは動かない。copyRole と同じ履歴の積み方）。役職に紐づく記録は役職が変わるだけなので消さない。戻り値: 新しい役職 */
+  ONW.promoteRole = (g, id, role) => {
+    const cd = cards(g);
+    g.currentRoles[id] = role;
+    const t = (g.roleTrail = g.roleTrail || {});
+    (t[id] = t[id] || []).push(role);
+    (cd.trail[id] = cd.trail[id] || []).push(cd.at[id]);   // カードは同じ（役職だけが変わる）
+    ONW.fixServants(g); if (ONW.avenger) ONW.avenger.fix(g); if (ONW.prankster) ONW.prankster.fix(g);
+    if (ONW.pureLover) ONW.pureLover.note(g, [id]);
+    return role;
+  };
   /** シャッフラー: 山札から引いたカード(role)を、toId のカードの上に置く（役職はそのカードの上で書き換わる。カードそのものは動かない）。
    *  byCard = 置いたシャッフラーのカードID。印は g.shufflerMarks[置かれたカードID] = [{ by, role, from, to }, …]（カード単位。カードが動けば印もついていく。複数のシャッフラーが同じカードに置いたら印は重なって全部残る。同じシャッフラーが置き直したときだけ新しい印に置き換わる。上書き（ドッペル・グレムリンのコピー・抹消）で全部消える）。
    *  上書きされた役職に紐づく記録（悪女・キューピッド・破局師・純愛者の選択、各役職のターゲットなど）は消し、新しい役職が従者・処刑人なら新しいご主人・ターゲットが決まる。
@@ -329,12 +341,33 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   };
   /** 観測の人狼用: 夜（と朝のうち）に能力を使った記録。from = 能力を使った人のID、players = 対象のプレイヤーID、graves = 対象の墓地番号(0始まり)。
    *  新聞と同じく、昼に酔いが覚めてからの能力は記録しない（呼ぶ側で判断）。同じ内容は観測結果の文章を作るときにまとめる */
-  ONW.observeNote = (g, from, players, graves) => {
+  ONW.observeNote = (g, from, players, graves, role) => {
     if (!g || !from) return;
     const pl = (players || []).filter(Boolean), gr = (graves || []).filter((x) => Number.isInteger(x));
     if (!pl.length && !gr.length) return;
-    (g.observeLog = g.observeLog || []).push({ from, players: pl, graves: gr });
+    (g.observeLog = g.observeLog || []).push({ from, players: pl, graves: gr, role: role || null });   // role = そのとき使われた役職（詩人の通知用。観測の人狼は使わない。模倣の人狼は模倣先、墓荒らし・ドッペル経由は手にした役職）
   };
+  /** 詩人通知の件数の上限（マイクラ版 poetVisibleRoleLimit の初期値。1〜5） */
+  ONW.POET_LIMIT = 1;
+  /** 詩人通知の文章（マイクラ版 notifyPoetsAtDayStart と同じ形:「〇〇の能力が △△ に使われていました。」）。
+   *  対象が墓地だけの能力は対象外。同じ（役職・対象）は1件にまとめ、ランダムに上限件数ぶん選ぶ。1件もなければ「対象を選ぶ夜能力は使われていませんでした。」 */
+  ONW.poetPick = (g) => {
+    const nm = (id) => ((g.players || []).find((q) => q.id === id) || {}).name || "?";
+    const rn = (r) => ((ONW.ROLE_INFO || {})[r] || {}).name || "?";
+    const evs = [], seen = [];
+    (g.observeLog || []).forEach((e) => {
+      if (!e.players || !e.players.length || !e.role) return;
+      const pl = [...new Set(e.players)], key = e.role + "|" + pl.join(",");
+      if (seen.includes(key)) return;
+      seen.push(key); evs.push({ role: e.role, players: pl, line: `${rn(e.role)}の能力が ${pl.map(nm).join("、")} に使われていました。` });
+    });
+    if (!evs.length) return { events: [], lines: ["対象を選ぶ夜能力は使われていませんでした。"] };
+    const sh = ONW.utils && ONW.utils.shuffle ? ONW.utils.shuffle(evs) : evs, ev = sh.slice(0, Math.max(1, Math.min(5, ONW.POET_LIMIT || 1)));
+    return { events: ev.map((e) => ({ role: e.role, players: e.players })), lines: ev.map((e) => e.line) };
+  };
+  ONW.poetLines = (g) => ONW.poetPick(g).lines;
+  /** 詩人（最終盤面で、酔いが覚めている人。封印されていない人）。通知は待機時間に1人1回だけ伝わる（g.poetSeen）。模倣の人狼が詩人を模倣していても受け取れる */
+  ONW.poetHolders = (g) => (g.players || []).filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.POET && !ONW.hiddenDrunk(g, p.id) && !(ONW.seal && ONW.seal.is(g, p.id)));
   /** 観測結果の文章（本家の「〇〇は△△に能力を使っていました。」と同じ形。墓地は「墓地N」）。重複は1回にまとめ、誰が使ったか分かるよう並びはランダム */
   ONW.observerLines = (g) => {
     const nm = (id) => ((g.players || []).find((q) => q.id === id) || {}).name || "?";

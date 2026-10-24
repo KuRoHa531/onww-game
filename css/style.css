@@ -1286,6 +1286,26 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* ---- 心眼の人狼: 昼に見抜いた相手のカードがめくれ、桃紫の光と「👁 最終役職」の札が付く ---- */
 .tb-seat.mindup .tb-card { filter: drop-shadow(0 0 12px rgba(255,90,200,.95)); }
 .tb-seat.mindup .tb-badge { background: #8a1f6a; border-color: #ff9ae0; color: #fff0fa; }
+/* ---- 感覚の占い師: 昼に感じ取った相手のカードがめくれ、気配の色の光と「👁 気配」の札が付く（村人=緑 / 人狼=赤 / 狂っている=橙 / 第三陣営=灰 / 恋人=桃） ---- */
+.tb-seat.senseup .tb-badge { color: #fff; }
+.tb-seat.senseup.sense-village .tb-card { filter: drop-shadow(0 0 12px rgba(85,255,85,.95)); }
+.tb-seat.senseup.sense-village .tb-badge { background: #1f7a2e; border-color: #8dff9a; }
+.tb-seat.senseup.sense-wolf .tb-card { filter: drop-shadow(0 0 12px rgba(255,85,85,.95)); }
+.tb-seat.senseup.sense-wolf .tb-badge { background: #9b1c1c; border-color: #ff9a9a; }
+.tb-seat.senseup.sense-mad .tb-card { filter: drop-shadow(0 0 12px rgba(255,166,60,.95)); }
+.tb-seat.senseup.sense-mad .tb-badge { background: #a8620f; border-color: #ffc983; }
+.tb-seat.senseup.sense-third .tb-card { filter: drop-shadow(0 0 12px rgba(215,215,225,.95)); }
+.tb-seat.senseup.sense-third .tb-badge { background: #5a5f70; border-color: #e3e4ec; }
+.tb-seat.senseup.sense-lover .tb-card { filter: drop-shadow(0 0 12px rgba(255,126,182,.95)); }
+.tb-seat.senseup.sense-lover .tb-badge { background: #b83a72; border-color: #ffb3d4; }
+.tb-front.tb-team-sensemad { border-color: #ffa63c; }
+.tb-front .tb-wolfmark.tb-sense { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); }
+.tb-front .tb-wolfmark.tb-sense small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; }
+.tb-front .tb-wolfmark.tb-sense--village { filter: drop-shadow(0 0 7px rgba(85,255,85,.9)); } .tb-front .tb-wolfmark.tb-sense--village small { color: #b9ffc0; }
+.tb-front .tb-wolfmark.tb-sense--wolf { filter: drop-shadow(0 0 7px rgba(255,85,85,.9)); } .tb-front .tb-wolfmark.tb-sense--wolf small { color: #ffb3b3; }
+.tb-front .tb-wolfmark.tb-sense--mad { filter: drop-shadow(0 0 7px rgba(255,166,60,.9)); } .tb-front .tb-wolfmark.tb-sense--mad small { color: #ffd9a3; }
+.tb-front .tb-wolfmark.tb-sense--third { filter: drop-shadow(0 0 7px rgba(215,215,225,.9)); } .tb-front .tb-wolfmark.tb-sense--third small { color: #e3e4ec; }
+.tb-front .tb-wolfmark.tb-sense--lover { filter: drop-shadow(0 0 7px rgba(255,126,182,.95)); } .tb-front .tb-wolfmark.tb-sense--lover small { color: #ffc2dc; }
 /* ---- パン屋: 昼タイマー開始時のバナー ---- */
 .bread-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(60,38,12,.94); border: 2px solid #e8b04a; color: #ffe9bf; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
 .bread-banner__icon { font-size: 1.5em; }
@@ -2005,3 +2025,90 @@ body.ovl-open .dbg-fab--float, body:has(.dbg-sheet) .dbg-fab--float { visibility
 
 /* 役職情報: 役職ごとの薄い区切り（同じ役職で別の人の行は区切らない） */
 .rs-gsep { height: 0; margin: 5px 0; border-top: 1px solid var(--line); opacity: .45; }
+
+/* ---- 道化の爆弾魔: 爆殺されるカード(結果発表)。bomb=赤く震える導火線 / boom=爆発(💥)して表になる ---- */
+.tb-seat.gx-bomb, .tb-seat.gx-boom { z-index: 8; pointer-events: none; }
+.tb-seat.gx-bomb .tb-card { animation: gx-bombshake .12s linear infinite, gx-bombglow .6s ease-in-out infinite alternate; }
+.tb-seat.gx-bomb::after { content: "💣"; position: absolute; top: -6px; right: -4px; font-size: calc(var(--cw) * .42); animation: gx-bombblink .3s steps(2) infinite; }
+.tb-seat.gx-boom .tb-card { animation: gx-boomcard .9s ease-out; }
+.tb-seat.gx-boom::after { content: "💥"; position: absolute; top: 50%; left: 50%; font-size: calc(var(--cw) * 1.7); transform: translate(-50%, -50%) scale(0); animation: gx-boompop 1.2s ease-out forwards; pointer-events: none; }
+@keyframes gx-bombshake { 0% { transform: translate(-2px, 1px) rotate(-1.5deg); } 50% { transform: translate(2px, -1px) rotate(1.5deg); } 100% { transform: translate(-1px, 2px) rotate(-1deg); } }
+@keyframes gx-bombglow { from { box-shadow: 0 0 6px 1px rgba(255, 90, 40, .5); } to { box-shadow: 0 0 20px 7px rgba(255, 40, 20, .95); } }
+@keyframes gx-bombblink { 0% { opacity: 1; } 100% { opacity: .25; } }
+@keyframes gx-boomcard { 0% { transform: scale(1.25); filter: brightness(3); } 40% { transform: scale(.9) rotate(-3deg); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
+@keyframes gx-boompop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 35% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
+
+/* =========================================================
+   上皿天秤（js/stage.js の libraSync）— 天秤で投票が制限されているとき、選ばれた2人のカードを皿に載せる。
+   結果発表では、つられた（票数が多い）ほうの皿だけが下がる（同数なら両方下がる）
+   ========================================================= */
+.tb-seat-ph { display: none; }
+.libra-scale { --amp: 16px; --ease: 1.2s cubic-bezier(.3,1.35,.5,1); position: relative; display: flex; flex-direction: column; align-items: center; width: min(100%, 360px); margin: 6px auto 14px; }
+/* 皿（真鍮のおわん）。カードは皿の上に載る。棒の両端に皿が乗る上皿天秤 */
+.libra-pans { display: flex; justify-content: space-between; width: 100%; position: relative; z-index: 2; }
+.libra-pan { position: relative; display: flex; flex-direction: column; align-items: center; width: 44%; transition: transform var(--ease); }
+.libra-slot { display: flex; justify-content: center; min-height: var(--ch); position: relative; z-index: 1; margin-bottom: -10px; }
+.libra-dish { position: relative; z-index: 2; width: 100%; max-width: 150px; height: 28px; }
+.libra-dish::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 15px; border-radius: 50%; background: linear-gradient(90deg, #6e5120, #d9b96a 30%, #f2e2a8 50%, #b08a3e 75%, #5f4519); box-shadow: inset 0 -3px 5px rgba(60,40,10,.55); }
+.libra-dish::after { content: ""; position: absolute; left: 3%; right: 3%; top: 7px; height: 21px; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: linear-gradient(90deg, #5f4519, #c9a652 30%, #f0dd9a 48%, #a17d37 75%, #4f3a14); z-index: -1; box-shadow: 0 3px 6px rgba(0,0,0,.5); }
+.libra-dish::before { z-index: 1; }
+/* 皿が名前（.tb-name）を隠していたので、名前は皿の下に出す（皿に載った2人の名前が投票中も見える） */
+.libra-pan { padding-bottom: 28px; }
+.libra-slot .tb-seat .tb-name { position: absolute; left: 50%; top: calc(100% + 20px); transform: translateX(-50%); z-index: 3; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+/* 棒（緑青色。中央に針と支点）。皿の底が棒の両端に乗る */
+.libra-top { width: 54%; height: 12px; position: relative; z-index: 1; margin-top: 0; }
+.libra-beam { position: relative; width: 116%; margin-left: -8%; height: 12px; border-radius: 6px; background: linear-gradient(#8fa844, #456a2c 55%, #233a18); box-shadow: 0 2px 4px rgba(0,0,0,.6), inset 0 0 0 1px rgba(20,32,12,.8); transform-origin: 50% 50%; transition: transform var(--ease); }
+.libra-beam::before { content: ""; position: absolute; left: 50%; bottom: 6px; width: 8px; height: 52px; margin-left: -4px; background: linear-gradient(90deg, #8a6a2b, #f2e2a8, #8a6a2b); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.libra-beam::after { content: ""; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f6edcb, #a78f55 60%, #5a4318); box-shadow: 0 0 0 1px #4a3512; }
+.libra-scale.dn-a:not(.dn-b) .libra-beam { transform: rotate(-9deg); }
+.libra-scale.dn-b:not(.dn-a) .libra-beam { transform: rotate(9deg); }
+.libra-scale.dn-a:not(.dn-b) .libra-pan[data-i="0"], .libra-scale.dn-b:not(.dn-a) .libra-pan[data-i="1"] { transform: translateY(var(--amp)); }
+.libra-scale.dn-a:not(.dn-b) .libra-pan[data-i="1"], .libra-scale.dn-b:not(.dn-a) .libra-pan[data-i="0"] { transform: translateY(calc(var(--amp) * -1)); }
+.libra-scale.dn-a.dn-b .libra-pan { transform: translateY(var(--amp)); }   /* 同数: 両方の皿が下がる */
+/* 支柱と台座（真鍮） */
+.libra-post { width: 26px; height: 22px; margin-top: 2px; background: linear-gradient(90deg, #6e5120, #f2e2a8 50%, #5f4519); clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%); }
+.libra-base { width: 120px; height: 34px; margin-bottom: 6px; background: linear-gradient(90deg, #5f4519, #c9a652 25%, #f2e2a8 50%, #a17d37 75%, #4f3a14); clip-path: polygon(24% 0, 76% 0, 90% 70%, 100% 100%, 0 100%, 10% 70%); filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
+@media (prefers-reduced-motion: reduce) { .libra-beam, .libra-pan { transition: none; } }
+
+/* 天秤が発動したとき: 大きな⚖️が画面に出てから投票が始まる（js/ui.js の ui.libraFlash） */
+.libra-flash { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(8, 10, 24, .55); pointer-events: none; animation: libraFlashBg 2.2s ease both; }
+.libra-flash span { font-size: min(46vw, 220px); line-height: 1; filter: drop-shadow(0 0 22px rgba(255, 224, 120, .75)); animation: libraFlashMark 2.2s cubic-bezier(.2, .9, .3, 1.2) both; }
+.libra-flash small { color: #fff3c4; font-weight: 700; letter-spacing: .12em; text-shadow: 0 2px 8px #000; animation: libraFlashBg 2.2s ease both; }
+@keyframes libraFlashBg { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes libraFlashMark { 0% { transform: scale(.3) rotate(-18deg); opacity: 0; } 22% { transform: scale(1.15) rotate(6deg); opacity: 1; } 34% { transform: scale(1) rotate(-3deg); } 80% { transform: scale(1) rotate(0); opacity: 1; } 100% { transform: scale(1.1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .libra-flash, .libra-flash span, .libra-flash small { animation-duration: 2.2s; } }
+
+/* 現在の配役の下の「発動した闇鍋シナジー」（js/wikiview.js の synergyHtml） */
+.gd-syn-t { margin: 8px 0 4px; font-size: 13px; font-weight: 700; }
+.gd-syn-row { display: flex; align-items: flex-start; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.gd-syn-row:last-child { border-bottom: 0; }
+.gd-syn-lh { display: flex; flex-direction: column; gap: 2px; min-width: 6.5em; }
+.gd-syn-lh small { font-size: 10px; color: var(--ink-dim); }
+.gd-syn-ar { color: var(--ink-dim); padding-top: 14px; }
+.gd-syn-rh { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.gd-syn-rh > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.gd-syn-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .04); font-weight: 700; }
+.gd-syn-pri { margin-left: 4px; font-size: 10px; color: var(--gold); }
+.gd-syn-lab { width: 100%; color: var(--gold); font-weight: 700; }
+.gd-syn-always { color: var(--ink); font-weight: 700; }
+.gd-syn-now { width: 100%; margin: 4px 0 6px; } .gd-syn-now .gd-syn-lab { font-size: 12px; }
+.gd-syn-more { width: 100%; } .gd-syn-more summary { cursor: pointer; color: var(--ink-dim); }
+
+/* 天秤（libra）が発動したときの上皿天秤（ui.js の lpHtml。棒は大きく傾いてから、ゆれて水平に釣り合う。皿は水平のまま） */
+.libra-flash__pan { animation: lf-in 2.2s ease both; filter: drop-shadow(0 0 22px rgba(255,224,120,.55)); }
+@keyframes lf-in { 0% { opacity: 0; transform: scale(.7); } 15% { opacity: 1; transform: scale(1.04); } 25% { transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.libra-flash .lp-beam { animation: lf-beam 2s cubic-bezier(.4,.1,.4,1) .15s both; transition: none; }
+.libra-flash .lp-end { animation: lf-end 2s cubic-bezier(.4,.1,.4,1) .15s both; transition: none; }
+@keyframes lf-beam { 0% { transform: rotate(-18deg); } 22% { transform: rotate(14deg); } 42% { transform: rotate(-9deg); } 60% { transform: rotate(5deg); } 76% { transform: rotate(-2deg); } 100% { transform: rotate(0deg); } }
+@keyframes lf-end { 0% { transform: rotate(18deg); } 22% { transform: rotate(-14deg); } 42% { transform: rotate(9deg); } 60% { transform: rotate(-5deg); } 76% { transform: rotate(2deg); } 100% { transform: rotate(0deg); } }
+@media (prefers-reduced-motion: reduce) { .libra-flash .lp-beam, .libra-flash .lp-end { animation: none; } }
+
+/* 上皿天秤の部品（js/ui.js の lpHtml） */
+.lp-wrap { position: relative; }
+.lp-scale { position: absolute; left: 0; top: 0; width: 600px; height: 410px; transform-origin: 0 0; }
+.lp-base { position: absolute; left: 0; top: 0; }
+.lp-beam { position: absolute; width: 0; height: 0; transform-origin: 0 0; transition: transform .5s cubic-bezier(.3,1.35,.5,1); }
+.lp-beamsvg { position: absolute; left: -280px; top: -110px; overflow: visible; }
+.lp-end { position: absolute; top: 0; width: 0; height: 0; transform-origin: 0 0; transition: transform .5s cubic-bezier(.3,1.35,.5,1); }
+.lp-pan { position: absolute; left: -100px; top: -56px; display: block; overflow: visible; }
+.lp-pan--back { z-index: 1; } .lp-pan--front { z-index: 3; }

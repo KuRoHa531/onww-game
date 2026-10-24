@@ -84,7 +84,7 @@
         setPair(g, p.id, a, b);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(a)} と ${nameOf(b)} を恋人にしました。`);
         c.hold(p.id, `${nameOf(a)} と ${nameOf(b)} を恋人にしました。`);
-        ONW.observeNote(g, p.id, [a, b]);
+        ONW.observeNote(g, p.id, [a, b], null, "cupid");
         ONW.newsNote(g, "cupid");
         seen(g, p.id, a, b);
         c.rev[p.id] = heartReveal(a, b);   // 朝、選んだ2人のカードが❤でめくれる

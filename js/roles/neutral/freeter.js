@@ -205,7 +205,7 @@
         ONW.setRoleBound(g, "freeterTargets", p.id, t);
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${rn(r)} の ${nameOf(t)} に就職しました。`);
         c.hold(p.id, `${nameOf(t)} の初期役職は「${rn(r)}」でした。${nameOf(t)} に就職しました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "freeter");
         ONW.newsNote(g, "freeter");
         c.rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
       },

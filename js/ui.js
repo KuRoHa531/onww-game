@@ -202,9 +202,9 @@ window.ONW = window.ONW || {};
       <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.toggleGroup('${key}')">
         <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
       </button>`;
-    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief"]);
+    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]);
     const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger"]), dark = ["dark_avatar"];
-    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "detective"]);
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective"]);
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -492,11 +492,13 @@ window.ONW = window.ONW || {};
       const log = info.log.length ? `<div class="si-h">夜の行動ログ</div>${info.log.map((t) => `<div class="si-log">${esc(t)}</div>`).join("")}` : "";
       const mimicInfo = (info.mimicInfo || []).length ? `<div class="si-h">役職情報</div>${info.mimicInfo.map((x) => `<div class="si-log">模倣の人狼 ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。</div>`).join("")}` : "";
       const mind = (info.mind || []).length ? `<div class="si-h">昼の行動（心眼の人狼）</div>${info.mind.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.role ? `最終役職: <strong>${esc(ONW.roles.getInfo(x.role).name)}</strong>` : "")).join("")}` : "";
+      const libra = info.libra ? `<div class="si-h">昼の行動（天秤）</div>${row(esc(info.libra.by), `→ <strong>${esc(info.libra.a)}</strong> と <strong>${esc(info.libra.b)}</strong> に投票対象を制限`)}` : "";   // 観戦者には、使った人と選ばれた2人を出す
+      const sense = (info.sense || []).length ? `<div class="si-h">昼の行動（感覚の占い師）</div>${info.sense.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.key ? `気配: <strong>${esc(ONW.senseSeer.feelLabel(x.key))}</strong>` : "")).join("")}` : "";   // 観戦者には、使った事実と感じた気配を出す（観戦者は全員の役職が見える）
       const rnm = (r) => esc(ONW.roles.getInfo(r).name), FAIL = { target_locked: "ロックされて失敗", dead: "対象が先に死亡" };
       const eraser = (info.eraser || []).length ? `<div class="si-h">抹消（抹消の人狼）</div>${info.eraser.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.before ? (x.before === x.after ? `<span class=\"rs-dim\">変化なし</span>` : `<strong>${rnm(x.before)}</strong> → <strong>${rnm(x.after)}</strong>`) : `<span class="rs-dim">${esc(FAIL[x.fail] || "まだ抹消されていません")}</span>`)).join("")}` : "";
       const sl = info.seal || { rows: [], sealed: [] };
       const seal = sl.rows.length || sl.sealed.length ? `<div class="si-h">封印（封印の狂人）</div>${sl.rows.map((x) => row(`${esc(x.by)}${x.target ? ` → ${esc(x.target)}` : ""}`, x.fail ? `<span class="rs-dim">封印されていたため失敗</span>` : "封印しました")).join("")}${sl.sealed.length ? row("封印されている人", `<strong>${sl.sealed.map(esc).join("、")}</strong>`) : ""}` : "";
-      body = live + votes + mind + eraser + seal + log + mimicInfo || `<div class="si-log">まだ記録はありません。</div>`;
+      body = live + votes + mind + sense + libra + eraser + seal + log + mimicInfo || `<div class="si-log">まだ記録はありません。</div>`;
     }
     const html = `<div class="night-info__head"><span>夜ログ</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
       (open && info ? `<div class="si-body">${body}</div>` : "");
@@ -773,7 +775,7 @@ window.ONW = window.ONW || {};
     const g = ONW.game, flash = (t) => { g.abilityMsg = t; ui.render(g); setTimeout(() => { if (g.abilityMsg === t) { g.abilityMsg = ""; ui.render(g); } }, 4000); };
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.isDead || g.isSpectator) return;
     if (kind === "day") {   // 昼能力: 独裁者だけが使える。押すとホストに確認し、使える人にだけカード選択が開く（使えない人は押しても何も起きない = 誰が独裁者か透けない）。もう一度押すと閉じる
-      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen || g.thiefOpen) { g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.thiefOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
+      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen || g.thiefOpen || g.libraOpen) { g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.thiefOpen = false; g.libraOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
       ONW.net.dictOpen();
       return;
     }
@@ -843,13 +845,18 @@ window.ONW = window.ONW || {};
     if (!game.mindOpen || game.isDead || game.isSpectator) return "";
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    const sense = game.mindRole === "sense_seer";   // 感覚の占い師も同じ操作欄を使う（昼能力ボタン → カードを選ぶ → 確定）
+    const head = sense
+      ? `<p class="night-step__hint"><strong>感覚の占い師の昼能力</strong>: 上のテーブルから、<strong>気配を感じ取る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
+      <p class="night-step__hint">「感じ取る」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人・人狼・狂っている・第三陣営・恋人陣営</strong>のどの気配かがわかります。使えるのは1回だけで、取り消せません。妖狐を感じ取っても呪殺しません。</p>`
+      : `<p class="night-step__hint"><strong>心眼の人狼の昼能力</strong>: 上のテーブルから、<strong>最終役職を見抜く相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
+      <p class="night-step__hint">「見抜く」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）がわかります。使えるのは1回だけで、取り消せません。妖狐を見抜いても呪殺しません。</p>`;
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>心眼の人狼の昼能力</strong>: 上のテーブルから、<strong>最終役職を見抜く相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
-      <p class="night-step__hint">「見抜く」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）がわかります。使えるのは1回だけで、取り消せません。妖狐を見抜いても呪殺しません。</p>
+      ${head}
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
-      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.mindConfirm()">見抜く</button><button class="btn" onclick="ONW.ui.mindCancel()">キャンセル</button></div>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.mindConfirm()">${sense ? "感じ取る" : "見抜く"}</button><button class="btn" onclick="ONW.ui.mindCancel()">キャンセル</button></div>
     </div>`;
   };
   /** 交換者: 選んだ2人の票数を入れ替える（確定）。確定すると取り消せない。議論は続く */
@@ -879,6 +886,80 @@ window.ONW = window.ONW || {};
       </details>
       <p class="night-step__hint">選択中: <strong>${ids.length ? ids.map((x) => esc(nm(x))).join(" ⇔ ") : "まだ選んでいません"}</strong>${ids.length === 1 ? "（あと1人）" : ""}</p>
       <div class="btn-row" style="justify-content:center;"><button class="btn" ${ids.length === 2 ? "" : "disabled"} onclick="ONW.ui.exchConfirm()">交換する</button><button class="btn" onclick="ONW.ui.exchCancel()">キャンセル</button></div>
+    </div>`;
+  };
+  /** 天秤: 選んだ2人に投票対象を制限する（確定）。確定すると取り消せない。議論はそこで打ち切られて、すぐ投票に移る */
+  ui.libraConfirm = function () {
+    const g = ONW.game, ids = (g.nightSel && g.nightSel.players) || [];
+    if (!g.libraOpen || ids.length !== 2) return;
+    g.libraOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.net.libra(ids[0], ids[1]);
+    ONW.stage.sync(g); ui.render(g);
+  };
+  ui.libraCancel = function () {
+    const g = ONW.game;
+    g.libraOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 天秤の昼能力の操作欄（昼能力ボタンで開いたとき）。上のテーブルから2人選んで「投票対象を制限する」。使うとすぐ投票に移る（何をしたかは情報確認に載る） */
+  // ---- 天秤（libra）発動演出の上皿天秤の部品（SVG。css の .lp-*） ----
+  const DW = 600, DH = 410, PIVOT_Y = 250, ARM = 210, TILT_MAX = 18, HEAVY = -16;   // 天秤の設計寸法（px。画面が狭いときは全体を縮める）/ 負の角度 = 左が下がる
+  /** 上皿天秤の部品（SVG）。真鍮 = 台座・皿・つまみ / 緑青 = 棒 */
+  const SVG_DEFS = `<defs>
+    <linearGradient id="lpBrass" x1="0" x2="1"><stop offset="0" stop-color="#6e5120"/><stop offset=".3" stop-color="#d9b96a"/><stop offset=".5" stop-color="#f2e2a8"/><stop offset=".75" stop-color="#b08a3e"/><stop offset="1" stop-color="#5f4519"/></linearGradient>
+    <linearGradient id="lpBrassV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9d390"/><stop offset=".5" stop-color="#b58f45"/><stop offset="1" stop-color="#6c4f1d"/></linearGradient>
+    <linearGradient id="lpGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fa844"/><stop offset=".45" stop-color="#456a2c"/><stop offset="1" stop-color="#233a18"/></linearGradient>
+  </defs>`;
+  const BASE_SVG = `<svg class="lp-base" viewBox="0 0 ${DW} ${DH}" width="${DW}" height="${DH}">${SVG_DEFS}
+    <ellipse cx="300" cy="398" rx="120" ry="9" fill="rgba(0,0,0,.4)"/>
+    <path d="M226 374 L374 374 L388 394 Q300 406 212 394 Z" fill="url(#lpBrass)"/>
+    <path d="M263 320 L337 320 L364 376 L236 376 Z" fill="url(#lpBrass)"/>
+    <path d="M250 350 q6 -11 12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0" fill="none" stroke="#6a4d1a" stroke-width="2" opacity=".8"/>
+    <path d="M246 362 q6 -9 12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0" fill="none" stroke="#6a4d1a" stroke-width="1.5" opacity=".6"/>
+    <ellipse cx="300" cy="320" rx="36" ry="8" fill="url(#lpBrass)"/>
+    <rect x="284" y="290" width="32" height="32" fill="url(#lpBrass)"/>
+    <ellipse cx="300" cy="290" rx="22" ry="6" fill="url(#lpBrassV)"/>
+    <path d="M288 288 L292 256 Q300 246 308 256 L312 288 Z" fill="url(#lpBrass)"/>
+    <g stroke="#cbbd8f" stroke-linecap="round" opacity=".85">${[-TILT_MAX, 0, TILT_MAX].map((d) => { const r = d * Math.PI / 180, l = d === 0 ? 14 : 8; return `<path d="M${(300 + 112 * Math.sin(r)).toFixed(1)} ${(PIVOT_Y - 112 * Math.cos(r)).toFixed(1)} L${(300 + (112 + l) * Math.sin(r)).toFixed(1)} ${(PIVOT_Y - (112 + l) * Math.cos(r)).toFixed(1)}" stroke-width="${d === 0 ? 3 : 2}"/>`; }).join("")}</g>
+  </svg>`;
+  const BEAM_SVG = `<svg class="lp-beamsvg" viewBox="-280 -110 560 150" width="560" height="150">
+    <path d="M-258 -8 L-66 -10 C-52 -12 -44 -20 -34 -26 L-24 -16 L-12 -30 L0 -20 L12 -30 L24 -16 L34 -26 C44 -20 52 -12 66 -10 L258 -8 L258 9 L72 12 C54 14 38 24 18 30 L-18 30 C-38 24 -54 14 -72 12 L-258 9 Z" fill="url(#lpGreen)" stroke="#1b2a12" stroke-width="1.2"/>
+    <path d="M-4 -28 L0 -104 L4 -28 Z" fill="url(#lpBrass)"/>
+    <rect x="-270" y="-12" width="54" height="26" rx="4" fill="url(#lpGreen)" stroke="#1b2a12"/>
+    <rect x="216" y="-12" width="54" height="26" rx="4" fill="url(#lpGreen)" stroke="#1b2a12"/>
+    <circle cx="-243" cy="1" r="4.5" fill="url(#lpBrassV)"/><circle cx="243" cy="1" r="4.5" fill="url(#lpBrassV)"/>
+    <circle cx="0" cy="0" r="13" fill="url(#lpBrassV)" stroke="#4a3512"/><circle cx="0" cy="0" r="4" fill="#3b2a0e"/>
+  </svg>`;
+  const PAN_BACK = `<svg class="lp-pan lp-pan--back" viewBox="0 0 200 60" width="200" height="60"><ellipse cx="100" cy="14" rx="100" ry="13" fill="url(#lpBrass)"/><ellipse cx="100" cy="15" rx="84" ry="8" fill="#4d3010"/></svg>`;
+  const PAN_FRONT = `<svg class="lp-pan lp-pan--front" viewBox="0 0 200 60" width="200" height="60"><path d="M0 14 Q100 40 200 14 Q192 54 132 56 L68 56 Q8 54 0 14 Z" fill="url(#lpBrass)" stroke="#4a3512" stroke-width=".8"/><path d="M92 52 h16 v12 q-8 6 -16 0 z" fill="#5a5a5f"/></svg>`;
+
+  const lpHtml = function () {
+    const k = Math.min(1, ((window.innerWidth || 400) - 16) / DW);
+    const end = (x) => `<div class="lp-end" style="left:${x}px">${PAN_BACK}${PAN_FRONT}</div>`;
+    return `<div class="lp-wrap" style="width:${DW * k}px;height:${DH * k}px"><div class="lp-scale" style="transform:scale(${k})">${BASE_SVG}<div class="lp-beam" style="left:300px;top:${PIVOT_Y}px">${BEAM_SVG}${end(-ARM)}${end(ARM)}</div></div></div>`;
+  };
+
+  /** 天秤が発動したときの演出: 画面いっぱいに大きな⚖️が出て、消えたあとに投票が始まる（net.js の hostLibra が ONW.LIBRA_FLASH_MS 後に投票へ移す） */
+  ONW.LIBRA_FLASH_MS = 2300;
+  ui.libraFlash = function () {
+    try {
+      const old = document.getElementById("libraFlash"); if (old) old.remove();
+      const el = document.createElement("div"); el.id = "libraFlash"; el.className = "libra-flash"; el.innerHTML = `<div class="libra-flash__pan">${lpHtml()}</div>` + "<small>天秤が発動しました</small>";
+      document.body.appendChild(el);
+      setTimeout(() => { if (el.parentNode) el.remove(); }, ONW.LIBRA_FLASH_MS - 100);
+    } catch (e) { /* 表示できなくても投票は始まる */ }
+  };
+  ui.libraBlock = function (game) {
+    if (game.isDead || game.isSpectator || !game.libraOpen) return "";
+    const ids = (game.nightSel && game.nightSel.players) || [];
+    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : (((game.others || []).find((p) => p.id === id) || {}).name || "?");
+    return `<div class="sober-box dict-box">
+      ${ui.abHelpStart(game)}
+      <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo(game.libraRole || "libra") || {}).name || "天秤")}の昼能力</strong>: 上のテーブルから、<strong>投票対象にする2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
+      <p class="night-step__hint">「投票対象を制限する」を押すと、議論をそこで打ち切ってすぐ投票に移り、その投票では選んだ2人のどちらかにしか投票できなくなります。選んだ2人は投票が始まるときに全員に知らされますが、誰が使ったかは結果発表までわかりません。使えるのは1回だけで、取り消せません。</p>
+      </details>
+      <p class="night-step__hint">選択中: <strong>${ids.length ? ids.map((x) => esc(nm(x))).join(" ⚖ ") : "まだ選んでいません"}</strong>${ids.length === 1 ? "（あと1人）" : ""}</p>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" ${ids.length === 2 ? "" : "disabled"} onclick="ONW.ui.libraConfirm()">投票対象を制限する</button><button class="btn" onclick="ONW.ui.libraCancel()">キャンセル</button></div>
     </div>`;
   };
   /** 保安官: 選んだ相手を撃つ（確定）。取り消せない。議論は続く */
@@ -1251,6 +1332,7 @@ window.ONW = window.ONW || {};
         ${sober}
         ${ui.dictBlock(game)}
         ${ui.exchBlock(game)}
+        ${ui.libraBlock(game)}
         ${ui.sheriffBlock(game)}
         ${ui.thiefBlock(game)}
         ${ui.rejobBlock(game)}
@@ -1427,7 +1509,8 @@ window.ONW = window.ONW || {};
             ...(res.slides || []).map((x) => L(`<span class="rs-info">ペンギン:</span> ${esc(x.by)} に投票した ${(x.voters || []).map(esc).join("・")} の${x.w}票は、${esc(x.to)} へ滑りました。`))],   // ペンギンは昼能力ではないので、昼行動結果ではなく役職情報に出す（滑らせた順。処理の順番はペンギン → 交換者 → 番犬）
             [...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`))],
             [...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
-            [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : [])],
+            [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : []),
+      ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${x.names.map(esc).join("、")} が爆発して敗北しました。` : "爆発する人はいませんでした。"}`))],
             [...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
             [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`))],
             [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
@@ -1454,10 +1537,14 @@ window.ONW = window.ONW || {};
               const rem = addedRoles.slice();
               const found = c.found.map((n) => { const i = rem.indexOf(n); if (i >= 0) rem.splice(i, 1); return mark(n, true, i >= 0); });
               const lack = c.state === "fail" ? ` <span class="rs-dead">✘ あと${c.min - c.have}</span>` : "";
-              return head + L(`<span class="rs-dim">${esc(what)}${esc(cond)}</span>`) + L(`${found.join("")}${lack}`);
+              const addLines = (c.adds || []).map((x) => L(`<span class="rs-info">＋出した: ${esc(x.role)}（${esc(x.slot)}）</span> <span class="rs-dim">← ${esc(x.from)}${x.base ? `（${esc(x.base)}から変化）` : ""}</span>`)).join("");   // シナジーで足した役職: 何を・どの席/墓地に・何を置き換えて出したか
+              const capLines = (c.caps || []).map((x) => L(`<span class="rs-dead">－減らした: ${esc(x.from)}（${esc(x.slot)}）</span> <span class="rs-dim">→ ${esc(x.role)}</span>`)).join("");
+              const none = !(c.adds || []).length && !(c.caps || []).length && c.state !== "fail" ? L(`<span class="rs-dim">（足した役職なし＝元から条件を満たしていた）</span>`) : "";
+              return head + L(`<span class="rs-dim">${esc(what)}${esc(cond)}</span>`) + L(`${found.join("")}${lack}`) + addLines + capLines + none;
             }
             const line = r.items.map((it) => mark(`${it.role}${it.need > 1 ? `×${it.need}` : ""}`, it.state !== "fail", it.state === "added")).join("");
-            return head + L(line);
+            const reqAdds = r.items.flatMap((it) => (it.adds || [])).map((x) => L(`<span class="rs-info">＋出した: ${esc(x.role)}（${esc(x.slot)}）</span> <span class="rs-dim">← ${esc(x.from)}${x.base ? `（${esc(x.base)}から変化）` : ""}</span>`)).join("");
+            return head + L(line) + reqAdds;
           });
           return `${sep}${H("シナジー情報")}${ONW.utils.tintHtml(blocks.join(""), res)}`;
         })()}

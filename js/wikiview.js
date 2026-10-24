@@ -7,10 +7,11 @@
  *   ルーム設定  … 今のルームの設定(人数・タイマー・詳細設定・変化先の有無)。見るだけ
  *   現在の配役  … 今のルームに入っている役職と枚数(本家の「配役役職の説明」と同じ考え方)
  *   全役職      … 全役職の一覧(同梱している wiki/index.html?embed=1 を iframe で表示)
+ *   シナジー    … 闇鍋シナジーの一覧(wiki/synergy.html?embed=1 を iframe で表示。ゲーム本体の最新のルールを直接読む)
  *
  * 画面(#app)は再描画されても、これは body 直下にあるので消えない。
  *
- *   ONW.wikiView.open(tab?)  … 開く(tab: "room" | "deck" | "all")
+ *   ONW.wikiView.open(tab?)  … 開く(tab: "room" | "deck" | "all" | "synergy")
  *   ONW.wikiView.close()     … 閉じる(×ボタン / 外側タップ / Esc)
  *
  * 「全役職」側の「ウェブ版」絞り込みは、このゲームの ONW.ROLE_INFO を親フレームから
@@ -23,8 +24,9 @@ window.ONW = window.ONW || {};
 
   const wikiView = {};
   const WIKI_URL = "wiki/index.html?embed=1";
-  const TABS = [["room", "ルーム設定"], ["deck", "現在の配役"], ["all", "全役職"]];
-  let root = null, frame = null, lastFocus = null, tab = null;
+  const SYNERGY_URL = "wiki/synergy.html?embed=1";
+  const TABS = [["room", "ルーム設定"], ["deck", "現在の配役"], ["all", "全役職"], ["synergy", "全シナジー"]];
+  let root = null, frame = null, frame2 = null, lastFocus = null, tab = null;
   const openRoles = new Set();   // 「現在の配役」で説明を開いている役職(再描画しても開いたままにする)
 
   const esc = (s) => ONW.utils.esc(s);
@@ -93,9 +95,9 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief"]),
+    village: ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]),
     wolf: ONW.sortByRoleOrder(["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger"]),
-    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "detective"]),
+    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective"]),
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
@@ -118,8 +120,45 @@ window.ONW = window.ONW || {};
     return counts;
   }
 
+  /** 「現在の配役」が本当の役職で数えられているか（変化公開ON かつ 昼の開始以降）。シナジー欄はこのときだけ出す（変化候補を並べている間に出すと、変化の結果が透けるため） */
+  function deckIsRevealed() {
+    const g = ONW.game, tf = g.tfView;
+    return !!(g.revealTransforms && afterDayStart() && tf && tf.mode === "reveal" && Array.isArray(tf.pairs));
+  }
+  /** 発動している闇鍋シナジー（現在の配役 counts に「出たら」の役職がいるもの）。新しい通信は作らず、画面に出している配役と ONW.roles.synergyRules() / ONW.SYNERGY_COUNT_RULES から計算する。
+   *  プレイヤー名・「実際に足されたか」は出さない。そのかわり、いまの配役に出ている対象の役職（✔/✘・枚数）は出す */
+  function synergyHtml(counts) {
+    if (!deckIsRevealed() || !ONW.roles || !ONW.roles.synergyRules || !ONW.SYNERGY_COUNT_RULES) return "";
+    const has = (r) => counts[r] > 0, tm = (r) => info(r).team;
+    const chip = (r, extra) => `<span class="gd-syn-chip t-${tm(r)}">${esc(info(r).name)}${extra || ""}</span>`;
+    const rows = [];
+    ONW.roles.synergyRules().filter((r) => has(r.trigger)).forEach((r) => {
+      const m = new Map(); r.required.forEach((id) => m.set(id, (m.get(id) || 0) + 1));
+      const req = ONW.sortByRoleOrder([...m.keys()]).map((id) => { const n = counts[id] || 0, ok = n >= m.get(id); return `<span style="${ok ? "" : "opacity:.4"}">${chip(id, (m.get(id) > 1 ? ` ×${m.get(id)}` : "") + (ok ? " ✔" : " ✘"))}</span>`; }).join("");   // いまの配役に出ているか（✔=出ている / ✘=出ていない）
+      rows.push({ key: r.trigger, html: `<div class="gd-syn-row"><div class="gd-syn-lh"><small>出たら</small>${chip(r.trigger)}</div><span class="gd-syn-ar">→</span><div class="gd-syn-rh">${req}</div></div>` });
+    });
+    ONW.SYNERGY_COUNT_RULES.filter((c) => c.always ? (c.anyOf || []).some(has) : has(c.trigger)).forEach((c) => {
+      const txt = [c.min > 0 ? `合計${c.min}枚以上` : "", c.max != null ? `${c.max}枚まで` : ""].filter(Boolean).join("・");
+      const chips = ONW.sortByRoleOrder((c.anyOf || []).slice()).map((id) => chip(id)).join("");
+      const key = c.trigger || (c.anyOf || [])[0];
+      const presentIds = ONW.sortByRoleOrder((c.anyOf || []).filter((id) => counts[id] > 0));   // 現在の配役にいる対象の役職（トリガー本人は数えない）
+      const total = presentIds.reduce((a, id) => a + counts[id], 0);
+      const presentHtml = `<div class="gd-syn-now"><span class="gd-syn-lab">現在の配役にいる対象: 計${total}枚${c.min > 0 ? `（最低${c.min}枚${total >= c.min ? " ✔" : " ✘"}）` : ""}</span><div>${presentIds.length ? presentIds.map((id) => chip(id, counts[id] > 1 ? ` ×${counts[id]}` : "")).join("") : "<small>なし</small>"}</div></div>`;
+      const when = c.always ? `<small>常に</small><span class="gd-syn-always">適用</span>` : `<small>出たら</small>${chip(c.trigger)}`;
+      rows.push({ key, html: `<div class="gd-syn-row"><div class="gd-syn-lh">${when}</div><span class="gd-syn-ar">→</span><div class="gd-syn-rh"><span class="gd-syn-lab">${esc(c.label)}（${esc(txt)}）</span>${presentHtml}${(c.anyOf || []).length > 8 ? `<details class="gd-syn-more"><summary>対象の役職（${c.anyOf.length}）</summary><div>${chips}</div></details>` : `<div>${chips}</div>`}</div></div>` });
+    });
+    if (!rows.length) return "";   // 発動しているシナジーが無ければ、見出しごと出さない
+    const order = ONW.sortByRoleOrder([...new Set(rows.map((x) => x.key))]);
+    const body = ["village", "wolf", "third"].map((t) => {
+      const list = rows.filter((x) => (info(x.key).team === t || (t === "third" && !["village", "wolf"].includes(info(x.key).team)))).sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+      return list.length ? `<h4 class="gd-syn-t t-${t}">${TEAM_TITLE[t]}</h4>${list.map((x) => x.html).join("")}` : "";
+    }).join("");
+    return `<section class="gd-sec gd-syn"><h3 class="gd-h">発動した闇鍋シナジー</h3>${body}</section>`;
+  }
+
   function deckHtml() {
     const g = ONW.game, counts = deckCounts();
+    const baseCounts = { ...counts };   // 酔っ払い・恋人（重複役職）を足す前の、役職だけの配役
     const totalRoles = Object.values(counts).reduce((a, b) => a + b, 0);
     if (g.drunkCount > 0) counts.drunk = g.drunkCount;
     if (g.loverCount > 0) counts.lover = g.loverCount;   // 重複役職（配役の枚数には数えないが、構成には出す）
@@ -158,7 +197,7 @@ window.ONW = window.ONW || {};
     return `
       <p class="gd-summary">現在の配役設定 <b>${Math.max(0, totalRoles - grave)}人村 / 墓地${grave}枚 / 役職${totalRoles}枚</b></p>
       <p class="gd-note">現在の配役に含まれる役職です。役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? (g.revealManualRoles ? "手動配役を変化公開に表示する設定がONなので、各役職は変化役にまとめて表示しています。本当の役職は昼の開始時に反映されます。" : "変化公開がONなので、変化後の役職は昼の開始時に反映されます。") : ""}</p>
-      ${["village", "wolf", "third"].map(teamBlock).join("")}${dupBlock()}`;
+      ${["village", "wolf", "third"].map(teamBlock).join("")}${dupBlock()}${synergyHtml(baseCounts)}`;
   }
 
   // ---------------------------------------------------------
@@ -183,10 +222,12 @@ window.ONW = window.ONW || {};
           <div class="wikiv__pane" data-pane="room"></div>
           <div class="wikiv__pane" data-pane="deck"></div>
           <iframe class="wikiv__frame" data-pane="all" title="全役職"></iframe>
+          <iframe class="wikiv__frame" data-pane="synergy" title="全シナジー"></iframe>
         </div>
       </div>`;
     document.body.appendChild(root);
-    frame = root.querySelector(".wikiv__frame");
+    frame = root.querySelector('.wikiv__frame[data-pane="all"]');
+    frame2 = root.querySelector('.wikiv__frame[data-pane="synergy"]');
 
     root.querySelector(".wikiv__close").addEventListener("click", wikiView.close);
     root.querySelectorAll(".wikiv__tab").forEach((b) => b.addEventListener("click", () => wikiView.setTab(b.getAttribute("data-tab"))));
@@ -199,7 +240,7 @@ window.ONW = window.ONW || {};
     // Esc(ゲーム側にフォーカスがある時 / iframe 内で押された時の通知)
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && wikiView.isOpen()) wikiView.close(); });
     window.addEventListener("message", (e) => {
-      if (frame && e.source === frame.contentWindow && e.data && e.data.onwWiki === "close") wikiView.close();
+      if (((frame && e.source === frame.contentWindow) || (frame2 && e.source === frame2.contentWindow)) && e.data && e.data.onwWiki === "close") wikiView.close();
     });
   }
 
@@ -213,6 +254,10 @@ window.ONW = window.ONW || {};
     root.querySelectorAll("[data-pane]").forEach((p) => p.classList.toggle("on", p.getAttribute("data-pane") === tab));
     if (tab === "all") {
       if (!frame.getAttribute("src")) frame.setAttribute("src", WIKI_URL);   // 初回だけ読み込む
+      return;
+    }
+    if (tab === "synergy") {
+      if (!frame2.getAttribute("src")) frame2.setAttribute("src", SYNERGY_URL);   // 初回だけ読み込む
       return;
     }
     const pane = root.querySelector(`[data-pane="${tab}"]`);
@@ -237,7 +282,7 @@ window.ONW = window.ONW || {};
     if (!root) build();
     if (t && TABS.some(([k]) => k === t)) tab = t;
     else if (!tab) tab = inRoom() ? "deck" : "all";
-    if (!inRoom() && tab !== "all") tab = "all";   // ルームの外では「全役職」から
+    if (!inRoom() && tab !== "all" && tab !== "synergy") tab = "all";   // ルームの外では「全役職」「全シナジー」から
     paint();
     lastFocus = document.activeElement;
     root.classList.add("open");
@@ -261,7 +306,7 @@ window.ONW = window.ONW || {};
     };
   }
   // 変化公開や配役の更新(コボード等)は ui.render を通らないことがあるので、開いている間だけ軽く見張る
-  setInterval(() => { if (wikiView.isOpen() && tab !== "all") paint(); }, 1000);
+  setInterval(() => { if (wikiView.isOpen() && tab !== "all" && tab !== "synergy") paint(); }, 1000);
 
   ONW.wikiView = wikiView;
 

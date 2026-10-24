@@ -84,7 +84,7 @@
         setPicks(g, p.id, h, k);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は 本命に ${nameOf(h)}、キープに ${nameOf(k)} を選びました。`);
         c.hold(p.id, `本命は ${nameOf(h)}、キープは ${nameOf(k)} です。`);
-        ONW.observeNote(g, p.id, [h, k]);
+        ONW.observeNote(g, p.id, [h, k], null, "evil_woman");
         ONW.newsNote(g, "evil_woman");
         seen(g, p.id, h, k);
         c.rev[p.id] = peekReveal(h, k);   // 朝、本命のカードが❤・キープのカードが♡でめくれる

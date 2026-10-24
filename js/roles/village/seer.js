@@ -95,13 +95,13 @@
           g.nightLogsAll.push(`${label} ${p.name} は ${nameOf(t)} を占い、${rn(r)} でした。`);
           hold(p.id, `${nameOf(t)} の役職は「${rn(r)}」でした。`);
           rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
-          ONW.observeNote(g, p.id, [t]);
+          ONW.observeNote(g, p.id, [t], null, c.eff(p));
           ONW.newsNote(g, c.eff(p));
         } else if (sel.graves.length) {
           const items = sel.graves.slice().sort((x, y) => x - y).map((i) => ({ k: `g:${i}`, role: ONW.mimic.seerSeen(g, g.center0[i], "g:" + i) }));   // 墓地の白狼も村人と出る
           items.forEach((it) => { const i = +it.k.slice(2); g.nightLogsAll.push(`${label} ${p.name} は 墓地${i + 1} を確認し、${rn(it.role)} でした。`); hold(p.id, `墓地${i + 1}枚目は「${rn(it.role)}」でした。`); });
           rev[p.id] = { kind: "peek", items };
-          ONW.observeNote(g, p.id, [], items.map((it) => +it.k.slice(2)));
+          ONW.observeNote(g, p.id, [], items.map((it) => +it.k.slice(2)), c.eff(p));
           ONW.newsNote(g, c.eff(p));
         }
       },

@@ -34,7 +34,7 @@
   const SUPPORTED = new Set(["seer", "robber", "troublemaker", "mason", "merlin", "dictator", "exchanger", "mind_wolf",
     "straw_doll", "cat_sidhe", "black_cat", "cat_pumpkin", "tough_guy", "chicken", "wolf_king", "tofu_wolf", "mapo_wolf", "assassin", "baker", "star", "mayor", "queen", "visitor", "newspaper",
     "sheriff", "white_wolf", "forgetful_wolf", "wolf_dreamer",
-    "big_wolf", "lone_wolf", "observer_wolf", "mad_seer", "exposed_madman", "muzzle_madman", "watchdog", "keymaster", "relic_robber", "insomniac", "eraser_wolf", "mirage_wolf", "mad_queen"]);   // 狂った女王: 模倣先に入る（模倣した人は、村人陣営には「女王」・人狼陣営には「狂った女王」として通知される。王国滅亡は起きない。mad_queen.js） / 蜃気狼: 模倣先に入る（占われると蜃気狼と同じランダムな役職に見える。mirage_wolf.js） / 9of9: 残りの10役職 / 抹消の人狼 5of5: 抹消の人狼（模倣の人狼が夜に選んだ相手の役職を、昼になる前に抹消する）   // 7of9: 保安官（模倣保安官は村人陣営を執行）/ 判定が違う役（白狼・忘却の人狼・狼夢人）   // 3of9: 夜にカードを選ぶ能力（占い師・怪盗・いたずらっ子）/ 4of9: 夜の情報（共有者・マーリン）/ 5of9: 昼能力（独裁者・交換者・心眼の人狼。保安官は判定が違うので 7of9）/ 6of9: 受動効果（わら人形・猫又・黒猫・ネコカボチャ・タフガイ・チキン・人狼王・豆腐/麻婆・アサシン・パン屋・スター・メイヤー・女王・訪問者・新聞配達員）。段階ごとに足す
+    "big_wolf", "lone_wolf", "observer_wolf", "mad_seer", "exposed_madman", "muzzle_madman", "watchdog", "keymaster", "relic_robber", "insomniac", "eraser_wolf", "mirage_wolf", "mad_queen", "sense_seer", "libra"]);   // 感覚の占い師: 模倣先に入る（昼能力は sense_seer.js の canUse が mimic.actRole で見る） / 狂った女王: 模倣先に入る（模倣した人は、村人陣営には「女王」・人狼陣営には「狂った女王」として通知される。王国滅亡は起きない。mad_queen.js） / 蜃気狼: 模倣先に入る（占われると蜃気狼と同じランダムな役職に見える。mirage_wolf.js） / 9of9: 残りの10役職 / 抹消の人狼 5of5: 抹消の人狼（模倣の人狼が夜に選んだ相手の役職を、昼になる前に抹消する）   // 7of9: 保安官（模倣保安官は村人陣営を執行）/ 判定が違う役（白狼・忘却の人狼・狼夢人）   // 3of9: 夜にカードを選ぶ能力（占い師・怪盗・いたずらっ子）/ 4of9: 夜の情報（共有者・マーリン）/ 5of9: 昼能力（独裁者・交換者・心眼の人狼。保安官は判定が違うので 7of9）/ 6of9: 受動効果（わら人形・猫又・黒猫・ネコカボチャ・タフガイ・チキン・人狼王・豆腐/麻婆・アサシン・パン屋・スター・メイヤー・女王・訪問者・新聞配達員）。段階ごとに足す
   const state = { all: true };   // 9of9: 全部の役職がつながったので、模倣先の制限（SUPPORTED）は外した。disableAll() で段階的な制限に戻せる（テスト用）
 
   const isSupported = (role) => state.all || SUPPORTED.has(role);
@@ -275,7 +275,7 @@
     // 酔い覚めの演出: 仲間の人狼の🐺（大狼を模倣していれば墓地も）＋ 観測の人狼・口封じの狂人を模倣していればその演出（観測結果・口封じのミュートマーク）。9of9
     soberPeek(c, id, fin) {
       const mr = roleOf(c.g, id), pk = K.soberPeek(c, id, mr === "big_wolf" ? "big_wolf" : fin), td = mr && ONW.roleDef(mr);
-      if (td && td.soberPeek && (mr === "observer_wolf" || mr === "muzzle_madman")) Object.assign(pk, td.soberPeek(c, id, mr) || {});
+      if (td && td.soberPeek && (mr === "observer_wolf" || mr === "poet" || mr === "muzzle_madman")) Object.assign(pk, td.soberPeek(c, id, mr) || {});
       return pk;
     },
     // 酔い覚め: 仲間の人狼（人狼系共通）＋ 模倣している役職

@@ -66,7 +66,8 @@ window.ONW = window.ONW || {};
     const validPlayer = (p, id) => id && id !== p.id && !deadSet.has(id) && g.players.some((q) => q.id === id);
     const nn = (rid) => { if (stage !== "late") ONW.newsNote(g, rid); };   // 新聞配達員の新聞: 夜に能力を使った役職を記録（昼に酔いが覚めてからの能力は、新聞には載らない）
     // 役職ファイルの cpuNight.run に渡す道具
-    const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves); };   // 観測の人狼: 夜に誰が誰に能力を使ったかを記録（昼の酔い覚め後は記録しない）
+    const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves, n.cur); };   // n.cur = いま能力を使っている役職（詩人の通知に載る。模倣の人狼は模倣先）
+      // 観測の人狼: 夜に誰が誰に能力を使ったかを記録（昼の酔い覚め後は記録しない）
     const hold = (id, text) => { if (!text) return; g.nightResults = g.nightResults || {}; (g.nightResults[id] = g.nightResults[id] || []).push(text); };   // 人間なら net.js の hold() で預かる夜の結果を、CPUも同じ文で g.nightResults に積む（結果画面の「情報確認（全員）」に出る。CPUには届かないので画面には影響しない）
     const n = { g: gv, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
 
@@ -75,7 +76,7 @@ window.ONW = window.ONW || {};
       if (!on(s.nd.stage)) return;
       const exec = (p) => {
         if (s.nd.stage !== "seal" && ONW.seal.failIfSealed(g, p.id, act(p), { hold, mimic: ONW.mimic.isMimic(g, p.id, role(p)) })) return;   // 封印されているCPUの夜の能力は失敗（行動しない）
-        const go = () => s.nd.run(n, p, rn(role(p)), false, act(p)); if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
+        const go = () => { n.cur = act(p); s.nd.run(n, p, rn(role(p)), false, act(p)); }; if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
       const actors = cpus.filter((p) => s.roles.includes(act(p)) && !noTarget(p) && !deadSet.has(p.id));
       if (plan) plan.push({ roles: s.roles, order: s.order, idx: s.idx, actors, exec }); else actors.forEach(exec);
     });
@@ -89,7 +90,8 @@ window.ONW = window.ONW || {};
       const asMimic = ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id]) && ONW.mimic.roleOf(g, p.id) === got;
       if (ONW.seal.failIfSealed(g, p.id, got, { hold, mimic: asMimic })) return;   // 封印されているCPUの朝の連鎖・昼の酔い覚めの能力は失敗   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
       const exec = () => {
-        if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
+        n.cur = got;
+      if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
         if (nd) nd.run(n, p, label, true, got);
         i.relic = keep;
       };
@@ -163,6 +165,11 @@ window.ONW = window.ONW || {};
     g.cpuInfo = g.cpuInfo || {};
     ONW.roleHook("mind_wolf", "cpuNotice")(g, id, target, role, cpu.kit);
   };
+  /** 感覚の占い師のCPUが昼に感じ取った結果（気配の種類）を覚える。中身は sense_seer.js の cpuNotice */
+  cpu.noticeSense = function (g, id, target, key) {
+    g.cpuInfo = g.cpuInfo || {};
+    ONW.roleHook("sense_seer", "cpuNotice")(g, id, target, key, cpu.kit);
+  };
   /** 昼に役職が入れ替わって後覚者の能力が発動したCPU: 最終的な役職を知る。中身は insomniac.js の cpuNotice */
   cpu.notifyInsom = function (g, id) {
     g.cpuInfo = g.cpuInfo || {};
@@ -181,7 +188,7 @@ window.ONW = window.ONW || {};
   // =========================================================
   const isWolfSide = (r) => isWolf(r) || isMad(r);                       // 人狼陣営（狂人含む）= 本家の isWolfTeam
   const WOLF_LIKE = () => ONW.WOLF_KIND;                                  // 占い結果で「人狼」と見える役職
-  const AVOID_RESULT = ["tanner", "love_tanner", "bounty_hunter", "opportunist", "amanojaku", "winner", "freeter", "servant", "fox"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
+  const AVOID_RESULT = ["tanner", "love_tanner", "bounty_hunter", "opportunist", "amanojaku", "winner", "freeter", "servant", "fox", "jester_bomber"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
   const setupRoles = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])];   // 占い結果に出してよい（実在する）役職
   const roleInSetup = (g, role) => setupRoles(g).includes(role) || (g.coDeck || []).some((x) => x.r === role);
   /** 「村人CO」をしてよいか: 配役(selectedRoles)か、変化公開で公開された役職(coDeck の cand でないもの)に、村人・忘却の人狼・狼憑き(本人は村人だと思い込む役職)がいるときだけ。
@@ -480,7 +487,8 @@ window.ONW = window.ONW || {};
     const i = infoOf(g, p.id), me = selfRole(g, p);
     const mates = [...ONW.loverMates(g, p.id), ...(ONW.heartbreaker ? ONW.heartbreaker.believed(g, p.id) : [])];   // 恋人の相方には投票しない（追放されると心中で一緒に敗北するため）。破局で壊されたことはCPUには知らされないので、壊された相方もまだ恋人だと思って避ける
     const hx = ONW.roleHook(me, "cpuVoteExclude");   // 役職ごとの除外（従者はご主人に投票しない / 共有者は相方に投票しない）。各役職ファイルの cpuVoteExclude
-    return g.players.filter((q) => q.id !== p.id && !mates.includes(q.id) && alive(g, q.id) && !(hx && hx(cpu.kit, g, p, q, i, me)));
+    const lim = ONW.libra ? ONW.libra.limit(g) : null;   // 天秤で投票が制限されているときは、選ばれた2人の中だけ
+    return g.players.filter((q) => q.id !== p.id && !mates.includes(q.id) && alive(g, q.id) && (!lim || lim.includes(q.id)) && !(hx && hx(cpu.kit, g, p, q, i, me)));
   }
 
   /** 投票先の評価点（本家 scoreTargetForCpu を、この版にある役職に合わせたもの） */
@@ -504,7 +512,7 @@ window.ONW = window.ONW || {};
     // 他人のCO（役職）
     if (co === "villager") s += wolfSide ? 1.8 : 0.8;
     if (co && WOLF_LIKE().includes(co) || co === "team:wolf") s += wolfSide ? -1.0 : 2.4;
-    if (co === "tanner" || co === "love_tanner" || co === "bounty_hunter") s -= wolfSide ? 0.6 : 2.4;
+    if (co === "tanner" || co === "love_tanner" || co === "bounty_hunter" || co === "jester_bomber") s -= wolfSide ? 0.6 : 2.4;
     if (co === "seer" || co === "mad_seer") {
       const n = g.players.filter((x) => { const c = g.coBoard && g.coBoard[x.id] && g.coBoard[x.id].co; return c === "seer" || c === "mad_seer"; }).length;
       s += n >= 2 ? (wolfSide ? 0.6 : 1.5) : (wolfSide ? -0.3 : -0.8);
@@ -515,7 +523,7 @@ window.ONW = window.ONW || {};
     // 占い師COの結果（この人を占ったという報告）
     claims.filter((c) => c.kind === "seer" && c.target === q.id).forEach((c) => {
       if (WOLF_LIKE().includes(c.role)) s += wolfSide ? 0.8 : 2.8;
-      else if (c.role === "tanner" || c.role === "love_tanner" || c.role === "bounty_hunter" || c.role === "fox") s -= wolfSide ? 0.5 : 2.2;   // 妖狐と占われた人は、投票しても妖狐が負けるだけ（占い師に呪殺されている）ので避ける
+      else if (c.role === "tanner" || c.role === "love_tanner" || c.role === "bounty_hunter" || c.role === "jester_bomber" || c.role === "fox") s -= wolfSide ? 0.5 : 2.2;   // 妖狐と占われた人は、投票しても妖狐が負けるだけ（占い師に呪殺されている）ので避ける
       else s += wolfSide ? -0.4 : -1.0;
       if (c.from === p.id) {   // 自分が報告した結果には従う（本家）
         if (WOLF_LIKE().includes(c.role)) s += 12;

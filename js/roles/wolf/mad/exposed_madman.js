@@ -96,7 +96,7 @@
         delete (g.exposeAnnounced || {})[p.id];
         g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} を暴露の対象に選びました。`);
         c.hold(p.id, `${c.nameOf(t)} を暴露の対象に選びました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "exposed_madman");
         ONW.newsNote(g, "exposed_madman");
       },
     },

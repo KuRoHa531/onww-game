@@ -48,7 +48,7 @@
         ONW.setRoleBound(g, "loveTargets", p.id, t);   // 役職についていく（以降に役職が動いたら、移動先の人の選択になる）
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を選んでいました。`);
         c.hold(p.id, `${nameOf(t)} に一目惚れしました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "love_tanner");
         ONW.newsNote(g, "love_tanner");
       },
     },

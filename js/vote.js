@@ -313,7 +313,7 @@ window.ONW = window.ONW || {};
    */
   vote.applyServantSubstitution = function applyServantSubstitution(game) {
     const R = ONW.ROLE, gone = new Set(game.deadIds || []);
-    const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER];
+    const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER, R.JESTER_BOMBER];
     game.servantSubs = [];
     let changed = true;
     while (changed) {
@@ -393,10 +393,10 @@ window.ONW = window.ONW || {};
       if (kind === "tomo" && immune(t)) { if (!game.toughBlocks.some((b) => b.id === t && b.by === by)) game.toughBlocks.push({ id: t, by, kind }); return false; }   // 空振り
       // 従者の身代わり（道連れ）: ご主人が道連れ(tomo)で死ぬときは、従者が身代わりになる（ご主人は生き残る）。追放の身代わり(applyServantSubstitution)と同じ条件:
       //   従者がまだ死んでいない / 従者が恋人でない / ご主人の最終役職が 従者・てるてる坊主・一目惚れしてるてる でない。従者が複数いれば先に見つかった1人
-      if (kind === "tomo") {
-        const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER];
+      if (kind === "tomo" || kind === "bomb") {   // 道連れ・爆殺（道化の爆弾魔）: 従者がご主人の身代わりになる
+        const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER, R.JESTER_BOMBER];
         const sub = blocked.includes(game.currentRoles[t]) ? null : ONW.servantSubPairs(game).find(([s, m]) => m === t && s !== t && !done.has(s) && !gone.has(s) && !tomoSimul.has(s) && !ONW.isLover(game, s));   // 従者が同時に（同じ波で）道連れにされるときも、先に死んでいるときも、身代わりにならない
-        if (sub) { game.chainSub[sub[0]] = t; return kill(sub[0], by, "tomo", chain); }
+        if (sub) { game.chainSub[sub[0]] = t; return kill(sub[0], by, kind, chain); }
       }
       done.add(t); if (chain) queue.push(t); game.chainIds.push(t); game.chainBy[t] = by; game.chainKind[t] = kind; if (late) game.chainLate[t] = true;
       ONW.loverMates(game, t).forEach((mate) => { if (mate !== t) kill(mate, t, "lovers", chain); });   // 恋人: 相方も同時に心中（純愛者などで恋人が複数いれば全員。相方の相方も続けて心中する）
@@ -447,7 +447,7 @@ window.ONW = window.ONW || {};
     //   ・飼い主がネコカボチャなら、噛み返されて番犬も死ぬ（kind: "bite"・by = ネコカボチャ）。結果は game.dogBites = [{ by, target, back? }]（起きた順）
     //   ・【同時噛み】1人が複数の番犬（本物・模倣番犬・今後の犬の狂人）の飼い主になっていて、その犬たちが全員その人に投票していたら、犬たちは【同時に】噛み殺す。
     //     game.dogBites には噛んだ犬ごとに { by, target, simul?: 同時に噛んだ犬が2匹以上 } が入る（死因 kind "bite" の by は先頭の犬）。ネコカボチャが飼い主なら、噛んだ犬全員を噛み返す
-    game.dogBites = [];
+    game.dogBites = []; game.bombs = [];   // 道化の爆弾魔の爆殺: 起きた順に { bomber: 吊られた爆弾魔, ids: 爆発した人たち }（ONW.bomber.explode が入れる）
     if (ONW.watchdog) {
       const groups = [];   // [{ o: 飼い主, ws: 噛む犬たち }]（最初に見つかった順）
       ONW.watchdog.activePairs(game).forEach(([w, o]) => {
@@ -541,13 +541,19 @@ window.ONW = window.ONW || {};
       });
       flushTomo();   // わら人形の道連れをまとめて実行
     }
+    // 道化の爆弾魔の爆殺（マイクラ版 includeJesterBomberExplosions）: 吊られて（追放・道連れなどで死んで）しまった爆弾魔に、投票していた人が爆発する（kind "bomb"・chain=false）。
+    //   ・連鎖の波がすべて終わったあと（道連れで死んだ爆弾魔も数える）・王国滅亡の前。爆殺された人の恋人・従者・キューピッド・背徳者は kill() が処理する。詳細は js/roles/neutral/jester_bomber.js（B.explode）
+    if (ONW.bomber) ONW.bomber.explode(game, { done, gone, kill, setSimul: (s) => { tomoSimul = s; } });
     // 王国滅亡（本家 applyQueenKingdomDeaths）: 女王が追放・道連れ（めくれた）か昼中に死亡していたら、まだめくれていない他の村人陣営が一斉にめくれる。
     //   ・対象は最終役職が村人陣営の人（女王本人は除く。チキン・恋人になっている村人陣営の人も王国滅亡で倒れる）。同時に「王国滅亡」でめくれ、勝利条件を失う（結果は game.kingdomIds / chainKind = "queen"）
     //   ・めくれる順に連鎖する能力（道連れ・無理心中など）は、本家と同じく発動しない（連鎖が終わったあとにまとめて倒れる）
     //   ・女王が倒れる → 村人陣営が倒れる → その中の恋人の相方も心中で倒れる → その相方が女王なら…と続くので、変化がなくなるまで繰り返す
     late = true;
     for (;;) {
-      const queensFell = allIds.filter((id) => game.currentRoles[id] === R.QUEEN && !ONW.seal.is(game, id) && (done.has(id) || gone.has(id)));   // 封印されている女王が倒れても王国滅亡は起きない（2of4b）
+      let queensFell = allIds.filter((id) => game.currentRoles[id] === R.QUEEN && (done.has(id) || gone.has(id)));
+      if (queensFell.length && allIds.some((id) => game.currentRoles[id] === R.QUEEN && !done.has(id) && !gone.has(id))) queensFell = [];   // 女王が2人以上いるとき、まだ倒れていない女王がいる間は王国滅亡しない（最後の女王が倒れたときに滅亡。姫君の継承も最後の女王のときだけ）
+      if (ONW.princess) queensFell = ONW.princess.succeedFallen(game, queensFell, new Set([...done, ...gone]));   // 封印された女王も姫君が継承する（昇格は起こる）
+      queensFell = queensFell.filter((id) => !ONW.seal.is(game, id));   // 継承されなかった封印の女王が倒れても王国滅亡は起きない（2of4b）   // 姫君: 追放・道連れで倒れた女王は、生きている姫君がいれば姫君が女王に昇格して継承する（王国滅亡は起きない。昼中に継承済みの女王も除く。docs/princess.md）
       if (!queensFell.length) break;
       game.queenFallen = queensFell.slice();
       let changed = false;
@@ -690,7 +696,7 @@ window.ONW = window.ONW || {};
     const isLover = (id) => ONW.isLover(game, id);
     // タフガイのとばっちりで追放された人は、てるてる・一目惚れしてるてる・処刑人のターゲットとしての「追放」には数えない（追放されても、その勝利条件は満たさない）
     const bounced = new Set((game.toughBounces || []).flatMap((b) => b.to || []));
-    const bitten = (id) => (game.chainKind || {})[id] === "bite";   // 番犬に噛み殺された人: 追放ではないので、てるてる系・賞金稼ぎ・神の祝福の「追放」条件を満たさない
+    const bitten = (id) => ["bite", "bomb"].includes((game.chainKind || {})[id]);   // 番犬に噛み殺された人・道化の爆弾魔に爆殺された人: 追放ではないので、てるてる系・賞金稼ぎ・神の祝福の「追放」条件を満たさない
     const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id));
     const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id));
     // 賞金稼ぎ: 追放（道連れを含む）でめくれて、選んだ相手が人狼判定なら単独勝利。心中・無理心中・タフガイのとばっちりでは発動せず、恋人（重複役職）の賞金稼ぎは勝てない（マイクラ版 applyLimitedSingleWinners）
@@ -717,7 +723,7 @@ window.ONW = window.ONW || {};
     const godBless = gods.filter((id) => {
       if (!executed.includes(id)) return false;
       const ck = (game.chainKind || {})[id];
-      if (ck === "lovers" || ck === "love" || ck === "bite") return false;       // 心中・無理心中・番犬の噛殺
+      if (ck === "lovers" || ck === "love" || ck === "bite" || ck === "bomb") return false;       // 心中・無理心中・番犬の噛殺・爆殺
       if (voted.has(id) && execAll.some(([, tg]) => tg === id)) return false;   // 処刑（処刑人のターゲットとして追放）
       return true;                                                              // 追放 / 道連れ
     });
@@ -887,7 +893,9 @@ window.ONW = window.ONW || {};
     // 3.8 王国滅亡（本家 buildQueenOverrideResult。判定が特殊なので勝利優先度の表には載せない。勝てる例外のメモは docs/victory-priority.md「王国滅亡の判定メモ」）: 女王が追放・道連れ（または昼中に死亡）したとき。神の祝福・恋人勝利・てるてる系・神降臨・処刑人より後ろ、基本勝敗より前
     //   ・女王と人狼判定の者が一緒に倒れた → 勝者なし / 人狼判定の者が倒れていない → 人狼陣営の勝利 / 人狼陣営がいない → 勝者なし
     //   ・生存したチキンがいれば、determineWinners が村人陣営の逆転勝利に作り直す（このときは chickenForce で、ここは通らない）
-    const fallenQueens = ids.filter((id) => role(id) === R.QUEEN && dead.has(id));
+    const villageSideQueen = (id) => !ONW.isLover(game, id) && !(ONW.shuffler && ONW.shuffler.tagged && ONW.shuffler.tagged(game, id)) && !(ONW.reverse && ONW.reverse.is && ONW.reverse.is(game, id)) && !(ONW.copylist && ONW.copylist.is && ONW.copylist.is(game, id));   // 恋人・シャッフラー・反転・コピリストの陣営の女王が倒れても王国滅亡は起きるが、それだけでは村人陣営の敗北にならない（優先度の表の恋人 ＞ シャッフラーなどの陣営判定に任せる。反転・コピリストは未実装）
+    const queenLeft = ids.some((id) => role(id) === R.QUEEN && !dead.has(id));   // 女王がまだ生き残っているときは「倒れた女王」はいない（最後の女王が倒れたときだけ王国滅亡の勝敗）
+    const fallenQueens = queenLeft ? [] : ids.filter((id) => role(id) === R.QUEEN && dead.has(id) && !(game.crownShield || {})[id] && villageSideQueen(id));   // 姫君が継承した女王（昼中・結果発表）は「倒れた女王」に数えない
     if (!game.chickenForce && fallenQueens.length) {
       const wq = ONW.vote.wolfJudgeIds(game), wqDead = wq.filter((id) => dead.has(id));
       if (wqDead.length) return set("勝者なし", [], [], `女王 ${nm(fallenQueens)} と人狼判定の者 ${nm(wqDead)} が同時に倒れました。村人陣営は勝利条件を失い、人狼陣営も勝てないため勝者なしです。`, []);
@@ -1052,10 +1060,47 @@ window.ONW = window.ONW || {};
     game.pranksterResult = { id: hid, name: nm(hid), targetId: rec.t, target: nm(rec.t), outcome: rec.o, label: P.LABELS[rec.o] || rec.o, success, chicken: saved };
   };
 
-  /** 勝敗を判定する（チキンの逆転つき）→ そのあと愉快犯の条件を適用 */
+  /**
+   * 道化の爆弾魔（マイクラ版 vote.js の applyJesterBomberResult）: 吊られた爆弾魔は追加勝利し、爆発した人（その爆弾魔に投票していた人）は勝者から外れる。
+   *  勝利優先度の表には載せない（追加勝利＋「爆殺された人は勝利条件を失う」。docs/victory-priority.md「道化の爆弾魔の判定メモ」）。適用の順は マイクラ版 finalizeResultWithChicken と同じ: 通常の結果 → チキン → 愉快犯 → 道化の爆弾魔。
+   *  ・爆弾魔: 勝てない扱いの人（勝てなかった恋人・シャッフラーの失敗・撃たれた人・王国滅亡で倒れた人）は追加勝利しない（愉快犯と同じ規則）。吊られた爆弾魔どうしは爆発しない（勝者として守られる）。
+   *  ・爆発した人: 誰が勝者に入っていても外す（愉快犯の「全員勝利」のあとでも敗北）。
+   *  結果は g.bomberResult = { bombers: [{ id, name, ids, names, killed, killedNames, win }] }（結果発表の役職情報 res.bomber・演出が使う）。爆弾魔が吊られていなければ null。 */
+  vote.applyBomber = function applyBomber(game) {
+    game.bomberResult = null;
+    const B = ONW.bomber;
+    if (!B || game.abandoned || !(game.bombs || []).length) return;
+    const R = ONW.ROLE, T = ONW.TEAM, ids = game.players.map((p) => p.id);
+    const nm = (id) => (ONW.utils.playerById(game, id) || {}).name || "?";
+    const dead = ONW.vote.deadSet(game);
+    const loverWin = new Set(ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).flat());
+    const shot = ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : [];
+    const noWin = new Set(ids.filter((id) => (ONW.isLover(game, id) && !loverWin.has(id) && game.currentRoles[id] !== R.WINNER) || (game.shufflerBan || []).includes(id) || shot.includes(id) || (game.kingdomIds || []).includes(id) || (game.queenFallen || []).includes(id) || (game.deadKind || {})[id] === "queen"));
+    const hanged = B.hangedIds(game), blown = B.explodedIds(game);
+    const w = new Set(game.winnerIds || []);
+    blown.forEach((id) => w.delete(id));                                   // 爆発した人は敗北
+    const winBombers = hanged.filter((id) => !noWin.has(id));
+    winBombers.forEach((id) => w.add(id));                                 // 吊られた爆弾魔は追加勝利
+    const others = [...w].filter((id) => !hanged.includes(id));
+    let teams = [...(game.winTeams || [])], keys = [...(game.winners || [])];
+    if (winBombers.length) {
+      const had = teams.includes("道化の爆弾魔");
+      if (!had) teams.push("道化の爆弾魔");
+      if (!keys.includes(T.THIRD)) keys.push(T.THIRD);
+      if (!others.length) { teams = ["道化の爆弾魔"]; keys = [T.THIRD]; game.winTitle = "道化の爆弾魔勝利"; }   // 爆弾魔以外に勝者がいなくなった（全員爆発・もともと勝者なし）
+      else if (!had && /勝利$/.test(game.winTitle || "") && game.winTitle !== "全員勝利") game.winTitle = game.winTitle.replace(/勝利$/, "＆道化の爆弾魔勝利");   // 追加勝利: 勝利タイトルも「村人陣営＆道化の爆弾魔勝利」にする（愉快犯の追加勝利と同じ）
+    }
+    const lines = hanged.map((b) => { const x = game.bombs.find((q) => q.bomber === b); return `道化の爆弾魔 ${nm(b)} が吊られて自爆したため、${x.ids.length ? `${x.ids.map(nm).join("、")} が爆発して敗北しました。` : "爆発する人はいませんでした。"}`; });
+    game.winDetail = `${game.winDetail || ""}${game.winDetail ? "\n" : ""}${lines.join("\n")}`;
+    game.winnerIds = [...w]; game.winTeams = teams; game.winners = keys;
+    game.bomberResult = { bombers: game.bombs.map((x) => ({ id: x.bomber, name: nm(x.bomber), ids: x.ids.slice(), names: x.ids.map(nm), killed: x.killed.slice(), killedNames: x.killed.map(nm), subs: (x.subs || []).slice(), win: winBombers.includes(x.bomber) })) };
+  };
+
+  /** 勝敗を判定する（チキンの逆転つき）→ 愉快犯の条件 → 道化の爆弾魔（マイクラ版と同じ順） */
   vote.determineWinners = function determineWinners(game) {
     determineWinnersInner(game);
     ONW.vote.applyPrankster(game);
+    ONW.vote.applyBomber(game);
     return game.winners;
   };
 

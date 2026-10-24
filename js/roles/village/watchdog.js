@@ -139,7 +139,7 @@
         setOwner(g, p.id, t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を飼い主にしていました。`);
         c.hold(p.id, ownerLine(nameOf(t)));
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "watchdog");
         ONW.newsNote(g, "watchdog");
         c.rev[p.id] = boneReveal(t);   // 朝、選んだ飼い主のカードが🦴でめくれる
       },

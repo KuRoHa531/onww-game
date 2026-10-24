@@ -14,8 +14,8 @@
  *         deck = 配役設定(roleCounts)の並び順、count = 初期枚数(省略は0)。役職ID(ONW.ROLE.<ID大文字>)は defineRole で自動で作られる。
  *   seerSees: "<役職ID>"        占われたときに見える役職(白狼=村人 / 狼憑き=人狼)
  *         sort は ONW.ROLE_INFO の並び順(小さいほど先。省略した役職は最後に登録順)。like で土台にしても info は引き継がない(必ず自分で書く)
- *   groups: { wolf: n, mad: n, tomo: n, selfAsVillager: n, selfAsWolf: n, newsHidden: n, "transform:<変化役のID>": n }
- *         役職グループへの所属(ONW.WOLF_KIND / MAD_KIND / TOMO_ROLES / SELF_AS_VILLAGER / SELF_AS_WOLF / NEWS_HIDDEN / TRANSFORM_GROUPS[変化役])。
+ *   groups: { wolf: n, mad: n, tomo: n, selfAsVillager: n, selfAsWolf: n, selfAsSeer: n, newsHidden: n, "transform:<変化役のID>": n }
+ *         役職グループへの所属(ONW.WOLF_KIND / MAD_KIND / TOMO_ROLES / SELF_AS_VILLAGER / SELF_AS_WOLF / SELF_AS_SEER / NEWS_HIDDEN / TRANSFORM_GROUPS[変化役])。
  *         n は「所属」を表すための数字。並び順は js/roleorder.js の ONW.ROLE_ORDER(wikiの順)で決まるので、n の大きさは気にしなくてよい(基準に無い役職どうしの予備の並びだけに使う)。
  *         例: 光の使徒の変化先になる役職は groups: { "transform:light_apostle": 3 }
  *   【必須・毎回入れること】新しい役職は、陣営に合う変化役の変化先に必ず入れる（抜けると、ロビーの変化候補・固定役の変化指定・設定のOFF・ガイドに出ない）:
@@ -174,6 +174,7 @@ window.ONW = window.ONW || {};
     fill(ONW.TOMO_ROLES, members("tomo"));
     fill(ONW.SELF_AS_VILLAGER, members("selfAsVillager"));
     fill(ONW.SELF_AS_WOLF, members("selfAsWolf"));
+    fill(ONW.SELF_AS_SEER, members("selfAsSeer"));
     fill(ONW.NEWS_HIDDEN, members("newsHidden"));
     const TG = ONW.TRANSFORM_GROUPS;
     Object.keys(TG).forEach((k) => delete TG[k]);

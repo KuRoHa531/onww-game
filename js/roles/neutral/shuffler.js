@@ -25,7 +25,7 @@
    *  口封じの狂人は、引いたときのターゲット決めと演出を 3of4 で作るまで山札から外す（マイクラ版は入る）。 */
   const BLOCKED = [
     "light_apostle", "dark_avatar", "silver_shadow",
-    "seer", "mad_seer", "robber", "relic_robber", "troublemaker",
+    "seer", "mad_seer", "fake_seer", "robber", "relic_robber", "troublemaker",
     "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman",
     "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler",
     "assassin", "merlin", "mason", "cultist",
@@ -104,7 +104,7 @@
   //  ・恋人（重複役職）: 恋人陣営が勝っているときは乗っ取らない（恋人 ＞ シャッフラー）。恋人陣営が勝てなかったときは、(+恋人)を持つシャッフラー本人は恋人として判定されて敗北、対象(第三陣営など)だけがシャッフラー陣営として勝てる。対象が(+恋人)の組は乗っ取らない。
   //  ・チキンの逆転（chickenForce）のときも乗っ取らない。
   //  すべてカードの印（picks）で追従するので、昼のうちに怪盗などでカードが動いても、最終盤面のカードの持ち主で判定される。
-  const DEATH_WIN = () => [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER];   // 追放・死亡しないと勝てない役職（処刑人は入れない: 処刑人に変化させた組は、変化させた人が死亡したら失敗）
+  const DEATH_WIN = () => [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER];   // 追放・死亡しないと勝てない役職（処刑人は入れない: 処刑人に変化させた組は、変化させた人が死亡したら失敗）
   const teamOfRole = (r) => (ONW.roles.getInfo(r) || {}).team;
   const isLv = (g, id) => !!(ONW.isLover && ONW.isLover(g, id));
   /** この組が失敗か。w = 勝者の集合（てるてる系は勝者に入っていれば死亡しても可） */
@@ -202,7 +202,7 @@
    *  それ以外は死亡すると失敗なので票を入れない（ONW.shuffler.failed の条件と同じ） */
   function cpuVoteScore(k, g, p, q, i) {
     if (!i.shuffle || i.shuffle.target !== q.id || q.id === p.id) return 0;
-    return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER].includes(i.shuffle.role) ? 100 : -100;
+    return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER].includes(i.shuffle.role) ? 100 : -100;
   }
 
   ONW.defineRole("shuffler", {
@@ -242,7 +242,7 @@
         const r = shuffle(g, holderOf(g, p.id), t);
         g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         c.hold(p.id, `${nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`);
-        ONW.observeNote(g, p.id, [t]);
+        ONW.observeNote(g, p.id, [t], null, "shuffler");
         ONW.newsNote(g, "shuffler");
         c.rev[p.id] = { kind: "shuffler", target: t, role: ONW.shownRole(r.role) };   // 朝の演出用（2of4 で山札からめくって置く演出にする）
       },

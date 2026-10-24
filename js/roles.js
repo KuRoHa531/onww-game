@@ -420,6 +420,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF], priority: [ONW.ROLE.VILLAGER] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
+    { trigger: ONW.ROLE.FAKE_SEER,      required: [ONW.ROLE.SEER] },                             // 偽占い師が出る闇鍋には、占い師も最低1枚出す（偽占い師の結果は占い師と見比べて初めて意味が出る。マイクラ版 YAMINABE の偽占い師シナジー）
     { trigger: ONW.ROLE.MIRAGE_WOLF,    required: [ONW.ROLE.SEER] },                             // 蜃気狼が出る闇鍋には、占い師も最低1枚出す（占われてランダムな役職に見えるのが活きる盤面。マイクラ版 YAMINABE の蜃気狼シナジー: 占い師・偽占い師・感覚の占い師・指読みのどれか。Web版にあるのは占い師）
     { trigger: ONW.ROLE.REBEL_MADMAN,   required: [ONW.ROLE.DICTATOR] },                       // 反逆の狂人が出る闇鍋には、独裁者も最低1枚出す（反転させるクーデターの相手がいないと活きない。マイクラ版 YAMINABE の反逆の狂人シナジー）
     { trigger: ONW.ROLE.BLACK_WOLF_MADMAN, required: [ONW.ROLE.WEREWOLF, ONW.ROLE.SEER] },   // 黒子の狂人が出る闇鍋には、人狼と占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面。マイクラ版 YAMINABE の黒子の狂人シナジー）
@@ -427,6 +428,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.FOX,            required: [ONW.ROLE.SEER] },                             // 妖狐が出る闇鍋には、占い師も最低1枚出す（妖狐は占われて呪殺されるため。マイクラ版 YAMINABE の妖狐シナジー）
     { trigger: ONW.ROLE.FOX_MARKED,     required: [ONW.ROLE.SEER, ONW.ROLE.FOX, ONW.ROLE.VILLAGER], priority: [ONW.ROLE.VILLAGER] },   // 狐憑きが出る闇鍋には、占い師・妖狐・村人も最低1枚ずつ出す（占われて「妖狐」と出る相手と、本物の妖狐。自分を村人だと思い込む狐憑きに、本物の村人が1人は並ぶように）
     { trigger: ONW.ROLE.FANATIC,        required: [ONW.ROLE.FOX, ONW.ROLE.SEER] },               // 背徳者が出る闇鍋には、ご主人の妖狐と占い師も最低1枚ずつ出す（妖狐を呪殺できる占い師がいる盤面にする）
+    { trigger: ONW.ROLE.PRINCESS,       required: [ONW.ROLE.VILLAGER, ONW.ROLE.QUEEN], priority: [ONW.ROLE.VILLAGER] },   // 姫君が出る闇鍋には、村人（自認村人の相方）と女王も最低1枚ずつ出す（マイクラ版 YAMINABE の姫君シナジー。昇格する相手・夜に姫君を知る女王がいる盤面）
     { trigger: ONW.ROLE.MASON,          required: [ONW.ROLE.MASON, ONW.ROLE.MASON] },           // 共有者が出る闇鍋には、光の使徒から変化した共有者を合わせて最低2枚出す（共有者が1人だけにならない）
   ];
   /** 闇鍋シナジー一覧。SYNERGY_RULES に、自認村人の役職(ONW.SELF_AS_VILLAGER)で村人のルールがまだ無いものを自動で足す（優先度高め）。新しい自認村人の役職を足しても、村人が出るシナジーが自動でつく */
@@ -447,11 +449,12 @@ window.ONW = window.ONW || {};
    * 今後候補を足すときは、ここに役職を1つ足すだけ（光の使徒の変化先である役職に限る）。
    */
   ONW.MAPO_COUNTER_ROLES = [ONW.ROLE.MAYOR, ONW.ROLE.WATCHDOG, ONW.ROLE.SHERIFF, ONW.ROLE.EXCHANGER, ONW.ROLE.DICTATOR];
-  /** 封印の効果を受ける役職（マイクラ版 YAMINABE_SEAL_TARGET_ROLES のうち、このWeb版にある役職。復讐者・愉快犯を足して44役職）。封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足すときは、マイクラ版の一覧に入っている役職をここにも足す */
-  ONW.SEAL_TARGET_ROLES = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker", "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "keymaster", "watchdog", "mind_wolf", "mimic_wolf", "eraser_wolf", "assassin", "wolf_king", "mayor", "mad_mayor", "mapo_wolf", "observer_wolf", "newspaper", "chicken", "queen", "mad_queen", "black_cat", "cat_pumpkin", "cat_sidhe", "insomniac", "tough_guy", "baker", "dictator", "sheriff", "exchanger", "mad_exchanger", "thief", "avenger", "prankster"];
+  /** 封印の効果を受ける役職（マイクラ版 YAMINABE_SEAL_TARGET_ROLES のうち、このWeb版にある役職。復讐者・愉快犯・感覚の占い師を足して45役職）。封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足すときは、マイクラ版の一覧に入っている役職をここにも足す */
+  ONW.SEAL_TARGET_ROLES = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker", "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "keymaster", "watchdog", "mind_wolf", "mimic_wolf", "eraser_wolf", "assassin", "wolf_king", "mayor", "mad_mayor", "mapo_wolf", "observer_wolf", "newspaper", "chicken", "queen", "mad_queen", "black_cat", "cat_pumpkin", "cat_sidhe", "insomniac", "tough_guy", "baker", "dictator", "sheriff", "exchanger", "mad_exchanger", "thief", "avenger", "prankster", "sense_seer", "libra", "fake_seer", "poet"];
   ONW.SYNERGY_COUNT_RULES = [
     { trigger: ONW.ROLE.INSOMNIAC, label: "役職を変える役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
     { trigger: ONW.ROLE.KEYMASTER, label: "ロック対象の役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリン）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
+    { trigger: ONW.ROLE.POET, label: "詩人が見られる役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.SEER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.VISITOR, ONW.ROLE.KEYMASTER, ONW.ROLE.WATCHDOG, ONW.ROLE.FAKE_SEER, ONW.ROLE.ERASER_WOLF, ONW.ROLE.EXPOSED_MADMAN, ONW.ROLE.SEAL_MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.FREETER, ONW.ROLE.GREMLIN, ONW.ROLE.LOVE_TANNER, ONW.ROLE.PURE_LOVER, ONW.ROLE.EVIL_WOMAN, ONW.ROLE.AVENGER, ONW.ROLE.PRANKSTER, ONW.ROLE.CUPID, ONW.ROLE.HEARTBREAKER, ONW.ROLE.SHUFFLER], min: 2 },   // 詩人が出る闇鍋には、詩人の通知に出る（夜に対象を選ぶ能力を使う。ONW.observeNote に記録される）役職を合わせて最低2枚出す（墓地だけを対象にする墓荒らしは通知に出ないので除く）
     { trigger: ONW.ROLE.HEARTBREAKER, label: "恋人系役職", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
     { trigger: ONW.ROLE.MAPO_WOLF, label: "麻婆対抗役", get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
     { trigger: ONW.ROLE.SEAL_MADMAN, label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES; }, min: 3 },   // 封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE の封印の狂人シナジー: YAMINABE_SEAL_TARGET_ROLES を3枚。Web版にある役職の分）
