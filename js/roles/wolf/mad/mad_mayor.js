@@ -17,7 +17,7 @@
  */
 (function (ONW) {
   ONW.defineRole("mad_mayor", {
-    info: { deck: 75, name: "狂ったメイヤー", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.67,
+    info: { sealTarget: true, deck: 75, name: "狂ったメイヤー", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.67,
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。昼の投票で、ルーム設定の狂ったメイヤー票数ぶん投票できます（最終盤面で狂ったメイヤーを持っている人の1票が、その票数ぶんとして数えられます）。票数はルーム設定で全員が見られます。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.9, "transform:dark_avatar": 18 },
     descFor: (desc, g) => desc.replace("ルーム設定の狂ったメイヤー票数", `ルーム設定の狂ったメイヤー票数（このルームでは${ONW.madMayorVotes(g)}票）`),   // いまのルーム設定の票数を説明文に差し込む（メイヤーの descFor と同じ作り）

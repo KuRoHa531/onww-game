@@ -4,7 +4,7 @@
   const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.TOUGH_GUY && !ONW.hiddenDrunk(g, id) && !(ONW.seal && ONW.seal.is(g, id));   // 封印の狂人に封印されているタフガイは、はじき返しも道連れ無効も働かない（2of4b）   // 模倣の人狼がタフガイを模倣していても働く（受動効果は模倣先で見る）
 
   ONW.defineRole("tough_guy", {
-    info: { deck: 47, name: "タフガイ", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.5,
+    info: { sealTarget: true, deck: 47, name: "タフガイ", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.5,
       desc: "村人陣営。夜の能力はありません。最多得票になっても追放されず、カードがめくれて票をはじき返します。はじき返された票は次点の得票者（同数なら全員）にとばっちりとして降りかかり、代わりに追放されます（とばっちりで追放された人は、てるてる・一目惚れしてるてるの勝利条件も、処刑人のターゲットが追放された扱いも満たしません）。猫又・黒猫・ネコカボチャ・わら人形の道連れでは死亡しません（心中・無理心中ははじき返せず、死亡します）。" },
     // CPUの発言: 本家(cpu.js)どおり55%で本当にタフガイCO、残り45%は村人騙り（村人が配役にいないときは、いる村役職の騙り）
     cpuClaim(k, g, p, r, i, c) {

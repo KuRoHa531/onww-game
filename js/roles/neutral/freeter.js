@@ -190,7 +190,7 @@
       fids.forEach((f) => { i.known[f] = "freeter"; });
     },
     cpuNight: { order: 30, stage: "seer", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
-    info: { deck: 34, name: "フリーター", team: ONW.TEAM.THIRD, wakeOrder: 6, sort: 37,
+    info: { observe: "player", sealTarget: true, deck: 34, name: "フリーター", team: ONW.TEAM.THIRD, wakeOrder: 6, sort: 37,
       desc: "第三陣営。夜に1人を選んで就職し、その人の初期役職がわかります。就職先が勝利したら自分も追加で勝利します（役職が入れ替わっても、就職先はカードについていきます）。昼の議論中に就職先が死亡したら、昼能力ボタンから生きている人へ再就職でき（新しい就職先が死亡するたびに何度でも）、新しい就職先の最終役職（そのときのカード）がわかります。勝敗は最後の就職先で決まります。朝のあとの待機時間に、あなたに就職したフリーターのカードが表になります。" },
     groups: { "transform:silver_shadow": 6 },
     night: {

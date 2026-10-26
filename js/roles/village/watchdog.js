@@ -114,7 +114,7 @@
     return c;
   }
   ONW.defineRole("watchdog", {
-    info: { deck: 66, name: "番犬", team: ONW.TEAM.VILLAGE, wakeOrder: 12, sort: 17.95,
+    info: { observe: "player", sealTarget: true, deck: 66, name: "番犬", team: ONW.TEAM.VILLAGE, wakeOrder: 12, sort: 17.95,
       desc: "村人陣営。夜に自分以外の1人を飼い主に選びます。朝、番犬から見て選んだ飼い主のカードが🦴でめくれます。飼い主は追放されなくなりますが、番犬自身が飼い主に投票すると飼い主を噛み殺します。役職が入れ替わると、飼い主の判定もカードについていきます（上書きされると消えます）。" },
     groups: { "transform:light_apostle": 27 },   // 光の使徒の変化先（村人系）
     uiNight: {

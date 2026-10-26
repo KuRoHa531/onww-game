@@ -7,7 +7,7 @@
 (function (ONW) {
   const K = ONW.wolfKit;
   ONW.defineRole("cat_pumpkin", {
-    info: { deck: 49, name: "ネコカボチャ", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.5,
+    info: { sealTarget: true, deck: 49, name: "ネコカボチャ", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.5,
       desc: "人狼陣営。他の人狼を確認できます。追放されると、黒猫と同じようにランダムな1人を道連れにします。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 9, tomo: 4, "transform:dark_avatar": 9 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,

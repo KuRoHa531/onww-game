@@ -77,7 +77,7 @@
 
   ONW.defineRole("fake_seer", {
     like: "seer",   // 夜の画面・選び方・CO・CPUの発言は占い師の定義を土台にする（結果の抽選に関わる night.resolve / morning.run / cpuNight.run は下で差し替え）
-    info: { deck: 89, count: 0, name: "偽占い師", team: ONW.TEAM.VILLAGE, wakeOrder: 40, sort: 23.1,
+    info: { observe: "player", sealTarget: true, deck: 89, count: 0, name: "偽占い師", team: ONW.TEAM.VILLAGE, wakeOrder: 40, sort: 23.1,
       desc: "村人陣営。本人には占い師として表示され、占い師と同じ夜能力（プレイヤー1人か墓地カードを見る）を使えます。ただし結果は配役内からランダムに表示され、妖狐を占っても呪殺しません。" },
     groups: { selfAsSeer: 1, "transform:light_apostle": 34 },   // 自認は占い師。光の使徒の変化先（村人系）。並びは ROLE_ORDER で決まる（番号は所属を表すだけ）
     cpuNight: Object.assign({}, base.cpuNight, { run }),

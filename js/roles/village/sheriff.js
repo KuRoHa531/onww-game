@@ -291,7 +291,7 @@
   Object.assign(ONW.sheriff, { shotClaims, claimJudge, confirmedHits, cpuVoteSee });
 
   ONW.defineRole("sheriff", {
-    info: { deck: 67, name: "保安官", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.97,
+    info: { sealTarget: true, deck: 67, name: "保安官", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.97,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外の1人を撃ちます。村人陣営でない人を撃つと、その人は死に、勝利条件と投票権を失います。村人陣営を撃ってしまうと、死ぬのは保安官自身です。（模倣の人狼が模倣したときは逆で、人狼陣営でない人を撃つと執行され、人狼陣営を撃つと自分が死にます。）どちらの場合も、昼のあいだは周りからは同じ「撃たれた」としか見えません（カードには銃痕とひびだけ）。結果発表で「執行」か「誤爆」かが分かります。シュレディンガーの猫を撃っても誰も死にませんが、その猫は村人陣営に固定されます（人狼王にガードされた場合などは何も起きません）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に保安官を持っている人が使えます。" },
     groups: { "transform:light_apostle": 28 },   // 光の使徒の変化先（村人系）
     // CPU（5of6a）: 本物は必ず「保安官CO」。騙りは低い確率で「保安官CO」だけ（結果なし。claim を書かないと、村人が配役にいるとき「村人CO」に置き換わってしまう）

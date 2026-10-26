@@ -47,7 +47,7 @@
   ONW.dictator = { canUse, targets, declare };
 
   ONW.defineRole("dictator", {
-    info: { deck: 64, name: "独裁者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.8,
+    info: { sealTarget: true, deck: 64, name: "独裁者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.8,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから独裁を宣言すると、すぐに議論を打ち切り（投票はしません）、選んだ相手だけを処刑します。従者は身代わりになれません。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に独裁者を持っている人が使えます。" },
     groups: { "transform:light_apostle": 25 },   // 光の使徒の変化先（村人系）
 

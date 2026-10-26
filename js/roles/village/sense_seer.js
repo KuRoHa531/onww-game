@@ -35,7 +35,7 @@
     "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]);
   /** 狂人系（マイクラ版 isMadRole のうち Web版にある役職） */
   const MAD_ROLES = new Set(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen",
-    "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger"]);
+    "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman"]);
 
   /** 役職 role（持ち主 id）の気配の種類（蜃気狼・恋人は見ない。そこは judge）。昇格した狂人は人狼 */
   function classify(g, role, id) {
@@ -149,7 +149,7 @@
   ONW.senseSeer = { achievements, FEEL, classify, judge, resultText, feelLabel, coText, coHideText, coOptions, canUse, targets, used, targetOf, apply, doneText, specLines };
 
   ONW.defineRole("sense_seer", {
-    info: { deck: 86, name: "感覚の占い師", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.98,
+    info: { sealTarget: true, deck: 86, name: "感覚の占い師", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.98,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外の1人を選ぶと、その人の最終役職（そのときのカード）から「村人・人狼・狂っている・第三陣営・恋人陣営」のどの気配かを感じ取れます。妖狐を占っても呪殺しません。蜃気狼は、盤面にあり得るランダムな役職の気配に感じられます。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に感覚の占い師を持っている人が使えます。" },
     groups: { "transform:light_apostle": 31 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER（wiki の order 31）で決まる（番号は所属を表すだけ）
     // 昼の演出(stage.js の flashes("early") が g.senseFlash を渡す。net.js の senseday が items [{ id, key }] を入れる): 感じ取った相手のカードがめくれ、気配の色の光と「👁 気配」の札で数秒開いて裏に戻る。

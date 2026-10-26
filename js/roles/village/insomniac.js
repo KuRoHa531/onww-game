@@ -68,7 +68,7 @@
     // CPU: 最終役職を知る(酔い覚め直後 sober / 夜が終わったあと after / 昼に動いたとき notice)
     cpuSober(g, id, i, shown) { i.mode = "insomniac"; i.finalRole = shown; },
     cpuAfter: cpuFinal, cpuNotice: cpuFinal,
-    info: { deck: 12, name: "後覚者", team: ONW.TEAM.VILLAGE, wakeOrder: 70, sort: 28,
+    info: { sealTarget: true, deck: 12, name: "後覚者", team: ONW.TEAM.VILLAGE, wakeOrder: 70, sort: 28,
       desc: "村人陣営。夜行動がすべて終わったあと、自分の最終役職を確認できます。" },
     groups: { "transform:light_apostle": 6 },
     settleMsg: { order: 10, run(c, p, mode) {

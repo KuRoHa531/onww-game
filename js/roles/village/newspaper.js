@@ -13,7 +13,7 @@
   }
 
   ONW.defineRole("newspaper", {
-    info: { deck: 43, name: "新聞配達員", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 13,
+    info: { sealTarget: true, deck: 43, name: "新聞配達員", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 13,
       desc: "村人陣営。夜の能力はありません。最終盤面に新聞配達員がいると、昼になって変化公開のあと、昨夜能力を使った役職の名前が新聞として全員に知らされます（プレイヤー名は分かりません）。闇の化身・光の使徒・銀色の影は載りません。新聞は「情報確認」からいつでも見返せます。" },
     groups: { "transform:light_apostle": 16 },
     /** 昼の始まり(変化公開のあと): 新聞の紙を出す。戻り値: 紙が出終わるまでの待ち時間(ms)。出さないときは 0 */

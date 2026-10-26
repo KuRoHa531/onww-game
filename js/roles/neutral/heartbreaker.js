@@ -106,7 +106,7 @@
   }
 
   ONW.defineRole("heartbreaker", {
-    info: { deck: 57, name: "破局師", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.8,
+    info: { observe: "player", sealTarget: true, deck: 57, name: "破局師", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.8,
       desc: "第三陣営（破局の側）。夜に自分以外の1人を選びます。選んだ人が恋人関係にあれば、その恋人関係を壊します（破局）。待機時間に、破局させた恋人のペアのカードが💔でめくれます。選ばれた人・恋人の人には何も知らされません。破局に成功すると、あなたも追加で勝利します。（闇鍋で破局師が出るときは、悪女・純愛者・キューピッドのどれかも必ず出ます。）" },
     groups: { "transform:silver_shadow": 17 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）
     uiNight: {

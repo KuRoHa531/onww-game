@@ -164,7 +164,7 @@
   ONW.eraserWolf = { targetOf, afterRole, resolve, failText, resultFor, coText, specLines, achievements };
 
   ONW.defineRole("eraser_wolf", {
-    info: { deck: 70, name: "抹消の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.58,
+    info: { observe: "player", sealTarget: true, deck: 70, name: "抹消の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.58,
       desc: "人狼陣営。他の人狼を確認できます。夜に自分以外の1人を選ぶと、朝にその人の役職と重複役職を抹消します（人狼系は人狼、狂人系は狂人、村人陣営・第三陣営は村人になります）。対象がロックされている場合は失敗します。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 8.8, "transform:dark_avatar": 9.3 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,

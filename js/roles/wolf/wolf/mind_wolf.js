@@ -84,7 +84,7 @@
   ONW.mindWolf = { canUse, targets, used, targetOf, apply, resultText, coText, coHideText, doneText, specLines };
 
   ONW.defineRole("mind_wolf", {
-    info: { deck: 68, name: "心眼の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.56,
+    info: { sealTarget: true, deck: 68, name: "心眼の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.56,
       desc: "人狼陣営。他の人狼を確認できます。昼の議論中に、昼能力ボタンから対象1人を選ぶと、その人の最終役職（そのときのカード）が分かります。妖狐を見抜いても呪殺しません。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 8.7, "transform:dark_avatar": 9.2 },
     nightMsg: K.nightMsg, got: K.got, soberPeek: K.soberPeek,

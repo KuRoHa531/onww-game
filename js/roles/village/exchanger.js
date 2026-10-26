@@ -65,7 +65,7 @@
   ONW.exchanger = { canUse, targets, apply, used, view, cancelled, roleOf, isEx, run: (R, ex, steps, cap) => runSwaps(R, ex, steps, cap), ms: (ex) => swapsMs(ex) };
 
   ONW.defineRole("exchanger", {
-    info: { deck: 65, name: "交換者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.9,
+    info: { sealTarget: true, deck: 65, name: "交換者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.9,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから生きている人を2人（自分を含めてよい）選ぶと、その2人の票数を入れ替えます。入れ替わるのは投票の集計のときで、結果発表で票数が出たあとに入れ替わる様子が見えます。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に交換者を持っている人が使えます。交換者が複数いれば、使った順に入れ替わります。" },
     groups: { "transform:light_apostle": 26 },   // 光の使徒の変化先（村人系）
 

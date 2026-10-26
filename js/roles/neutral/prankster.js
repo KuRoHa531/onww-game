@@ -102,7 +102,7 @@
   }
 
   ONW.defineRole("prankster", {
-    info: { deck: 83, name: "愉快犯", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 35.8,
+    info: { observe: "player", sealTarget: true, deck: 83, name: "愉快犯", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 35.8,
       desc: "第三陣営。夜に自分以外のプレイヤーを1人選びます。選んだ相手を基準に、「選んだ人が敗北したら／勝利したら」のあとに「追加勝利・単独勝利・全員敗北・全員勝利・選んだ人だけ勝利・選んだ人以外全員勝利・愉快犯以外全員勝利」のいずれかが続く14通りの勝利条件から、1つがランダムで適用されます（どの条件になるかは愉快犯本人にも分かりません）。愉快犯が2人以上いる場合は、誰か1人の条件が共有されて適用されます。夜に対象を選んだ愉快犯がいると、昼の始まりに「愉快な笑い声が聞こえました。」と全員に知らされます。" },
     groups: { "transform:silver_shadow": 23 },   // 銀色の影の変化先（第三陣営の役職は必ず入れる）
     uiNight: {

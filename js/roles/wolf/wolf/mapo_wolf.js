@@ -19,7 +19,7 @@
     return true;
   }
   ONW.defineRole("mapo_wolf", {
-    info: { deck: 50, name: "麻婆の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.45,
+    info: { sealTarget: true, deck: 50, name: "麻婆の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.45,
       desc: "人狼陣営。他の人狼を確認できます。麻婆の人狼と豆腐の人狼が同時にいるとき、昼の始まりに麻婆豆腐が完成し、豆腐の人狼は1票ではメンタル崩壊せず（最多得票のときだけ追放）2票持ちになります。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 8.5, "transform:dark_avatar": 8.5 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,

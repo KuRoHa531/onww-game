@@ -323,7 +323,7 @@ window.ONW = window.ONW || {};
         if (!game.eliminated.includes(m) || game.eliminated.includes(s)) return;
         if (ONW.isLover(game, s)) return;                         // 従者自身が恋人（恋人陣営）なら身代わりにならない
         if (gone.has(s)) return;                                    // すでに死んでいる従者は身代わりになれない
-        if (blocked.includes(game.currentRoles[m])) return;         // 従者の連鎖・てるてる系は身代わりにしない
+        if (blocked.includes(game.currentRoles[m]) || ONW.vote.jesterSubBlocked(game, m)) return;         // 従者の連鎖・てるてる系・昇格していない道化の狂人は身代わりにしない
         game.eliminated = game.eliminated.filter((x) => x !== m);
         game.eliminated.push(s);
         game.mentalIds = (game.mentalIds || []).filter((x) => x !== m);
@@ -395,7 +395,7 @@ window.ONW = window.ONW || {};
       //   従者がまだ死んでいない / 従者が恋人でない / ご主人の最終役職が 従者・てるてる坊主・一目惚れしてるてる でない。従者が複数いれば先に見つかった1人
       if (kind === "tomo" || kind === "bomb") {   // 道連れ・爆殺（道化の爆弾魔）: 従者がご主人の身代わりになる
         const blocked = [R.SERVANT, R.TANNER, R.LOVE_TANNER, R.BOUNTY_HUNTER, R.JESTER_BOMBER];
-        const sub = blocked.includes(game.currentRoles[t]) ? null : ONW.servantSubPairs(game).find(([s, m]) => m === t && s !== t && !done.has(s) && !gone.has(s) && !tomoSimul.has(s) && !ONW.isLover(game, s));   // 従者が同時に（同じ波で）道連れにされるときも、先に死んでいるときも、身代わりにならない
+        const sub = blocked.includes(game.currentRoles[t]) || ONW.vote.jesterSubBlocked(game, t) ? null : ONW.servantSubPairs(game).find(([s, m]) => m === t && s !== t && !done.has(s) && !gone.has(s) && !tomoSimul.has(s) && !ONW.isLover(game, s));   // 従者が同時に（同じ波で）道連れにされるときも、先に死んでいるときも、身代わりにならない
         if (sub) { game.chainSub[sub[0]] = t; return kill(sub[0], by, kind, chain); }
       }
       done.add(t); if (chain) queue.push(t); game.chainIds.push(t); game.chainBy[t] = by; game.chainKind[t] = kind; if (late) game.chainLate[t] = true;
@@ -638,12 +638,12 @@ window.ONW = window.ONW || {};
   /**
    * 勝敗を判定する（マイクラ版の優先順位に準拠。このWeb版にある役職の範囲）。
    * 【勝利優先度（正本: docs/victory-priority.md。ここを変えるときは必ず合わせて直す）】
-   *   チキン ＞ 神の祝福 ＞ シャッフラー ＞ 名探偵 ＞ 賞金稼ぎ ＞ バランサー ＞ てるてる坊主＝一目惚れしてるてる＝処刑人 ＞ 恋人 ＞ 神 ＞ 妖狐 ＞ アサシン(暗殺成功) ＞ 村人陣営＝人狼陣営
+   *   チキン ＞ 神の祝福 ＞ シャッフラー ＞ 名探偵 ＞ 賞金稼ぎ ＞ バランサー ＞ 道化の狂人 ＞ てるてる坊主＝一目惚れしてるてる＝処刑人 ＞ 恋人 ＞ 神 ＞ 妖狐 ＞ アサシン(暗殺成功) ＞ 村人陣営＝人狼陣営
    *   ・チキン: 村人陣営以外が勝つ結果を、生存したチキンが村人陣営の勝利に逆転（determineWinners / chickenForce で下の分岐をすべて飛ばす）
    *   ・シャッフラー: 通常の結果が出たあと、対象が勝者に入っていれば乗っ取る（determineWinnersCore。神の祝福・恋人・チキンの逆転では乗っ取らない）
    *   ・妖狐: 村人陣営・人狼陣営（アサシンの逆転後の人狼陣営も）が勝つ結果だけを、全員生存の妖狐が乗っ取る（determineWinnersCore）
    *   1. 神が追放された        → 神の祝福: 神以外の全員が勝利（追放されたオポチュニストは除く）
-   *   1.5 恋人 / 1.6 名探偵（全員の初期役職を当てた）/ 1.7 賞金稼ぎ / 1.8 バランサー（票が入った全員の票数が同じ）
+   *   1.5 恋人 / 1.6 名探偵（全員の初期役職を当てた）/ 1.7 賞金稼ぎ / 1.8 バランサー（票が入った全員の票数が同じ）/ 1.9 道化の狂人（追放・道連れで死亡 → 人狼陣営の勝利）
    *   2. てるてる系が追放された / 2.5 処刑人のターゲットが追放された → 同じ順位（一緒に勝つ）
    *   3. 神が追放されていない   → 神降臨: 神の単独勝利
    *   3.8 王国滅亡（女王が倒れた。この優先度表には載っていない）
@@ -662,6 +662,45 @@ window.ONW = window.ONW || {};
    */
   vote.deadSet = function deadSet(game) {
     return new Set([...(game.executed || []), ...(game.deadIds || [])]);
+  };
+
+  /**
+   * 執念の狂人（js/roles/wolf/mad/tenacious_madman.js・docs/tenacious-madman.md）: 人狼陣営が勝利する結果でも、死亡していると勝者から外れる人のID
+   * （マイクラ版 addWolfTeamWinners / cannotWinByGodBlessing）。勝利優先度の表に新しい行は作らない（狂人系の基本勝敗の中で、本人だけが外れる）。
+   *   ・最終盤面で執念の狂人を持っていて、死亡した人。死因は問わない（追放・道連れ・心中・後追い・昼中の死亡など = vote.deadSet。game.executed が resolveChain のあとで更新済みのときに呼ぶこと）。
+   *   ・封印されている人は対象外（ふつうの狂人と同じに勝つ）。ただし人狼判定に昇格している人は、封印されていても対象（マイクラ版どおり。昇格した人が死ねば、どのみち村人陣営の勝ち）。
+   *   ・opts.god: 神の祝福の勝者を決めるとき。マイクラ版 cannotWinByGodBlessing は封印を見ないので、封印の例外なし。
+   *   ・使う所: determineWinnersCoreBase の 神の祝福(1) / 王国滅亡の人狼陣営勝利(3.8) / 基本勝敗の人狼陣営(4)。ほかの陣営（村人・第三・恋人など）の勝利には関わらない。
+   */
+  vote.tenaciousLostIds = function tenaciousLostIds(game, opts) {
+    const dead = ONW.vote.deadSet(game), god = !!(opts && opts.god), promoted = game.promotedWolfIds || [];
+    return game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.TENACIOUS_MADMAN && dead.has(id)
+      && (god || !(ONW.seal && ONW.seal.is(game, id)) || promoted.includes(id)));
+  };
+
+  /**
+   * 道化の狂人（js/roles/wolf/mad/jester_madman.js・docs/jester-madman.md）: 追放または道連れで死亡して、人狼陣営の勝利を作る人のID（マイクラ版 buildJesterMadmanPriorityResult）。
+   *   ・最終盤面で道化の狂人を持っていて、追放（game.executed のうち、直接の追放 と 道連れ kind "tomo"）で死んだ人。マイクラ版の死因 execute / chain だけ。
+   *   ・心中・無理心中・後追い・王国滅亡・番犬の噛殺・爆殺（道化の爆弾魔）・昼中の死亡（呪殺など。game.deadIds だけにいる人）では働かない。
+   *   ・人狼判定に昇格している人（game.promotedWolfIds）は対象外（吊られたら人狼判定の死亡で村人陣営の勝ち）。封印されている人も対象外（ふつうの狂人と同じ）。
+   *   ・使う所: determineWinnersCoreBase の分岐 1.9（バランサーの下・てるてる系の上）。チキンの逆転の再判定（chickenForce）では使わない。
+   */
+  vote.jesterMadmanIds = function jesterMadmanIds(game) {
+    if (!game.currentRoles || !ONW.ROLE.JESTER_MADMAN) return [];
+    const ex = new Set(game.executed || []), ck = game.chainKind || {}, promoted = game.promotedWolfIds || [];
+    return game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.JESTER_MADMAN && ex.has(id) && (ck[id] === undefined || ck[id] === "tomo")
+      && !promoted.includes(id) && !(ONW.seal && ONW.seal.is(game, id)));
+  };
+
+  /**
+   * 道化の狂人は、従者の身代わりにならない（マイクラ版 isServantSubstitutionBlockedRole: 道化の狂人で、人狼判定に昇格していない人）。
+   *   ・昇格している道化の狂人（人狼がいないときの代用人狼）は、ふつうに身代わりになる。昇格は updatePromotion で決める（結果を変えない: 配布時のカードで決まる）。
+   *   ・使う所: applyServantSubstitution（追放の身代わり）と resolveChain の kill()（道連れ・爆殺の身代わり）。
+   */
+  vote.jesterSubBlocked = function jesterSubBlocked(game, id) {
+    if (!ONW.ROLE.JESTER_MADMAN || (game.currentRoles || {})[id] !== ONW.ROLE.JESTER_MADMAN) return false;
+    ONW.vote.updatePromotion(game);
+    return !(game.promotedWolfIds || []).includes(id);
   };
 
   /**
@@ -688,6 +727,8 @@ window.ONW = window.ONW || {};
     game.assassinResult = (game.assassinList || []).map((a) => ({ by: a.id, target: a.target, hit: E(game, a.target) === R.MERLIN }));   // 結果の演出用
     game.bountyResult = ONW.bountyResult(game);   // 賞金稼ぎ: 選んだ相手が最終盤面で人狼判定（本物の人狼系 + 昇格した狂人）か（結果の演出・勝敗用）
     const dead = ONW.vote.deadSet(game);   // 死んだ人全員（死因を問わない。game.executed は上で更新済み）
+    game.jesterMadmanWin = [];   // 道化の狂人: 追放・道連れで死亡して人狼陣営の勝利を作った人（分岐 1.9。結果の説明用）
+    game.tenaciousCut = [];   // 執念の狂人: 死亡したため人狼陣営（または神の祝福）の勝利から外れた人（勝敗の説明用。下の 1 / 3.8 / 4 の分岐が決める）
     const gods = ids.filter((id) => role(id) === R.GOD);
     game.godMode = null; game.godIds = []; game.godBlown = [];   // 結果の演出用: "bless"（神の祝福）/ "descend"（神降臨）/ null
     // 無理心中で巻き込まれたてるてる系は、自分のてるてる勝利は発動しない（相手の一目惚れしてるてると「一緒に勝った」扱いになるだけ）
@@ -836,6 +877,7 @@ window.ONW = window.ONW || {};
       if (shBan.size && ONW.shuffler) game.winDetail = `${game.winDetail}\n${ONW.shuffler.failText(game, [...shBan])}`;
       shotLostIds.forEach((id) => { if (w.has(id)) shotCut.add(id); w.delete(id); });   // 追加勝利（破局師・天邪鬼・勝ち組など）でも、撃たれて死んだ人は勝てない
       if (shotCut.size) game.winDetail = `${game.winDetail}\n${nm([...shotCut])} は保安官に撃たれたため、勝利条件を失いました。`;
+      if ((game.tenaciousCut || []).length && !game.foxTake && !game.shufflerTake) game.winDetail = `${game.winDetail}\n執念の狂人 ${nm(game.tenaciousCut)} は死亡したため、勝利条件を失いました。`;   // 執念の狂人（docs/tenacious-madman.md）
       game.winnerIds = [...w];
       return game.winners;
     };
@@ -844,7 +886,9 @@ window.ONW = window.ONW || {};
     if (!game.chickenForce && godBless.length) {
       game.godMode = "bless"; game.godIds = godBless.slice();
       game.godBlown = ids.filter((id) => (role(id) === R.OPPORTUNIST && dead.has(id)) || role(id) === R.AMANOJAKU || role(id) === R.LOSER);   // 結果演出: 祝福で吹き飛ばされるカード
-      const win = ids.filter((id) => role(id) !== R.GOD && role(id) !== R.AMANOJAKU && role(id) !== R.LOSER && !(role(id) === R.OPPORTUNIST && dead.has(id)));   // 天邪鬼は祝福に逆らえず敗北
+      const tenGod = ONW.vote.tenaciousLostIds(game, { god: true });   // 執念の狂人: 死亡していたら祝福でも勝てない（封印の例外なし。マイクラ版 cannotWinByGodBlessing）
+      game.tenaciousCut = tenGod.slice();
+      const win = ids.filter((id) => role(id) !== R.GOD && role(id) !== R.AMANOJAKU && role(id) !== R.LOSER && !(role(id) === R.OPPORTUNIST && dead.has(id)) && !tenGod.includes(id));   // 天邪鬼は祝福に逆らえず敗北
       return set("神の祝福を受けました", ["神の祝福"], win,
         `神 ${nm(godBless)} が追放されたため、神以外の全員が勝利です。追放されたオポチュニストと天邪鬼と負け組は勝利できません。`, [ONW.TEAM.THIRD]);
     }
@@ -865,6 +909,19 @@ window.ONW = window.ONW || {};
     const balWinIds = ONW.balancer && !game.chickenForce ? ONW.balancer.winIds(game).filter((id) => !shFailPre.has(id)) : [];
     if (!game.chickenForce && balWinIds.length) {
       return set("バランサー勝利", ["バランサー"], balWinIds, ONW.balancer.winText(game, balWinIds, nm), [ONW.TEAM.THIRD]);
+    }
+    // 1.9 道化の狂人の勝利（js/roles/wolf/mad/jester_madman.js・docs/jester-madman.md）: 追放または道連れで死亡した道化の狂人がいれば、人狼が1人以上死んでいても人狼陣営の勝利（マイクラ版 buildJesterMadmanPriorityResult）。
+    //   バランサーのすぐ下・てるてる系・処刑人のすぐ上（docs/victory-priority.md）。昇格した道化の狂人・封印された道化の狂人・追放以外の死因では起きない（vote.jesterMadmanIds）。
+    //   勝者は人狼陣営の基本勝敗と同じ（人狼系・狂人系・吊られた呪われし者。死亡した執念の狂人は外れる）。チキンの逆転は determineWinners がこの結果をもう一度作り直す（chickenForce では通らない）
+    const jesterIds = game.chickenForce ? [] : ONW.vote.jesterMadmanIds(game);
+    if (jesterIds.length) {
+      game.jesterMadmanWin = jesterIds.slice();
+      const tenJ = ONW.vote.tenaciousLostIds(game);
+      game.tenaciousCut = tenJ.slice();
+      const cwJ = game.cursedWolfIds || [], deadWolvesJ = ONW.vote.wolfJudgeIds(game).filter((id) => dead.has(id));
+      const winJ = ids.filter((id) => (cwJ.includes(id) ? ONW.TEAM.WOLF : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF && !tenJ.includes(id));
+      return set("人狼陣営勝利", ["人狼陣営"], winJ,
+        `道化の狂人 ${nm(jesterIds)} が追放または道連れで死亡したため、人狼陣営の勝利です。${deadWolvesJ.length ? `（死亡した人狼: ${nm(deadWolvesJ)}）` : ""}`, [ONW.TEAM.WOLF]);
     }
     // 2. てるてる系の勝利
     if (!game.chickenForce && (tanners.length || loveTanners.length)) {
@@ -899,7 +956,9 @@ window.ONW = window.ONW || {};
     if (!game.chickenForce && fallenQueens.length) {
       const wq = ONW.vote.wolfJudgeIds(game), wqDead = wq.filter((id) => dead.has(id));
       if (wqDead.length) return set("勝者なし", [], [], `女王 ${nm(fallenQueens)} と人狼判定の者 ${nm(wqDead)} が同時に倒れました。村人陣営は勝利条件を失い、人狼陣営も勝てないため勝者なしです。`, []);
-      const wolfTeam = ids.filter((id) => ONW.roles.getInfo(role(id)).team === ONW.TEAM.WOLF || (game.cursedWolfIds || []).includes(id));
+      const tenQ = ONW.vote.tenaciousLostIds(game);   // 執念の狂人: 死亡していたら人狼陣営の勝利でも勝てない（封印されていれば勝てる）
+      game.tenaciousCut = tenQ.slice();
+      const wolfTeam = ids.filter((id) => ONW.roles.getInfo(role(id)).team === ONW.TEAM.WOLF || (game.cursedWolfIds || []).includes(id)).filter((id) => !tenQ.includes(id));
       if (wolfTeam.length) return set("人狼陣営勝利", ["人狼陣営"], wolfTeam, `女王 ${nm(fallenQueens)} が倒れ、人狼判定の者は倒れていないため人狼陣営の勝利です。（村人陣営は勝利条件を失いました）`, [ONW.TEAM.WOLF]);
       return set("勝者なし", [], [], `女王 ${nm(fallenQueens)} が倒れ、村人陣営も人狼陣営も勝利条件を満たしませんでした。`, []);
     }
@@ -924,7 +983,9 @@ window.ONW = window.ONW || {};
     else detail = fake ? "人狼判定の者が誰も死亡しませんでした。" : "本物の人狼が誰も死亡しませんでした。";
     if (reversed) detail = `アサシン ${nm(assHits.map((a) => a.by))} が マーリン ${nm(assHits.map((a) => a.target))} を暗殺しました。人狼陣営の逆転勝利です。（${detail}）`;
     const cw = game.cursedWolfIds || [];   // 吊られた呪われし者は人狼陣営の側に入る（村人陣営の勝利には入らない）
-    const win = ids.filter((id) => (cw.includes(id) ? ONW.TEAM.WOLF : ONW.roles.getInfo(role(id)).team) === side);
+    const tenB = side === ONW.TEAM.WOLF ? ONW.vote.tenaciousLostIds(game) : [];   // 執念の狂人: 人狼陣営が勝つ結果（アサシンの逆転・模倣チキンの逆転も含む）でも、死亡していたら勝者から外れる（封印されていれば外れない）
+    game.tenaciousCut = tenB.slice();
+    const win = ids.filter((id) => (cw.includes(id) ? ONW.TEAM.WOLF : ONW.roles.getInfo(role(id)).team) === side && !tenB.includes(id));
     if (cw.length) detail += `（呪われし者 ${nm(cw)} は吊られて人狼陣営になりました）`;
     return set(side === ONW.TEAM.VILLAGE ? "村人陣営勝利" : "人狼陣営勝利", [side === ONW.TEAM.VILLAGE ? "村人陣営" : "人狼陣営"], win, detail, [side]);
   };

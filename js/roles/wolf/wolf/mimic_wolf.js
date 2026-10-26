@@ -232,7 +232,7 @@
   const skipMerge = (td, mr) => td.nightMsg === K.nightMsg || td.soberLines === K.soberLines || (ONW.SELF_AS_WOLF || []).includes(mr) || (ONW.SELF_AS_VILLAGER || []).includes(mr);
 
   ONW.defineRole("mimic_wolf", {
-    info: { deck: 69, name: "模倣の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.57,
+    info: { sealTarget: true, deck: 69, name: "模倣の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.57,
       desc: "人狼陣営。他の人狼を確認できます。試合の開始時に（墓地から引いたときは引いた時点で）、配役された盤面と墓地にある村人陣営・人狼陣営・狂人系の役職から1つをランダムに選び、その役職の能力を模倣して使えます（模倣先はカードの下に出ます）。占い・判定・勝利条件は常に人狼として扱われます（占われると「模倣の人狼」と出ます）。人狼・村人・狂人など一部の役職は模倣できません。例外: 白狼・忘却の人狼を模倣すると人狼判定に数えられず、狼夢人を模倣すると占い結果が人狼になります。保安官を模倣したときは、人狼陣営でない人を撃つと執行され、人狼陣営（白狼・模倣の人狼を含む）を撃つと誤爆して自分が死にます。チキンを模倣して最後まで生き残ると、人狼陣営が負けるはずの結果（村人陣営などの勝ち）を人狼陣営の逆転勝利に変えます（本物のチキンも逆転できるときは本物が優先。恋人になっていると逆転できません）。" },
     groups: { wolf: 8.8, "transform:dark_avatar": 9.3 },
     // 夜の始まり: 仲間の人狼（人狼系共通）＋ 模倣した役職（3of9 以降、模倣先の夜の画面・情報がここに合流する）

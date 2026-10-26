@@ -34,7 +34,7 @@
     cpuClaim: (...a) => ONW.roleHook("tanner", "cpuClaim")(...a),   // てるてる系の発言・投票は tanner.js と同じ
     cpuVoteScore: (...a) => ONW.roleHook("tanner", "cpuVoteScore")(...a),
     cpuNight: { order: 20, stage: "seer", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
-    info: { deck: 17, name: "一目惚れしてるてる", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 35,
+    info: { observe: "player", sealTarget: true, deck: 17, name: "一目惚れしてるてる", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 35,
       desc: "第三陣営。夜に1人選び、自分が追放されたらその相手も一緒に追放扱いになり、自分と相手が勝利します。" },
     groups: { "transform:silver_shadow": 2 },
     night: {

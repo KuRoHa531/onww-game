@@ -5,7 +5,7 @@
 
   ONW.defineRole("baker", {
     cpuClaim(k, g, p, r, i, c) { c.co = "baker"; },   // パン屋: パンが焼けたことは全員に知らされるので、必ずパン屋COする
-    info: { deck: 32, name: "パン屋", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 12,
+    info: { sealTarget: true, deck: 32, name: "パン屋", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 12,
       desc: "村人陣営。夜の能力はありません。最終盤面にパン屋がいると、昼になって、変化公開・新聞・暴露・麻婆豆腐のあと、昼のタイマーが始まる前に「パンが焼けました」と全員に知らされます（誰がパン屋かは分かりません）。" },
     groups: { "transform:light_apostle": 13 },
     /** 昼の始まり(変化公開 → 新聞 → 暴露 → 麻婆豆腐 のあと): 「パンが焼けました」を出す。戻り値: バナーが消えるまでの待ち時間(ms)。出さないときは 0（昼のタイマーはこの後に始まる） */

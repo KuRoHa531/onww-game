@@ -114,7 +114,7 @@
   Object.assign(ONW.thief, { stoleText, stoleShort, cpuSpeak, achievements });
 
   ONW.defineRole("thief", {
-    info: { deck: 80, name: "盗賊", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 18,
+    info: { sealTarget: true, deck: 80, name: "盗賊", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 18,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから生きている自分以外の1人を選ぶと、その人の投票数を1票ぶん盗みます（盗まれた人は1票減り、あなたは1票増えます）。投票数が0票の人からは盗めず、失敗します（失敗しても使用済みになります）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に盗賊を持っている人が使えます。" },
     groups: { "transform:light_apostle": 30 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER で決まる（番号は所属を表すだけ）
     // CPU（4of4）: 本物は必ず「盗賊CO」。騙りは低い確率で「盗賊CO」だけ（結果なし。claim を書かないと、村人が配役にいるとき「村人CO」に置き換わってしまう）

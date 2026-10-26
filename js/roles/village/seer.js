@@ -74,7 +74,7 @@
       cpuClaim(k, g, p, "seer", i, c); return c.result || null;
     },
     cpuNight: { order: 10, stage: "seer", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
-    info: { deck: 8, count: 1, name: "占い師", team: ONW.TEAM.VILLAGE, wakeOrder: 40, sort: 23,
+    info: { observe: "player", sealTarget: true, deck: 8, count: 1, name: "占い師", team: ONW.TEAM.VILLAGE, wakeOrder: 40, sort: 23,
       desc: "村人陣営。プレイヤー1人を見るか、墓地カードを確認できます。" },
     groups: { "transform:light_apostle": 2 },
     night: {

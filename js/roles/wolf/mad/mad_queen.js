@@ -104,7 +104,7 @@
     } } },
     // CPUの人狼陣営: 狂った女王を知らされた（人狼陣営どうしとして、投票しない）
     cpuNotice(g, id, queenIds, k) { const i = k.infoOf(g, id); queenIds.forEach((q) => { i.known[q] = "mad_queen"; }); },
-    info: { deck: 72, name: "狂った女王", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.65,
+    info: { sealTarget: true, deck: 72, name: "狂った女王", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.65,
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。朝のあとの待機時間に、最終盤面で村人陣営になっていて酔いが覚めている人には「女王」と同じ通知が出ます（本物の女王と区別がつきません）。最終盤面で人狼陣営になっていて酔いが覚めている人（本人を含む）には、狂った女王のカードが表になって誰が狂った女王か知らされます。女王と違い、狂った女王が倒れても王国滅亡は起きません。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.7, "transform:dark_avatar": 16 },
     /** 待機時間: CPUの人狼陣営は、ここで狂った女王を知る（人間にはこの下の settleMsg で送る） */

@@ -23,7 +23,7 @@
         R.t += 1800;
       } },
     },
-    info: { deck: 42, name: "チキン", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 11,
+    info: { sealTarget: true, deck: 42, name: "チキン", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 11,
       desc: "村人陣営。夜の能力はありません。1票でも入るとショック死（追放扱い）します。最後まで生き残っていると、村人陣営以外が勝つはずの結果を、村人陣営の逆転勝利に変えます（恋人になっている場合は逆転できません）。人狼陣営が「模倣の人狼」でチキンを模倣したときは逆向きで、人狼陣営が負けるはずの結果を人狼陣営の逆転勝利に変えます。" },
     groups: { "transform:light_apostle": 15 },
   });

@@ -19,7 +19,7 @@
  */
 (function (ONW) {
   ONW.defineRole("mad_exchanger", {
-    info: { deck: 77, name: "狂った交換者", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.69,
+    info: { sealTarget: true, deck: 77, name: "狂った交換者", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.69,
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。昼の議論中に「昼能力」ボタンから生きている人を2人（自分を含めてよい）選ぶと、その2人の票数を入れ替えます。入れ替わるのは投票の集計のときで、結果発表で票数が出たあとに入れ替わる様子が見えます。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に狂った交換者を持っている人が使えます。交換者と同じく、使った順に入れ替わります。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.96, "transform:dark_avatar": 20 },
   });

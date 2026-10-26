@@ -161,7 +161,7 @@ window.ONW = window.ONW || {};
     Object.keys(T).forEach((k) => delete T[k]);
     list.forEach((x) => {
       let o = infoObjs.get(x.info);
-      if (!o) infoObjs.set(x.info, (o = { name: x.info.name, team: x.info.team, wakeOrder: x.info.wakeOrder, desc: x.info.desc }));
+      if (!o) infoObjs.set(x.info, (o = { name: x.info.name, team: x.info.team, wakeOrder: x.info.wakeOrder, desc: x.info.desc, observe: x.info.observe, sealTarget: x.info.sealTarget }));   // sealTarget = 封印の効果を受ける役職の目印（ONW.SEAL_TARGET_ROLES を自動で作る）   // observe = 夜の能力が ONW.observeNote に記録される役職の目印（"player" / "grave"。詩人・観測の人狼のシナジーの対象を自動で作る。ONW.observableRoles）
       T[x.id] = o;
     });
     // 役職グループ: 並びは js/roleorder.js の ONW.ROLE_ORDER(wikiの順=実装した順)。groups の数字は「基準に無い役職」どうしの予備の並びにだけ使う(同じ数字は ROLE_INFO の並び順)

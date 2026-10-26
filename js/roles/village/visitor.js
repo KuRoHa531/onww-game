@@ -88,7 +88,7 @@
       i.visitedBy = [...new Set([...(i.visitedBy || []), ...visitorIds])];
       visitorIds.forEach((v) => { i.known[v] = "visitor"; });
     },
-    info: { deck: 45, name: "訪問者", team: ONW.TEAM.VILLAGE, wakeOrder: 7, sort: 15,
+    info: { observe: "player", sealTarget: true, deck: 45, name: "訪問者", team: ONW.TEAM.VILLAGE, wakeOrder: 7, sort: 15,
       desc: "村人陣営。夜に自分以外の1人を訪問します。訪問した相手の役職は分かりません。相手には、朝のあとの待機時間に「訪問してきた人」のカードが表になって知らされます（訪問先は役職のカードについていくので、役職が入れ替わると、訪問してきた人も入れ替わります）。" },
     groups: { "transform:light_apostle": 18 },
     night: {

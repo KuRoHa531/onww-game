@@ -141,7 +141,7 @@
     },
     soberLines(c, id) { return [princessText(c.g, princessIds(c.g, id), "姫君はいません。")]; },
     soberPeek(c, id) { const ids = princessIds(c.g, id); return ids.length ? { princesses: ids } : {}; },
-    info: { deck: 46, name: "女王", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17,
+    info: { sealTarget: true, deck: 46, name: "女王", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17,
       desc: "村人陣営。夜の能力はありません。朝のあとの待機時間に、最終盤面で村人陣営になっていて酔いが覚めている人にだけ、女王のカードが表になって誰が女王か知らされます（人狼陣営・第三陣営には知らされません。恋人でも最終役職が村人陣営なら知らされます）。女王が追放または道連れで倒れると「王国滅亡」: 他の村人陣営（チキン・恋人になっている人も含む）のカードが一斉にめくれ、勝利条件を失います。女王と人狼判定の者が同時に倒れたときは勝者なし、人狼判定の者が倒れていなければ人狼陣営の勝利です。" },
     groups: { "transform:light_apostle": 19 },
     /** 待機時間: 人間にはこの下の settleMsg で送る。CPUの村人陣営は、ここで女王を知る */

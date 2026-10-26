@@ -29,7 +29,7 @@
       const pool = cands.filter((c) => !k.isWolf(i.known[c]));
       return k.pick(pool.length ? pool : cands);
     },
-    info: { deck: 29, name: "アサシン", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.35,
+    info: { sealTarget: true, deck: 29, name: "アサシン", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.35,
       desc: "人狼陣営。他の人狼を確認できます。追放されたら、その場で自分以外の全員から1人を選びます。選んだ相手がマーリンなら、人狼陣営の逆転勝利です。" },
     groups: { wolf: 7, "transform:dark_avatar": 7 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek });

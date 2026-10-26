@@ -211,7 +211,7 @@
   };
 
   ONW.defineRole("seal_madman", {
-    info: { deck: 76, name: "封印の狂人", team: ONW.TEAM.WOLF, wakeOrder: 0, sort: 1.68,
+    info: { observe: "player", deck: 76, name: "封印の狂人", team: ONW.TEAM.WOLF, wakeOrder: 0, sort: 1.68,
       desc: "人狼陣営（狂人系）。人狼が誰かは分かりません。夜の最初に自分以外の1人を選び、その人の能力を封印します。封印された人は夜の能力が失敗し、夜の能力のない役職でも能力や通知が封印されます。封印の狂人が封印の狂人を封印すると、封印された方の封印は失敗します（封印の狂人を封印しようとしている人が優先。互いに封印しあうときはランダムな方が優先）。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.95, "transform:dark_avatar": 19 },
     uiNight: uiPick,

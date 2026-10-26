@@ -61,7 +61,7 @@
   };
 
   ONW.defineRole("exposed_madman", {
-    info: { deck: 52, name: "暴露狂人", team: ONW.TEAM.WOLF, wakeOrder: 42, sort: 1.8,
+    info: { observe: "player", sealTarget: true, deck: 52, name: "暴露狂人", team: ONW.TEAM.WOLF, wakeOrder: 42, sort: 1.8,
       desc: "人狼陣営。夜に1人を選びます。昼の始まりに、その人の最終役職だけが全員に公開されます（選んだ相手の名前や暴露狂人本人は公開されません）。恋人や酔っ払いなどの付加情報も一緒に公開されます。人狼が誰かは分かりません。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.5, "transform:dark_avatar": 14 },
     uiNight: uiPick,

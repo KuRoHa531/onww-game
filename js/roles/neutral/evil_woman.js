@@ -61,7 +61,7 @@
   }
 
   ONW.defineRole("evil_woman", {
-    info: { deck: 55, name: "悪女", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.6,
+    info: { observe: "player", sealTarget: true, deck: 55, name: "悪女", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.6,
       desc: "第三陣営（恋人陣営）。夜に「本命」1人と「キープ」1人を選び、自分と本命が恋人になります。キープは恋人にはなりません。朝、悪女から見て本命のカードは❤、キープのカードは♡でめくれ、選ばれた2人には待機時間に悪女のカードがめくれます。" },
     groups: { "transform:silver_shadow": 15 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）
     uiNight: {

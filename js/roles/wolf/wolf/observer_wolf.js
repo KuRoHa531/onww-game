@@ -29,7 +29,7 @@
   }
 
   ONW.defineRole("observer_wolf", {
-    info: { deck: 51, name: "観測の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.55,
+    info: { sealTarget: true, deck: 51, name: "観測の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.55,
       desc: "人狼陣営。他の人狼を確認できます。朝のあとの待機時間に、昨夜だれが誰（どの墓地）に能力を使っていたかが分かります（能力を使った役職は分かりません）。結果は昼の情報確認からいつでも見返せます。酔っ払っているときは、酔いが覚めたときに分かります。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 8.6, "transform:dark_avatar": 9.1 },
     nightMsg: K.nightMsg, got: K.got,

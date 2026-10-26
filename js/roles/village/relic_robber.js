@@ -83,7 +83,7 @@
     },
     cpuFakeGot: { kind: "relic", make: fakeGot },
     cpuNight: { order: 50, stage: "relic", chain: true, chainEnd: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
-    info: { deck: 10, name: "墓荒らし", team: ONW.TEAM.VILLAGE, wakeOrder: 50, sort: 26,
+    info: { observe: "grave", sealTarget: true, deck: 10, name: "墓荒らし", team: ONW.TEAM.VILLAGE, wakeOrder: 50, sort: 26,
       desc: "村人陣営。夜に墓地カード1枚と自分の役職を交換します。交換後の役職に夜行動があればその能力も使えます。" },
     groups: { "transform:light_apostle": 4 },
     night: {

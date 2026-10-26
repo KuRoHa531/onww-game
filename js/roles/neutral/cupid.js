@@ -61,7 +61,7 @@
   }
 
   ONW.defineRole("cupid", {
-    info: { deck: 56, name: "キューピッド", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.7,
+    info: { observe: "player", sealTarget: true, deck: 56, name: "キューピッド", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.7,
       desc: "第三陣営（恋人陣営）。夜に自分以外の2人を選び、その2人を恋人にします（自分は恋人になりません）。朝、キューピッドから見て選んだ2人のカードが❤でめくれ、選ばれた2人は待機時間に自分と相方のカードが同時に❤でめくれます。恋人にした人が死ぬと、キューピッドも後を追います。選んだ2人がどちらも死なずに勝利したときは、あなたが吊られていても追加で勝利します。" },
     groups: { "transform:silver_shadow": 16 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる。ロビーの変化候補・固定役の変化指定・設定のOFF・ガイドはここから自動で出る）
     uiNight: {

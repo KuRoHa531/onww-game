@@ -149,7 +149,7 @@
       skip(R) { (R.res.kings || []).forEach((x) => { R.badge[`p:${x.id}`] = "ガード!"; }); },
       clear(R) { document.querySelectorAll(".tg-burst").forEach((e) => e.remove()); if (R && R.gx) Object.keys(R.gx).forEach((k) => { if (R.gx[k] === "kingguard") delete R.gx[k]; }); },
     },
-    info: { deck: 48, name: "人狼王", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.4,
+    info: { sealTarget: true, deck: 48, name: "人狼王", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.4,
       desc: "人狼陣営。他の人狼を確認できます。最終盤面で人狼王を持っている人のカードは、朝のあとの待機時間に全員の画面で表になり、誰が人狼王か公開されます。占い・判定・勝利条件は常に人狼として扱われます。他に人狼系がいないときは、設定に関係なく狂人系の1人が昇格して人狼判定になります。追放・とばっちり・道連れでは、他に人狼判定の人が生き残るときだけ追放されず（死なず）、カードがめくれそうになってガードされます（他に人狼判定がいない・先に全員死亡している・他の人狼判定が全員同時に死ぬときは死にます。人狼王どうしだけが同時に追放・道連れにされるときは互いを守り合って死にませんが、人狼王以外の人狼判定も同時に死ぬときは全員死にます）。心中・無理心中では無条件で死にます。" },
     groups: { wolf: 8, "transform:dark_avatar": 8 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,

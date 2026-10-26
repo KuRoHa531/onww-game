@@ -101,7 +101,7 @@
   }
 
   ONW.defineRole("pure_lover", {
-    info: { deck: 54, name: "純愛者", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.5,
+    info: { observe: "player", sealTarget: true, deck: 54, name: "純愛者", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.5,
       desc: "第三陣営（恋人陣営）。夜に自分以外の1人を選び、自分とその相手が恋人になります。朝、純愛者から見て選んだ人のカードがハートでめくれ、選ばれた人には待機時間に純愛者のカードがめくれます。" },
     groups: { "transform:silver_shadow": 14 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる。ロビーの変化候補・固定役の変化指定・設定のOFF・ガイドはここから自動で出る）
     uiNight: {

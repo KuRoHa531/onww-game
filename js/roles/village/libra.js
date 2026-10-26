@@ -178,7 +178,7 @@
   ONW.libra = { roleOf, used, targets, canUse, apply, limit, ok, voteTargets, view, actText, noticeText, doneText, specLine, achievements };
 
   ONW.defineRole("libra", {
-    info: { deck: 88, name: "天秤", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.991,
+    info: { sealTarget: true, deck: 88, name: "天秤", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.991,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている人を2人（自分を含めてよい）選ぶと、議論をそこで打ち切ってすぐ投票に移り、その投票では選んだ2人のどちらかにしか投票できなくなります。選ばれた2人は投票が始まるときに全員に知らされますが、誰が天秤を使ったかは結果発表までわかりません。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に天秤を持っている人が使えます。投票画面には上皿天秤が出て、皿のカードを押して投票します。" },
     // CPU（4of4）: 本物は必ず「天秤CO」。天秤は使うとすぐ投票に移る（結果を言う前に議論が終わる）ので、結果開示はない（COボタンも役職COだけ）。
     //   騙りは「天秤CO」だけ（結果なし。claim を書かないと、村人が配役にいるとき「村人CO」に置き換わってしまう）。自動で使う・投票判断は上の cpuPick / cpuVoteSee

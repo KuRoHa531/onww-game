@@ -46,7 +46,7 @@
   const noneClaim = () => ({ short: "能力の使用なし", text: NONE_TEXT, claim: { kind: "poet", none: true } });
 
   ONW.defineRole("poet", {
-    info: { deck: 90, name: "詩人", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 23.2,
+    info: { sealTarget: true, deck: 90, name: "詩人", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 23.2,
       desc: "村人陣営。夜の能力はありません。朝のあとの待機時間に、昨夜ランダムな1つの役職の能力が誰に使われていたかが分かります（使った人は分かりません。墓地だけを対象にした能力は対象外）。結果は昼の「情報確認」からいつでも見返せます。酔っ払っているときは、酔いが覚めたときに分かります。" },
     groups: { "transform:light_apostle": 35 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER（wiki の order 35）で決まる
     // ---- COボタン（結果開示: 使われていた役職 → 対象。co.js の poetrole / poettgt） ----

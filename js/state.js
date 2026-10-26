@@ -345,6 +345,12 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (!g || !from) return;
     const pl = (players || []).filter(Boolean), gr = (graves || []).filter((x) => Number.isInteger(x));
     if (!pl.length && !gr.length) return;
+    // 足し忘れ防止: 能力を記録する役職には info.observe が必要（詩人・観測の人狼の闇鍋シナジーの対象を自動で作るため）。無い役職は1回だけ警告（ゲームは止めない）。
+    //   観測の人狼にだけ見える役職（墓地だけが対象）は "grave"、プレイヤーを選ぶ役職は "player"
+    if (role) {
+      const want = pl.length ? "player" : "grave", have = ((ONW.ROLE_INFO || {})[role] || {}).observe;
+      if (have !== want && have !== "player") { ONW._observeWarned = ONW._observeWarned || {}; if (!ONW._observeWarned[role]) { ONW._observeWarned[role] = 1; if (typeof console !== "undefined") console.warn("[observe] " + role + " は ONW.observeNote を呼んでいますが info.observe が " + (have || "未設定") + " です（期待: \"" + want + "\"）。役職ファイルの info に observe を足してください（docs/observe-synergy.md）"); } }
+    }
     (g.observeLog = g.observeLog || []).push({ from, players: pl, graves: gr, role: role || null });   // role = そのとき使われた役職（詩人の通知用。観測の人狼は使わない。模倣の人狼は模倣先、墓荒らし・ドッペル経由は手にした役職）
   };
   /** 詩人通知の件数の上限（マイクラ版 poetVisibleRoleLimit の初期値。1〜5） */

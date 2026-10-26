@@ -82,7 +82,7 @@
     },
     cpuFakeGot: { kind: "robber", make: fakeGot },   // 夜のあとに人外の役職を手にしたときの嘘(kind: 「手にした」と言える役職かの判定に使う)
     cpuNight: { order: 70, stage: "robber", chain: true, run },   // CPUの夜の行動(order が小さいほど先 / chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
-    info: { deck: 9, count: 1, name: "怪盗", team: ONW.TEAM.VILLAGE, wakeOrder: 55, sort: 25,
+    info: { observe: "player", sealTarget: true, deck: 9, count: 1, name: "怪盗", team: ONW.TEAM.VILLAGE, wakeOrder: 55, sort: 25,
       desc: "村人陣営。自分以外1人と役職を交換し、新しい自分の役職だけ確認できます。" },
     groups: { "transform:light_apostle": 3 },
     night: {

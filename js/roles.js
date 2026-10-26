@@ -449,12 +449,21 @@ window.ONW = window.ONW || {};
    * 今後候補を足すときは、ここに役職を1つ足すだけ（光の使徒の変化先である役職に限る）。
    */
   ONW.MAPO_COUNTER_ROLES = [ONW.ROLE.MAYOR, ONW.ROLE.WATCHDOG, ONW.ROLE.SHERIFF, ONW.ROLE.EXCHANGER, ONW.ROLE.DICTATOR];
-  /** 封印の効果を受ける役職（マイクラ版 YAMINABE_SEAL_TARGET_ROLES のうち、このWeb版にある役職。復讐者・愉快犯・感覚の占い師を足して45役職）。封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足すときは、マイクラ版の一覧に入っている役職をここにも足す */
-  ONW.SEAL_TARGET_ROLES = ["seer", "mad_seer", "robber", "relic_robber", "troublemaker", "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "keymaster", "watchdog", "mind_wolf", "mimic_wolf", "eraser_wolf", "assassin", "wolf_king", "mayor", "mad_mayor", "mapo_wolf", "observer_wolf", "newspaper", "chicken", "queen", "mad_queen", "black_cat", "cat_pumpkin", "cat_sidhe", "insomniac", "tough_guy", "baker", "dictator", "sheriff", "exchanger", "mad_exchanger", "thief", "avenger", "prankster", "sense_seer", "libra", "fake_seer", "poet"];
+  /** 夜（と朝のうち）に能力を使うと ONW.observeNote に記録される役職を、各役職ファイルの info.observe から集める（詩人・観測の人狼の闇鍋シナジー用）。
+   *  info.observe = "player"（プレイヤーを対象に選ぶ。詩人にも観測の人狼にも見える）/ "grave"（墓地だけを対象にする。観測の人狼にだけ見える）。
+   *  kind = "poet"（"player" だけ）/ "observer"（"player" と "grave"）。役職を足したら、observeNote を呼ぶ役職の info に observe を付けるだけで、シナジー・wikiの一覧に自動で入る */
+  ONW.observableRoles = (kind) => ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO).filter((r) => {
+    const o = (ONW.ROLE_INFO[r] || {}).observe;
+    return kind === "poet" ? o === "player" : (o === "player" || o === "grave");
+  }));
+  /** 封印の効果を受ける役職（マイクラ版 YAMINABE_SEAL_TARGET_ROLES のうち、このWeb版にある役職）。各役職ファイルの info.sealTarget: true から自動で作る（ROLE_ORDER 順）。
+   *  封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足す・移植するときは、マイクラ版の一覧に入っている役職の info に sealTarget: true を付けるだけでよい（docs/seal-target.md） */
+  Object.defineProperty(ONW, "SEAL_TARGET_ROLES", { configurable: true, enumerable: true, get() { return ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO || {}).filter((r) => ONW.ROLE_INFO[r].sealTarget === true)); } });
   ONW.SYNERGY_COUNT_RULES = [
     { trigger: ONW.ROLE.INSOMNIAC, label: "役職を変える役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
     { trigger: ONW.ROLE.KEYMASTER, label: "ロック対象の役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリン）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
-    { trigger: ONW.ROLE.POET, label: "詩人が見られる役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.SEER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.VISITOR, ONW.ROLE.KEYMASTER, ONW.ROLE.WATCHDOG, ONW.ROLE.FAKE_SEER, ONW.ROLE.ERASER_WOLF, ONW.ROLE.EXPOSED_MADMAN, ONW.ROLE.SEAL_MADMAN, ONW.ROLE.MAD_SEER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.FREETER, ONW.ROLE.GREMLIN, ONW.ROLE.LOVE_TANNER, ONW.ROLE.PURE_LOVER, ONW.ROLE.EVIL_WOMAN, ONW.ROLE.AVENGER, ONW.ROLE.PRANKSTER, ONW.ROLE.CUPID, ONW.ROLE.HEARTBREAKER, ONW.ROLE.SHUFFLER], min: 2 },   // 詩人が出る闇鍋には、詩人の通知に出る（夜に対象を選ぶ能力を使う。ONW.observeNote に記録される）役職を合わせて最低2枚出す（墓地だけを対象にする墓荒らしは通知に出ないので除く）
+    { trigger: ONW.ROLE.POET, label: "詩人が見られる役職", get anyOf() { return ONW.observableRoles("poet"); }, min: 2 },   // 詩人が出る闇鍋には、詩人の通知に出る役職（夜に対象を選ぶ能力を使い ONW.observeNote に記録される役職。墓地だけを対象にする墓荒らしは除く）を合わせて最低2枚。対象は各役職ファイルの info.observe（"player"）から自動で作る＝役職を足すときは observeNote を呼ぶ役職に info.observe を付ける
+    { trigger: ONW.ROLE.OBSERVER_WOLF, label: "観測の人狼が見られる役職", get anyOf() { return ONW.observableRoles("observer"); }, min: 2 },   // 観測の人狼が出る闇鍋には、観測結果に出る役職（info.observe が "player" か "grave"。墓荒らしなど墓地だけを対象にする役職も含む）を合わせて最低2枚（詩人と同じ考え方。個数は詩人と同じ2枚）
     { trigger: ONW.ROLE.HEARTBREAKER, label: "恋人系役職", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
     { trigger: ONW.ROLE.MAPO_WOLF, label: "麻婆対抗役", get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
     { trigger: ONW.ROLE.SEAL_MADMAN, label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES; }, min: 3 },   // 封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE の封印の狂人シナジー: YAMINABE_SEAL_TARGET_ROLES を3枚。Web版にある役職の分）
