@@ -104,7 +104,7 @@
   //  ・恋人（重複役職）: 恋人陣営が勝っているときは乗っ取らない（恋人 ＞ シャッフラー）。恋人陣営が勝てなかったときは、(+恋人)を持つシャッフラー本人は恋人として判定されて敗北、対象(第三陣営など)だけがシャッフラー陣営として勝てる。対象が(+恋人)の組は乗っ取らない。
   //  ・チキンの逆転（chickenForce）のときも乗っ取らない。
   //  すべてカードの印（picks）で追従するので、昼のうちに怪盗などでカードが動いても、最終盤面のカードの持ち主で判定される。
-  const DEATH_WIN = () => [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER];   // 追放・死亡しないと勝てない役職（処刑人は入れない: 処刑人に変化させた組は、変化させた人が死亡したら失敗）
+  const DEATH_WIN = () => [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER, ONW.ROLE.MARTYR];   // 追放・死亡しないと勝てない役職（殉職者も。マイクラ版 DEATH_REQUIRED_TO_WIN_ROLES）（処刑人は入れない: 処刑人に変化させた組は、変化させた人が死亡したら失敗）
   const teamOfRole = (r) => (ONW.roles.getInfo(r) || {}).team;
   const isLv = (g, id) => !!(ONW.isLover && ONW.isLover(g, id));
   /** この組が失敗か。w = 勝者の集合（てるてる系は勝者に入っていれば死亡しても可） */
@@ -202,7 +202,7 @@
    *  それ以外は死亡すると失敗なので票を入れない（ONW.shuffler.failed の条件と同じ） */
   function cpuVoteScore(k, g, p, q, i) {
     if (!i.shuffle || i.shuffle.target !== q.id || q.id === p.id) return 0;
-    return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER].includes(i.shuffle.role) ? 100 : -100;
+    return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER, ONW.ROLE.MARTYR].includes(i.shuffle.role) ? 100 : -100;
   }
 
   ONW.defineRole("shuffler", {

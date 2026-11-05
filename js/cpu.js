@@ -187,8 +187,10 @@ window.ONW = window.ONW || {};
   // 昼の発言（CO・騙り・結果開示）と投票。本家(マイクラ版)のCPUの考え方に合わせてある
   // =========================================================
   const isWolfSide = (r) => isWolf(r) || isMad(r);                       // 人狼陣営（狂人含む）= 本家の isWolfTeam
+  /** 反転者: 反転が奇数回ついている（酔いが覚めて知った）村人・人狼陣営のCPUは、自陣営が負ければ勝てる。投票・発言は逆の陣営のつもりで振る舞う（docs/reverser.md）。偶数回なら普通 */
+  const revFlip = (g, p, r) => !!(ONW.reverser && !ONW.hiddenDrunk(g, p.id) && ONW.reverser.odd(g, p.id) && (isWolfSide(r) || ONW.roles.getInfo(r).team === "village"));
   const WOLF_LIKE = () => ONW.WOLF_KIND;                                  // 占い結果で「人狼」と見える役職
-  const AVOID_RESULT = ["tanner", "love_tanner", "bounty_hunter", "opportunist", "amanojaku", "winner", "freeter", "servant", "fox", "jester_bomber"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
+  const AVOID_RESULT = ["tanner", "love_tanner", "bounty_hunter", "opportunist", "amanojaku", "winner", "freeter", "servant", "fox", "jester_bomber", "martyr"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。殉職者も入っている。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
   const setupRoles = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])];   // 占い結果に出してよい（実在する）役職
   const roleInSetup = (g, role) => setupRoles(g).includes(role) || (g.coDeck || []).some((x) => x.r === role);
   /** 「村人CO」をしてよいか: 配役(selectedRoles)か、変化公開で公開された役職(coDeck の cand でないもの)に、村人・忘却の人狼・狼憑き(本人は村人だと思い込む役職)がいるときだけ。
@@ -417,7 +419,8 @@ window.ONW = window.ONW || {};
       // スター・女王: 待機時間に知らされるので、本当のCOの扱いが特別（各役職ファイルの cpuFirst。配列を返したらその発言だけで終わり）
       const first = ONW.roleHook(g.currentRoles[p.id], "cpuFirst"), fr = first ? first(cpu.kit, g, p, r) : null;
       if (fr) { fr.forEach((e) => plan.push(e)); return; }
-      if (isWolfSide(r)) {                                                 // 人狼陣営は必ず騙る（本家 liarMode）
+      const rflip = revFlip(g, p, r) && !isWolfSide(r);   // 反転された村人側のCPUは、人外のように騙る（自陣営が負けたいため）
+      if (isWolfSide(r) || rflip) {                                                 // 人狼陣営は必ず騙る（本家 liarMode）
         const lie = lieClaim(g, p, r);
         c.co = lie.co; c.result = lie.result;
       } else {
@@ -458,7 +461,7 @@ window.ONW = window.ONW || {};
     const claimsNow = plan.filter((e) => e.claim && (e.claim.kind === "freeter" || e.claim.kind === "servant")).map((e) => ({ from: e.p.id, ...e.claim }));
     spoke.forEach(({ p, r, i, c }) => {
       if (!c.co || i.inboundSpoken || (c.result && c.result.claim && c.result.claim.kind === "visited")) return;
-      const lying = isWolfSide(r) || c.co !== r;
+      const lying = isWolfSide(r) || revFlip(g, p, r) || c.co !== r;
       const e = inboundReal(g, p, i, c.co) || (lying ? inboundFake(g, p, r, i, c.co, claimersTo(g, p.id, claimsNow)) : null);
       if (!e) return;
       i.inboundSpoken = true;
@@ -494,13 +497,13 @@ window.ONW = window.ONW || {};
   /** 投票先の評価点（本家 scoreTargetForCpu を、この版にある役職に合わせたもの） */
   function scoreVote(g, p, q) {
     const i = infoOf(g, p.id), me = selfRole(g, p), ini = g.drunkOverlay && g.drunkOverlay[p.id] ? me : ONW.shownRole(g.initialRoles[p.id]);
-    const wolfSide = isWolfSide(me);
+    const flip = revFlip(g, p, me), wolfSide = isWolfSide(me) !== flip;   // 反転された自陣営のCPUは、逆の陣営として票を入れる
     const k = i.known[q.id];
     const claims = g.cpuClaims || [];
     const co = (g.coBoard && g.coBoard[q.id] && g.coBoard[q.id].co) || null;
     let s = 0;
     // 仲間は投票しない（人狼系は仲間の人狼、狂信者は人狼）
-    if ((isWolf(me) || ini === "cultist") && isWolf(k)) s -= 100;
+    if (!flip && (isWolf(me) || ini === "cultist") && isWolf(k)) s -= 100;
     // 自分が見て知っている情報: 村人側と分かっている人は避ける / 投票を避ける結果役職は避ける / 人狼と分かっている人は狙う
     if (k && !wolfSide) {
       if (isWolf(k)) s += 12;
@@ -512,7 +515,7 @@ window.ONW = window.ONW || {};
     // 他人のCO（役職）
     if (co === "villager") s += wolfSide ? 1.8 : 0.8;
     if (co && WOLF_LIKE().includes(co) || co === "team:wolf") s += wolfSide ? -1.0 : 2.4;
-    if (co === "tanner" || co === "love_tanner" || co === "bounty_hunter" || co === "jester_bomber") s -= wolfSide ? 0.6 : 2.4;
+    if (co === "tanner" || co === "love_tanner" || co === "bounty_hunter" || co === "jester_bomber" || co === "martyr") s -= wolfSide ? 0.6 : 2.4;
     if (co === "seer" || co === "mad_seer") {
       const n = g.players.filter((x) => { const c = g.coBoard && g.coBoard[x.id] && g.coBoard[x.id].co; return c === "seer" || c === "mad_seer"; }).length;
       s += n >= 2 ? (wolfSide ? 0.6 : 1.5) : (wolfSide ? -0.3 : -0.8);
@@ -523,7 +526,7 @@ window.ONW = window.ONW || {};
     // 占い師COの結果（この人を占ったという報告）
     claims.filter((c) => c.kind === "seer" && c.target === q.id).forEach((c) => {
       if (WOLF_LIKE().includes(c.role)) s += wolfSide ? 0.8 : 2.8;
-      else if (c.role === "tanner" || c.role === "love_tanner" || c.role === "bounty_hunter" || c.role === "jester_bomber" || c.role === "fox") s -= wolfSide ? 0.5 : 2.2;   // 妖狐と占われた人は、投票しても妖狐が負けるだけ（占い師に呪殺されている）ので避ける
+      else if (c.role === "tanner" || c.role === "love_tanner" || c.role === "bounty_hunter" || c.role === "jester_bomber" || c.role === "martyr" || c.role === "fox") s -= wolfSide ? 0.5 : 2.2;   // 妖狐と占われた人は、投票しても妖狐が負けるだけ（占い師に呪殺されている）ので避ける
       else s += wolfSide ? -0.4 : -1.0;
       if (c.from === p.id) {   // 自分が報告した結果には従う（本家）
         if (WOLF_LIKE().includes(c.role)) s += 12;
@@ -540,7 +543,7 @@ window.ONW = window.ONW || {};
     const plans = g.cpuVotePlan || {}, reals = g.cpuRealVote || {};
     Object.entries(plans).forEach(([vid, t]) => {
       if (vid === p.id) return;
-      const ally = (isWolf(me) || ini === "cultist") && isWolf(i.known[vid]);
+      const ally = !flip && (isWolf(me) || ini === "cultist") && isWolf(i.known[vid]);
       if ((ally ? (reals[vid] || t) : t) !== q.id) return;
       s += 0.6;
       if (ally) s += 1.2;
@@ -594,7 +597,7 @@ window.ONW = window.ONW || {};
     if (!(realOk && saidOk)) {
       real = chooseVote(g, p);
       const me = selfRole(g, p);   // 自認が人外のときだけ嘘をつく（実際の役職は見ない）
-      said = real && isNonVillage(me) && Math.random() < VOTE_LIE_RATE ? fakeVoteTarget(g, p, real) : real;   // 村人側と思っているCPUは本当のことを言う
+      said = real && (isNonVillage(me) || revFlip(g, p, me)) && Math.random() < VOTE_LIE_RATE ? fakeVoteTarget(g, p, real) : real;   // 村人側と思っているCPUは本当のことを言う
       g.cpuRealVote[p.id] = real; g.cpuVotePlan[p.id] = said;
     }
     return { target: real, said, text: `${nameOf(g, said)}に入れようと思います。` };
@@ -604,6 +607,6 @@ window.ONW = window.ONW || {};
   cpu.decideVote = function (g, p) { return chooseVote(g, p); };
 
   // 役職ファイルのCPUフック(cpuClaim / cpuLie / cpuFakeGot など)が使う、役職をまたぐ道具
-  Object.assign(cpu.kit, { rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
+  Object.assign(cpu.kit, { revFlip, rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
   ONW.cpu = cpu;
 })(window.ONW);

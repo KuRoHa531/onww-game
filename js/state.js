@@ -166,7 +166,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
    *     確認: node _wip/groupcheck.js .（登録もれがあれば FAIL。node _wip/viewall.js . の一覧にも出る）
    *  【必須・役職追加のたびに入れること】並びは js/roleorder.js の ONW.ROLE_ORDER(wikiの順)の末尾にIDを足す(groups の数字では並ばない)。確認: node _wip/orderAll.js .
    * ===================================================================================== */
-  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "mimicRole", "sealTargets", "avengerTargets", "pranksterPicks"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
+  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "mimicRole", "sealTargets", "avengerTargets", "pranksterPicks", "reverserTarget", "lawyerClient", "lawyerClientRole"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
   const holderKeyOfGrave = (i) => "g:" + i;
   ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; if ((key === "pureLoverTargets" || key === "akujoHonmei" || key === "cupidPair") && ONW.pureLover) { const c = ONW.cardAt(g, holderId); (g.pureLoverGen = g.pureLoverGen || {})[c] = ((g.pureLoverGen || {})[c] || 0) + 1; ONW.pureLover.note(g, []); } };   // 選び直したカードは、新しい恋人関係（次の番号）   // 純愛者が選んだ瞬間も、結果画面の「恋人の印」の履歴に残す
   ONW.getRoleBound = (g, key, holderId) => (g[key] || {})[holderId];
@@ -180,7 +180,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     let role = g.currentRoles[srcId];
     if (role === ONW.ROLE.DOPPELGANGER) role = ONW.ROLE.VILLAGER;
     const carry2 = role === ONW.ROLE.EVIL_WOMAN ? "akujoKeep" : null;   // 悪女は本命(carry)とキープ(carry2)の2つを持つ
-    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.KEYMASTER]: "keyTargets", [ONW.ROLE.WATCHDOG]: "watchdogOwners", [ONW.ROLE.EXECUTIONER]: "execTargets", [ONW.ROLE.AVENGER]: "avengerTargets", [ONW.ROLE.PRANKSTER]: "pranksterPicks" }[role];
+    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.REVERSER]: "reverserTarget", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.KEYMASTER]: "keyTargets", [ONW.ROLE.WATCHDOG]: "watchdogOwners", [ONW.ROLE.EXECUTIONER]: "execTargets", [ONW.ROLE.AVENGER]: "avengerTargets", [ONW.ROLE.PRANKSTER]: "pranksterPicks" }[role];
     // コピーされた側(dst)は、酔っ払いでない限り（夜に配られた役職のまま眠っていないので）コピーされた役職の能力を自分では使えない。だから選択（フリーターの就職先・悪女の本命/キープ など）もまるごとコピーする。
     // 酔っ払いの dst は昼に酔いが覚めてから最終役職の能力を自分で使えるので、「能力を使った判定」(選択の記録)はコピーしない（従者のご主人・処刑人のターゲットは能力の使用ではなく自動で決まるのでこれまで通り）。
     const dstDrunk = !!ONW.hiddenDrunk(g, dstId), passive = carry === "servantMasters" || carry === "execTargets";
@@ -195,6 +195,8 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (g.watchdogOwners) delete g.watchdogOwners[dstId];   // 上書きされた番犬の飼い主の記録は消す（番犬をコピーするときは下で新しく入れる）
     if (g.mimicRole) delete g.mimicRole[dstId];   // 上書きされた模倣の人狼の模倣先は消す（模倣の人狼をコピーするときは下で同じ模倣先を入れる）
     if (role === ONW.ROLE.MIMIC_WOLF && ONW.mimic) { if (g.mimicRole && g.mimicRole[srcId]) g.mimicRole[dstId] = g.mimicRole[srcId]; else ONW.mimic.choose(g, dstId); }   // 9of9: 模倣の人狼をコピーしたら模倣先も同じ（なければ決める）
+    if (g.lawyerClient) { delete g.lawyerClient[dstId]; delete g.lawyerClientRole[dstId]; }
+    if (g.reverserTarget) delete g.reverserTarget[dstId];   // 上書きされた反転者の記録は消す（反転者をコピーするときは下で反転の付与先ごとコピーする。付与済みの反転は反転者のカードの記録なので、上書きされた席の分は無効になる）
     if (g.keyTargets) delete g.keyTargets[dstId];   // 上書きされた鍵師の記録は消す（鍵師をコピーするときは下で新しく入れる。ロックそのものは席についているので消えない）
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[dstId]];   // 上書きされたカードの上のシャッフラーの印は消える（上に別の役職が置かれたのと同じ）
     if (g.pureLoverTargets) delete g.pureLoverTargets[dstId];   // 上書きされた役職の純愛者の記録は消す（古い記録の復活を防ぐ。純愛者をコピーするときは下で新しく入れる）
@@ -270,6 +272,8 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (g.breakerTargets) delete g.breakerTargets[toId];   // 上書きされた破局師の記録は消す
     if (g.watchdogOwners) delete g.watchdogOwners[toId];   // 上書きされた番犬の飼い主の記録は消す
     if (g.mimicRole) delete g.mimicRole[toId];   // 上書きされた模倣の人狼の模倣先は消す（模倣の人狼をコピーしたときは下で同じ模倣先を入れる）
+    if (g.lawyerClient) { delete g.lawyerClient[toId]; delete g.lawyerClientRole[toId]; }
+    if (g.reverserTarget) delete g.reverserTarget[toId];   // 上書きされた反転者の記録は消す（ドッペルが反転者をコピーしても付与先は引き継がない。朝のうちに自分で選ぶ）
     if (g.keyTargets) delete g.keyTargets[toId];   // 上書きされた鍵師の記録は消す（ロックは席についているので残る）
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[toId]];   // 上書きされたカードの上のシャッフラーの印は消える
     if (g.pureLoverTargets) delete g.pureLoverTargets[toId];   // 上書きされた役職の純愛者の記録は消す（あとで古い記録が復活しないように）
@@ -299,7 +303,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   ONW.shufflerPlace = (g, toId, role, byCard) => {
     const cd = cards(g), card = cd.at[toId], from = g.currentRoles[toId];   // from = 置かれる前のそのカードの役職（選ばれた人への通知「A から B」の A）
     g.currentRoles[toId] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
     (g.pureLoverGen = g.pureLoverGen || {})[card] = ((g.pureLoverGen || {})[card] || 0) + 1;   // 置かれたカードは別の恋人関係（次の番号）
     const marks = (g.shufflerMarks = g.shufflerMarks || {}), by = byCard || card;
     const list = (marks[card] = (Array.isArray(marks[card]) ? marks[card] : marks[card] ? [marks[card]] : []).filter((e) => e.by !== by));   // 同じシャッフラーが同じカードに置き直したときは、新しい印だけ残す
@@ -456,7 +460,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）
       transformFrom: {}, centerTransformFrom: {}, winnerIds: null, // ルーム設定の配役枚数
-      debugOn: false, dbg: null, dbgWarn: [], dbgVotes: {}, dbgFoxVotes: {},   // デバッグモード（debug.js）
+      debugOn: false, dbg: null, dbgWarn: [], dbgVotes: {}, dbgFoxVotes: {}, dbgDukeVotes: {},   // デバッグモード（debug.js）
       inGame: false,                  // 試合中か（ホストがルームに戻るまで true）
       spectators: [], specNames: {},  // 途中参加の観戦者
       deadIds: [], ghostLog: [], chatTab: "main", isDead: false, specInfo: null, specInfoOpen: true, nightResolved: false,   // 死亡者 / 霊界チャット / 観戦者向けの全員情報

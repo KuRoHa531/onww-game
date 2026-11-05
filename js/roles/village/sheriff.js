@@ -89,7 +89,7 @@
   /** 執行されそうな人の身代わりになる従者のID（なければ null）。従者本人を撃つときは身代わりなし。生きている・恋人でない従者だけ（追放の身代わり vote.applyServantSubstitution と同じ条件） */
   function substituteOf(g, target) {
     const r = R();
-    if (g.currentRoles[target] === r.SERVANT) return null;
+    if (g.currentRoles[target] === r.SERVANT || g.currentRoles[target] === r.MARTYR) return null;   // 殉職者の身代わりにもならない（マイクラ版 servantSubstituteForSheriffTarget）
     const pair = ONW.servantSubPairs(g).find(([s, m]) => m === target && s !== target && !isDead(g, s) && !ONW.isLover(g, s));
     return pair ? pair[0] : null;
   }

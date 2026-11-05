@@ -157,6 +157,7 @@ co.poetPick = function (id) {
   co.freeterWho = () => set({ step: "fwho" });
   co.pickFreeter = (id) => done(...hookOfKind("freeter").infoWho(id, K));
   // 従者がいる（本家: 「自分の従者がいます。」）
+  co.reversedInfo = () => done(...hookOfKind("reverser").infoReversed(K));   // 反転されている（情報開示）
   co.servantInfo = () => done(...hookOfKind("servant").infoHas());
 
   // 役職が変わっていることを伝える（本家 openChangedRoleInfoCoMenu のうち、Web版にある役職の分。文言は本家のまま）
@@ -279,7 +280,7 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedInfo()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedInfo()") + btn("反転されている", "ONW.co.reversedInfo()");
     } else if (s.step === "visited") {
       title = "訪問された";
       body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("");

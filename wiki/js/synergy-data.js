@@ -215,7 +215,8 @@ window.ONW_WIKI_SYNERGY = {
    "heartbreaker",
    "shuffler",
    "avenger",
-   "prankster"
+   "prankster",
+   "reverser"
    ],
   "min": 2,
   "max": null,
@@ -250,7 +251,8 @@ window.ONW_WIKI_SYNERGY = {
    "heartbreaker",
    "shuffler",
    "avenger",
-   "prankster"
+   "prankster",
+   "reverser"
    ],
   "min": 2,
   "max": null,
@@ -344,7 +346,11 @@ window.ONW_WIKI_SYNERGY = {
    "heartbreaker",
    "shuffler",
    "avenger",
-   "prankster"
+   "prankster",
+   "demon_duke",
+    "predictor",
+    "reverser",
+    "lawyer"
    ],
    "min": 3,
    "max": null,

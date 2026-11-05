@@ -10,7 +10,7 @@
   --gold-dim: #a7996f;
   --ink: #e7e4f0;
   --ink-dim: #9c99b3;
-  --village: #5f9a7d;
+  --village: #55ff55;
   --wolf: #c9463d;
   --tanner: #b98a3d;
 
@@ -410,6 +410,9 @@ body {
 .rs-dead { color: var(--blood); }
 .rs-good { color: #7fd47f; }
 .rs-info { color: #6fd3e0; }
+.rs-wname { color: #ff9a3c; }   /* 結果シートの勝者・敗者の名前（陣営の色＝緑・赤・灰色・ピンクとは別の色） */
+.rs-lname { color: #6b86d6; }
+.rs-extra-name { color: #ffd3a1; font-weight: 700; }   /* 結果シートの勝者欄: 陣営の勝者のほかに追加で勝った人（追加勝利）の名前 */
 .rs-pl { color: #ffb86b; }   /* 結果画面: 夜行動結果・昼行動結果・役職情報の文章中のプレイヤー名（役職名は陣営の色 t-village / t-wolf / t-third） */
 .rs-gv { color: #5aa9ff; }   /* 結果画面: 墓地名（墓地1 など）。プレイヤー名・役職名・得票の色とは別 */
 .rs-me { color: #c792ff; font-weight: 700; }   /* 結果画面・チャット: 自分の名前（他の人のプレイヤー名 rs-pl のオレンジと区別する。rs-pl の後に書いて上書き） */
@@ -723,7 +726,7 @@ body.chat-mode .panel > * { flex-shrink: 0; } body.chat-mode .panel > .chat-log 
 /* 役職アイコン（背景透過PNGを陣営色の地に載せる） */
 .role-icon { display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; overflow: hidden; }
 .role-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.role-icon--village { background: #3fa564; }
+.role-icon--village { background: #4fd64f; }
 .role-icon--wolf    { background: #d24a42; }
 .role-icon--third   { background: #d7d7dc; }
 .role-icon--none { display: none; }
@@ -877,6 +880,12 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .res-cap__t { font-size: 24px; font-weight: 800; letter-spacing: .12em; color: var(--gold); }
 .res-cap .rs-win { font-size: 30px; }
 .res-pop { animation: dl-show .5s ease-out both; }
+/* 追加勝利: 勝利陣営の字幕の下に、追加で勝った役職を1つずつ貼り足す（docs/extra-win-fx.md） */
+.rs-extra { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 8px; }
+.rs-extra__h { font-size: 13px; letter-spacing: .2em; color: var(--gold); opacity: .85; width: 100%; }
+.rs-extra__chip { display: inline-block; font-size: 16px; font-weight: 700; padding: 3px 10px; border: 1px solid var(--gold); border-radius: 4px; color: var(--gold); background: rgba(0, 0, 0, .35); animation: ex-stamp .45s cubic-bezier(.2, 1.4, .4, 1) both; }
+.rs-extra__chip b { color: #fff; }
+@keyframes ex-stamp { from { opacity: 0; transform: scale(2.4) rotate(-6deg); } to { opacity: 1; transform: none; } }
 
 /* ---- 変化公開: 古びた紙 ---- */
 .tfp-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: pointer; }
@@ -2112,3 +2121,46 @@ body.ovl-open .dbg-fab--float, body:has(.dbg-sheet) .dbg-fab--float { visibility
 .lp-end { position: absolute; top: 0; width: 0; height: 0; transform-origin: 0 0; transition: transform .5s cubic-bezier(.3,1.35,.5,1); }
 .lp-pan { position: absolute; left: -100px; top: -56px; display: block; overflow: visible; }
 .lp-pan--back { z-index: 1; } .lp-pan--front { z-index: 3; }
+
+/* ---- 魔界公爵追放会議（3of4）---- */
+body.duke-meeting, body.dk-result { background: radial-gradient(ellipse at 50% 0%, #4a1458 0%, #1c0626 55%, #0a0210 100%) !important; transition: background .8s ease; }
+body.duke-meeting .panel, body.dk-result .panel { background: rgba(40, 10, 52, .78); border-color: #8d2bb3; box-shadow: 0 0 22px rgba(160, 40, 200, .35); }
+body.duke-meeting::before, body.dk-result::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(circle at 50% 100%, rgba(255, 40, 80, .22), transparent 60%); animation: dkPulse 3s ease-in-out infinite; }
+@keyframes dkPulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+.dk-banner { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; pointer-events: none; background: rgba(20, 0, 30, .72); animation: dkBanner 2.6s ease both; }
+.dk-banner span { font-size: clamp(26px, 8vw, 54px); font-weight: 900; letter-spacing: .14em; color: #ff5a7a; text-shadow: 0 0 18px #c01048, 0 3px 10px #000; animation: dkIn 2.6s cubic-bezier(.2, .9, .3, 1.1) both; }
+.dk-banner small { color: #e7c8ff; letter-spacing: .1em; text-shadow: 0 2px 8px #000; }
+@keyframes dkBanner { 0% { opacity: 0; } 12%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes dkIn { 0% { transform: scale(1.8); opacity: 0; } 20% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); } }
+.dk-fx { position: fixed; inset: 0; z-index: 9990; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: radial-gradient(ellipse at 50% 0%, #4a1458 0%, #1c0626 60%, #0a0210 100%); color: #f1ddff; animation: dkFade .6s ease both; }
+.dk-title { font-size: clamp(22px, 6vw, 40px); font-weight: 900; letter-spacing: .14em; color: #ff5a7a; text-shadow: 0 0 16px #c01048; }
+.dk-list { max-height: 46vh; overflow: auto; text-align: center; font-size: 15px; line-height: 1.9; }
+.dk-row { animation: dkFade .4s ease both; } .dk-row i { color: #ff8fb0; font-style: normal; }
+.dk-verdict { min-height: 70px; text-align: center; opacity: 0; transition: opacity .5s; } .dk-verdict.on { opacity: 1; }
+.dk-verdict b { display: block; font-size: clamp(28px, 9vw, 56px); font-weight: 900; letter-spacing: .12em; text-shadow: 0 0 20px currentColor; } .dk-verdict small { color: #e7c8ff; }
+.dk-ok { color: #ff3b5c; } .dk-ng { color: #ffd45a; }
+@keyframes dkFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 魔界公爵追放会議: 票数・投票のバッジは黒（結果発表の場面では dkb の席） */
+.tb-seat .tb-badge.tb-badge--black { background: #0b0b0f; border-color: #6b6b78; color: #fff; }
+
+/* 魔界公爵追放会議: 開始前の3秒カウントダウン / 死んでいる人のカードがすーっとグレーと黒の裏面に */
+.dk-banner.dk-count { animation: none; background: rgba(20, 0, 30, .72); }
+.dk-banner.dk-count span { font-size: clamp(64px, 24vw, 140px); animation: dkTick .9s ease-out both; }
+@keyframes dkTick { 0% { transform: scale(1.7); opacity: 0; } 25% { transform: scale(1); opacity: 1; } 100% { transform: scale(.92); opacity: .85; } }
+.tb-seat.dkgone .tb-card { animation: dkGone 1.8s ease-in-out both; }
+.tb-seat.dkgone .tb-name { color: #77777e; text-decoration: line-through; transition: color 1.8s ease; }
+@keyframes dkGone { from { filter: none; } to { filter: grayscale(1) brightness(.42) contrast(1.1); } }
+.tb-seat .tb-badge.tb-badge--black.tb-badge--lit { background: #ffd54a; border-color: #fff3b0; color: #1a0a00; transform: scale(1.35); box-shadow: 0 0 14px 4px rgba(255, 210, 70, .95); transition: transform .12s ease; }
+
+/* 反転者: 反転された人のカードは裏面のまま180度回転（--rot = 180deg × 反転の回数）。めくれたときも回ったまま */
+.tb-seat.rev .tb-inner { transform: rotate(var(--rot, 180deg)); }
+.tb-seat.up.rev .tb-inner { transform: rotateY(180deg) rotate(var(--rot, 180deg)); }
+.result-sheet .rs-tag-reverse { color: #6fc3ff; }   /* 反転者: 「(+反転1)」 */
+
+.servant-banner.lawyer-banner { top: 30%; }   /* 弁護士: 従者バナーと重ならない */
+
+/* 勝利の貼り重ね（docs/win-ladder.md）: 新しい勝利が上から貼り付けられ、前の勝利は重ねられて小さく・薄く・取り消し線になる */
+.res-cap .rs-under { font-size: 16px; opacity: .5; text-decoration: line-through; text-decoration-thickness: 2px; filter: saturate(.6); }
+.res-cap .rs-paste { animation: rs-paste .5s cubic-bezier(.2, 1.3, .4, 1) both; text-shadow: 0 3px 10px rgba(0, 0, 0, .55); }
+@keyframes rs-paste { 0% { opacity: 0; transform: translateY(-26px) scale(1.7) rotate(-5deg); } 60% { opacity: 1; transform: translateY(2px) scale(.96) rotate(1deg); } 100% { opacity: 1; transform: none; } }

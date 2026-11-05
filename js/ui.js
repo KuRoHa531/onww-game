@@ -44,6 +44,10 @@ window.ONW = window.ONW || {};
     if (game.phase !== ONW.PHASE.ONLINE_RESULT && !reviewing) { ui.closeResultChat(); ui.closeResultInfo(); }
     if (game.phase !== ONW.PHASE.LOBBY) ui.closePlayerMenu(); else ui.refreshPlayerMenu();   // ロビーの名前メニュー
     document.body.classList.toggle("is-title", game.phase === ONW.PHASE.TITLE);
+    { const dk = game.phase === ONW.PHASE.ONLINE_VOTE && !!game.dukeIds;   // 魔界公爵追放会議: 全員の画面の背景が暗い赤紫になり、開始の帯が出る
+      document.body.classList.toggle("duke-meeting", dk);
+      if (dk && !ui._dukeShown) { ui._dukeShown = true; const b = document.createElement("div"); b.className = "dk-banner"; b.innerHTML = "<span>魔界公爵追放会議</span><small>魔界公爵だと思う人に投票してください</small>"; document.body.appendChild(b); setTimeout(() => b.remove(), 2600); }
+      if (!dk) ui._dukeShown = false; }
     document.getElementById("phase-label").textContent = phaseName(game);
     document.getElementById("day-clock").textContent =
       game.phase === "day" && !game.votePhaseStarted
@@ -204,7 +208,7 @@ window.ONW = window.ONW || {};
       </button>`;
     const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]);
     const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman"]), dark = ["dark_avatar"];
-    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective"]);
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer"]);
     const roles = `
       <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
       <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
@@ -309,10 +313,10 @@ window.ONW = window.ONW || {};
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('revealManualRoles')">${game.revealManualRoles ? "ON" : "OFF"}</button>` : `<span>${game.revealManualRoles ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: 配役した役職（変化していないカード）も、変化公開に「光の使徒 → 占い師」のように変化先として並べます（人狼陣営は闇の化身、第三陣営は銀色の影から）。どれが本当に変化したのか分からなくなります。ガイドの「現在の配役」も、昼の開始までは変化役にまとめて表示されます。変化公開がONのときだけ働きます。</p>
-          <div class="field-row"><label>デバッグモード</label>
-            ${isHost ? `<button class="btn" onclick="ONW.debug.toggle()">${game.debugOn ? "ON" : "OFF"}</button>` : `<span>${game.debugOn ? "ON" : "OFF"}</span>`}
+          ${isHost && (game.debugOn || (ONW.debug && ONW.debug.allowed())) ? `<div class="field-row"><label>デバッグモード</label>
+            <button class="btn" onclick="ONW.debug.toggle()">${game.debugOn ? "ON" : "OFF"}</button>
           </div>
-          <p class="night-step__hint">ON: ホストが役職の固定・CPUの能力先・投票先の指定などを行えます。ONの間は参加者全員の画面に「デバッグモード中」と表示されます。</p>`)}
+          <p class="night-step__hint">ON: ホストが役職の固定・CPUの能力先・投票先の指定などを行えます。ONの間は参加者全員の画面に「デバッグモード中」と表示されます。</p>` : ""}`)}
         ${isHost ? sec("secRule", "ルール設定", "マイルール・コード", presetUi) : ""}
       </div>
       </div>`;
@@ -493,12 +497,13 @@ window.ONW = window.ONW || {};
       const mimicInfo = (info.mimicInfo || []).length ? `<div class="si-h">役職情報</div>${info.mimicInfo.map((x) => `<div class="si-log">模倣の人狼 ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。</div>`).join("")}` : "";
       const mind = (info.mind || []).length ? `<div class="si-h">昼の行動（心眼の人狼）</div>${info.mind.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.role ? `最終役職: <strong>${esc(ONW.roles.getInfo(x.role).name)}</strong>` : "")).join("")}` : "";
       const libra = info.libra ? `<div class="si-h">昼の行動（天秤）</div>${row(esc(info.libra.by), `→ <strong>${esc(info.libra.a)}</strong> と <strong>${esc(info.libra.b)}</strong> に投票対象を制限`)}` : "";   // 観戦者には、使った人と選ばれた2人を出す
+      const predict = (info.predict || []).length ? `<div class="si-h">昼の行動（予想屋）</div>${info.predict.map((x) => row(esc(x.by), `→ <strong>${esc(x.text)}</strong> と予想`)).join("")}` : "";   // 観戦者には、予想屋が決めた予想を出す（投票が始まるまで選び直せるので、そのときの最新）
       const sense = (info.sense || []).length ? `<div class="si-h">昼の行動（感覚の占い師）</div>${info.sense.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.key ? `気配: <strong>${esc(ONW.senseSeer.feelLabel(x.key))}</strong>` : "")).join("")}` : "";   // 観戦者には、使った事実と感じた気配を出す（観戦者は全員の役職が見える）
       const rnm = (r) => esc(ONW.roles.getInfo(r).name), FAIL = { target_locked: "ロックされて失敗", dead: "対象が先に死亡" };
       const eraser = (info.eraser || []).length ? `<div class="si-h">抹消（抹消の人狼）</div>${info.eraser.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.before ? (x.before === x.after ? `<span class=\"rs-dim\">変化なし</span>` : `<strong>${rnm(x.before)}</strong> → <strong>${rnm(x.after)}</strong>`) : `<span class="rs-dim">${esc(FAIL[x.fail] || "まだ抹消されていません")}</span>`)).join("")}` : "";
       const sl = info.seal || { rows: [], sealed: [] };
       const seal = sl.rows.length || sl.sealed.length ? `<div class="si-h">封印（封印の狂人）</div>${sl.rows.map((x) => row(`${esc(x.by)}${x.target ? ` → ${esc(x.target)}` : ""}`, x.fail ? `<span class="rs-dim">封印されていたため失敗</span>` : "封印しました")).join("")}${sl.sealed.length ? row("封印されている人", `<strong>${sl.sealed.map(esc).join("、")}</strong>`) : ""}` : "";
-      body = live + votes + mind + sense + libra + eraser + seal + log + mimicInfo || `<div class="si-log">まだ記録はありません。</div>`;
+      body = live + votes + mind + sense + libra + predict + eraser + seal + log + mimicInfo || `<div class="si-log">まだ記録はありません。</div>`;
     }
     const html = `<div class="night-info__head"><span>夜ログ</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
       (open && info ? `<div class="si-body">${body}</div>` : "");
@@ -775,7 +780,7 @@ window.ONW = window.ONW || {};
     const g = ONW.game, flash = (t) => { g.abilityMsg = t; ui.render(g); setTimeout(() => { if (g.abilityMsg === t) { g.abilityMsg = ""; ui.render(g); } }, 4000); };
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.isDead || g.isSpectator) return;
     if (kind === "day") {   // 昼能力: 独裁者だけが使える。押すとホストに確認し、使える人にだけカード選択が開く（使えない人は押しても何も起きない = 誰が独裁者か透けない）。もう一度押すと閉じる
-      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen || g.thiefOpen || g.libraOpen) { g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.thiefOpen = false; g.libraOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
+      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen || g.thiefOpen || g.libraOpen || g.predOpen) { g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.thiefOpen = false; g.libraOpen = false; g.predOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
       ONW.net.dictOpen();
       return;
     }
@@ -892,14 +897,43 @@ window.ONW = window.ONW || {};
   ui.libraConfirm = function () {
     const g = ONW.game, ids = (g.nightSel && g.nightSel.players) || [];
     if (!g.libraOpen || ids.length !== 2) return;
-    g.libraOpen = false; g.nightSel = { players: [], graves: [] };
+    g.libraOpen = false; g.predOpen = false; g.nightSel = { players: [], graves: [] };
     ONW.net.libra(ids[0], ids[1]);
     ONW.stage.sync(g); ui.render(g);
   };
   ui.libraCancel = function () {
     const g = ONW.game;
-    g.libraOpen = false; g.nightSel = { players: [], graves: [] };
+    g.libraOpen = false; g.predOpen = false; g.nightSel = { players: [], graves: [] };
     ONW.stage.sync(g); ui.render(g);
+  };
+  /** 予想屋: 「確定して閉じる」。いま選んでいる人（0人でも）で予想を保存して画面を閉じる。0人で確定すると「誰も死亡しない」予想になる。昼が終わるまでは、昼能力ボタンからまた開いて何度でも選び直せる */
+  ui.predConfirm = function () {
+    const g = ONW.game, ids = (g.nightSel && g.nightSel.players) || [];
+    if (!g.predOpen) return;
+    g.predOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.net.predict(ids, true);
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 予想屋: 閉じる（選んだ人はタップのたびにもう保存されている。「誰も死亡しない」予想にしたいときは「確定して閉じる」を使う） */
+  ui.predClose = function () {
+    const g = ONW.game;
+    g.predOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 予想屋の昼能力の操作欄（昼能力ボタンで開いたとき）。上のテーブルから、最終的に死亡すると思う人のカードを何人でも押す（タップのたびに保存される） */
+  ui.predBlock = function (game) {
+    if (game.isDead || game.isSpectator || !game.predOpen) return "";
+    const ids = (game.nightSel && game.nightSel.players) || [];
+    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : (((game.others || []).find((p) => p.id === id) || {}).name || "?");
+    const all = ids;
+    return `<div class="sober-box dict-box">
+      ${ui.abHelpStart(game)}
+      <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo("predictor") || {}).name || "予想屋")}の昼能力</strong>: 上のテーブルから、<strong>最終的に死亡すると思う人のカード</strong>を押してください（死亡した人も含めて何人でも。自分も選べます。もう一度押すと解除）。</p>
+      <p class="night-step__hint">選んだ人は押すたびに保存されます。投票が始まるまで何度でも選び直せます。最終的な死亡者（追放・道連れ・昼の死亡など）と<strong>完全に一致</strong>すれば単独勝利です（1人でも多くても少なくてもだめ。誰も死亡しないと思うなら、誰も選ばずに「確定して閉じる」）。昼のうちに死亡した人も選べます。</p>
+      </details>
+      <p class="night-step__hint">死亡すると予想: <strong>${all.length ? all.map((x) => esc(nm(x))).join("、") : "誰も選んでいません（確定すると「誰も死亡しない」予想）"}</strong></p>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" onclick="ONW.ui.predConfirm()">確定して閉じる</button><button class="btn" onclick="ONW.ui.predClose()">閉じる</button></div>
+    </div>`;
   };
   /** 天秤の昼能力の操作欄（昼能力ボタンで開いたとき）。上のテーブルから2人選んで「投票対象を制限する」。使うとすぐ投票に移る（何をしたかは情報確認に載る） */
   // ---- 天秤（libra）発動演出の上皿天秤の部品（SVG。css の .lp-*） ----
@@ -1086,6 +1120,15 @@ window.ONW = window.ONW || {};
     const el = document.createElement("div");
     el.className = "servant-banner";
     el.innerHTML = `<span class="servant-banner__text">あなたの従者がいるようです</span>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
+  };
+  /** 弁護士: 依頼人に「あなたに弁護士がついています」のバナーを出す（従者通知と同じ作り・同じ長さ。誰が弁護士かは出さない。従者バナーと重ならないよう少し下） */
+  ui.showLawyer = function () {
+    document.querySelectorAll(".lawyer-banner").forEach((e) => e.remove());
+    const el = document.createElement("div");
+    el.className = "servant-banner lawyer-banner";
+    el.innerHTML = `<span class="servant-banner__text">あなたに弁護士がついています</span>`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3600);
   };
@@ -1333,6 +1376,7 @@ window.ONW = window.ONW || {};
         ${ui.dictBlock(game)}
         ${ui.exchBlock(game)}
         ${ui.libraBlock(game)}
+        ${ui.predBlock(game)}
         ${ui.sheriffBlock(game)}
         ${ui.thiefBlock(game)}
         ${ui.rejobBlock(game)}
@@ -1366,14 +1410,15 @@ window.ONW = window.ONW || {};
     if (game.strawPick) return `<section class="panel"><h2>わら人形</h2><p class="lede">あなたがめくれました。上のテーブルで、<strong>道連れにする相手のカード</strong>を押してください。</p><p class="night-step__hint">選び終わるまでタイマーは止まっています。</p></section>`;
     if (game.strawWait) return `<section class="panel night-step"><p class="lede">結果を待っています…</p>${log}</section>`;   // 誰が選んでいるかは出さない
     if (game.dictDeclared) return `<section class="panel night-step"><p class="lede">独裁者が独裁を宣言しました。議論を打ち切って、結果を待っています…</p>${log}</section>`;
+    if (game.dukeIds && !game.dukeIds.includes(ONW.net.myId())) return `<section class="panel night-step"><p class="lede">魔界公爵追放会議です。あなたは参加できません（生存者のみ）。結果を待っています…</p>${log}</section>`;
     if (game.isDead) return `<section class="panel night-step"><p class="lede">あなたは死亡しているため、投票できません。結果を待っています…</p>${log}</section>`;
     if (game.voted) return `<section class="panel night-step"><p class="lede">あなたの投票先は固定されています。結果を待っています…</p>${log}</section>`;
     const sel = (game.others || []).find((p) => p.id === game.voteSel);
     return `
       <section class="panel">
-        <h2>${game.foxVoteOn ? "妖狐投票" : "投票"}</h2>
+        <h2>${game.dukeIds ? "魔界公爵追放会議" : game.foxVoteOn ? "妖狐投票" : "投票"}</h2>
         <p class="lede">上のテーブルで、追放したい人の<strong>カードを押して</strong>ください。もう一度押すと未投票に戻ります。タイマーが終わった時に、選んでいる人に投票されます。</p>
-        ${game.foxVoteOn ? `<p class="night-step__hint">妖狐投票です。最多得票の人（同数最多も）が<strong>妖狐か狐憑き</strong>のときだけ追放されます（そうでなければ誰も追放されず、票数だけ発表されます）。このあとに通常の投票があります。</p>` : ""}
+        ${game.dukeIds ? `<p class="night-step__hint">魔界公爵追放会議です。<strong>魔界公爵だと思う人</strong>のカードを押してください（生存者のみ・1人1票。自分にも投票できます。投票しなくてもかまいません）。最多得票の人が魔界公爵なら処刑され、そうでなければ魔界公爵の勝利です。</p>` : ""}${game.foxVoteOn ? `<p class="night-step__hint">妖狐投票です。最多得票の人（同数最多も）が<strong>妖狐か狐憑き</strong>のときだけ追放されます（そうでなければ誰も追放されず、票数だけ発表されます）。このあとに通常の投票があります。</p>` : ""}
         <p class="night-step__hint vote-now">${sel ? `現在の投票先: <strong>${esc(sel.name)}</strong>` : "現在: 未投票"}</p>
         ${log}
       </section>`;
@@ -1406,6 +1451,7 @@ window.ONW = window.ONW || {};
     if (pp.mapo) pub.push("麻婆豆腐が完成しました");
     if (pp.bread > 0) pub.push(pp.bread > 1 ? `パンが${pp.bread}個焼けました` : "パンが焼けました");
     (pp.deaths || []).forEach((t) => pub.push(tint(t)));
+    if ((pp.duke || []).length) { pub.push("<strong>魔界公爵追放会議</strong>"); pp.duke.forEach((t) => pub.push(tint(t))); }   // 魔界公爵追放会議の結果（全員に公開）
     const pubHtml = pub.length ? `<div class="rinfo-card"><div class="rinfo-name">公開された情報</div>${pub.map(L).join("")}</div>` : "";
     const news = Array.isArray(pp.news)
       ? `<div class="info-news"><div class="info-news__title">混沌新聞</div>${pp.news.length ? `<p class="info-news__head">昨夜、動きのあった役職</p>${pp.news.map((t) => `<p class="info-news__item">${esc(t)}</p>`).join("")}` : `<p class="info-news__head">昨夜、目立った能力行使はなかったようです。</p>`}</div>`
@@ -1484,11 +1530,12 @@ window.ONW = window.ONW || {};
         ${res.counts.length ? res.counts.map((c) => L(`${esc(c.name)} <span class="rs-dim">:</span> <span class="rs-vote">${c.c}票</span>`)).join("") : none("得票はありません。")}`}`}
         ${/* 【道連れ・後追い】投票結果のすぐ下（本家と同じ）。従者の身代わり・道連れ・心中・後追いなど、連鎖で起きたことを順に並べる。何も無ければ欄ごと出さない */ ""}
         ${chainSec}
+        ${res.duke ? `${sep}${H("魔界公爵追放会議")}${ONW.demonDuke.lines(res.duke).map((t) => L(ONW.utils.tintHtml(esc(t), res))).join("")}` : ""}
         ${opts.preview ? "" : sep}
         ${opts.preview ? "" : `<div class="rs-win t-${winTeam}">${esc(res.title)}</div>
-        ${res.abandoned ? none("ホストが廃村にしました。勝者も敗者もいません。") : `${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}
-        ${L(`<span class="rs-good">勝者:</span> ${res.winners.map((n) => esc(n)).join("、") || "なし"}`)}
-        ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map((n) => esc(n)).join("、") || "なし"}`)}`}`}
+        ${res.abandoned ? none("ホストが廃村にしました。勝者も敗者もいません。") : `${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}${(res.ladder || []).length > 1 ? L(`<span class="rs-info">勝利の乗っ取り:</span> ${res.ladder.map((x) => esc(x.title)).join(' <span class="rs-dim">→</span> ')}`) : ""}
+        ${L(`<span class="rs-good">勝者:</span> ${res.winners.map((n) => ((res.extraWin || []).some((x) => x.name === n) ? `<span class="rs-extra-name">${esc(n)}</span>` : `<span class="rs-wname">${esc(n)}</span>`)).join("、") || "なし"}`)}
+        ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map((n) => `<span class="rs-lname">${esc(n)}</span>`).join("、") || "なし"}`)}`}`}
         ${sep}${H("役職履歴")}
         ${res.history.map((h) => L(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead || h.day ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
         ${sep}
@@ -1510,14 +1557,15 @@ window.ONW = window.ONW || {};
             [...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`))],
             [...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
             [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : []),
-      ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${x.names.map(esc).join("、")} が爆発して敗北しました。` : "爆発する人はいませんでした。"}`))],
-            [...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
+      ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${(x.loseNames || x.names).length ? `${(x.loseNames || x.names).map(esc).join("、")} が爆発して敗北しました。` : ""}${(x.keepNames || []).length ? `殉職者 ${x.keepNames.map(esc).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`))],
+            [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
             [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`))],
             [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
             ...((res.detective && res.detective.boards) || []).map((b) => {   // 名探偵情報（マイクラ版 buildDetectiveResultLines と同じ。名探偵ごとに1組）
               const nmOf = (id) => ((res.detective.seats || []).find((q) => q.id === id) || {}).name || "?", rn = (r) => (ONW.roles.getInfo(r) || {}).name || r;
               return [L(`<span class="rs-info">名探偵:</span> ${esc(b.name)} は初期役職について`), ...b.cells.filter(Boolean).map((c) => L(`${esc(nmOf(c.id))} を ${esc(rn(c.guess))}`)), L(`と推測し、${b.success ? "成功" : "失敗"}していました。`)];
             }),
+            ...((res.predictor || []).map((x) => [L(`<span class="rs-info">予想屋:</span> ${esc(x.name)} は${esc(x.text)}と予想していました。`)])),   // 予想屋情報（マイクラ版の予想屋情報と同じ。予想屋ごとに1組。js/roles/neutral/predictor.js の view）
           ];
           const gs = groups.filter((x) => x.length);
           return gs.length ? `${sep}${H("役職情報")}${ONW.utils.tintHtml(gs.map((x) => x.join("")).join('<div class="rs-gsep"></div>'), res)}` : "";

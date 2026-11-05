@@ -158,8 +158,9 @@ window.ONW = window.ONW || {};
         case "muzzle": add(d.text); break;
         case "poetday": add("【詩人通知】", (d.lines && d.lines.length) ? d.lines : ["対象を選ぶ夜能力は使われていませんでした。"]); break;
         case "observeday": add("【観測通知】", (d.lines && d.lines.length) ? d.lines : ["観測できる夜能力はありませんでした。"]); break;
-        case "sealday": case "insomday": case "jobcut": case "servantday": case "jobday": case "mindday": case "senseday": case "sheriffdone": case "thiefdone": add(d.text); break;
+        case "sealday": case "insomday": case "jobcut": case "servantday": case "jobday": case "mindday": case "senseday": case "revday": case "lawyerday": case "sheriffdone": case "thiefdone": add(d.text); break;
         case "libradone": if (d.a && d.b) add(ONW.libra.doneText(d.a, d.b)); break;   // 天秤が昼に2人を選んだ結果
+        case "predsaved": if (d.text) { const old = out.logs.findIndex((x) => /^あなたは.*予想しました。$/.test(x)); if (old >= 0) out.logs.splice(old, 1); add(d.text); } break;   // 予想屋: 昼に何度も選び直せるので、最後に保存された予想の1行だけを載せる
         case "exchdone": if (d.a && d.b) add(`${d.a} と ${d.b} の票数を入れ替えます。`); break;   // mindday: 心眼の人狼が昼に見抜いた結果
         default: break;
       }

@@ -81,10 +81,10 @@
     // 結果発表の演出(stage.js の startResult / skipResult が引く): 従者の身代わり
     //   execExclude: 通常の追放フリップから除く人(身代わりになった従者。二重にめくらない) / intro: ご主人のカードがめくれそうになる(途中まで回って揺れ、また裏のまま戻る) → 従者のカードが表になる。複数あれば1組ずつ順に
     stageResult: {
-      execExclude: (res) => (res.servantSubs || []).map((x) => x.servantId),
+      execExclude: (res) => (res.servantSubs || []).filter((x) => !x.duke).map((x) => x.servantId),   // 魔界公爵追放会議の身代わり(x.duke)は demon_duke.js の追放会議の場面で見せる
       intro: { order: 10, run(R) {
         const { res, P, later, setCap, esc, paint, G, up, dead, badge, lovOn } = R;   // alm はスキップで作り直されるので、そのつど R.alm を読む
-        const subs = res.servantSubs || [];
+        const subs = (res.servantSubs || []).filter((x) => !x.duke);
         R.subN = subs.length;
         subs.forEach((x) => {
           const mk = P(x.masterId), sk = P(x.servantId), sh = res.history.find((h) => h.id === x.servantId);

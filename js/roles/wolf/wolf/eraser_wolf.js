@@ -66,7 +66,8 @@
   function overwrite(g, t, role) {
     const card = ONW.cardAt(g, t), changed = g.currentRoles[t] !== role;
     g.currentRoles[t] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen", "senseSeerTarget", "senseSeerSeen"].forEach((k) => { if (g[k]) delete g[k][t]; });
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen", "senseSeerTarget", "senseSeerSeen", "reverserTarget"].forEach((k) => { if (g[k]) delete g[k][t]; });
+    if (g.reverserTarget) Object.keys(g.reverserTarget).forEach((h) => { if (g.reverserTarget[h] === t) delete g.reverserTarget[h]; });   // 対象についていた (+反転) も消える（反転者の持ち主の記録のうち、対象に付けたもの。docs/reverser.md）
     if (g.shufflerMarks) delete g.shufflerMarks[card];   // シャッフラーの印も消える
     if (g.drunkOverlay) delete g.drunkOverlay[t];        // 酔っ払い(重複役職)も消える
     if (g.drunkRevealed) delete g.drunkRevealed[t];
