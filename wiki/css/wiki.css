@@ -299,3 +299,49 @@ details.syn-team > summary.syn-h--sec { cursor: pointer; list-style: none; paddi
 details.syn-team > summary.syn-h--sec::-webkit-details-marker { display: none; }
 details.syn-team > summary.syn-h--sec::before { content: "▶"; display: inline-block; margin-right: 6px; font-size: 11px; transition: transform .15s; }
 details.syn-team[open] > summary.syn-h--sec::before { transform: rotate(90deg); }
+
+/* ルールまとめ(rules.html)。色は陣営の色: 村人=緑 / 人狼=赤 / 第三=灰 / 共通=金 */
+.rules-app { display: flex; flex-direction: column; gap: 14px; }
+.rules-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.rules-sec { padding: 18px 18px 16px; border-left: 4px solid var(--gold-dim); }
+.rules-sec h2 { margin: 0 0 12px; }
+.rules-sec--win { border-left-color: var(--gold); }
+.rules-sec--vote { border-left-color: #6fa8dc; }
+.rules-sec--promo { border-left-color: var(--wolf); }
+.rules-sec--dup { border-left-color: #b48be0; }
+.rules-sec--assign { border-left-color: #5fc7b0; }
+.rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rule { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 6px; background: var(--bg-panel-raised); border: 1px solid var(--line); border-left-width: 4px; }
+.rule p { margin: 0; line-height: 1.8; font-size: 14px; color: var(--ink); }
+.rule strong { color: var(--gold); }
+.rule--village { border-left-color: var(--village); }
+.rule--wolf { border-left-color: var(--wolf); }
+.rule--third { border-left-color: #b9b6c9; }
+.rule--common { border-left-color: var(--gold-dim); }
+.rule__tag { align-self: flex-start; display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid currentColor; }
+.rule--village .rule__tag, .rule__tag--village { color: var(--village); }
+.rule--wolf .rule__tag, .rule__tag--wolf { color: #ff7a70; }
+.rule--third .rule__tag, .rule__tag--third { color: #c9c6d9; }
+.rule--common .rule__tag, .rule__tag--common { color: var(--gold); }
+.rules-sub { margin: 16px 0 8px; font-size: 14px; color: var(--gold); font-family: var(--font-display); }
+.rules-prio { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rules-prio .gt { color: var(--ink-dim); font-weight: 700; }
+.prio { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 14px; font-weight: 700; color: #12131c; }
+.prio--1 { background: #e0b0ff; }
+.prio--2 { background: #ff9ec4; }
+.prio--3 { background: #8ed0ff; }
+.prio--4 { background: #b5e6a0; }
+.is-embed .rules-app { padding-top: 12px; }
+
+/* ルールまとめのタブは、ほかのタブの上に1段だけ別に置く */
+.wiki-nav--top { padding-bottom: 0; }
+.wiki-nav--sub { padding-top: 8px; }
+.is-embed .wiki-nav--top, .is-embed .wiki-nav--sub { display: none; }
+
+.rules-sec--prio { border-left-color: #e8a85c; }
+.rules-sec--order { border-left-color: #8ed0ff; }
+.rules-note { margin: 0 0 10px; font-size: 13px; color: var(--ink-dim); }
+.rules-prio--chips { gap: 6px 4px; }
+.rules-prio--chips .chip { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); line-height: 1.4; }
+.rules-prio--chips .chip small { font-size: 11px; font-weight: 500; color: var(--ink-dim); margin-left: 2px; }
+.rules-prio--chips .chip--end { background: rgba(232,196,106,.16); border-color: rgba(232,196,106,.5); }

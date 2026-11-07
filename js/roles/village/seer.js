@@ -6,7 +6,7 @@
     const g = n.g;   // cur: 朝に使うとき（朝の時点の実際のカードを見る）
     const rolesNow = cur ? g.currentRoles : g.initialRoles, graveNow = cur ? g.center : g.center0;
     const i = n.infoOf(p.id), f = n.forced(p);
-    const lim = ONW.seerGraveMax(g);   // 設定された「占える墓地の枚数」
+    const lim = ONW.seerGraveMax(g, rid);   // 設定された「占える墓地の枚数」（rid: 使う役職。占い師・狂った占い師は別の設定）
     const fg = (f.graves || []).filter((k) => k >= 0 && k < g.center.length).slice(0, lim);
     const fp = n.validPlayer(p, f.player) ? f.player : null;
     i.grave = [];
@@ -65,7 +65,7 @@
       },
     },
     // 夜(と朝の連鎖)にカードを押して行動する: 墓地も選べる(設定枚数まで)。プレイヤーを選ぶと墓地の選択は外れる(狂った占い師も同じ)
-    stagePick: { graves: true, exclusive: true, graveMax: (g) => ONW.seerGraveMax(g) },
+    stagePick: { graves: true, exclusive: true, graveMax: (g, role) => ONW.seerGraveMax(g, role) },
     cpuLie: { role: "seer", weight: 40, order: 1, claim: lieClaim },   // 騙りで名乗る確率の重み(order 順に抽選)と、騙りの結果開示
     cpuClaim,   // CPUの昼の発言(CO・結果開示)
     /** 墓荒らし・ドッペルゲンガーで占い師を手にしたCPUが、続けて言う結果: 朝のうちに占った相手（人 or 墓地） */
@@ -80,8 +80,8 @@
     night: {
       kind: "seer", order: 10,
       complete: (np, ng) => np === 1 || ng >= 1,
-      normalize(c, players, graves) {   // プレイヤー1人 か 墓地(設定枚数まで)。同時には選べない
-        if (graves.length) { players = []; graves = graves.slice(0, ONW.seerGraveMax(c.g)); if (!graves.length) players = []; }
+      normalize(c, players, graves, sel, id, role) {   // プレイヤー1人 か 墓地(設定枚数まで)。同時には選べない（role: 使っている役職。占い師・偽・狂で枚数が別）
+        if (graves.length) { players = []; graves = graves.slice(0, ONW.seerGraveMax(c.g, role)); if (!graves.length) players = []; }
         else players = players.slice(0, 1);
         return { players, graves };
       },
@@ -112,7 +112,7 @@
         const g = c.g, rn = c.rn, nameOf = c.nameOf, me = c.me, label = c.label, players = c.players;
         let graves = c.graves, lines = null, reveal = null;
         if (graves.length) {
-          graves = graves.slice(0, ONW.seerGraveMax(g)).sort((x, y) => x - y);
+          graves = graves.slice(0, ONW.seerGraveMax(g, c.ar)).sort((x, y) => x - y);
           const seenG = graves.map((i) => ({ i, role: ONW.mimic.seerSeen(g, g.center[i], "g:" + i) }));   // 墓地の白狼も村人と出る（墓地の蜃気狼はランダム。1枚につき1回だけ引く）
           lines = seenG.map((x) => `墓地${x.i + 1}枚目は「${rn(x.role)}」でした。`);
           seenG.forEach((x) => g.nightLogsAll.push(`${label} ${me.name} は 墓地${x.i + 1} を確認し、${rn(x.role)} でした。`));

@@ -643,7 +643,7 @@ window.ONW = window.ONW || {};
    *   ・シャッフラー: 通常の結果が出たあと、対象が勝者に入っていれば乗っ取る（determineWinnersCore。神の祝福・恋人・チキンの逆転では乗っ取らない）
    *   ・妖狐: 村人陣営・人狼陣営（アサシンの逆転後の人狼陣営も）が勝つ結果だけを、全員生存の妖狐が乗っ取る（determineWinnersCore）
    *   1. 神が追放された        → 神の祝福: 神以外の全員が勝利（追放されたオポチュニストは除く）
-   *   1.5 恋人 / 1.6 名探偵（全員の初期役職を当てた）/ 1.7 賞金稼ぎ / 1.8 バランサー（票が入った全員の票数が同じ）/ 1.9 道化の狂人（追放・道連れで死亡 → 人狼陣営の勝利）
+   *   1.55 静観者（誰にも能力を使われず票も入らなかった静観者がちょうど1人。追加勝利の人がいれば敗北）/ 1.6 名探偵（全員の初期役職を当てた）/ 1.7 賞金稼ぎ / 1.8 バランサー（票が入った全員の票数が同じ）/ 1.9 道化の狂人（追放・道連れで死亡 → 人狼陣営の勝利）
    *   2. てるてる系が追放された / 2.5 処刑人のターゲットが追放された → 同じ順位（一緒に勝つ）
    *   3. 神が追放されていない   → 神降臨: 神の単独勝利
    *   3.8 王国滅亡（女王が倒れた。この優先度表には載っていない）
@@ -683,7 +683,7 @@ window.ONW = window.ONW || {};
    *   ・最終盤面で道化の狂人を持っていて、追放（game.executed のうち、直接の追放 と 道連れ kind "tomo"）で死んだ人。マイクラ版の死因 execute / chain だけ。
    *   ・心中・無理心中・後追い・王国滅亡・番犬の噛殺・爆殺（道化の爆弾魔）・昼中の死亡（呪殺など。game.deadIds だけにいる人）では働かない。
    *   ・人狼判定に昇格している人（game.promotedWolfIds）は対象外（吊られたら人狼判定の死亡で村人陣営の勝ち）。封印されている人も対象外（ふつうの狂人と同じ）。
-   *   ・使う所: determineWinnersCoreBase の分岐 1.9（バランサーの下・てるてる系の上）。チキンの逆転の再判定（chickenForce）では使わない。
+   *   ・使う所: determineWinnersCoreBase の分岐 3.5（神降臨の下・アサシンと同順位）。チキンの逆転の再判定（chickenForce）では使わない。
    */
   vote.jesterMadmanIds = function jesterMadmanIds(game) {
     if (!game.currentRoles || !ONW.ROLE.JESTER_MADMAN) return [];
@@ -882,6 +882,7 @@ window.ONW = window.ONW || {};
         const extra = teams.filter((t) => t !== "処刑人" || w.size);
         game.winTitle = `${extra.length ? extra.join("＆") : "追加勝利"}勝利`;
         game.winDetail = `${String(detail).replace("ため勝者なしです。", "ため、村人陣営にも人狼陣営にも勝者はいません。")} 追加勝利: ${[...w].map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、")}`;
+        if (extra.length) game.winBaseIds = [...w];   // 陣営の勝者がいなくて、追加勝利の人だけが勝つとき: タイトル（「〇〇勝利」）にもう名前が出ているので、「追加勝利」の演出・欄には重ねて出さない
       }
       // シャッフラー: 失敗した人は追加勝利（天邪鬼・フリーターなど）でも勝てない / 勝ち組に変化させた組は、失敗していなければシャッフラーも追加で勝利
       shBan.forEach((id) => w.delete(id));
@@ -920,9 +921,26 @@ window.ONW = window.ONW || {};
       game.godBlown = ids.filter((id) => (role(id) === R.OPPORTUNIST && dead.has(id)) || role(id) === R.AMANOJAKU || role(id) === R.LOSER);   // 結果演出: 祝福で吹き飛ばされるカード
       const tenGod = ONW.vote.tenaciousLostIds(game, { god: true });   // 執念の狂人: 死亡していたら祝福でも勝てない（封印の例外なし。マイクラ版 cannotWinByGodBlessing）
       game.tenaciousCut = tenGod.slice();
-      const win = ids.filter((id) => role(id) !== R.GOD && role(id) !== R.AMANOJAKU && role(id) !== R.LOSER && !(role(id) === R.OPPORTUNIST && dead.has(id)) && !(role(id) === R.MARTYR && !martyrDirectExec(id)) && !tenGod.includes(id));   // 天邪鬼は祝福に逆らえず敗北
+      const win = ids.filter((id) => role(id) !== R.GOD && role(id) !== R.AMANOJAKU && role(id) !== R.LOSER && role(id) !== R.WATCHER && !(role(id) === R.OPPORTUNIST && dead.has(id)) && !(role(id) === R.MARTYR && !martyrDirectExec(id)) && !tenGod.includes(id));   // 天邪鬼は祝福に逆らえず敗北 / 静観者も祝福でも勝てない（マイクラ版 extraRoles.js の祝福の勝者の除外と cannotWinByGodBlessing の ROLE.WATCHER。実績 watcher_god_loss「祝福の外側」の前提）
       return set("神の祝福を受けました", ["神の祝福"], win,
-        `神 ${nm(godBless)} が追放されたため、神以外の全員が勝利です。追放されたオポチュニストと天邪鬼と負け組は勝利できません。`, [ONW.TEAM.THIRD]);
+        `神 ${nm(godBless)} が追放されたため、神以外の全員が勝利です。追放されたオポチュニストと天邪鬼と負け組と静観者は勝利できません。`, [ONW.TEAM.THIRD]);
+    }
+    // 1.55 静観者の勝利（js/roles/neutral/watcher.js・docs/watcher.md）: 誰にも能力を使われず（g.watcherTouched）、誰からも票を入れられず（vote.tally）、死亡していない静観者がちょうど1人。神の祝福(1)のあと・名探偵(1.6)より前（docs/victory-priority.md。シャッフラーの乗っ取りはこの結果のあとに determineWinnersCore が行う）。
+    //   マイクラ版 watcherPriorityResult / hasAdditionalWinnerForWatcher: 条件を満たす静観者が2人以上いれば成立しない / 他に追加勝利の人（オポチュニスト・天邪鬼・勝ち組・フリーター・従者など）が1人でもいれば敗北（この分岐は成立せず、下の分岐の結果になる）。
+    //   追加勝利の有無は、set() で追加勝利まで足した結果を試しに作って、静観者以外の勝者がいるかを見る（乗っ取りの印 foxTake / lawyerTake / shufflerTake は試すあいだだけ外す。作り直しは下の set が行う）。チキンの逆転（chickenForce）の再判定では飛ばす。
+    //   (+反転)が奇数回の静観者は ONW.watcher.winIds が外す（反転者の共通ルール ONW.reverser.apply に任せる）。シャッフラーの失敗条件に当たる人は、処刑人と同じく先に除く
+    const watIds = ONW.watcher && !game.chickenForce && !(game.ladderBlock && game.ladderBlock.has(13)) ? ONW.watcher.winIds(game, { dead, exclude: [...shFailPre] }) : [];
+    let watOk = false;
+    if (watIds.length) {
+      const sv = [game.foxTake, game.lawyerTake, game.shufflerTake];
+      game.foxTake = game.lawyerTake = game.shufflerTake = null;
+      set("静観者勝利", ["静観者"], watIds, "", [ONW.TEAM.THIRD]);
+      const got = game.winnerIds || [];
+      watOk = watIds.every((id) => got.includes(id)) && got.every((id) => watIds.includes(id));
+      [game.foxTake, game.lawyerTake, game.shufflerTake] = sv;
+    }
+    if (hit(13, watOk)) {
+      return set("静観者勝利", ["静観者"], watIds, ONW.watcher.winText(game, watIds, nm), [ONW.TEAM.THIRD]);
     }
     // 1.6 名探偵の勝利: 投票のあとの推理で、自分を除く全員の初期役職を当てた（js/roles/neutral/detective.js）。神の祝福のあと・賞金稼ぎ(1.7)・バランサー(1.8)より前（docs/victory-priority.md）。名探偵が2人以上いれば、推理に成功した全員が同時に勝つ。
     //   シャッフラーの乗っ取りは、この結果が出たあとに determineWinnersCore が行う（シャッフラー ＞ 名探偵）。アサシンの逆転より上なので、暗殺が成功していても名探偵の単独勝利（マイクラ版の「人狼陣営・名探偵勝利」の同時勝利はなし = ユーザー指定）
@@ -952,27 +970,14 @@ window.ONW = window.ONW || {};
     if (hit(6, !game.chickenForce && balWinIds.length)) {
       return set("バランサー勝利", ["バランサー"], balWinIds, ONW.balancer.winText(game, balWinIds, nm), [ONW.TEAM.THIRD]);
     }
-    // 1.9 道化の狂人の勝利（js/roles/wolf/mad/jester_madman.js・docs/jester-madman.md）: 追放または道連れで死亡した道化の狂人がいれば、人狼が1人以上死んでいても人狼陣営の勝利（マイクラ版 buildJesterMadmanPriorityResult）。
-    //   バランサーのすぐ下・てるてる系・処刑人のすぐ上（docs/victory-priority.md）。昇格した道化の狂人・封印された道化の狂人・追放以外の死因では起きない（vote.jesterMadmanIds）。
-    //   勝者は人狼陣営の基本勝敗と同じ（人狼系・狂人系・吊られた呪われし者。死亡した執念の狂人は外れる）。チキンの逆転は determineWinners がこの結果をもう一度作り直す（chickenForce では通らない）
-    const jesterIds = game.chickenForce ? [] : ONW.vote.jesterMadmanIds(game);
-    if (hit(7, jesterIds.length)) {
-      game.jesterMadmanWin = jesterIds.slice();
-      const tenJ = ONW.vote.tenaciousLostIds(game);
-      game.tenaciousCut = tenJ.slice();
-      const cwJ = game.cursedWolfIds || [], deadWolvesJ = ONW.vote.wolfJudgeIds(game).filter((id) => dead.has(id));
-      const winJ = ids.filter((id) => (cwJ.includes(id) ? ONW.TEAM.WOLF : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF && !tenJ.includes(id));
-      return set("人狼陣営勝利", ["人狼陣営"], winJ,
-        `道化の狂人 ${nm(jesterIds)} が追放または道連れで死亡したため、人狼陣営の勝利です。${deadWolvesJ.length ? `（死亡した人狼: ${nm(deadWolvesJ)}）` : ""}`, [ONW.TEAM.WOLF]);
-    }
     // 2. てるてる系の勝利
     if (hit(8, !game.chickenForce && (tanners.length || loveTanners.length))) {
       const win = [...tanners, ...loveTanners, ...execWinIds];   // ターゲットがてるてる系なら、処刑人もてるてる系も一緒に勝利
       loveTanners.forEach((id) => { const t = (game.loveTargets || {})[id]; if (t) win.push(t); });
-      const teams = [], parts = [];
-      if (execWinIds.length) { teams.push("処刑人"); parts.push(`処刑人 ${nm(execWinIds)} のターゲットが追放されました`); }
+      const teams = [], parts = [];   // タイトルは「てるてる坊主＆処刑人勝利」の順（同時勝利。追加勝利ではない）
       if (tanners.length) { teams.push("てるてる坊主"); parts.push(`追放されたてるてる坊主: ${nm(tanners)}`); }
       if (loveTanners.length) { teams.push("一目惚れしてるてる"); parts.push(`追放された一目惚れしてるてる: ${nm(loveTanners)}`); }
+      if (execWinIds.length) { teams.push("処刑人"); parts.push(`処刑人 ${nm(execWinIds)} のターゲットが追放されました`); }
       return set(`${teams.join("＆")}勝利`, teams, win, parts.join(" / "), [ONW.TEAM.THIRD]);
     }
     // 2.5 処刑人の単独勝利（ターゲットが追放された。てるてる系と同じ順位で、神降臨より前。村人陣営・人狼陣営は勝てない）
@@ -988,6 +993,19 @@ window.ONW = window.ONW || {};
     if (hit(11, !game.chickenForce && godAlive.length)) {
       game.godMode = "descend"; game.godIds = godAlive.slice();
       return set("神降臨", ["神"], godAlive, "神が追放されませんでした。", [ONW.TEAM.THIRD]);
+    }
+    // 3.5 道化の狂人の勝利（2026-11-07 から アサシンと同順位。恋人・神降臨より下）（js/roles/wolf/mad/jester_madman.js・docs/jester-madman.md）: 追放または道連れで死亡した道化の狂人がいれば、人狼が1人以上死んでいても人狼陣営の勝利（マイクラ版 buildJesterMadmanPriorityResult）。
+    //   神降臨のすぐ下・王国滅亡(3.8)・基本勝敗(アサシンの逆転)のすぐ上。妖狐・弁護士・シャッフラーの乗っ取りは、アサシンの逆転と同じく上に積まれる（docs/victory-priority.md）。昇格した道化の狂人・封印された道化の狂人・追放以外の死因では起きない（vote.jesterMadmanIds）。
+    //   勝者は人狼陣営の基本勝敗と同じ（人狼系・狂人系・吊られた呪われし者。死亡した執念の狂人は外れる）。チキンの逆転は determineWinners がこの結果をもう一度作り直す（chickenForce では通らない）
+    const jesterIds = game.chickenForce ? [] : ONW.vote.jesterMadmanIds(game);
+    if (hit(7, jesterIds.length)) {
+      game.jesterMadmanWin = jesterIds.slice();
+      const tenJ = ONW.vote.tenaciousLostIds(game);
+      game.tenaciousCut = tenJ.slice();
+      const cwJ = game.cursedWolfIds || [], deadWolvesJ = ONW.vote.wolfJudgeIds(game).filter((id) => dead.has(id));
+      const winJ = ids.filter((id) => (cwJ.includes(id) ? ONW.TEAM.WOLF : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF && !tenJ.includes(id));
+      return set("人狼陣営勝利", ["人狼陣営"], winJ,
+        `道化の狂人 ${nm(jesterIds)} が追放または道連れで死亡したため、人狼陣営の勝利です。${deadWolvesJ.length ? `（死亡した人狼: ${nm(deadWolvesJ)}）` : ""}`, [ONW.TEAM.WOLF]);
     }
     // 3.8 王国滅亡（本家 buildQueenOverrideResult。判定が特殊なので勝利優先度の表には載せない。勝てる例外のメモは docs/victory-priority.md「王国滅亡の判定メモ」）: 女王が追放・道連れ（または昼中に死亡）したとき。神の祝福・恋人勝利・てるてる系・神降臨・処刑人より後ろ、基本勝敗より前
     //   ・女王と人狼判定の者が一緒に倒れた → 勝者なし / 人狼判定の者が倒れていない → 人狼陣営の勝利 / 人狼陣営がいない → 勝者なし
@@ -1051,7 +1069,7 @@ window.ONW = window.ONW || {};
     Object.assign(game, saved); game.ladderBlock = null;
     return out.reverse();
   };
-  const START_FROM = new Set([1, 2, 4, 5, 8, 9]);   // hit の番号: 1 神の祝福 / 2 名探偵 / 4 魔界公爵 / 5 賞金稼ぎ / 8 てるてる系（一目惚れしてるてる・処刑人と同時を含む） / 9 処刑人
+  const START_FROM = new Set([1, 2, 4, 5, 8, 9, 13]);   // hit の番号: 1 神の祝福 / 13 静観者 / 2 名探偵 / 4 魔界公爵 / 5 賞金稼ぎ / 8 てるてる系（一目惚れしてるてる・処刑人と同時を含む） / 9 処刑人
   vote.determineWinnersCore = function determineWinnersCore(game) {
     game.shufflerTake = null; game.shufflerBan = []; game.foxTake = null; game.lawyerTake = null; game.ladderBlock = null;
     ONW.vote.determineWinnersCoreBase(game);
@@ -1074,6 +1092,8 @@ window.ONW = window.ONW || {};
     // 「そこからスタート」の勝利（docs/win-ladder.md）: 陣営の勝敗が出る前から勝ちが決まっている単独勝利（神の祝福・名探偵・魔界公爵・賞金稼ぎ・てるてる系・処刑人）は、基本勝敗（村人/人狼）や、それより下の勝利を見せず、その勝利から貼り始める。複数あるときは、一番優先度の高い勝利から貼り始める（その下の「そこからスタート」の勝利は貼らない）。そこから上の乗っ取り（妖狐・弁護士・シャッフラー）は、これまでどおり貼る。アサシンの暗殺成功は、基本勝敗が最初から人狼陣営勝利なので、そのまま人狼陣営から始まる
     // 王国滅亡（分岐12）: 女王が倒れた時点で村人陣営は負けているので、村人陣営（基本勝敗）は貼らない。人狼判定の者が倒れていなければ人狼陣営勝利から。女王と人狼判定の者が一緒に倒れた（勝者なし）ときは、その上に成立している勝利があればそこから、なければ貼らない（1段）
     if (lad && lad.length > 1) { const q = lad.findIndex((x) => x.kind === "branch" && x.n === 12); if (q >= 0) { lad.splice(0, q); if (lad[0].title === "勝者なし" && lad[1] && lad[1].kind === "branch") lad.splice(0, 1); } }
+    // 道化の狂人（分岐7）の逆転勝利: 村人陣営（基本勝敗）は貼らず、人狼陣営勝利から始める（アサシンと同じ）。その上の乗っ取り・単独勝利は、これまでどおり続けて貼る
+    if (lad && lad.length > 1) { const jq = lad.findIndex((x) => x.kind === "branch" && x.n === 7); if (jq > 0) lad.splice(0, jq); }
     if (lad && lad.length > 1) { let s0 = -1; lad.forEach((x, i) => { if (x.kind === "branch" && START_FROM.has(x.n)) s0 = i; }); if (s0 > 0) lad.splice(0, s0); const gb = lad.findIndex((x) => x.kind === "branch" && x.n === 1); if (gb > 0) lad.splice(0, gb); }   // 神の祝福は、下に「そこからスタート」の勝利（処刑人・賞金稼ぎなど）があっても、神の祝福だけから始める
     if (!game.chickenForce) game.winLadder = lad ? lad.filter((x, i) => !i || x.title !== lad[i - 1].title || x.ids.join() !== lad[i - 1].ids.join()) : null;   // 同じ結果の連続は1つに
     return game.winners;
@@ -1218,7 +1238,7 @@ window.ONW = window.ONW || {};
       const had = teams.includes("道化の爆弾魔");
       if (!had) teams.push("道化の爆弾魔");
       if (!keys.includes(T.THIRD)) keys.push(T.THIRD);
-      if (!others.length) { teams = ["道化の爆弾魔"]; keys = [T.THIRD]; game.winTitle = "道化の爆弾魔勝利"; }   // 爆弾魔以外に勝者がいなくなった（全員爆発・もともと勝者なし）
+      if (!others.length) { teams = ["道化の爆弾魔"]; keys = [T.THIRD]; game.winTitle = "道化の爆弾魔勝利"; game.winBaseIds = winBombers.slice(); }   // 爆弾魔以外に勝者がいなくなった（全員爆発・もともと勝者なし）
       else if (!had && /勝利$/.test(game.winTitle || "") && game.winTitle !== "全員勝利") game.winTitle = game.winTitle.replace(/勝利$/, "＆道化の爆弾魔勝利");   // 追加勝利: 勝利タイトルも「村人陣営＆道化の爆弾魔勝利」にする（愉快犯の追加勝利と同じ）
     }
     const lines = hanged.map((b) => { const x = game.bombs.find((q) => q.bomber === b), lose = x.ids.filter((id) => game.currentRoles[id] !== R.MARTYR), keep = x.ids.filter((id) => game.currentRoles[id] === R.MARTYR); return `道化の爆弾魔 ${nm(b)} が吊られて自爆したため、${x.ids.length ? `${lose.length ? `${lose.map(nm).join("、")} が爆発して敗北しました。` : ""}${keep.length ? `殉職者 ${keep.map(nm).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`; });

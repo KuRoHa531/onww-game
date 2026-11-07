@@ -179,6 +179,7 @@ window.ONW_WIKI_SYNERGY = {
     "robber",
     "troublemaker",
     "relic_robber",
+    "cosplayer",
     "doppelganger",
     "shuffler",
     "gremlin"
@@ -320,6 +321,7 @@ window.ONW_WIKI_SYNERGY = {
    "libra",
    "fake_seer",
    "poet",
+   "cosplayer",
    "assassin",
    "wolf_king",
    "mapo_wolf",
@@ -336,6 +338,7 @@ window.ONW_WIKI_SYNERGY = {
    "mad_exchanger",
    "tenacious_madman",
    "jester_madman",
+   "smoke_madman",
    "love_tanner",
    "freeter",
    "doppelganger",
@@ -353,6 +356,32 @@ window.ONW_WIKI_SYNERGY = {
     "lawyer"
    ],
    "min": 3,
+   "max": null,
+   "force": false,
+   "early": false,
+   "unlessLover": false
+  },
+  {
+   "trigger": "spy",
+   "always": false,
+   "label": "人狼系（一匹狼以外）",
+   "anyOf": [
+    "werewolf",
+    "big_wolf",
+    "white_wolf",
+    "tofu_wolf",
+    "forgetful_wolf",
+    "assassin",
+    "wolf_king",
+    "mapo_wolf",
+    "cat_pumpkin",
+    "observer_wolf",
+    "mind_wolf",
+    "mimic_wolf",
+    "eraser_wolf",
+    "mirage_wolf"
+   ],
+   "min": 2,
    "max": null,
    "force": false,
    "early": false,
@@ -415,6 +444,7 @@ window.ONW_WIKI_SYNERGY = {
   "恋人系役職": "破局師が出る闇鍋には、壊す相手の恋人を作る役職を最低1枚出す。恋人（重複役職）が最初から配られているときは足さない。",
   "麻婆対抗役": "麻婆豆腐（豆腐の人狼の3票）に対抗できる役職を、現世でも墓地でもよいので最低1枚出す。",
   "封印作用のある役職": "封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す。",
+  "人狼系（一匹狼以外）": "スパイが出る闇鍋には、闇の化身から一匹狼以外の人狼系を合計2人以上出す（人狼が1人だけだと、狼マークに見えるスパイが確定してしまうため。一匹狼は誰からも見えないので数えない）。",
   "悪女・純愛者・キューピッド": "常に適用: この3役職は合わせて1人まで（変化から出た分だけ減らす）。",
   "マーリン": "常に適用: マーリンは1人まで（変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）。"
  }

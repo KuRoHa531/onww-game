@@ -6,16 +6,24 @@
     const g = n.g;
     const f = n.forced(p), i = n.infoOf(p.id);
     const t = n.validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : n.pick(g.players.filter((q) => q.id !== p.id));
-    const why = ONW.keymaster.gate(g, p.id, [t.id]);   // 鍵師のロック: 自分の席か相手の席がロック中なら🔒に弾かれて失敗（役職は動かない）
+    const ch = ONW.watcher.shiftChain(g, p.id, t.id), ta = ch.to;   // 静観者を選んだら、実際に交換する相手は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。docs/watcher.md）
+    if (!ta) {   // 移す先がなければ交換できない（静観者を選んだことは「能力を使われた」に数える）
+      i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]); i.keyFail = { kind: "shift", target: t.id };
+      n.hold(p.id, ONW.watcher.noneLine("交換"));
+      return;
+    }
+    const why = ONW.keymaster.gate(g, p.id, [ta]);   // 鍵師のロック: 自分の席か相手の席がロック中なら🔒に弾かれて失敗（役職は動かない）
     if (why) {
       i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]); i.keyFail = { kind: why, target: t.id };
       n.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t.id], `${label} ${p.name}`));
+      ONW.watcher.keyFailShown(g, p.id, [t.id], [ta]);
       return;
     }
-    ONW.swapPlayers(g, p.id, t.id);
+    ONW.swapPlayers(g, p.id, ta);
     i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]);
     i.known[p.id] = i.newRole; i.known[t.id] = "robber";
-    g.nightLogsAll.push(`${label} ${p.name} は ${t.name} と役職を交換し、${n.rn(i.newRole)} になりました。`);
+    const nmOf = (id) => (g.players.find((q) => q.id === id) || {}).name || "?";
+    g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${label} ${p.name}`, nmOf, n.rn(i.newRole), "交換") || `${label} ${p.name} は ${t.name} と役職を交換し、${n.rn(i.newRole)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
     n.hold(p.id, `${t.name} と役職を交換しました。あなたの新しい役職は「${n.rn(i.newRole)}」です。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
@@ -34,7 +42,9 @@
     c.co = "robber";
     if (i.keyFail) {   // ロックされて交換に失敗した: 正直に「失敗した」と言う（役職は怪盗のまま）
       const t = nameOf(g, i.target);
-      c.result = i.keyFail.kind === "self"
+      c.result = i.keyFail.kind === "shift"
+        ? { short: `${t} → 変化なし`, text: `${t} を選びましたが、交換できる相手がおらず役職は変化しませんでした。`, claim: null }
+        : i.keyFail.kind === "self"
         ? { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }
         : { short: `${t} → ロックで失敗`, text: `${t} を選びましたが、役職がロックされていたため交換できませんでした。`, claim: null };
       return;
@@ -91,12 +101,14 @@
       normalize: (c, players) => ({ players: players.slice(0, 1), graves: [] }),
       resolve(c, p) {   // 怪盗 → いたずらっ子（起床順。怪盗はシャッフラー・グレムリンのあと）。いたずらっ子の入れ替えは最後にまとめて反映
         const g = c.g, rn = c.rn;
-        const t = c.selOf(p).players[0]; if (!t) return;
-        const why = ONW.keymaster.gate(g, p.id, [t]);   // 鍵師のロック（鍵師は先の段階で済んでいる）: 自分か相手の席がロック中なら失敗。役職は動かず、新聞・観測にも載らない
-        if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
-        ONW.swapPlayers(g, p.id, t);
+        const t = c.selOf(p).players[0]; if (!t) return;   // t = 選んだ席（文章・演出・ログはこの席で出す）
+        const ch = ONW.watcher.shiftChain(g, p.id, t), ta = ch.to;   // 静観者を選んだら、実際に交換する相手は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。docs/watcher.md）
+        if (!ta) { c.hold(p.id, ONW.watcher.noneLine("交換")); return; }   // 移す先がなければ交換できない（新聞・観測にも載らない）
+        const why = ONW.keymaster.gate(g, p.id, [ta]);   // 鍵師のロック（鍵師は先の段階で済んでいる）: 自分か相手の席がロック中なら失敗。役職は動かず、新聞・観測にも載らない
+        if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [t], [ta]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
+        ONW.swapPlayers(g, p.id, ta);
         const got = g.currentRoles[p.id];
-        g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);
+        g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${rn(c.eff(p))} ${p.name}`, c.nameOf, rn(got), "交換") || `${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
         c.hold(p.id, `${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
         const ml = ONW.mimic.takenLine(g, p.id, got, rn); if (ml) c.hold(p.id, ml);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
         c.rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "swap", target: t, role: ONW.shownRole(got) });
@@ -107,12 +119,14 @@
     morning: {
       run(c) {
         if (!c.players.length) return null;
-        const g = c.g, rn = c.rn, id = c.id, t = c.players[0];
-        const why = ONW.keymaster.gate(g, id, [t]);   // 朝のうち（墓荒らし・ドッペルで手にした怪盗 / 酔い覚め）もロックは効く
-        if (why) return { lines: [ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };
-        ONW.swapPlayers(g, id, t);
+        const g = c.g, rn = c.rn, id = c.id, t = c.players[0];   // t = 選んだ席（文章・演出はこの席）
+        const ch = ONW.watcher.shiftChain(g, id, t), ta = ch.to;   // 静観者を選んだら、実際に交換する相手は別の人（ずれた先がまた静観者ならさらに別の人。墓荒らし・ドッペル・酔い覚め経由でも同じ）
+        if (!ta) return { lines: [ONW.watcher.noneLine("交換")], reveal: null, nextChain: null, failed: true };
+        const why = ONW.keymaster.gate(g, id, [ta]);   // 朝のうち（墓荒らし・ドッペルで手にした怪盗 / 酔い覚め）もロックは効く
+        if (why) { const fl = ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [t], [ta]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
+        ONW.swapPlayers(g, id, ta);
         const got = g.currentRoles[id];
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);
+        g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${c.label} ${c.me.name}`, c.nameOf, rn(got), "交換") || `${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
         const ml = ONW.mimic.takenLine(g, id, got, rn);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
         return {
           lines: [`${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`, ...(ml ? [ml] : [])],

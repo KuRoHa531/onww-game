@@ -25,6 +25,7 @@
    *  口封じの狂人は、引いたときのターゲット決めと演出を 3of4 で作るまで山札から外す（マイクラ版は入る）。 */
   const BLOCKED = [
     "light_apostle", "dark_avatar", "silver_shadow",
+    "spy",   // スパイ（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
     "seer", "mad_seer", "fake_seer", "robber", "relic_robber", "troublemaker",
     "doppelganger", "love_tanner", "freeter", "visitor", "exposed_madman",
     "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler",
@@ -33,6 +34,7 @@
     "eraser_wolf",   // 抹消の人狼（夜に対象を選ぶ・昼になる前に実行する能力の役職。マイクラ版 shufflerEligibleRoles でも除外）
     "avenger",   // 復讐者（夜に復讐対象を選ぶ役職。マイクラ版 shufflerEligibleRoles の除外どおり）
     "prankster",   // 愉快犯（夜に対象を選ぶ役職。復讐者と同じ扱いで山札から外す。※マイクラ版 shufflerEligibleRoles の確認は 4of4）
+    "watcher",   // 静観者（マイクラ版 shufflerEligibleRoles の除外どおり。静観者のカードは交換・コピー・変化されない）
     "mimic_wolf", "mirage_wolf",   // 模倣の人狼・蜃気楼の人狼（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
@@ -175,20 +177,28 @@
   function cpuRun(n, p, label, cur, rid) {
     const g = n.g, f = n.forced(p), i = n.infoOf(p.id);
     const ok = (id) => id && g.players.some((q) => q.id === id);
-    const t = ok(f.player) ? f.player : n.pick(g.players).id;
-    const why = ONW.keymaster.gate(g, holderOf(g, p.id), [t]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら🔒に弾かれて失敗（山札からは引かない）
+    const t = ok(f.player) ? f.player : n.pick(g.players).id;   // t = 選んだ席（文章・ログ・記録はこの席で出す）
+    const ch = ONW.watcher.shiftChain(g, p.id, t, null, [holderOf(g, p.id)]), ta = ch.to;   // 静観者を選んだら、実際に変化させる席は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。docs/watcher.md）
+    if (!ta) {   // 移す先がなければ変化しない（静観者を選んだことは「能力を使われた」に数える）
+      if (!cur) { i.mode = "shuffler"; i.target = t; }
+      i.keyFail = { kind: "shift", target: t };
+      n.hold(p.id, ONW.watcher.noneLine("変化"));
+      return;
+    }
+    const why = ONW.keymaster.gate(g, holderOf(g, p.id), [ta]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら🔒に弾かれて失敗（山札からは引かない）
     if (why) {
       if (!cur) { i.mode = "shuffler"; i.target = t; }
       i.keyFail = { kind: why, target: t };
       n.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${label} ${p.name}`));
+      ONW.watcher.keyFailShown(g, holderOf(g, p.id), [t], [ta]);
       return;
     }
-    const r = shuffle(g, holderOf(g, p.id), t), shown = ONW.shownRole(r.role);
+    const r = shuffle(g, holderOf(g, p.id), ta), shown = ONW.shownRole(r.role);
     i.shuffle = { target: t, role: shown };   // 発言(cpuClaim)・投票(cpuVoteScore)が使う。朝に墓荒らし・ドッペルで手にした連鎖(cur)でも、本人の怪盗などの記録(mode / target)は上書きしない
     if (!cur) { i.mode = "shuffler"; i.target = t; }
     i.known[t] = shown;   // 引いたカードを見たので、その人の役職（いまの役職）を知っている
     if (t === p.id) i.shuffledTo = shown;   // 自分に置いたとき: 自分はもうその役職（発言・投票はその役職として行う。cpu.js の plan / selfRole）
-    g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} をランダムな役職「${n.rn(r.role)}」に変化させました。`);
+    g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${label} ${p.name}`, (id) => nm(g, id), (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${n.rn(r.role)}」に変化させました。`) || `${label} ${p.name} は ${nm(g, t)} をランダムな役職「${n.rn(r.role)}」に変化させました。`);   // 静観者にずれたときは「〇〇をランダムな役職に変化させようとしましたが、静観者だったため△△を…に変化させました。」
     n.hold(p.id, `${nm(g, t)} をランダムな役職「${n.rn(shown)}」に変化させました。`);   // 人間なら昼の情報確認に残る文（CPUも同じ文を残す）
     n.ob(p.id, [t]);
     n.nn(rid);
@@ -236,11 +246,13 @@
       normalize: (c, players) => ({ players: players.slice(0, 1), graves: [] }),
       resolve(c, p) {
         const g = c.g, nameOf = c.nameOf;
-        const t = c.selOf(p).players[0]; if (!t) return;
-        const why = ONW.keymaster.gate(g, holderOf(g, p.id), [t]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら失敗。山札から引かず、新聞・観測にも載らない
-        if (why) { c.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${c.rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, holderOf(g, p.id), p.id); return; }
-        const r = shuffle(g, holderOf(g, p.id), t);
-        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
+        const t = c.selOf(p).players[0]; if (!t) return;   // t = 選んだ席（文章・演出・ログはこの席で出す）
+        const ch = ONW.watcher.shiftChain(g, p.id, t, null, [holderOf(g, p.id)]), ta = ch.to;   // 静観者を選んだら、実際に変化させる席は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。docs/watcher.md）
+        if (!ta) { c.hold(p.id, ONW.watcher.noneLine("変化")); return; }   // 移す先がなければ変化しない（新聞・観測にも載らない）
+        const why = ONW.keymaster.gate(g, holderOf(g, p.id), [ta]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら失敗。山札から引かず、新聞・観測にも載らない
+        if (why) { c.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${c.rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, holderOf(g, p.id), [t], [ta]); c.rev[p.id] = ONW.keymaster.failRev(g, holderOf(g, p.id), p.id); return; }
+        const r = shuffle(g, holderOf(g, p.id), ta);
+        g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.rn(c.eff(p))} ${p.name}`, nameOf, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${c.rn(r.role)}」に変化させました。`) || `${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         c.hold(p.id, `${nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`);
         ONW.observeNote(g, p.id, [t], null, "shuffler");
         ONW.newsNote(g, "shuffler");
@@ -252,10 +264,12 @@
       run(c) {
         if (!c.players.length) return null;
         const g = c.g, id = c.id, t = c.players[0];
-        const why = ONW.keymaster.gate(g, id, [t]);   // 朝のうち(墓荒らし・ドッペル経由)・酔い覚めにもロックは効く
-        if (why) return { lines: [ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };
-        const r = shuffle(g, id, t);
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
+        const ch = ONW.watcher.shiftChain(g, id, t), ta = ch.to;   // 静観者を選んだら、実際に変化させる席は別の人（ずれた先がまた静観者ならさらに別の人。墓荒らし・ドッペル・酔い覚め経由でも同じ）
+        if (!ta) return { lines: [ONW.watcher.noneLine("変化")], reveal: null, nextChain: null, failed: true };
+        const why = ONW.keymaster.gate(g, id, [ta]);   // 朝のうち(墓荒らし・ドッペル経由)・酔い覚めにもロックは効く
+        if (why) { const fl = ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [t], [ta]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
+        const r = shuffle(g, id, ta);
+        g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.label} ${c.me.name}`, c.nameOf, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${c.rn(r.role)}」に変化させました。`) || `${c.label} ${c.me.name} は ${c.nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         const lines = [`${c.nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`];
         return { lines, reveal: { kind: "shuffler", target: t, role: ONW.shownRole(r.role) }, nextChain: null };
       },

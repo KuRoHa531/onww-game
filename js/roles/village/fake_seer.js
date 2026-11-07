@@ -53,7 +53,7 @@
     const g = n.g;
     const rolesNow = cur ? g.currentRoles : g.initialRoles, graveNow = cur ? g.center : g.center0;
     const i = n.infoOf(p.id), f = n.forced(p);
-    const lim = ONW.seerGraveMax(g);
+    const lim = ONW.seerGraveMax(g, "fake_seer");
     const fg = (f.graves || []).filter((k) => k >= 0 && k < g.center.length).slice(0, lim);
     const fp = n.validPlayer(p, f.player) ? f.player : null;
     i.grave = [];
@@ -109,7 +109,7 @@
         const g = c.g, rn = c.rn, nameOf = c.nameOf, me = c.me, label = c.label, players = c.players;
         let graves = c.graves, lines = null, reveal = null;
         if (graves.length) {
-          graves = graves.slice(0, ONW.seerGraveMax(g)).sort((x, y) => x - y);
+          graves = graves.slice(0, ONW.seerGraveMax(g, "fake_seer")).sort((x, y) => x - y);
           const seenG = seenGraves(g, graves, g.center);
           lines = seenG.map((x) => `墓地${x.idx + 1}枚目は「${rn(x.role)}」でした。`);
           seenG.forEach((x) => g.nightLogsAll.push(`${label} ${me.name} は 墓地${x.idx + 1} を確認し、${rn(x.role)} でした。`));

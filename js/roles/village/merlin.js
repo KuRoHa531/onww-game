@@ -1,13 +1,13 @@
 /** マーリン: 墓地以外の人狼を知っている(アサシンに選ばれると人狼陣営の逆転勝利) */
 (function (ONW) {
-  /** マーリンに見える人狼のID（墓地は見えない）。本物の人狼（一匹狼・忘却の人狼も含む）。人狼が誰もいなければ、昇格が決まっている狂人 */
+  /** マーリンに見える人狼のID（墓地は見えない）。本物の人狼（一匹狼・忘却の人狼も含む）とスパイ（人狼として見える）。人狼が誰もいなければ、昇格が決まっている狂人 */
   function sees(g, selfId) {
-    const ids = g.players.filter((q) => q.id !== selfId && ONW.WOLF_KIND.includes(g.initialRoles[q.id])).map((q) => q.id);
+    const ids = ONW.wolfLookIds(g, selfId, true);   // スパイも🐺として見える（WOLF_LOOK_ALL）
     if (ids.length) return ids;
     const mid = ONW.vote.certainPromotion(g);
     return mid && mid !== selfId ? [mid] : [];
   }
-  const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (q.id !== id && k.isWolf(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = g.initialRoles[q.id]; });
+  const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (q.id !== id && k.isLookAll(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = k.seenAs(g.initialRoles[q.id]); });
 
   // ---- CPUの発言(もとは cpu.js。中身は変更なし) ----
   /**
@@ -34,7 +34,7 @@
 
   ONW.defineRole("merlin", {
     cpuClaim(k, g, p, r, i, c) { const lie = merlinLie(k, g, p, i); c.co = lie.co; c.result = lie.result; },   // マーリン: 人狼が見えているので、別の村役職を騙る（マーリンCOは禁止）
-    cpuInit(g, id, k) { cpuLearn(g, id, k); const mid = g.players.some((q) => k.isWolf(g.initialRoles[q.id])) ? null : ONW.vote.certainPromotion(g);
+    cpuInit(g, id, k) { cpuLearn(g, id, k); const mid = g.players.some((q) => k.isLookAll(g.initialRoles[q.id])) ? null : ONW.vote.certainPromotion(g);
       if (mid && mid !== id) k.infoOf(g, id).known[mid] = "werewolf"; },
     cpuLearn,   // CPU: 墓地以外の人狼を知っている
     info: { deck: 28, name: "マーリン", team: ONW.TEAM.VILLAGE, wakeOrder: 25, sort: 10,

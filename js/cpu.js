@@ -19,7 +19,9 @@ window.ONW = window.ONW || {};
   /** 役職ファイル(js/roles/<役職>.js)のCPUフックが使う道具(役職固有ではない) */
   cpu.kit = {
     infoOf, isWolf, isMad, pick, nameOf,
-    isVisibleWolf: (r) => ONW.VISIBLE_WOLF.includes(r),   // 一匹狼は誰からも見えない
+    isVisibleWolf: (r) => ONW.WOLF_LOOK.includes(r),   // 🐺として見える役職（一匹狼は誰からも見えない・スパイは見える）
+    isLookAll: (r) => ONW.WOLF_LOOK_ALL.includes(r),   // マーリン・魔界公爵に見える役職（一匹狼も含む・スパイも見える）
+    seenAs: (r) => (ONW.WOLF_KIND.includes(r) ? r : ONW.WOLF_LOOK_ALL.includes(r) ? "werewolf" : r),   // CPUが覚える役職: 本物の人狼系はそのまま、スパイは「人狼」として覚える（役職は分からない）
   };
   /** 墓荒らし・ドッペル・酔い覚めのあと、朝のうちに夜の行動を使える役職(cpuNight.chain を持つ役職)。excl は除く */
   cpu.chainRoles = (excl) => ONW.roleIds().filter((id) => id !== excl && ((ONW.roleDef(id) || {}).cpuNight || {}).chain);
@@ -52,8 +54,8 @@ window.ONW = window.ONW || {};
     const act = (p) => ONW.mimic.actRole(g, p.id, role(p));   // 夜に使う能力の役職（模倣の人狼は模倣先。仲間表示など「カードそのもの」は role(p) のまま）
     // 人狼系は互いを知っている（役職ごとの情報は cpuInit: 狂信者・マーリン・共有者・従者・処刑人・大狼・神）
     if (all || stage === "init") cpus.forEach((p) => {
-      const vis = (r) => ONW.VISIBLE_WOLF.includes(r);   // 一匹狼は誰からも見えない
-      if (vis(role(p)) && role(p) !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== p.id && vis(role(q))) infoOf(g, p.id).known[q.id] = role(q); });
+      const vis = (r) => ONW.VISIBLE_WOLF.includes(r), look = (r) => ONW.WOLF_LOOK.includes(r);   // 見る側は本物の人狼系(一匹狼は誰からも見えない)、見える側はスパイも含む
+      if (vis(role(p)) && role(p) !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== p.id && look(role(q))) infoOf(g, p.id).known[q.id] = cpu.kit.seenAs(role(q)); });
       const h = ONW.roleHook(role(p), "cpuInit"), ha = act(p) !== role(p) ? ONW.roleHook(act(p), "cpuInit") : null;   // 模倣の人狼は模倣先の cpuInit（大狼の墓地・共有者・マーリンなど）も知る（9of9）
       if (h) h(g, p.id, cpu.kit);
       if (ha) ha(g, p.id, cpu.kit);
@@ -66,7 +68,7 @@ window.ONW = window.ONW || {};
     const validPlayer = (p, id) => id && id !== p.id && !deadSet.has(id) && g.players.some((q) => q.id === id);
     const nn = (rid) => { if (stage !== "late") ONW.newsNote(g, rid); };   // 新聞配達員の新聞: 夜に能力を使った役職を記録（昼に酔いが覚めてからの能力は、新聞には載らない）
     // 役職ファイルの cpuNight.run に渡す道具
-    const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves, n.cur); };   // n.cur = いま能力を使っている役職（詩人の通知に載る。模倣の人狼は模倣先）
+    const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves, n.cur); else if (ONW.watcher) ONW.watcher.touch(g, from, players); };   // 昼の酔い覚めは詩人・観測には載らないが、静観者の「能力を使われた」には数える   // n.cur = いま能力を使っている役職（詩人の通知に載る。模倣の人狼は模倣先）
       // 観測の人狼: 夜に誰が誰に能力を使ったかを記録（昼の酔い覚め後は記録しない）
     const hold = (id, text) => { if (!text) return; g.nightResults = g.nightResults || {}; (g.nightResults[id] = g.nightResults[id] || []).push(text); };   // 人間なら net.js の hold() で預かる夜の結果を、CPUも同じ文で g.nightResults に積む（結果画面の「情報確認（全員）」に出る。CPUには届かないので画面には影響しない）
     const n = { g: gv, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
@@ -102,9 +104,9 @@ window.ONW = window.ONW || {};
   /** 最終的に手にした役職 fin の「夜の始まりに見えるはずの情報」（仲間の人狼・共有者・神・墓地・従者のご主人など）を、CPUが知る。
    *  酔いが覚めたCPU（sober）と、ドッペルゲンガーでコピーしたCPUが使う。役職ごとの情報は各役職ファイルの cpuLearn */
   cpu.learnInfo = function (g, id, fin) {
-    const vis = (r) => ONW.VISIBLE_WOLF.includes(r), ini = (q) => g.initialRoles[q.id];
+    const vis = (r) => ONW.VISIBLE_WOLF.includes(r), look = (r) => ONW.WOLF_LOOK.includes(r), ini = (q) => g.initialRoles[q.id];
     const i = infoOf(g, id);
-    if (vis(fin) && fin !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== id && vis(ini(q))) i.known[q.id] = ini(q); });
+    if (vis(fin) && fin !== "forgetful_wolf") g.players.forEach((q) => { if (q.id !== id && look(ini(q))) i.known[q.id] = cpu.kit.seenAs(ini(q)); });
     const h = ONW.roleHook(fin, "cpuLearn"), fa = ONW.mimic.actRole(g, id, fin), ha = fa !== fin ? ONW.roleHook(fa, "cpuLearn") : null;   // 模倣先の cpuLearn も（9of9）
     if (h) h(g, id, cpu.kit);
     if (ha) ha(g, id, cpu.kit);
@@ -200,8 +202,27 @@ window.ONW = window.ONW || {};
   /** 騙りで名乗れる役職が1つもないときの「村人陣営CO」（COボタンの陣営COと同じ値）。co にこの値が入ったら、発言は「村人陣営CO」になる */
   const TEAM_CO = "team:village";
   /** 騙りでは名乗らない役職（マーリン: 人狼が見えている / 女王・チキン: 待機時間の扱いが特別）。これだけしか名乗れる村役職がないときは、役職COではなく村人陣営COにする */
-  const NO_LIE_ROLES = ["merlin", "queen", "chicken", "star", "wolf_marked", "wolf_dreamer"];   // 狼憑き・狼夢人は本人が自分の役職を知らない（思い込み系）ので、騙りでも名乗らない。スターは朝の待機時間に最終盤面の持ち主が全員に公開されるので、騙るとすぐ嘘がバレて破綻する（騙りでも「スターCO」「スターを奪った」と言わない。本物のスターは star.js の cpuFirst が必ずCOする）
-  const noLie = (r) => NO_LIE_ROLES.includes(r) || ONW.SELF_AS_VILLAGER.includes(r) || ONW.SELF_AS_WOLF.includes(r);   // 思い込み系の役職が増えても自動で含める
+  const NO_LIE_ROLES = ["merlin", "queen", "chicken", "wolf_marked", "wolf_dreamer"];   // 狼憑き・狼夢人は本人が自分の役職を知らない（思い込み系）ので、騙りでも名乗らない。スターは朝の待機時間に最終盤面の持ち主が全員に公開されるので、騙るとすぐ嘘がバレて破綻する（騙りでも「スターCO」「スターを奪った」と言わない。本物のスターは star.js の cpuFirst が必ずCOする）。ただし煙幕のときだけは例外（starLieOk: 煙幕で公開が出ないので騙れる）
+  /** 煙幕のときだけ、スターも騙りの候補に入れる。待機時間のスター公開が出ない（煙幕が待機時間から焚かれている）ので、誰がスターか分からず嘘がバレない。昼に酔いが覚めて焚かれた煙幕(smokeLate)は、スター公開が済んだあとなので対象外。配役にスターがいないときは名乗らない */
+  const starLieOk = (g) => !!(g && g.smokeOn && !g.smokeLate && roleInSetup(g, "star"));
+  const noLie = (r, g) => (r === "star" && !starLieOk(g)) || NO_LIE_ROLES.includes(r) || ONW.SELF_AS_VILLAGER.includes(r) || ONW.SELF_AS_WOLF.includes(r);   // 思い込み系の役職が増えても自動で含める
+/** 封印の狂人・エルフリンデが配役にいるときだけ、スター・パン屋の騙りを、公開の演出の有無に関わらず許可する（2026-11-07）。
+   *  封印されているスター・パン屋は公開に出ないので、「封印されているから出なかった」と言えば嘘が通る。騙りは「〇〇に封印されています。」と、誰に封印されたかの嘘をつく（本当は封印されていない）。 */
+  /** 「いるとき」= 配役(selectedRoles)にいる、または変化公開(g.coDeck の cand でないもの。変化公開ONのとき変化後の役職)で公開されているとき。変化公開OFFの変化先の候補(cand)や、公開されていない変化後の役職は数えない（みんなが知っている範囲） */
+  const publicRole = (g, r) => ((g && g.selectedRoles) || []).includes(r) || ((g && g.coDeck) || []).some((x) => x.r === r && !x.cand);
+  const sealerRoles = (g) => ["seal_madman", "elfrinde"].filter((r) => publicRole(g, r));
+  const sealLieOk = (g) => !!g && sealerRoles(g).length > 0;
+  /** 煙幕がスター公開を隠しているとき（煙幕が待機時間から焚かれた）は、封印の嘘は要らない（誰がスターかそもそも見えていない） */
+  const smokeCoversStar = (g) => !!(g && g.smokeOn && !g.smokeLate);
+  /** 騙りで名乗るスター・パン屋に、封印の嘘（「〇〇に封印されています。」）を付けるか */
+  const needSealLie = (g, co) => (co === "star" || co === "baker") && sealLieOk(g) && !(co === "star" && smokeCoversStar(g));
+  /** 誰に封印されたかの嘘（配役にいる封印の役職からランダム） */
+  function sealedByLie(g) {
+    const by = pick(sealerRoles(g)), nm = (ONW.ROLE_INFO[by] || {}).name || (by === "elfrinde" ? "エルフリンデ" : by);
+    return { short: `${nm}に封印されている`, text: `${nm}に封印されています。`, claim: { kind: "sealed", by } };
+  }
+  /** スターを模倣している模倣の人狼（模倣の人狼のつもりのCPU）で、スター公開に実際に出たか（煙幕・封印・酔いで出ていなければ false） */
+  const mimicStarRevealed = (g, p) => !!(ONW.starHolders && g.currentRoles[p.id] !== "star" && ONW.mimic.eff(g, p.id) === ONW.ROLE.STAR && ONW.starHolders(g).includes(p.id) && !smokeCoversStar(g));
   /** COの発言文: 陣営COは「村人陣営CO」、それ以外は「〇〇CO」 */
   const coText = (co) => (String(co).startsWith("team:") ? ({ village: "村人陣営CO", wolf: "人狼陣営CO", third: "第三陣営CO" }[String(co).slice(5)] || "陣営CO") : `${rn(co)}CO`);
   /** この試合に実在するその役職のカード枚数（配られた役職 + 墓地） */
@@ -251,7 +272,7 @@ window.ONW = window.ONW || {};
   const lieTable = () => ONW.roleIds().map((id, idx) => ({ id, idx, nd: (ONW.roleDef(id) || {}).cpuLie })).filter((x) => x.nd && x.nd.role === x.id)
     .sort((a, b) => a.nd.order - b.nd.order || a.idx - b.idx).map((x) => [x.id, x.nd.weight]);
   function pickLieRole(g) {
-    const chosen = weighted(lieTable());   // 重みは各役職ファイルの cpuLie(order 順)。従者は村人陣営以外だけが騙れる（本家も配役にいるときだけ、低めの確率）
+    const chosen = weighted([...lieTable(), ...(starLieOk(g) || sealLieOk(g) ? [["star", 4]] : []), ...(sealLieOk(g) ? [["baker", 4]] : [])]);   // 煙幕のとき・封印の狂人かエルフリンデがいるときだけ、スター(重み4)・パン屋(重み4。封印のときだけ)も抽選に入る（ほかの騙り役職と同じくらい）   // 重みは各役職ファイルの cpuLie(order 順)。従者は村人陣営以外だけが騙れる（本家も配役にいるときだけ、低めの確率）
     if (chosen === "villager" ? villagerAppears(g) : roleInSetup(g, chosen)) return chosen;   // 村人も、配役か変化公開に村人・忘却の人狼・狼憑きがいるときだけ名乗る
     const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleInSetup(g, r));
     if (fb.length) return pick(fb);
@@ -263,7 +284,7 @@ window.ONW = window.ONW || {};
   function villageLieRoles(g, ok) {
     return [...new Set([...setupRoles(g), ...(g.coDeck || []).map((x) => x.r), ...(villagerAppears(g) ? ["villager"] : [])])]
       .filter((r) => r !== "villager" || villagerAppears(g))
-      .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && !noLie(r) && (!ok || ok(r)));   // 思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
+      .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && !noLie(r, g) && (!ok || ok(r)));   // 思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
   }
   /** あり得る村役職 = 上の一覧。空のときは「手にした役職」の嘘などで役職名が要るので、最終手段として村人を返す（COの発言には使わない: CO は bareCo / pickLieRole が村人陣営COにする） */
   function villageRolesInPlay(g, ok) {
@@ -275,7 +296,7 @@ window.ONW = window.ONW || {};
   function bareCo(g, pref) {
     if (pref === TEAM_CO) return TEAM_CO;
     if (villagerAppears(g)) return "villager";
-    if (pref && pref !== "villager" && !noLie(pref)) return pref;
+    if (pref && pref !== "villager" && !noLie(pref, g)) return pref;
     const found = ["seer", "troublemaker", "robber", "mason", "insomniac"].find((r) => roleInSetup(g, r));
     if (found) return found;
     const pool = villageLieRoles(g);
@@ -327,6 +348,8 @@ window.ONW = window.ONW || {};
   function lieClaim(g, p, selfRole, forceCo) {
     const others = g.players.filter((q) => q.id !== p.id);
     const co = forceCo || pickLieRole(g);
+    if (!forceCo && needSealLie(g, co)) return { co, result: sealedByLie(g) };
+    if (!forceCo && co === "star") return { co, result: null };   // 煙幕のスター: 村人が配役にいても「村人CO」に置き換えず、スターCOのまま（ほかの役職の cpuLie.claim と同じ扱い）   // スター・パン屋の騙り（封印の狂人・エルフリンデがいるとき）: 「〇〇に封印されています。」と嘘を言う
     const nd = (ONW.roleDef(co) || {}).cpuLie;   // 騙りの結果開示は、その役職ファイルの cpuLie.claim（null なら通常の「COだけ」）
     if (nd && nd.role === co && nd.claim) { const res = nd.claim(cpu.kit, g, p, others, selfRole, co); if (res) return res; }
     const lr = (ONW.roleDef(co) || {}).cpuLieResult;   // 騙りの結果開示の作り方を持つ役職（墓荒らし: 「墓地N → 役職」）。COだけで終わらせず結果も言う
@@ -395,9 +418,10 @@ window.ONW = window.ONW || {};
   cpu.relicDoppelHonest = (i) => !!(i.relic && i.relic.newRole === "doppelganger" && i.doppel && !i.keyFail && ONW.roles.getInfo(i.doppel.newRole).team === "village");
   function chainedResult(g, p, i, c, r) {
     const cl = c.result && c.result.claim;
-    if (!cl || (cl.kind !== "doppel" && cl.kind !== "relic") || !cl.role || !cpu.hasChainResult(cl.role)) return null;
-    const real = cl.kind === "doppel" ? (i.doppel && i.doppel.newRole) : (i.relic && i.relic.newRole);
+    if (!cl || (cl.kind !== "doppel" && cl.kind !== "relic" && cl.kind !== "cosplay") || !cl.role || !cpu.hasChainResult(cl.role)) return null;
+    const real = cl.kind === "doppel" ? (i.doppel && i.doppel.newRole) : cl.kind === "cosplay" ? (i.cosplay && i.cosplay.role) : (i.relic && i.relic.newRole);   // コスプレイヤー: コスプレして手にした役職（本当に手にしたとき）の結果も続けて言う
     if (real === cl.role && cl.kind === "relic" && cl.role === "doppelganger") return relicDoppelChain(g, p, i);   // 墓荒らし → ドッペル → コピーした役職（占い師など）の順に言う
+    if (real === cl.role && cl.kind === "cosplay") return ONW.cosplayer.afterResult(cpu.kit, g, p, i, cl.role);   // コスプレして手にした役職の結果（墓荒らしにコスプレしたら、墓地との交換結果）
     if (real === cl.role) { const h = ONW.roleHook(cl.role, "cpuChainResult"); return h ? (h(cpu.kit, g, p, i) || null) : null; }
     const nd = (ONW.roleDef(cl.role) || {}).cpuLie;
     const res = nd && nd.role === cl.role && nd.claim ? nd.claim(cpu.kit, g, p, g.players.filter((q) => q.id !== p.id), r, cl.role) : null;
@@ -417,7 +441,9 @@ window.ONW = window.ONW || {};
       const c = { co: null, result: null, extra: null };   // extra: 結果開示のあとに続けて言う2つ目の結果
       if (hid) { plan.push({ p, text: `${rn("drunk")}CO`, co: "drunk", claim: { kind: "villager" }, gap: 3500 }); return; }
       // スター・女王: 待機時間に知らされるので、本当のCOの扱いが特別（各役職ファイルの cpuFirst。配列を返したらその発言だけで終わり）
-      const first = ONW.roleHook(g.currentRoles[p.id], "cpuFirst"), fr = first ? first(cpu.kit, g, p, r) : null;
+      const first = ONW.roleHook(g.currentRoles[p.id], "cpuFirst");
+      let fr = first ? first(cpu.kit, g, p, r) : null;
+      if (!fr && mimicStarRevealed(g, p)) fr = [{ p, text: `${rn("star")}CO`, co: "star", claim: { kind: "villager" }, gap: 3500 }];   // スターを模倣している模倣の人狼で、スター公開に実際に出たCPU: 全員にカードが見えているので、必ずスターCO（2026-11-07）
       if (fr) { fr.forEach((e) => plan.push(e)); return; }
       const rflip = revFlip(g, p, r) && !isWolfSide(r);   // 反転された村人側のCPUは、人外のように騙る（自陣営が負けたいため）
       if (isWolfSide(r) || rflip) {                                                 // 人狼陣営は必ず騙る（本家 liarMode）
@@ -607,6 +633,6 @@ window.ONW = window.ONW || {};
   cpu.decideVote = function (g, p) { return chooseVote(g, p); };
 
   // 役職ファイルのCPUフック(cpuClaim / cpuLie / cpuFakeGot など)が使う、役職をまたぐ道具
-  Object.assign(cpu.kit, { revFlip, rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
+  Object.assign(cpu.kit, { revFlip, rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, sealerRoles, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
   ONW.cpu = cpu;
 })(window.ONW);

@@ -5,16 +5,16 @@
 window.ONW = window.ONW || {};
 
 (function (ONW) {
-  const wolfNames = (g, self) => g.players.filter((q) => q.id !== self && ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.name);
+  const wolfNames = (g, self) => g.players.filter((q) => q.id !== self && ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.name);
 
   ONW.wolfKit = {
-    /** 夜の始まり: 仲間の人狼を知る(人狼・大狼・白狼・豆腐の人狼・アサシン) */
+    /** 夜の始まり: 仲間の人狼を知る（スパイも🐺として見える = ONW.WOLF_LOOK）(人狼・大狼・白狼・豆腐の人狼・アサシン) */
     nightMsg(c, p, r) {
       const g = c.g;
       let text = "", text2 = "", note = "", bigGraves = null, cultWolves = null;
       const mates = wolfNames(g, p.id);
       text = mates.length ? `仲間の人狼: ${mates.join("、")}` : "仲間の人狼はいません。";
-      const mateIds = g.players.filter((q) => q.id !== p.id && ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.id);
+      const mateIds = g.players.filter((q) => q.id !== p.id && ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.id);
       if (r === "white_wolf") note = "あなたは占い師に占われると村人と出ます。";
       if (r === "mirage_wolf") note = "あなたは占い師・狂った占い師・心眼の人狼・感覚の占い師からは、盤面にあり得るランダムな役職に見えます（自分が何に見えるかは分かりません）。墓地にいても同じです。";
       if (r === "assassin") note = "あなたが追放されたら、自分以外の全員から1人を選びます。選んだ相手がマーリンなら、人狼陣営の逆転勝利です。";
@@ -52,14 +52,14 @@ window.ONW = window.ONW || {};
     /** 酔い覚め: 仲間の人狼(大狼は墓地も) */
     soberLines(c, id, fin) {
       const g = c.g, rn = c.rn;
-      const wolves = g.players.filter((q) => q.id !== id && ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.name);
+      const wolves = g.players.filter((q) => q.id !== id && ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.name);
       const graves = () => `墓地: ${g.center0.map((cr, i) => `${i + 1}枚目「${rn(cr)}」`).join(" ")}`;
       return [wolves.length ? `仲間の人狼: ${wolves.join("、")}` : "仲間の人狼はいません。", ...(fin === "big_wolf" ? [graves()] : [])];
     },
     /** 酔い覚めの演出: 仲間の人狼のカードに🐺(大狼は墓地も) */
     soberPeek(c, id, fin) {
       const g = c.g, pk = {};
-      const ids = g.players.filter((q) => q.id !== id && ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.id);
+      const ids = g.players.filter((q) => q.id !== id && ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.id);
       if (ids.length) pk.wolves = ids;
       if (fin === "big_wolf") pk.graves = g.center0.slice();
       return pk;

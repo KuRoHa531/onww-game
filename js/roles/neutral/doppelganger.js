@@ -13,10 +13,16 @@
       n.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${label} ${p.name}`));
       return;
     }
-    const seen = g.currentRoles[t.id], got = ONW.copyRole(g, t.id, p.id), shown = ONW.shownRole(got);
+    const ch = ONW.watcher.shiftChain(g, p.id, t.id), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。docs/watcher.md）
+    if (!ta) {   // 移す先がなければコピーできない（静観者を選んだことは「能力を使われた」に数える）
+      i.mode = "doppel"; i.target = t.id; i.keyFail = { kind: "shift", target: t.id };
+      n.hold(p.id, ONW.watcher.noneLine("コピー"));
+      return;
+    }
+    const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id), shown = ONW.shownRole(got);
     i.mode = "doppel"; i.target = t.id; i.newRole = shown; i.known[p.id] = shown; i.known[t.id] = ONW.shownRole(seen);
     i.doppel = { target: t.id, newRole: shown };
-    g.nightLogsAll.push(`${n.rn("doppelganger")} ${p.name} は ${t.name} をコピーし、${n.rn(got)} になりました。`);
+    g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${n.rn("doppelganger")} ${p.name}`, (id) => (g.players.find((q) => q.id === id) || {}).name || "?", (x) => `${x} をコピーしよう`, (x) => `${x} の役職をコピーしよう`, (x) => `${x} の役職をコピーし、${n.rn(got)} になりました。`) || `${n.rn("doppelganger")} ${p.name} は ${t.name} をコピーし、${n.rn(got)} になりました。`);   // 静観者にずれたときは「〇〇をコピーしようとしましたが、静観者だったため△△の役職をコピーし、…になりました。」
     n.hold(p.id, `${t.name} をコピーしました。あなたの新しい役職は「${n.rn(shown)}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
     ONW.cpu.learnInfo(g, p.id, got);
     const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼をコピーしたら、模倣先の能力を使う
@@ -29,6 +35,7 @@
   function cpuClaim(k, g, p, r, i, c) {   // ドッペルゲンガー: 選んだ人と、コピーして手にした役職を開示（人外を手にしたら村人役を騙る）
     const { rn, nameOf, isNonVillage, nonVillageLie } = k;
     c.co = "doppelganger";
+    if (i.keyFail && i.keyFail.kind === "shift") { c.result = { short: "コピーできず", text: "コピーできる相手がおらず、コピーできませんでした。", claim: null }; return; }
     if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたためコピーに失敗しました。", claim: null }; return; }   // ロックされてコピーに失敗した: 正直に言う
     if (!i.doppel) return;   // コピー情報なし: COだけする
     const dt = nameOf(g, i.doppel.target), dn = i.doppel.newRole;
@@ -111,10 +118,12 @@
         const g = c.g, rn = c.rn, nameOf = c.nameOf, rev = c.rev;
         const t = c.selOf(p).players[0]; if (!t || t === p.id || !g.players.some((q) => q.id === t)) return;
         if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中ならコピー失敗。新聞・観測にも載らない
-        const seen = g.currentRoles[t], got = ONW.copyRole(g, t, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
+        const ch = ONW.watcher.shiftChain(g, p.id, t), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。文章・演出は選んだ席 t で出す。ログだけ「静観者だったため」を書く。docs/watcher.md）
+        if (!ta) { c.hold(p.id, ONW.watcher.noneLine("コピー")); return; }   // 移す先がなければコピーできない（新聞・観測にも載らない）
+        const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
         ONW.observeNote(g, p.id, [t], null, "doppelganger");
         ONW.newsNote(g, "doppelganger");
-        g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${nameOf(t)} をコピーし、${rn(got)} になりました。`);
+        g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${rn(c.eff(p))} ${p.name}`, nameOf, (x) => `${x} をコピーしよう`, (x) => `${x} の役職をコピーしよう`, (x) => `${x} の役職をコピーし、${rn(got)} になりました。`) || `${rn(c.eff(p))} ${p.name} は ${nameOf(t)} をコピーし、${rn(got)} になりました。`);
         c.hold(p.id, `${nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
         const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼をコピーしたら、模倣先の能力を朝のうちに使える（「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
         if (ONW.roleIsActive(ga)) { g.morningAct[p.id] = ga; }
@@ -127,9 +136,11 @@
         if (!c.players.length) return null;
         const g = c.g, rn = c.rn, id = c.id, t = c.players[0];
         if (ONW.keymaster.gate(g, id, [])) return { lines: [ONW.keymaster.fail(g, id, "self", "コピー", [], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
-        const seen = g.currentRoles[t], got = ONW.copyRole(g, t, id);
+        const ch = ONW.watcher.shiftChain(g, id, t), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。墓荒らしが引いたドッペル・酔い覚めでも同じ）
+        if (!ta) return { lines: [ONW.watcher.noneLine("コピー")], reveal: null, nextChain: null, failed: true };
+        const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, id);
         const lines = [`${c.nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} をコピーし、${rn(got)} になりました。`);
+        g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.label} ${c.me.name}`, c.nameOf, (x) => `${x} をコピーしよう`, (x) => `${x} の役職をコピーしよう`, (x) => `${x} の役職をコピーし、${rn(got)} になりました。`) || `${c.label} ${c.me.name} は ${c.nameOf(t)} をコピーし、${rn(got)} になりました。`);
         lines.push(...c.soberInfoLines(g, id, got));   // 模倣の人狼をコピーしたら「〜を模倣しています。」もここに入る（mimic_wolf.soberLines）
         const reveal = ONW.mimic.tag(g, id, got, { kind: "doppel", target: t, seen: ONW.shownRole(seen), role: ONW.shownRole(got) });   // コピー演出（朝も、昼に酔いが覚めたときも出す）
         const ga = ONW.mimic.gotAct(g, id, got);   // 模倣の人狼をコピーしたら、模倣先の能力を使える

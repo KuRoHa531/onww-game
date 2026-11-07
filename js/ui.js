@@ -13,6 +13,8 @@ window.ONW = window.ONW || {};
 
   const ui = {};
   const esc = (s) => ONW.utils.esc(s);
+  /** 煙幕の名前隠し（詳細設定がON）: 隠れている席の名前は「？？？」にする（「選択中: 〇〇」などの文章用。js/stage.js の nameHidden） */
+  const nmv = (id, name) => (ONW.stage && ONW.stage.nameHidden && ONW.stage.nameHidden(id) ? "？？？" : name);
   const $app = () => document.getElementById("app");
 
   const PHASE_LABEL = {
@@ -42,7 +44,7 @@ window.ONW = window.ONW || {};
     if (game.phase !== ONW.PHASE.LOBBY) game.viewResult = false;   // ルームに戻ったあとの「前回の結果を見る」は、ロビーにいる間だけ
     const reviewing = ui.isResultReview(game);
     if (game.phase !== ONW.PHASE.ONLINE_RESULT && !reviewing) { ui.closeResultChat(); ui.closeResultInfo(); }
-    if (game.phase !== ONW.PHASE.LOBBY) ui.closePlayerMenu(); else ui.refreshPlayerMenu();   // ロビーの名前メニュー
+    if (game.phase !== ONW.PHASE.LOBBY) { ui.closePlayerMenu(); ui.closeRoleMenu(); } else { ui.refreshPlayerMenu(); ui.refreshRoleMenu(); ui.refreshRoleSet(); ui.refreshRoleGroup(); }   // ロビーの名前メニュー / 役職設定の詳細設定メニュー
     document.body.classList.toggle("is-title", game.phase === ONW.PHASE.TITLE);
     { const dk = game.phase === ONW.PHASE.ONLINE_VOTE && !!game.dukeIds;   // 魔界公爵追放会議: 全員の画面の背景が暗い赤紫になり、開始の帯が出る
       document.body.classList.toggle("duke-meeting", dk);
@@ -174,7 +176,8 @@ window.ONW = window.ONW || {};
   ui.nameBr = (name) => {
     const h = ONW.stage && ONW.stage.breakHtml ? ONW.stage.breakHtml(name) : esc(name);
     const n = Math.max(...h.split("<br>").map((x) => Array.from(x).length));
-    return h.includes("<br>") ? `<span class="nb${n >= 5 ? ` nb-s${n > 5 ? 6 : 5}` : ""}">${h}</span>` : h;
+    // 改行表にない名前でも、5文字以上は折り返さず1行に収める（5文字=nb-s5 / 6文字以上=nb-s6。4文字以下は今までどおり）
+    return h.includes("<br>") || n >= 5 ? `<span class="nb${n >= 5 ? ` nb-s${n > 5 ? 6 : 5}` : ""}">${h}</span>` : h;
   };
   ui.mimicTag = (role, target) => role === "mimic_wolf" && target && ONW.ROLE_INFO[target] ? `<span class="tb-mimic dl-mimic">${ONW.stage && ONW.stage.breakHtml ? ONW.stage.breakHtml(ONW.ROLE_INFO[target].name) : esc(ONW.ROLE_INFO[target].name)}</span>` : "";
   ui.toggleGroup = function (key) { const g = ONW.game; g.roleOpen = { ...(g.roleOpen || {}), [key]: !(g.roleOpen || {})[key] }; ONW.ui.render(g); };
@@ -184,11 +187,293 @@ window.ONW = window.ONW || {};
     ONW.ui.render(g);
     if (g.invOpen && ONW.friends) ONW.friends.reload();
   };
-  ui.toggleSettings = function () { ONW.game.showSettings = !ONW.game.showSettings; ONW.game.setPage = null; ONW.ui.render(ONW.game); };
+  ui.toggleSettings = function () { ui.closeRoleMenu(); ONW.game.showSettings = !ONW.game.showSettings; ONW.game.setPage = null; ONW.game.roleSetPage = null; ONW.ui.render(ONW.game); };
   /** ルーム設定: タブ一覧 → そのページだけ表示 → 左上の戻るで一覧へ（page=null で一覧） */
   ui.setPage = function (page) {
-    ONW.game.setPage = page || null; ONW.ui.render(ONW.game);
+    ONW.game.setPage = page || null; ONW.game.roleSetPage = null; ONW.ui.render(ONW.game);
     const mp = document.querySelector(".settings-panel--modal"); if (mp) mp.scrollTop = 0;
+  };
+  /** 役職設定の中: 配役設定 / 詳細設定 / アサイン設定（sub=null で役職設定の入口へ） */
+  ui.setRolePage = function (sub) {
+    ONW.game.roleSetPage = sub || null; ONW.ui.render(ONW.game);
+    const mp = document.querySelector(".settings-panel--modal"); if (mp) mp.scrollTop = 0;
+  };
+  /** 左上の「戻る」: 役職設定の中の配役設定・詳細設定・アサイン設定からは役職設定の入口へ、それ以外は設定の一覧へ */
+  ui.setBack = function () {
+    const g = ONW.game;
+    if (g.setPage === "secRoles" && g.roleSetPage) ui.setRolePage(null); else ui.setPage(null);
+  };
+
+  /** 役職の一覧（配役設定・役職設定の詳細設定で共通）。並びは wiki 順（ONW.sortByRoleOrder = ONW.ROLE_ORDER） */
+  function roleLists() {
+    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]);
+    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]), dark = ["dark_avatar"];
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher"]);
+    return { village, wolfLike, madLike, dark, third };
+  }
+
+  // ---- 役職設定 > 詳細設定: 役職ごとの設定 ----
+  // 役職を押すと、画面をずらさず上に重なるメニュー（#rs-overlay。ロビーの名前メニュー #pm-overlay と同じ方式）で、その役職の設定が出る。
+  // 設定のある役職は下の ROLE_SETTINGS に足す（関数が (game, isHost) を受け取って中身のHTMLを返す）。
+  const stepRow = (isHost, label, value, minus, plus) => `
+      <div class="field-row"><label>${label}</label>
+        ${isHost ? `<div class="stepper"><button onclick="${minus}">−</button><span>${value}</span><button onclick="${plus}">＋</button></div>` : `<span>${value}</span>`}
+      </div>`;
+  const setRow = (isHost, game, label, key, dflt) => stepRow(isHost, label, game[key] ?? dflt, `ONW.net.changeSetting('${key}',-1)`, `ONW.net.changeSetting('${key}',1)`);
+  /** 変化先のON/OFFのチップ（変化役 b が変化できる役職 list） */
+  const tfChipsHtml = (game, isHost, b, list) => {
+    const offList = game.transformOff || [];
+    return `<div class="tf-set__chips">${list.map((t) => {
+      const on = !offList.includes(`${b}:${t}`);
+      const label = `${esc(ONW.roles.getInfo(t).name)} ${on ? "ON" : "OFF"}`;
+      return isHost ? `<button class="btn tf-chip ${on ? "tf-on" : "tf-off"}" onclick="ONW.net.toggleTarget('${b}','${t}')">${label}</button>` : `<span class="tf-chip ${on ? "tf-on" : "tf-off"}">${label}</span>`;
+    }).join("")}</div>`;
+  };
+  const TF_HINT = `<p class="night-step__hint">押すと、変化先にする役職をON/OFFできます。OFFの役職には変化せず、COの候補にも出ません。全部OFFだとこの変化役は変化しません。</p>`;
+  const hint = (t) => `<p class="night-step__hint">${t}</p>`;
+  /** ON/OFFを切り替える1行（ホストはボタン・ほかの人は表示のみ）。key は net.toggleOpt が受け付ける設定名 */
+  const onoffRow = (isHost, game, label, key, dflt) => { const on = dflt ? game[key] !== false : game[key] === true; return `<div class="field-row"><label>${label}</label>${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('${key}')">${on ? "ON" : "OFF"}</button>` : `<span>${on ? "ON" : "OFF"}</span>`}</div>`; };
+  const SEER_GRAVE = (game, isHost, who, key) => setRow(isHost, game, "墓地を占える枚数", key, 2) + hint(`${who}が夜に確認できる墓地のカードの枚数です（墓地の枚数が上限。ほかの占い系の役職とは別の設定）。`);
+  const ROLE_SETTINGS = {
+    seer: (g, h) => SEER_GRAVE(g, h, "占い師", "seerGraveCount"),
+    fake_seer: (g, h) => SEER_GRAVE(g, h, "偽占い師", "fakeSeerGraveCount"),
+    mad_seer: (g, h) => SEER_GRAVE(g, h, "狂った占い師", "madSeerGraveCount"),
+    mayor: (g, h) => setRow(h, g, "投票数", "mayorVoteCount", 2) + hint("メイヤーが昼の投票で持つ票数です（2〜10票）。最終盤面でメイヤーを持っている人の1票が、この票数ぶんとして数えられます。"),
+    mad_mayor: (g, h) => setRow(h, g, "投票数", "madMayorVoteCount", 2) + hint("狂ったメイヤーが昼の投票で持つ票数です（2〜10票。メイヤーとは別の設定）。最終盤面で狂ったメイヤーを持っている人の1票が、この票数ぶんとして数えられます。"),
+    smoke_madman: (g, h) => onoffRow(h, g, "能力対象のプレイヤー名も隠す", "smokeHideAbility") + hint("ON: 煙幕のあいだ、昼の能力対象（酔いが覚めたあとの夜能力・昼能力）のプレイヤー名が「？？？」になります。煙幕がもくもくしたあと、名前が「？？？」に変わって席がシャッフルされ、能力を選ぶたびにも席がランダムに入れ替わります。OFF（初期値）: 名前はそのまま見えます。") + onoffRow(h, g, "投票対象のプレイヤー名も隠す", "smokeHideVote") + hint("ON: 煙幕のあいだ、投票対象のプレイヤー名が「？？？」になります。投票の開始時にも席がシャッフルされ、昼のあいだとは別の並びになります。OFF（初期値）: 名前はそのまま見えます。能力対象とは別々に設定できます。"),
+    light_apostle: (g, h) => `<h3 class="set-sub">変化先の有無</h3>${TF_HINT}${tfChipsHtml(g, h, "light_apostle", ONW.TRANSFORM_GROUPS.light_apostle)}`,
+    dark_avatar: (g, h) => { const L = roleLists(); return `<h3 class="set-sub">変化先の有無（人狼系）</h3>${TF_HINT}${tfChipsHtml(g, h, "dark_avatar", L.wolfLike)}<h3 class="set-sub">変化先の有無（狂人系）</h3>${tfChipsHtml(g, h, "dark_avatar", L.madLike)}`; },
+    silver_shadow: (g, h) => `<h3 class="set-sub">変化先の有無</h3>${TF_HINT}${tfChipsHtml(g, h, "silver_shadow", ONW.TRANSFORM_GROUPS.silver_shadow)}`,
+  };
+  // ---- 役職設定 > アサイン設定（js/assign.js / docs/assign.md）----
+  // OFF（初期値）: 従来どおり。ON: 配役設定の枚数が「候補」になり、陣営ごとの最少〜最大人数と、役職ごとの出る確率で、試合の開始のときに配役数ぴったりを抽選する。
+  const CIRC = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+  function assignPage(game, isHost) {
+    const A = ONW.assign, c = A.check(game), on = !!game.assignOn;
+    const sw = `<div class="field-row"><label>アサイン設定</label>${isHost ? `<button class="btn" onclick="ONW.net.toggleAssign()">${on ? "ON" : "OFF"}</button>` : `<span>${on ? "ON" : "OFF"}</span>`}</div>`;
+    const intro = hint("OFF: 従来どおり、配役設定の枚数がそのまま配役になります。ON: 配役設定の枚数は「候補」になり、ゲーム開始のときに、下の人数と確率で配役数（何人村＋墓地）ぴったりを抽選します。選ばれなかった役職は、結果の役職履歴の下に「欠け」として出ます。");
+    if (!on) return sw + intro;
+    const R = A.ranges(game), minSum = A.TEAMS.reduce((n, t) => n + R[t][0], 0), maxSum = A.TEAMS.reduce((n, t) => n + R[t][1], 0);
+    const teams = A.TEAMS.map((t) => `
+      <div class="role-group t-${t}"><div class="role-group__title">${A.TEAM_NAME[t]}<span class="rg-count"> 候補 ${c.cap[t]}枚</span></div>
+        ${stepRow(isHost, "最少人数", `${R[t][0]}人`, `ONW.net.changeAssign('${t}',0,-1)`, `ONW.net.changeAssign('${t}',0,1)`)}
+        ${stepRow(isHost, "最大人数", `${R[t][1]}人`, `ONW.net.changeAssign('${t}',1,-1)`, `ONW.net.changeAssign('${t}',1,1)`)}
+      </div>`).join("");
+    const warn = !c.ok ? hint(`候補が足りません。配役設定の枚数を増やしてください（配役${c.need}枚 / 候補${c.have}枚）。`)
+      : !c.fit ? hint(minSum > c.need || maxSum < c.need ? `各陣営の最少・最大の合計が、配役${c.need}枚に合いません（最少の合計${minSum}人・最大の合計${maxSum}人）。開始はできますが、範囲を少しはみ出して配役します。`
+        : `いまの候補（村人${c.cap.village}枚・人狼${c.cap.wolf}枚・第三${c.cap.third}枚）では、この範囲で配役${c.need}枚ぴったりになる組み合わせがありません。開始はできますが、範囲を少しはみ出して配役します。候補を増やすか、範囲を広げてください。`) : "";
+    // 役職ごとの出る確率: 配役設定で1枚以上の役職だけ。陣営ごとに、wiki順
+    const have = ONW.sortByRoleOrder(Object.keys(game.roleCounts || {}).filter((r) => (game.roleCounts[r] || 0) > 0 && rmHit(r)));   // 検索中は、ヒットした役職だけ
+    const roleBox = (r) => {
+      const n = game.roleCounts[r];
+      return `<div class="asg-role"><div class="asg-role__name"><span>${esc(ONW.roles.getInfo(r).name)}</span><span class="rg-count">${n}枚</span></div>
+        ${Array.from({ length: n }, (_, k) => stepRow(isHost, `${CIRC[k] || k + 1} 出る確率`, `${A.chance(game, r, k)}%`, `ONW.net.changeAssignChance('${r}',${k},-5)`, `ONW.net.changeAssignChance('${r}',${k},5)`)).join("")}
+      </div>`;
+    };
+    const chances = A.TEAMS.map((t) => {
+      const list = have.filter((r) => A.teamOf(r) === t);
+      return list.length ? `<div class="role-group t-${t}"><div class="role-group__title">${A.TEAM_NAME[t]}</div>${list.map(roleBox).join("")}</div>` : "";
+    }).join("");
+    return `${sw}${intro}
+      <p class="night-step__hint">配役数 ${c.need}枚（${game.villageSize}人村＋墓地${game.graveCount}枚） / 候補 ${c.have}枚</p>
+      <h3 class="set-sub">陣営ごとの人数</h3>
+      ${hint("各陣営の人数を、最少〜最大の範囲でランダムに決めます。配役される役職数は必ずプレイヤー数＋墓地の枚数と同じになります（例: 6枚で全陣営が最少1・最大2なら、2・2・2枚になります）。")}
+      ${teams}${warn}
+      <h3 class="set-sub">役職ごとの出る確率</h3>
+      ${hint("配役設定で入れた役職は、①②…の札ごとに確率を決められます（配役設定で役職を押しても同じ確率を変えられます）。100%は必ず候補に入り、0%は出ません。確率に当たった札の中から、陣営の人数ぶんが選ばれます（例: 光の使徒 ①100% ②50% と 闇の化身 ①100% ②50% なら、光2・闇1 や 光1・闇2 になります）。")}
+      ${chances || (rmQ() ? rmNone() : hint("配役設定で役職の枚数を入れると、ここに出ます。"))}`;
+  }
+  /** 詳細設定のページ本体: 村人陣営 / 人狼陣営（人狼系・狂人系）/ 第三陣営 に分けて、wiki順に役職を並べる。設定のある役職だけ押せる */
+  function roleDetailPage(game) {
+    const q = rmQ(), L0 = roleLists();
+    const has = (r) => !!ROLE_SETTINGS[r];
+    const F = (l) => l.filter((r) => has(r) && rmHit(r)), L = { village: F(L0.village), dark: F(L0.dark), wolfLike: F(L0.wolfLike), madLike: F(L0.madLike), third: F(L0.third) };   // 設定のある役職だけ（検索中は、さらにヒットした役職だけ）。設定のない役職・役職のいない陣営は出さない
+    const cnt = (list) => list.filter(has).length;
+    // 陣営を押すと、画面をずらさず、さらに上に重なるメニュー（#rg-overlay）で設定のある役職が並ぶ。役職を押すと、その上にさらに重なって設定が出る（検索中だけ、ヒットした役職をそのまま並べる）
+    const head = (key, title, list) => `
+      <button class="rg-head" onclick="ONW.ui.openRoleGroup('${key}')">
+        <span>${title}</span><span class="rg-count"><b class="set-tab__go">›</b></span>
+      </button>`;
+    const item = (r) => `<button class="rs-role" onclick="ONW.ui.openRoleSet('${r}')"><span>${esc(ONW.roles.getInfo(r).name)}</span><span class="rg-count">設定 <b class="set-tab__go">›</b></span></button>`;
+    const list = (arr) => arr.map(item).join("");
+    const sub = (title, arr) => (arr.length ? `<div class="rg-sub"><div class="rg-label">${title}</div>${list(arr)}</div>` : "");
+    const wolfAll = [...L.dark, ...L.wolfLike, ...L.madLike];
+    const total = L.village.length + wolfAll.length + L.third.length;
+    return `
+      <p class="night-step__hint">陣営を押すと、設定のある役職が上に重なって出ます。役職を押すと、その役職の設定がさらに上に重なります。</p>
+      ${total ? "" : q ? rmNone() : hint("設定のある役職がありません。")}
+      ${L.village.length ? `<div class="role-group t-village">${head("village", "村人陣営", L.village)}${q ? list(L.village) : ""}</div>` : ""}
+      ${wolfAll.length ? `<div class="role-group t-wolf">${head("wolf", "人狼陣営", wolfAll)}${q ? `${list(L.dark)}${sub("人狼系", L.wolfLike)}${sub("狂人系", L.madLike)}` : ""}</div>` : ""}
+      ${L.third.length ? `<div class="role-group t-third">${head("third", "第三陣営", L.third)}${q ? list(L.third) : ""}</div>` : ""}`;
+  }
+  let rmKind = null;   // 役職設定の重なるメニュー（deck / detail / assign）
+  let rsRole = null;   // 設定メニューを開いている役職
+  let rsKind = null;   // null = 詳細設定の役職ごとの設定 / "chance" = 配役設定の役職ごとの「出る確率」（アサイン設定。枚数も同じ画面で変えられる）
+  ui.openRoleSet = function (role) { if (!ROLE_SETTINGS[role]) return; rsRole = role; rsKind = null; ui.refreshRoleSet(); };
+  /** 配役設定の役職を押したとき: 役職ごとの出る確率（枚数・①②…の確率）が、画面をずらさず上に重なるメニュー（#rs-overlay）で出る */
+  ui.openRoleChance = function (role) { if (!(role in (ONW.game.roleCounts || {}))) return; rsRole = role; rsKind = "chance"; ui.refreshRoleSet(); const c = document.querySelector("#rs-overlay .rs-card"); if (c) c.scrollTop = 0; };
+  ui.closeRoleSet = function () { rsRole = null; rsKind = null; const w = document.getElementById("rs-overlay"); if (w) w.remove(); };
+  /** 開いているメニューを最新の設定で描き直す（設定を変えるたび・ロビーが描き直されるたびに呼ばれる。詳細設定のページを離れたら閉じる） */
+  ui.refreshRoleSet = function () {
+    if (rsRole === null) return;
+    const g = ONW.game;
+    if (g.phase !== ONW.PHASE.LOBBY || !g.showSettings || g.setPage !== "secRoles" || rmKind !== (rsKind === "chance" ? "deck" : "detail")) { ui.closeRoleSet(); return; }
+    let w = document.getElementById("rs-overlay");
+    if (!w) {
+      w = document.createElement("div");
+      w.id = "rs-overlay";
+      w.onclick = (e) => { if (e.target === w) ui.closeRoleSet(); };
+      document.body.appendChild(w);
+    }
+    const old = w.querySelector(".rs-card"), top = old ? old.scrollTop : 0, info = ONW.roles.getInfo(rsRole);
+    w.innerHTML = `<div class="pm-card rs-card" role="dialog" aria-modal="true">
+      <div class="pm-title t-${info.team}">${esc(info.name)}</div><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.ui.closeRoleSet()">✕</button>
+      ${rsKind === "chance" ? roleChanceBody(rsRole, g, ONW.net.isHost) : ROLE_SETTINGS[rsRole](g, ONW.net.isHost)}
+    </div>`;
+    const card = w.querySelector(".rs-card"); if (card) card.scrollTop = top;
+  };
+
+  // ---- 役職設定の重なるメニュー共通: 役職の検索（ヒットの仕方はwikiの「役職名」検索と同じ = 大文字小文字を区別しない部分一致）----
+  let rmQuery = "";   // 検索ボックスの文字（メニューを開き直すと空に戻る）
+  const rmQ = () => rmQuery.trim().toLowerCase();
+  const rmHit = (r) => { const q = rmQ(); return !q || ONW.roles.getInfo(r).name.toLowerCase().includes(q); };
+  const rmNone = () => `<p class="night-step__hint">「${esc(rmQuery.trim())}」に当てはまる役職がありません。</p>`;
+
+  /** 配役設定の役職ごとのメニュー（#rs-overlay）の中身: 枚数と、札（①②…）ごとの出る確率（アサイン設定。js/assign.js） */
+  function roleChanceBody(role, game, isHost) {
+    const A = ONW.assign, n = game.roleCounts[role] || 0, on = !!game.assignOn;
+    const note = hint(on ? "アサイン設定がONなので、配役設定の枚数は「候補」です。①②…の札ごとの確率で、出る札が決まります（100%は必ず候補に入り、0%は出ません）。" : "確率が使われるのは、アサイン設定がONのときです（OFFのあいだは、枚数どおりに配役されます）。");
+    const cnt = stepRow(isHost, "枚数", `${n}枚`, `ONW.net.changeRole('${role}',-1)`, `ONW.net.changeRole('${role}',1)`);
+    const rows = n > 0 ? Array.from({ length: n }, (_, k) => stepRow(isHost, `${CIRC[k] || k + 1} 出る確率`, `${A.chance(game, role, k)}%`, `ONW.net.changeAssignChance('${role}',${k},-5)`, `ONW.net.changeAssignChance('${role}',${k},5)`)).join("") : hint("枚数を1枚以上にすると、①②…の札ごとの確率を決められます。");
+    return `${note}${cnt}${rows}`;
+  }
+  /** 配役設定の役職の行: 役職名を押すとその役職の確率メニューが重なって出る / 右は枚数の＋− */
+  function deckRoleRow(game, isHost, r) {
+    const n = game.roleCounts[r] ?? 0, nm = esc(ONW.roles.getInfo(r).name);
+    return `<div class="field-row"><button class="rs-role" onclick="ONW.ui.openRoleChance('${r}')"><span>${nm}</span><span class="rg-count">確率 <b class="set-tab__go">›</b></span></button>
+        ${isHost ? `<div class="stepper"><button onclick="ONW.net.changeRole('${r}',-1)">−</button><span>${n}</span><button onclick="ONW.net.changeRole('${r}',1)">＋</button></div>` : `<span>${n}</span>`}
+      </div>`;
+  }
+  // ---- 役職設定 > 配役設定（重なるメニューの中身）----
+  // 陣営（村人・人狼・第三・重複役職）を押すと、画面をずらさず、さらに上に重なるメニュー（#rg-overlay）で中の役職の枚数を変える（検索中は、ヒットした役職だけ配役設定の中にそのまま出す）
+  const RG_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営", dup: "重複役職" };
+  let rgKey = null;   // 陣営のメニューを開いている陣営（village / wolf / third / dup）
+  /** 陣営のメニューの中身（配役設定の枚数の行）。wolf は 闇の化身 → 人狼系 → 狂人系 の順 */
+  function deckGroupRows(key, game, isHost) {
+    if (rmKind === "detail") return detailGroupRows(key);
+    const c = game.roleCounts, L0 = roleLists();
+    const row = (label, value, minus, plus) => stepRow(isHost, label, value, minus, plus);
+    const roleRow = (r) => deckRoleRow(game, isHost, r);
+    if (key === "village") return L0.village.map(roleRow).join("");
+    if (key === "third") return L0.third.map(roleRow).join("");
+    if (key === "wolf") return `${L0.dark.map(roleRow).join("")}
+      <div class="rg-sub"><div class="rg-label">人狼系</div>${L0.wolfLike.map(roleRow).join("")}</div>
+      <div class="rg-sub"><div class="rg-label">狂人系</div>${L0.madLike.map(roleRow).join("")}</div>`;
+    if (key === "dup") return `${row("酔っ払い(人)", game.drunkCount || 0, "ONW.net.changeSetting('drunkCount',-1)", "ONW.net.changeSetting('drunkCount',1)")}
+        ${row("酔う確率(1人ごと)", `${game.drunkChance ?? 100}%`, "ONW.net.changeSetting('drunkChance',-5)", "ONW.net.changeSetting('drunkChance',5)")}
+        <p class="night-step__hint" style="margin:4px 8px 8px;">配役の枚数には数えません。ランダムな参加者（CPU含む）に重なり、議論時間の半分が過ぎるまで自分の役職が分かりません。人数ぶんの枠が、それぞれ「酔う確率」で当たります。</p>
+        ${row("恋人(組)", game.loverCount || 0, "ONW.net.changeSetting('loverCount',-1)", "ONW.net.changeSetting('loverCount',1)")}
+        ${row("恋人になる確率(1組ごと)", `${game.loverChance ?? 100}%`, "ONW.net.changeSetting('loverChance',-5)", "ONW.net.changeSetting('loverChance',5)")}
+        <p class="night-step__hint" style="margin:4px 8px 8px;">恋人は2人1組で、ランダムな参加者（CPU含む）に重なります（酔っ払いと同じ人に重なることもあります）。夜に相方のカードが❤️でめくれ、相方が死亡すると、死因を問わず同時に心中します。二人とも死ななければ恋人陣営の勝利で、恋人以外は敗北です。組数は村の人数の半分までです。</p>`;
+    return "";
+  }
+  /** 詳細設定の陣営のメニューの中身（設定のある役職の行。押すとその役職の設定がさらに上に重なる）。wolf は 闇の化身 → 人狼系 → 狂人系 */
+  function detailGroupRows(key) {
+    const L0 = roleLists(), has = (r) => !!ROLE_SETTINGS[r];
+    const item = (r) => `<button class="rs-role" onclick="ONW.ui.openRoleSet('${r}')"><span>${esc(ONW.roles.getInfo(r).name)}</span><span class="rg-count">設定 <b class="set-tab__go">›</b></span></button>`;
+    const list = (arr) => arr.filter(has).map(item).join("");
+    const sub = (title, arr) => (arr.some(has) ? `<div class="rg-sub"><div class="rg-label">${title}</div>${list(arr)}</div>` : "");
+    if (key === "village") return list(L0.village);
+    if (key === "third") return list(L0.third);
+    if (key === "wolf") return `${list(L0.dark)}${sub("人狼系", L0.wolfLike)}${sub("狂人系", L0.madLike)}`;
+    return "";
+  }
+  ui.openRoleGroup = function (key) { if (!RG_TITLE[key]) return; rgKey = key; ui.refreshRoleGroup(); const c = document.querySelector("#rg-overlay .rg-card"); if (c) c.scrollTop = 0; };
+  ui.closeRoleGroup = function () { rgKey = null; ui.closeRoleSet(); const w = document.getElementById("rg-overlay"); if (w) w.remove(); };
+  /** 開いている陣営のメニューを最新の設定で描き直す（枚数を変えるたび・ロビーが描き直されるたびに呼ばれる。配役設定を離れたら閉じる） */
+  ui.refreshRoleGroup = function () {
+    if (rgKey === null) return;
+    const g = ONW.game, isHost = ONW.net.isHost;
+    if (g.phase !== ONW.PHASE.LOBBY || !g.showSettings || g.setPage !== "secRoles" || (rmKind !== "deck" && rmKind !== "detail")) { ui.closeRoleGroup(); return; }
+    let w = document.getElementById("rg-overlay");
+    if (!w) {
+      w = document.createElement("div");
+      w.id = "rg-overlay";
+      w.onclick = (e) => { if (e.target === w) ui.closeRoleGroup(); };
+      document.body.appendChild(w);
+    }
+    const old = w.querySelector(".rg-card"), top = old ? old.scrollTop : 0;
+    const need = g.villageSize + g.graveCount, have = Object.values(g.roleCounts).reduce((a, b) => a + b, 0);
+    const L0 = roleLists(), list = rgKey === "village" ? L0.village : rgKey === "third" ? L0.third : rgKey === "wolf" ? [...L0.dark, ...L0.wolfLike, ...L0.madLike] : [];
+    const sum = list.reduce((n, r) => n + (g.roleCounts[r] ?? 0), 0);
+    const hintTxt = rmKind === "detail" || rgKey === "dup" ? "" : `${RG_TITLE[rgKey]} ${sum}枚 / ${g.assignOn ? `候補 ${have}枚（配役${need}枚を抽選）` : `現在 ${have}枚 / 必要 ${need}枚`}`;
+    w.innerHTML = `<div class="pm-card rg-card" role="dialog" aria-modal="true">
+      <div class="pm-title t-${rgKey}">${RG_TITLE[rgKey]}</div><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.ui.closeRoleGroup()">✕</button>
+      ${hintTxt ? `<p class="night-step__hint" style="text-align:center;">${hintTxt}</p>` : ""}
+      ${deckGroupRows(rgKey, g, isHost)}
+    </div>`;
+    const card = w.querySelector(".rg-card"); if (card) card.scrollTop = top;
+  };
+  function deckPage(game, isHost) {
+    const c = game.roleCounts, need = game.villageSize + game.graveCount, have = Object.values(c).reduce((a, b) => a + b, 0);
+    const row = (label, value, minus, plus) => stepRow(isHost, label, value, minus, plus);
+    const roleRow = (r) => deckRoleRow(game, isHost, r);
+    // 陣営だけを並べ、押すと中の役職が上に重なるメニューで開く（検索中だけ、ヒットした役職をそのまま並べる）
+    const q = rmQ();
+    const sum = (list) => list.reduce((n, r) => n + (c[r] ?? 0), 0);
+    const head = (key, title, list, sub) => `
+      <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.openRoleGroup('${key}')">
+        <span>${title}</span><span class="rg-count">${sum(list)}枚 <b class="set-tab__go">›</b></span>
+      </button>`;
+    const L0 = roleLists(), F = (l) => l.filter(rmHit);   // 配役設定・詳細設定とも、wiki順（ONW.ROLE_ORDER）の同じ並び
+    const village = F(L0.village), wolfLike = F(L0.wolfLike), madLike = F(L0.madLike), dark = F(L0.dark), third = F(L0.third);
+    const hasHit = !q || village.length + wolfLike.length + madLike.length + dark.length + third.length > 0;
+    const hits = (title, list) => `<div class="rg-sub"><div class="rg-label">${title}</div>${list.map(roleRow).join("")}</div>`;
+    const roles = q ? `
+      ${hasHit ? "" : rmNone()}
+      ${village.length ? `<div class="role-group t-village">${head("village", "村人陣営", village)}${village.map(roleRow).join("")}</div>` : ""}
+      ${dark.length + wolfLike.length + madLike.length ? `<div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
+          ${dark.map(roleRow).join("")}${wolfLike.length ? hits("人狼系", wolfLike) : ""}${madLike.length ? hits("狂人系", madLike) : ""}
+      </div>` : ""}
+      ${third.length ? `<div class="role-group t-third">${head("third", "第三陣営", third)}${third.map(roleRow).join("")}</div>` : ""}` : `
+      <div class="role-group t-village">${head("village", "村人陣営", L0.village)}</div>
+      <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...L0.dark, ...L0.wolfLike, ...L0.madLike])}</div>
+      <div class="role-group t-third">${head("third", "第三陣営", L0.third)}</div>
+      <div class="role-group t-dup"><button class="rg-head" onclick="ONW.ui.openRoleGroup('dup')"><span>重複役職</span><span class="rg-count">酔${game.drunkCount || 0}人・恋${game.loverCount || 0}組 <b class="set-tab__go">›</b></span></button></div>`;
+    return `<p class="night-step__hint">${game.assignOn ? `アサイン設定ON: ここで入れた枚数は候補です。配役${need}枚（${game.villageSize}人村+墓地${game.graveCount}枚）を、ゲーム開始のときに抽選します / 現在の候補 ${have}枚` : `必要枚数: ${need}枚（${game.villageSize}人村+墓地${game.graveCount}枚） / 現在 ${have}枚`}</p>${roles}`;
+  }
+  // ---- 役職設定: 配役設定 / 詳細設定 / アサイン設定は、画面をずらさず上に重なるメニュー（#rm-overlay）で開く ----
+  const RM_TITLE = { deck: "配役設定", detail: "詳細設定", assign: "アサイン設定" };
+  ui.openRoleMenu = function (kind) { if (!RM_TITLE[kind]) return; const prev = rmKind; if (prev !== kind) rmQuery = ""; rmKind = kind; if (prev !== kind) { ui.closeRoleSet(); ui.closeRoleGroup(); } ui.refreshRoleMenu(); const c = document.querySelector("#rm-overlay .rm-card"); if (c) c.scrollTop = 0; };
+  ui.closeRoleMenu = function () { rmKind = null; rmQuery = ""; ui.closeRoleSet(); ui.closeRoleGroup(); const w = document.getElementById("rm-overlay"); if (w) w.remove(); };
+  /** 検索ボックスの入力: 中身（役職の一覧）だけを描き直す（入力ボックスは作り直さないので、日本語入力の途中でも切れない） */
+  ui.setRoleSearch = function (v) { rmQuery = String(v || ""); ui.refreshRoleMenu(); };
+  /** 開いているメニューを最新の設定で描き直す（設定を変えるたび・ロビーが描き直されるたびに呼ばれる。役職設定のページを離れたら閉じる） */
+  ui.refreshRoleMenu = function () {
+    if (rmKind === null) return;
+    const g = ONW.game, isHost = ONW.net.isHost;
+    if (g.phase !== ONW.PHASE.LOBBY || !g.showSettings || g.setPage !== "secRoles") { ui.closeRoleMenu(); return; }
+    let w = document.getElementById("rm-overlay");
+    if (!w) {
+      w = document.createElement("div");
+      w.id = "rm-overlay";
+      w.onclick = (e) => { if (e.target === w) ui.closeRoleMenu(); };
+      document.body.appendChild(w);
+    }
+    const inner = rmKind === "deck" ? deckPage(g, isHost) : rmKind === "detail" ? roleDetailPage(g) : assignPage(g, isHost);
+    let card = w.querySelector(".rm-card");
+    if (!card || card.dataset.kind !== rmKind) {   // 開いたとき・別のメニューに切り替えたとき: 枠と検索ボックスを作る
+      w.innerHTML = `<div class="pm-card rm-card" role="dialog" aria-modal="true" data-kind="${rmKind}">
+        <div class="pm-title">${RM_TITLE[rmKind]}</div><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.ui.closeRoleMenu()">✕</button>
+        <input class="onw-input rm-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="役職名で検索" value="${esc(rmQuery)}" oninput="ONW.ui.setRoleSearch(this.value)" aria-label="役職名で検索">
+        <div class="rm-body"></div>
+      </div>`;
+      card = w.querySelector(".rm-card");
+    }
+    const body = card.querySelector(".rm-body"), top = card.scrollTop;
+    body.innerHTML = inner;
+    card.scrollTop = top;
+    ui.refreshRoleGroup();
   };
 
   // ---- ルーム設定パネル（「ルーム設定」を押すと出る）----
@@ -198,59 +483,11 @@ window.ONW = window.ONW || {};
       <div class="field-row"><label>${label}</label>
         ${isHost ? `<div class="stepper"><button onclick="${minus}">−</button><span>${value}</span><button onclick="${plus}">＋</button></div>` : `<span>${value}</span>`}
       </div>`;
-    const roleRow = (r) => row(ONW.roles.getInfo(r).name, c[r] ?? 0, `ONW.net.changeRole('${r}',-1)`, `ONW.net.changeRole('${r}',1)`);
-    // 陣営だけを並べ、押すと中の役職が開く（開閉は game.roleOpen に保持）
-    const open = game.roleOpen || {};
-    const sum = (list) => list.reduce((n, r) => n + (c[r] ?? 0), 0);
-    const head = (key, title, list, sub) => `
-      <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.toggleGroup('${key}')">
-        <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">${sum(list)}枚</span>
-      </button>`;
-    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]);
-    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman"]), dark = ["dark_avatar"];
-    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer"]);
-    const roles = `
-      <div class="role-group t-village">${head("village", "村人陣営", village)}${open.village ? village.map(roleRow).join("") : ""}</div>
-      <div class="role-group t-wolf">${head("wolf", "人狼陣営", [...dark, ...wolfLike, ...madLike])}
-        ${open.wolf ? `
-          ${dark.map(roleRow).join("")}
-          <div class="rg-sub">${head("wolfLike", "人狼系", wolfLike, true)}${open.wolfLike ? wolfLike.map(roleRow).join("") : ""}</div>
-          <div class="rg-sub">${head("madLike", "狂人系", madLike, true)}${open.madLike ? madLike.map(roleRow).join("") : ""}</div>` : ""}
-      </div>
-      <div class="role-group t-third">${head("third", "第三陣営", third)}${open.third ? third.map(roleRow).join("") : ""}</div>
-      <div class="role-group t-dup"><button class="rg-head" onclick="ONW.ui.toggleGroup('dup')"><span>${open.dup ? "▾" : "▸"} 重複役職</span><span class="rg-count">酔${game.drunkCount || 0}人・恋${game.loverCount || 0}組</span></button>
-        ${open.dup ? `${row("酔っ払い(人)", game.drunkCount || 0, "ONW.net.changeSetting('drunkCount',-1)", "ONW.net.changeSetting('drunkCount',1)")}
-        ${row("酔う確率(1人ごと)", `${game.drunkChance ?? 100}%`, "ONW.net.changeSetting('drunkChance',-5)", "ONW.net.changeSetting('drunkChance',5)")}
-        <p class="night-step__hint" style="margin:4px 8px 8px;">配役の枚数には数えません。ランダムな参加者（CPU含む）に重なり、議論時間の半分が過ぎるまで自分の役職が分かりません。人数ぶんの枠が、それぞれ「酔う確率」で当たります。</p>
-        ${row("恋人(組)", game.loverCount || 0, "ONW.net.changeSetting('loverCount',-1)", "ONW.net.changeSetting('loverCount',1)")}
-        ${row("恋人になる確率(1組ごと)", `${game.loverChance ?? 100}%`, "ONW.net.changeSetting('loverChance',-5)", "ONW.net.changeSetting('loverChance',5)")}
-        <p class="night-step__hint" style="margin:4px 8px 8px;">恋人は2人1組で、ランダムな参加者（CPU含む）に重なります（酔っ払いと同じ人に重なることもあります）。夜に相方のカードが❤️でめくれ、相方が死亡すると、死因を問わず同時に心中します。二人とも死ななければ恋人陣営の勝利で、恋人以外は敗北です。組数は村の人数の半分までです。</p>` : ""}</div>`;
     // 起こる順: 役職配布 → 夜 → 朝 → 待機時間 → 昼・議論 → 夕方・投票（待機時間は1秒刻み。ほかは5秒刻み）
     const TM_DEF = { deal: 5, settle: 5 };   // 古い版のホストの設定には役職配布・待機時間が無いので、初期値を見せる
     const timers = [["deal", "役職配布(演出のあとの待ち・秒)", 5], ["night", "夜時間(秒)", 5], ["morning", "朝時間(秒)", 5], ["settle", "待機時間(秒)", 1], ["day", "昼・議論(秒)", 5], ["vote", "夕方・投票(秒)", 5]].map(([k, l, st]) =>
       row(l, game.timers[k] ?? TM_DEF[k], `ONW.net.changeTimer('${k}',-${st})`, `ONW.net.changeTimer('${k}',${st})`)).join("") +
       `<p class="night-step__hint" style="margin:4px 8px 8px;">役職配布は、配る演出が終わってから夜になるまでの余裕です（0秒なら演出が終わってすぐ夜）。待機時間は、朝が終わってから昼になるまでで、短くすると待機時間の演出が間に合わず途切れることがあります。</p>`;
-    const offList = game.transformOff || [];
-    // 変化先の有無: 陣営だけを並べ、押すと変化役ごとの変化先（役職のON/OFF）が開く
-    const tfChips = (b, list) => `<div class="tf-set"><div class="tf-set__name">${esc(ONW.roles.getInfo(b).name)}の変化先</div>
-        <div class="tf-set__chips">${list.map((t) => {
-          const on = !offList.includes(`${b}:${t}`);
-          const label = `${esc(ONW.roles.getInfo(t).name)} ${on ? "ON" : "OFF"}`;
-          return isHost ? `<button class="btn tf-chip ${on ? "tf-on" : "tf-off"}" onclick="ONW.net.toggleTarget('${b}','${t}')">${label}</button>` : `<span class="tf-chip ${on ? "tf-on" : "tf-off"}">${label}</span>`;
-        }).join("")}</div></div>`;
-    const tfHead = (key, title, b, list, sub) => `
-      <button class="rg-head ${sub ? "rg-head--sub" : ""}" onclick="ONW.ui.toggleGroup('${key}')">
-        <span>${open[key] ? "▾" : "▸"} ${title}</span><span class="rg-count">ON ${list.filter((t) => !offList.includes(`${b}:${t}`)).length}/${list.length}</span>
-      </button>`;
-    const TG = ONW.TRANSFORM_GROUPS;
-    const tfRows = `
-      <div class="role-group t-village">${tfHead("tfVillage", "村人陣営", "light_apostle", TG.light_apostle)}${open.tfVillage ? tfChips("light_apostle", TG.light_apostle) : ""}</div>
-      <div class="role-group t-wolf">${tfHead("tfWolf", "人狼陣営", "dark_avatar", [...wolfLike, ...madLike])}
-        ${open.tfWolf ? `
-          <div class="rg-sub">${tfHead("tfWolfLike", "人狼系", "dark_avatar", wolfLike, true)}${open.tfWolfLike ? tfChips("dark_avatar", wolfLike) : ""}</div>
-          <div class="rg-sub">${tfHead("tfMadLike", "狂人系", "dark_avatar", madLike, true)}${open.tfMadLike ? tfChips("dark_avatar", madLike) : ""}</div>` : ""}
-      </div>
-      <div class="role-group t-third">${tfHead("tfThird", "第三陣営", "silver_shadow", TG.silver_shadow)}${open.tfThird ? tfChips("silver_shadow", TG.silver_shadow) : ""}</div>`;
     const presets = isHost ? ONW.settings.listPresets() : [];
     const presetUi = isHost ? `
       <h3 class="set-sub">マイルール</h3>
@@ -271,48 +508,46 @@ window.ONW = window.ONW || {};
         <button class="btn" onclick="ONW.net.importCode()">読み込む</button>
       </div>
       ${game.codeMsg ? `<p class="night-step__hint">${esc(game.codeMsg)}</p>` : ""}` : "";
-    // 設定は「人数 / 配役 / タイマー / 詳細」の4つに分け、見出しを押すと開く
-    const page = game.setPage || null, PT = { secPeople: "人数設定", secRoles: "配役設定", secTimer: "タイマー設定", secAdv: "詳細設定", secRule: "ルール設定" };
+    // 設定は「人数 / 役職 / タイマー / システム / ルール」に分け、見出しを押すと開く（役職設定の中の 配役設定 / 詳細設定 / アサイン設定 は、上に重なるメニューで開く）
+    const page = game.setPage || null, sub = game.roleSetPage || null, PT = { secPeople: "人数設定", secRoles: "役職設定", secTimer: "タイマー設定", secSys: "システム設定", secRule: "ルール設定" };
+    const pageTitle = PT[page] || "";
     const sec = (key, title, summary, inner) => {
       if (!page) return `<button class="set-tab" onclick="ONW.ui.setPage('${key}')"><span>${title}</span><span class="rg-count">${summary}</span><span class="set-tab__go">›</span></button>`;
       return page === key ? `<div class="set-sec__body">${inner}</div>` : "";
     };
     return `
       <div class="settings-modal" onclick="if(event.target===this)ONW.ui.toggleSettings()">
-      <div class="settings-panel settings-panel--modal"><div class="x-bar">${page ? `<button class="x-back" type="button" onclick="ONW.ui.setPage(null)">‹ 戻る</button>` : "<span></span>"}<button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.ui.toggleSettings()">✕</button></div>
-        <h2>${page ? PT[page] || "" : "ルーム設定"}</h2>
+      <div class="settings-panel settings-panel--modal"><div class="x-bar">${page ? `<button class="x-back" type="button" onclick="ONW.ui.setBack()">‹ 戻る</button>` : "<span></span>"}<button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.ui.toggleSettings()">✕</button></div>
+        <h2>${page ? pageTitle : "ルーム設定"}</h2>
         ${page ? "" : `<p class="night-step__hint">${isHost ? "変更したルールは自動で保存され、次回のルーム作成時に復元されます。" : "ホストが設定を変更できます。"}</p>`}
         ${sec("secPeople", "人数設定", `${game.villageSize}人村 / 墓地${game.graveCount}枚 / CPU${game.cpuCount}人`, `
           ${row("何人村", game.villageSize, "ONW.net.changeSetting('villageSize',-1)", "ONW.net.changeSetting('villageSize',1)")}
           <p class="night-step__hint">参加者（CPUも含む）が${game.villageSize}人まで入れます。定員を超えて入った人は観戦側になります。</p>
           ${row("墓地の枚数", game.graveCount, "ONW.net.changeSetting('graveCount',-1)", "ONW.net.changeSetting('graveCount',1)")}
           ${row("CPU人数", game.cpuCount, "ONW.net.changeSetting('cpuCount',-1)", "ONW.net.changeSetting('cpuCount',1)")}`)}
-        ${sec("secRoles", "配役設定", `${have}/${need}枚`, `
-          <p class="night-step__hint">必要枚数: ${need}枚（${game.villageSize}人村+墓地${game.graveCount}枚） / 現在 ${have}枚</p>
-          ${roles}`)}
+        ${sec("secRoles", "役職設定", game.assignOn ? `アサインON ${have}→${need}枚` : `${have}/${need}枚`, `
+          <p class="night-step__hint">押すと、画面の上に重なってメニューが出ます。</p>
+          <button class="set-tab" onclick="ONW.ui.openRoleMenu('deck')"><span>配役設定</span><span class="rg-count">${have}/${need}枚</span><span class="set-tab__go">›</span></button>
+          <button class="set-tab" onclick="ONW.ui.openRoleMenu('detail')"><span>詳細設定</span><span class="rg-count">役職ごとの設定</span><span class="set-tab__go">›</span></button>
+          <button class="set-tab" onclick="ONW.ui.openRoleMenu('assign')"><span>アサイン設定</span><span class="rg-count">${game.assignOn ? "ON" : "OFF"}</span><span class="set-tab__go">›</span></button>`)}
         ${sec("secTimer", "タイマー設定", `夜${game.timers.night}秒・昼${game.timers.day}秒`, timers)}
-        ${sec("secAdv", "詳細設定", "", `
+        ${sec("secSys", "システム設定", "", `
           <div class="field-row"><label>狂人昇格</label>
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleFake()">${game.fakeWolfWhenNoWolf ? "ON" : "OFF"}</button>` : `<span>${game.fakeWolfWhenNoWolf ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: 最終盤面に人狼がいないとき、狂人1人が人狼判定に昇格します。</p>
-          ${row("占い師が占える墓地の枚数", game.seerGraveCount ?? 2, "ONW.net.changeSetting('seerGraveCount',-1)", "ONW.net.changeSetting('seerGraveCount',1)")}
-          <p class="night-step__hint">占い師・狂った占い師が夜に確認できる墓地のカードの枚数です（墓地の枚数が上限）。</p>
-          ${row("メイヤーの投票数", game.mayorVoteCount ?? 2, "ONW.net.changeSetting('mayorVoteCount',-1)", "ONW.net.changeSetting('mayorVoteCount',1)")}
-          <p class="night-step__hint">メイヤーが昼の投票で持つ票数です（2〜10票）。最終盤面でメイヤーを持っている人の1票が、この票数ぶんとして数えられます。</p>
-          ${row("狂ったメイヤーの投票数", game.madMayorVoteCount ?? 2, "ONW.net.changeSetting('madMayorVoteCount',-1)", "ONW.net.changeSetting('madMayorVoteCount',1)")}
-          <p class="night-step__hint">狂ったメイヤーが昼の投票で持つ票数です（2〜10票。メイヤーとは別の設定）。最終盤面で狂ったメイヤーを持っている人の1票が、この票数ぶんとして数えられます。</p>
           <div class="field-row"><label>変化公開</label>
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('revealTransforms')">${game.revealTransforms ? "ON" : "OFF"}</button>` : `<span>${game.revealTransforms ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: 昼の開始時に「変化前 → 変化後」の役職名を公開します（誰が変化したかは分かりません）。</p>
-          <h3 class="set-sub">変化先の有無</h3>
-          <p class="night-step__hint">陣営を押すと、変化先にする役職をON/OFFできます。OFFの役職には変化せず、COの候補にも出ません。全部OFFだとその変化役は変化しません。</p>
-          ${tfRows}
           <div class="field-row"><label>手動配役を変化公開に表示</label>
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('revealManualRoles')">${game.revealManualRoles ? "ON" : "OFF"}</button>` : `<span>${game.revealManualRoles ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: 配役した役職（変化していないカード）も、変化公開に「光の使徒 → 占い師」のように変化先として並べます（人狼陣営は闇の化身、第三陣営は銀色の影から）。どれが本当に変化したのか分からなくなります。ガイドの「現在の配役」も、昼の開始までは変化役にまとめて表示されます。変化公開がONのときだけ働きます。</p>
+          <div class="field-row"><label>勝利の乗っ取り演出</label>
+            ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('winLadderFx')">${game.winLadderFx !== false ? "ON" : "OFF"}</button>` : `<span>${game.winLadderFx !== false ? "ON" : "OFF"}</span>`}
+          </div>
+          <p class="night-step__hint">ON: 結果発表で、成立した勝利が陣営の乗っ取りごとに低い順（人狼陣営勝利 → 妖狐陣営勝利 …）に貼り重ねられて出ます。OFF: 最終的な勝利だけをすぐに出します。</p>
           ${isHost && (game.debugOn || (ONW.debug && ONW.debug.allowed())) ? `<div class="field-row"><label>デバッグモード</label>
             <button class="btn" onclick="ONW.debug.toggle()">${game.debugOn ? "ON" : "OFF"}</button>
           </div>
@@ -331,7 +566,7 @@ window.ONW = window.ONW || {};
     const size = game.villageSize || 4, need = size + game.graveCount, have = Object.values(game.roleCounts).reduce((a, b) => a + b, 0);
     const guests = players.filter((p) => p.status !== "host");
     const allReady = guests.every((p) => p.status === "ready");
-    const ok = total === size && have === need && allReady;
+    const asg = ONW.assign.check(game), ok = total === size && asg.ok && allReady;   // アサイン設定ON: 配役設定の枚数は候補なので、配役数以上あればよい
     const me = all[game.meIndex] || {};
     const badge = (st) => { const [t, cls] = STATUS[st] || STATUS.waiting; return `<span class="st ${cls}">${t}</span>`; };
     // 名前の左にアイコン（画像があれば画像、無ければ頭文字の丸）。画像のある他人には小さな通報ボタン
@@ -346,10 +581,10 @@ window.ONW = window.ONW || {};
     };
     const canInvite = isHost && !!(A && A.user);
     let hint = "";
-    if (isHost) hint = total < size ? `あと${size - total}人必要です（CPUを増やして補えます）。` : have !== need ? `配役の枚数が合っていません（必要${need}枚 / 現在${have}枚）。` : !allReady ? "全員が「準備完了」になると開始できます。" : "開始できます。";
+    if (isHost) hint = total < size ? `あと${size - total}人必要です（CPUを増やして補えます）。` : !asg.ok ? (game.assignOn ? `アサイン設定がONですが、候補の枚数が足りません（配役${need}枚 / 候補${have}枚）。` : `配役の枚数が合っていません（必要${need}枚 / 現在${have}枚）。`) : !allReady ? "全員が「準備完了」になると開始できます。" : "開始できます。";
     else if (me.spec) hint = total >= size ? "満員のため観戦で入りました。空きが出たら「観戦 OFF」で参加できます。" : "観戦で参加します。ホストの開始を待っています…";
     else hint = me.status === "ready" ? "準備完了です。ホストの開始を待っています…" : "準備ができたら「準備完了」を押してください。";
-    const summary = `${size}人村 / 墓地${game.graveCount}枚 / 夜${game.timers.night}秒・議論${game.timers.day}秒・投票${game.timers.vote}秒`;
+    const summary = `${size}人村 / 墓地${game.graveCount}枚${game.assignOn ? " / アサインON" : ""} / 夜${game.timers.night}秒・議論${game.timers.day}秒・投票${game.timers.vote}秒`;
     return `
       <section class="panel night-step">
         <p class="lede">部屋コード（友達に教えてください）</p>
@@ -362,7 +597,7 @@ window.ONW = window.ONW || {};
         <p class="night-step__hint">${hint}</p>
         ${canInvite && game.invOpen ? `<div class="invite-panel"><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
         <div class="btn-row" style="justify-content:center;">
-          <button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>
+          ${isHost ? `<button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>` : ""}
           ${ui.hasLastResult(game) ? `<button class="btn" onclick="ONW.ui.openResultReview()">前回の結果を見る</button>` : ""}
           ${canInvite ? `<button class="btn" onclick="ONW.ui.toggleInvite()">フレンドを招待</button>` : ""}
           ${isHost
@@ -744,12 +979,12 @@ window.ONW = window.ONW || {};
     const logs = (held ? [] : [...(game.nightLogs || []), ...(game.nightNotes || []), ...(game.nightAck || [])]).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("");
     let action = "";
     const ar = game.actRole, canAct = !game.nightDone && ar;
-    const nm = (id) => ((game.others || []).find((p) => p.id === id) || {}).name || "?";
+    const nm = (id) => nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name || "?");
     const sel = game.nightSel || { players: [], graves: [] };
     const chosen = [...sel.players.map((id) => esc(nm(id))), ...sel.graves.map((i) => `墓地${i + 1}`)];
     const nowSel = (sep, need) => `<p class="night-step__hint">選択中: <strong>${chosen.length ? chosen.join(sep) : "まだ選んでいません"}</strong>${need && chosen.length < need ? `（あと${need - chosen.length}つ）` : ""}</p>`;
     const later = `<br>朝になるまで何度でも変更できます（選んだカードをもう一度押すと解除）。結果は朝に分かります。`;
-    const gmax = ONW.seerGraveMax(game);
+    const gmax = ONW.seerGraveMax(game, ar);
     // 役職ごとの夜の説明文は、各役職ファイルの uiNight.action(行動できる役職)/ uiNight.idle(行動がない役職)
     const nightUi = (id) => { const d = id && ONW.roleDef(id); return d && d.uiNight ? d.uiNight : null; };
     const X = { later, nowSel, gmax, sel, nm, esc, logs };
@@ -822,7 +1057,7 @@ window.ONW = window.ONW || {};
   ui.rejobBlock = function (game) {
     if (!game.rejobOpen || game.isDead || game.isSpectator) return "";
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
-    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
       <p class="night-step__hint"><strong>フリーターの昼能力（再就職）</strong>: 就職先が死亡しました。上のテーブルから、<strong>新しい就職先のカード</strong>を押してください（生きている自分以外の1人）。</p>
@@ -849,7 +1084,7 @@ window.ONW = window.ONW || {};
   ui.mindBlock = function (game) {
     if (!game.mindOpen || game.isDead || game.isSpectator) return "";
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
-    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     const sense = game.mindRole === "sense_seer";   // 感覚の占い師も同じ操作欄を使う（昼能力ボタン → カードを選ぶ → 確定）
     const head = sense
       ? `<p class="night-step__hint"><strong>感覚の占い師の昼能力</strong>: 上のテーブルから、<strong>気配を感じ取る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
@@ -883,7 +1118,7 @@ window.ONW = window.ONW || {};
     if (game.exchDone && !game.exchOpen) return "";   // 何をしたかは情報確認に載る（議論タイムの画面には出さない）
     if (!game.exchOpen) return "";
     const ids = (game.nightSel && game.nightSel.players) || [];
-    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : (((game.others || []).find((p) => p.id === id) || {}).name || "?");
+    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : nmv(id, (((game.others || []).find((p) => p.id === id) || {}).name || "?"));
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
       <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo(game.exchRole || "exchanger") || {}).name || "交換者")}の昼能力</strong>: 上のテーブルから、<strong>票数を入れ替える2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
@@ -924,7 +1159,7 @@ window.ONW = window.ONW || {};
   ui.predBlock = function (game) {
     if (game.isDead || game.isSpectator || !game.predOpen) return "";
     const ids = (game.nightSel && game.nightSel.players) || [];
-    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : (((game.others || []).find((p) => p.id === id) || {}).name || "?");
+    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : nmv(id, (((game.others || []).find((p) => p.id === id) || {}).name || "?"));
     const all = ids;
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
@@ -986,7 +1221,7 @@ window.ONW = window.ONW || {};
   ui.libraBlock = function (game) {
     if (game.isDead || game.isSpectator || !game.libraOpen) return "";
     const ids = (game.nightSel && game.nightSel.players) || [];
-    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : (((game.others || []).find((p) => p.id === id) || {}).name || "?");
+    const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : nmv(id, (((game.others || []).find((p) => p.id === id) || {}).name || "?"));
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
       <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo(game.libraRole || "libra") || {}).name || "天秤")}の昼能力</strong>: 上のテーブルから、<strong>投票対象にする2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
@@ -1015,7 +1250,7 @@ window.ONW = window.ONW || {};
     if (game.sheriffDone && !game.sheriffOpen) return "";   // 何を撃ったかは情報確認に載る（議論タイムの画面には出さない）
     if (!game.sheriffOpen) return "";
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
-    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
       <p class="night-step__hint"><strong>保安官の昼能力</strong>: 上のテーブルから、<strong>撃つ相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
@@ -1044,7 +1279,7 @@ window.ONW = window.ONW || {};
     if (game.thiefDone && !game.thiefOpen) return "";   // 何を盗んだか（盗めたか・失敗か）は情報確認に載る（議論タイムの画面には出さない）
     if (!game.thiefOpen) return "";
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
-    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
       <p class="night-step__hint"><strong>盗賊の昼能力</strong>: 上のテーブルから、<strong>票数を盗む相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
@@ -1063,7 +1298,7 @@ window.ONW = window.ONW || {};
   ui.dictBlock = function (game) {
     if (!game.dictOpen || game.isDead || game.isSpectator) return "";
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
-    const nm = id ? ((game.others || []).find((p) => p.id === id) || {}).name : "";
+    const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
       <p class="night-step__hint"><strong>独裁者の昼能力</strong>: 上のテーブルから、<strong>独裁で処刑する相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
@@ -1258,11 +1493,11 @@ window.ONW = window.ONW || {};
     const ar = game.morningChain;
     if (ar && !game.isSpectator) {
       const sel = game.nightSel || { players: [], graves: [] }, np = sel.players.length, ng = sel.graves.length;
-      const nm = (id) => ((game.others || []).find((p) => p.id === id) || {}).name || "?";
-      const chosen = [...sel.players.map((id) => esc(nm(id))), ...sel.graves.map((i) => `墓地${i + 1}`)];
-      const gmax = ONW.seerGraveMax(game);
+      const nm = (id) => nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name || "?");
+      const chosen = [...sel.players.map((id) => esc(nm(id))), ...sel.graves.map((i) => `墓地${i + 1}`), ...(Number.isInteger(sel.pick) && game.cosplayCards && game.cosplayCards[sel.pick] ? [esc(ONW.roles.getInfo(game.cosplayCards[sel.pick]).name)] : [])];
+      const gmax = ONW.seerGraveMax(game, ar);
       const uc = (ONW.roleDef(ar) || {}).uiNight;   // 確定できる条件と「押して」の文言は、各役職ファイルの uiNight.chainReady / chainHow(ない役職は いたずらっ子と同じ形)
-      const ready = uc && uc.chainReady ? uc.chainReady(np, ng) : np === 1;
+      const ready = uc && uc.chainReady ? uc.chainReady(np, ng, sel) : np === 1;
       const how = uc && uc.chainHow ? uc.chainHow(gmax) : ONW.roleDef("troublemaker").uiNight.chainHow(gmax);
       if (game.morningChainDone) chain = late ? "" : `<p class="night-step__hint">朝の能力は使用済みです。</p>`;
       else if (!late && game.settling) chain = `<p class="night-step__hint">待機時間になったので、新しい役職（${esc(ONW.roles.getInfo(ar).name)}）の能力は、昼の議論中に使えます。</p>`;   // 待機時間は選んでも受け付けられない（ホストが朝の連鎖として処理しない）ので、押せるように見せない
@@ -1312,16 +1547,20 @@ window.ONW = window.ONW || {};
     const role = g.myRole ? ONW.roles.getInfo(g.myRole) : null;
     // 全員に公開された情報: スターがいるときだけ誰か、パンが焼けたときだけ「パンが焼けました」を出す（いないとき・焼けていないときは何も出さない）
     const pubLines = [];
+    const smkHide = !!(g.smokeOn && !g.isSpectator && !(g.hostSpec && ONW.net.isHost));   // 煙幕中（煙幕が見える人）: 基本情報(スター・人狼王・暴露・愉快犯・麻婆豆腐・パン・混沌新聞)は情報確認にも載せない。観戦者・観戦中のホストは煙幕自体が出ないので今までどおり
+    if (g.smokeOn) pubLines.push(`煙幕通知: ${(ONW.smoke && ONW.smoke.TEXT) || "煙幕の狂人に煙幕を投げられたため、変化公開以外の昼の通知や演出が見えなくなりました。"}`);   // 煙幕の狂人: 隠された通知は、ここ(情報確認)で確認できる
+    if (!smkHide) {
     if ((g.starNames || []).length) pubLines.push(`スター: ${(g.starNames || []).map((n) => `<strong>${esc(n)}</strong>`).join("、")}`);
     if ((g.kingNames || []).length) pubLines.push(`人狼王: ${(g.kingNames || []).map((n) => `<strong>${esc(n)}</strong>`).join("、")}`);
     (g.exposeRows || []).forEach((r) => pubLines.push(`暴露通知: 暴露された人の最終役職は <strong>${esc(r.role)}</strong>${r.extras && r.extras.length ? `（${r.extras.map(esc).join("・")}）` : ""} です`));   // 暴露狂人: 誰かは載らない
     if (g.pranksterDone) pubLines.push("愉快な笑い声が聞こえました。");   // 愉快犯: 暴露のあと・麻婆豆腐の前
     if (g.mapoDone) pubLines.push("麻婆豆腐が完成しました");
     if (g.breadN > 0) pubLines.push(g.breadN > 1 ? `パンが${g.breadN}個焼けました` : "パンが焼けました");
+    }
     (g.deathNotes || []).forEach((t) => pubLines.push(esc(t)));   // 昼中の死亡の知らせ（呪殺・後追い・心中・王国滅亡・撃たれた）。チャットには出さない。妖狐か狐憑きか・執行か誤爆かは載せない
     const pub = pubLines.length ? `<hr class="info-sep"><p class="night-step__hint">公開された情報</p>${pubLines.map((t) => `<p class="night-step__hint">${t}</p>`).join("")}` : "";
     // 新聞配達員の新聞: 変化公開のあとに出た紙を、いつでも見返せる（動きがなかったときもそのまま載る）
-    const news = Array.isArray(g.newsLines)
+    const news = !smkHide && Array.isArray(g.newsLines)
       ? `<div class="info-news"><div class="info-news__title">混沌新聞</div>${g.newsLines.length ? `<p class="info-news__head">昨夜、動きのあった役職</p>${g.newsLines.map((t) => `<p class="info-news__item">${esc(t)}</p>`).join("")}` : `<p class="info-news__head">昨夜、目立った能力行使はなかったようです。</p>`}</div>`
       : "";
     return `${role ? `<p class="night-step__hint">配られた役職: <strong>${esc(role.name)}</strong>${g.myRole === "drunk" ? (g.soberRole ? `（酔いが覚めたあとの役職: <strong>${esc(ONW.roles.getInfo(g.soberRole).name)}</strong>）` : "（酔いが覚めるまで自分の役職は分かりません）") : ""}</p>` : ""}
@@ -1419,7 +1658,7 @@ window.ONW = window.ONW || {};
         <h2>${game.dukeIds ? "魔界公爵追放会議" : game.foxVoteOn ? "妖狐投票" : "投票"}</h2>
         <p class="lede">上のテーブルで、追放したい人の<strong>カードを押して</strong>ください。もう一度押すと未投票に戻ります。タイマーが終わった時に、選んでいる人に投票されます。</p>
         ${game.dukeIds ? `<p class="night-step__hint">魔界公爵追放会議です。<strong>魔界公爵だと思う人</strong>のカードを押してください（生存者のみ・1人1票。自分にも投票できます。投票しなくてもかまいません）。最多得票の人が魔界公爵なら処刑され、そうでなければ魔界公爵の勝利です。</p>` : ""}${game.foxVoteOn ? `<p class="night-step__hint">妖狐投票です。最多得票の人（同数最多も）が<strong>妖狐か狐憑き</strong>のときだけ追放されます（そうでなければ誰も追放されず、票数だけ発表されます）。このあとに通常の投票があります。</p>` : ""}
-        <p class="night-step__hint vote-now">${sel ? `現在の投票先: <strong>${esc(sel.name)}</strong>` : "現在: 未投票"}</p>
+        <p class="night-step__hint vote-now">${sel ? `現在の投票先: <strong>${esc(nmv(sel.id, sel.name))}</strong>` : "現在: 未投票"}</p>
         ${log}
       </section>`;
   };
@@ -1444,6 +1683,7 @@ window.ONW = window.ONW || {};
     // 全員に公開された情報（試合中の「情報確認」の下半分と同じ内容）
     const pp = res.infoPub || {}, pub = [];
     const names = (a) => a.map((n) => `<strong class="rs-pl">${esc(n)}</strong>`).join("、");
+    if (pp.smoke) pub.push(`煙幕通知: ${(ONW.smoke && ONW.smoke.TEXT) || "煙幕の狂人に煙幕を投げられたため、変化公開以外の昼の通知や演出が見えなくなりました。"}`);
     if ((pp.stars || []).length) pub.push(`スター: ${names(pp.stars)}`);
     if ((pp.kings || []).length) pub.push(`人狼王: ${names(pp.kings)}`);
     (pp.expose || []).forEach((r) => pub.push(`暴露通知: 暴露された人の最終役職は <strong>${esc(r.role)}</strong>${r.extras && r.extras.length ? `（${r.extras.map(esc).join("・")}）` : ""} です`));
@@ -1507,6 +1747,7 @@ window.ONW = window.ONW || {};
   ui.resultSheetHtml = function resultSheetHtml(game, res, opts) {
     opts = opts || {};
     const L = (h) => `<div class="rs-line">${h}</div>`;
+    const LH = (h) => `<div class="rs-line rs-hist">${h}</div>`;   // 役職履歴・墓地: 同じ人の行は途中で改行しない（はみ出すときは行ごと横にスクロール）
     const H = (t) => `<div class="rs-head">${t}</div>`;
     const sep = `<hr class="rs-sep">`;
     const seg = (s) => `<span class="t-${s.team}">${esc(s.name)}</span>${s.sfx ? `<span class="t-wolf">${esc(s.sfx)}</span>` : ""}${(s.tags || []).map((t) => `<span class="rs-tag-${t.k}">${esc(t.t)}</span>`).join("")}`;
@@ -1533,14 +1774,14 @@ window.ONW = window.ONW || {};
         ${res.duke ? `${sep}${H("魔界公爵追放会議")}${ONW.demonDuke.lines(res.duke).map((t) => L(ONW.utils.tintHtml(esc(t), res))).join("")}` : ""}
         ${opts.preview ? "" : sep}
         ${opts.preview ? "" : `<div class="rs-win t-${winTeam}">${esc(res.title)}</div>
-        ${res.abandoned ? none("ホストが廃村にしました。勝者も敗者もいません。") : `${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}${(res.ladder || []).length > 1 ? L(`<span class="rs-info">勝利の乗っ取り:</span> ${res.ladder.map((x) => esc(x.title)).join(' <span class="rs-dim">→</span> ')}`) : ""}
+        ${res.abandoned ? none("ホストが廃村にしました。勝者も敗者もいません。") : `${L(`<span class="rs-info">勝利陣営:</span> ${esc(res.teams.join("＆") || "なし")}`)}
         ${L(`<span class="rs-good">勝者:</span> ${res.winners.map((n) => ((res.extraWin || []).some((x) => x.name === n) ? `<span class="rs-extra-name">${esc(n)}</span>` : `<span class="rs-wname">${esc(n)}</span>`)).join("、") || "なし"}`)}
         ${L(`<span class="rs-dead">敗者:</span> ${res.losers.map((n) => `<span class="rs-lname">${esc(n)}</span>`).join("、") || "なし"}`)}`}`}
         ${sep}${H("役職履歴")}
-        ${res.history.map((h) => L(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead || h.day ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
+        ${res.history.map((h) => LH(`${esc(h.name)} ${chain(h.segs)} <span class="${h.dead || h.day ? "rs-dead" : "rs-alive"}">${h.status}</span>`)).join("")}
         ${sep}
-        ${res.grave.map((c) => L(`<span class="rs-gv">${c.label}</span> ${chain(c.segs)}`)).join("")}
-        ${none("欠け: なし")}
+        ${res.grave.map((c) => LH(`<span class="rs-gv">${c.label}</span> ${chain(c.segs)}`)).join("")}
+        ${res.missing && res.missing.length ? L(`<span class="rs-dim">欠け:</span> ${res.missing.map((m) => `<span class="t-${m.team}">${esc(m.name)}</span>`).join("、")}`) : none("欠け: なし")}
         ${sep}${H("夜行動結果")}
         ${res.nightLogs.length ? ONW.utils.tintHtml(res.nightLogs.map((t) => L(esc(t))).join(""), res) : none("夜行動ログはありません。")}
         ${/* 【昼行動結果】夜行動結果の下。昼能力（独裁者など）の結果はここに1行ずつ並べる */ ""}
@@ -1565,6 +1806,7 @@ window.ONW = window.ONW || {};
               const nmOf = (id) => ((res.detective.seats || []).find((q) => q.id === id) || {}).name || "?", rn = (r) => (ONW.roles.getInfo(r) || {}).name || r;
               return [L(`<span class="rs-info">名探偵:</span> ${esc(b.name)} は初期役職について`), ...b.cells.filter(Boolean).map((c) => L(`${esc(nmOf(c.id))} を ${esc(rn(c.guess))}`)), L(`と推測し、${b.success ? "成功" : "失敗"}していました。`)];
             }),
+            ...((res.watcher || []).length ? [(res.watcher || []).flatMap((x) => [...(x.touched.length ? [L(`<span class="rs-info">静観者:</span> ${esc(x.name)} は ${x.touched.map(esc).join("、")} に能力を使われていました。`)] : []), ...(x.voted.length ? [L(`<span class="rs-info">静観者:</span> ${esc(x.name)} は ${x.voted.map(esc).join("、")} に投票を入れられていました。`)] : [])])] : []),   // 静観者情報（マイクラ版の静観者情報と同じ。静観者全員で1組。js/roles/neutral/watcher.js の view）
             ...((res.predictor || []).map((x) => [L(`<span class="rs-info">予想屋:</span> ${esc(x.name)} は${esc(x.text)}と予想していました。`)])),   // 予想屋情報（マイクラ版の予想屋情報と同じ。予想屋ごとに1組。js/roles/neutral/predictor.js の view）
           ];
           const gs = groups.filter((x) => x.length);
@@ -1585,14 +1827,13 @@ window.ONW = window.ONW || {};
               const rem = addedRoles.slice();
               const found = c.found.map((n) => { const i = rem.indexOf(n); if (i >= 0) rem.splice(i, 1); return mark(n, true, i >= 0); });
               const lack = c.state === "fail" ? ` <span class="rs-dead">✘ あと${c.min - c.have}</span>` : "";
-              const addLines = (c.adds || []).map((x) => L(`<span class="rs-info">＋出した: ${esc(x.role)}（${esc(x.slot)}）</span> <span class="rs-dim">← ${esc(x.from)}${x.base ? `（${esc(x.base)}から変化）` : ""}</span>`)).join("");   // シナジーで足した役職: 何を・どの席/墓地に・何を置き換えて出したか
-              const capLines = (c.caps || []).map((x) => L(`<span class="rs-dead">－減らした: ${esc(x.from)}（${esc(x.slot)}）</span> <span class="rs-dim">→ ${esc(x.role)}</span>`)).join("");
+              // 2026-11-07: 「＋〇〇」の行は、上の色つきの「〇〇✔」と同じ情報なので出さない（足した役職は ✔ の色で分かる）
+              const capLines = (c.caps || []).map((x) => L(`<span class="rs-dead">－${esc(x.from)}</span>`)).join("");
               const none = !(c.adds || []).length && !(c.caps || []).length && c.state !== "fail" ? L(`<span class="rs-dim">（足した役職なし＝元から条件を満たしていた）</span>`) : "";
-              return head + L(`<span class="rs-dim">${esc(what)}${esc(cond)}</span>`) + L(`${found.join("")}${lack}`) + addLines + capLines + none;
+              return head + L(`<span class="rs-dim">${esc(what)}${esc(cond)}</span>`) + L(`${found.join("")}${lack}`) + capLines + none;
             }
             const line = r.items.map((it) => mark(`${it.role}${it.need > 1 ? `×${it.need}` : ""}`, it.state !== "fail", it.state === "added")).join("");
-            const reqAdds = r.items.flatMap((it) => (it.adds || [])).map((x) => L(`<span class="rs-info">＋出した: ${esc(x.role)}（${esc(x.slot)}）</span> <span class="rs-dim">← ${esc(x.from)}${x.base ? `（${esc(x.base)}から変化）` : ""}</span>`)).join("");
-            return head + L(line) + reqAdds;
+            return head + L(line);
           });
           return `${sep}${H("シナジー情報")}${ONW.utils.tintHtml(blocks.join(""), res)}`;
         })()}

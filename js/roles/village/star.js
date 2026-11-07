@@ -2,6 +2,7 @@
 (function (ONW) {
   /** 最終盤面でスターを持っているプレイヤーのID（スター公開の対象） */
   const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.STAR && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id)).map((p) => p.id);   // 酔いが覚めていない人は、覚めた瞬間に公開される
+  ONW.starHolders = holders;   // CPUの発言が使う（模倣の人狼がスターを模倣していて、スター公開に実際に出たか: js/cpu.js）
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
 
   ONW.defineRole("star", {

@@ -10,7 +10,7 @@
  *
  * 実装の場所:
  *   ・登録: このファイル（info / groups）と index.html の <script>（1of4）
- *   ・勝敗: js/vote.js（2of4。determineWinnersCoreBase の分岐 1.9。バランサーのすぐ下・てるてる系のすぐ上）
+ *   ・勝敗: js/vote.js（2of4。determineWinnersCoreBase の分岐 3.5。2026-11-07 から アサシンと同順位・神降臨のすぐ下。それまでは分岐 1.9 でバランサーのすぐ下）
  *   ・周辺: 従者の身代わりの除外（js/vote.js）/ js/roles/village/sense_seer.js（狂人系の気配）/ wiki ほか（3of4）
  *   ・ルールコード: js/settings.js（ONW70）
  *

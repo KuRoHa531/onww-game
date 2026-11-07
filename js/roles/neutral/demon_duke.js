@@ -21,7 +21,7 @@
   /** 魔界公爵に見える人狼判定の席（配布直後=初期役職の人狼系。一匹狼・忘却の人狼も含む。マイクラ版 assignDemonDukeVision の wolfJudgeIds）。
    *  人狼系が誰にも配られていなければ、人狼判定に昇格する狂人（ONW.vote.certainPromotion。人狼王だけがいるときの昇格を含む）。自分自身は含めない */
   function sees(g, selfId) {
-    const ids = g.players.filter((q) => q.id !== selfId && ONW.WOLF_KIND.includes(g.initialRoles[q.id])).map((q) => q.id);
+    const ids = ONW.wolfLookIds(g, selfId, true);   // スパイも🐺として見える（WOLF_LOOK_ALL）
     if (ids.length) return ids;
     const mid = ONW.vote.certainPromotion(g);
     return mid && mid !== selfId ? [mid] : [];
@@ -31,7 +31,7 @@
   ONW.demonDuke = { sees, textOf, NONE_TEXT };
 
   // CPU: 人狼が誰か分かっている（マーリンと同じ。人狼不在で昇格が決まっている狂人は、人狼側の仲間として扱う）
-  const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (q.id !== id && k.isWolf(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = g.initialRoles[q.id]; });
+  const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (q.id !== id && k.isLookAll(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = k.seenAs(g.initialRoles[q.id]); });
 
 
   // ================= 2of4: 魔界公爵追放会議の進行（マイクラ版 runDemonDukeMeetingIfNeeded）=================

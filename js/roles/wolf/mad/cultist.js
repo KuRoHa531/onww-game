@@ -1,6 +1,6 @@
 /** 狂信者: 墓地以外の人狼プレイヤーを知っている狂人 */
 (function (ONW) {
-  const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (k.isVisibleWolf(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = g.initialRoles[q.id]; });
+  const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (k.isVisibleWolf(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = k.seenAs(g.initialRoles[q.id]); });
 
   ONW.defineRole("cultist", {
     // 夜の演出(stage.js が g.cultReveal を受け取って 700ms 後に呼ぶ): 夜の始まりに人狼プレイヤーのカードが順に表になり、🐺が出る → 夜時間の間ずっと開いたまま
@@ -20,7 +20,7 @@
     nightMsg(c, p) {
       const g = c.g;
       let cultWolves = null;
-      const seenP = g.players.filter((q) => ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])), seen = seenP.map((q) => q.name);
+      const seenP = g.players.filter((q) => ONW.WOLF_LOOK.includes(g.initialRoles[q.id])), seen = seenP.map((q) => q.name);
       if (seenP.length) cultWolves = seenP.map((q) => q.id);   // 夜の始まりに、そのカードが表になって🐺が出る
       const mid = seen.length ? null : ONW.vote.certainPromotion(g);   // 人狼が不在で昇格が確定している狂人 = ご主人（役職まではわからない）
       const master = mid ? g.players.find((q) => q.id === mid) : null;
@@ -42,12 +42,12 @@
     },
     soberLines(c, id) {
       const g = c.g;
-      const wolves = g.players.filter((q) => q.id !== id && ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.name);
+      const wolves = g.players.filter((q) => q.id !== id && ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.name);
       return [wolves.length ? `人狼: ${wolves.join("、")}` : "人狼はいません。"];
     },
     soberPeek(c, id) {
       const g = c.g, pk = {};
-      const ids = g.players.filter((q) => ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.id);
+      const ids = g.players.filter((q) => ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.id);
       if (ids.length) pk.wolves = ids;
       else { const mid = ONW.vote.certainPromotion(g); if (mid === id) pk.wolves = [id]; }
       return pk;

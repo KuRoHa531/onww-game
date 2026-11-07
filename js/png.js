@@ -57,7 +57,8 @@ window.ONW = window.ONW || {};
     });
     sep();
     res.grave.forEach((c) => { const segs = [T(c.label + " ", C.grave)]; c.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); }); L.push({ segs, fit: true }); });
-    add(T("欠け: なし", C.dim));
+    if (res.missing && res.missing.length) { const ms = []; res.missing.forEach((m, i) => { if (i) ms.push(T("、")); ms.push(T(m.name, team(m.team))); }); add(T("欠け: ", C.dim), ...ms); }   // アサイン設定ON: 抽選で選ばれなかった候補
+    else add(T("欠け: なし", C.dim));
     sep(); head("夜行動結果");
     if (res.nightLogs.length) res.nightLogs.forEach((t) => addTint(T(t))); else add(T("夜行動ログはありません。", C.dim));
     // 【昼行動結果】夜行動結果の下。昼能力（独裁者など）の結果はここに1行ずつ並べる
@@ -81,6 +82,7 @@ window.ONW = window.ONW || {};
         const nmOf = (id) => ((res.detective.seats || []).find((q) => q.id === id) || {}).name || "?", rn = (r) => (ONW.roles.getInfo(r) || {}).name || r;
         return [[T("名探偵: ", C.info), T(`${b.name} は初期役職について`)], ...b.cells.filter(Boolean).map((c) => [T(`${nmOf(c.id)} を ${rn(c.guess)}`)]), [T(`と推測し、${b.success ? "成功" : "失敗"}していました。`)]];
       }),
+      ...((res.watcher || []).length ? [(res.watcher || []).flatMap((x) => [...(x.touched.length ? [[T("静観者: ", C.info), T(`${x.name} は ${x.touched.join("、")} に能力を使われていました。`)]] : []), ...(x.voted.length ? [[T("静観者: ", C.info), T(`${x.name} は ${x.voted.join("、")} に投票を入れられていました。`)]] : [])])] : []),   // 静観者情報（ui.js の結果欄と同じ組）
       ...((res.predictor || []).map((x) => [[T("予想屋: ", C.info), T(`${x.name} は${x.text}と予想していました。`)]])),   // 予想屋情報（ui.js の結果欄と同じ。予想屋ごとに1組）
     ];
     const gs = info.filter((g) => g.length);

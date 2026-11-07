@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" sizes="256x256" href="../img/icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png">
+<link rel="shortcut icon" href="../img/favicon.ico">
+<link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ルールまとめ | ワンナイト人狼ガイド 〜混沌に潜みし狼達〜</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/wiki.css">
+</head>
+<body>
+
+  <div class="moon-glow" aria-hidden="true"></div>
+
+  <header class="onw-header">
+    <h1 class="onw-header__title">
+      <span class="onw-header__title-sub">ONE NIGHT WEREWOLF GUIDE</span>
+      ルールまとめ
+    </h1>
+  </header>
+
+  <nav class="wiki-nav wiki-nav--top" aria-label="ルールまとめ">
+    <a class="wiki-nav__link on" href="rules.html">ルールまとめ</a>
+  </nav>
+  <nav class="wiki-nav wiki-nav--sub" aria-label="ガイドのページ">
+    <a class="wiki-nav__link" href="index.html">全役職</a>
+    <a class="wiki-nav__link" href="synergy.html">闇鍋シナジー</a>
+  </nav>
+
+  <main class="onw-app rules-app">
+    <p class="rules-legend" aria-label="色の見かた">
+      <span class="rule__tag rule__tag--village">村人陣営</span>
+      <span class="rule__tag rule__tag--wolf">人狼陣営</span>
+      <span class="rule__tag rule__tag--third">第三陣営</span>
+      <span class="rule__tag rule__tag--common">共通</span>
+    </p>
+    <section class="panel rules-sec rules-sec--win">
+      <h2>勝利条件</h2>
+      <ul class="rules-list">
+      <li class="rule rule--village"><span class="rule__tag">村人陣営</span><p>人狼判定が<strong>1人以上死亡</strong>している、かつ単独第三陣営が勝利条件を満たしていない。</p></li>
+      <li class="rule rule--wolf"><span class="rule__tag">人狼陣営</span><p>人狼判定が<strong>一人も死亡していない</strong>、かつ単独第三陣営が勝利条件を満たしていない。</p></li>
+      <li class="rule rule--third"><span class="rule__tag">第三陣営</span><p>それぞれの役職ごとの勝利条件を満たすと、追加勝利または単独勝利。</p></li>
+      <li class="rule rule--village"><span class="rule__tag">平和村なし</span><p>村人陣営は、人狼判定が誰もいない時に誰かを追放してもしなくても、単独第三陣営が勝利条件を満たしていない場合は勝利できる。（いわゆるワンナイト人狼でいう平和村がない）</p></li>
+      </ul>
+    </section>
+    <section class="panel rules-sec rules-sec--vote">
+      <h2>投票</h2>
+      <ul class="rules-list">
+      <li class="rule rule--common"><span class="rule__tag">同数投票</span><p><strong>両吊り</strong>。（役職の影響で例外あり）</p></li>
+      <li class="rule rule--common"><span class="rule__tag">自投票</span><p>自分には投票できない。ただし<strong>投票放棄（未投票）は可能</strong>。</p></li>
+      </ul>
+    </section>
+    <section class="panel rules-sec rules-sec--promo">
+      <h2>人狼判定の昇格</h2>
+      <ul class="rules-list">
+      <li class="rule rule--wolf"><span class="rule__tag">狂人系のみ</span><p>現世に狂人系役職の人狼陣営しかいない場合、ランダムな一人が<strong>元の役職のまま</strong>人狼判定に昇格する。</p></li>
+      <li class="rule rule--wolf"><span class="rule__tag">人狼王</span><p>人狼王がいて、他に人狼系がいない場合、ランダムな狂人系1人を人狼判定に昇格させる。</p></li>
+      </ul>
+    </section>
+    <section class="panel rules-sec rules-sec--dup">
+      <h2>重複役職</h2>
+      <ul class="rules-list">
+      <li class="rule rule--common"><span class="rule__tag">酔っ払い</span><p>昼の議論時間の<strong>半分が経過</strong>すると役職を自認できるので、昼中に夜能力を使用可能。</p></li>
+      <li class="rule rule--common"><span class="rule__tag">シャッフラー・恋人・反転</span><p>これらがついている場合、<strong>元の役職の陣営としては勝てない</strong>。</p></li>
+      </ul>
+      <h3 class="rules-sub">重複役職の優先度</h3>
+      <ol class="rules-prio">
+        <li><span class="prio prio--1">+反転</span></li>
+        <li class="gt">＞</li>
+        <li><span class="prio prio--2">+恋人</span></li>
+        <li class="gt">＞</li>
+        <li><span class="prio prio--3">+シャッフラー</span></li>
+        <li class="gt">＞</li>
+        <li><span class="prio prio--4">+コピリスト</span></li>
+      </ol>
+    </section>
+    <section class="panel rules-sec rules-sec--prio">
+      <h2>勝利優先度</h2>
+      <p class="rules-note">左ほど優先。「＝」は同順位（いっしょに勝つ）。</p>
+      <ol class="rules-prio rules-prio--chips">
+        <li><span class="chip ">チキン</span></li><li class="gt">＞</li><li><span class="chip ">模倣チキン</span></li><li class="gt">＞</li><li><span class="chip ">愉快犯</span></li><li class="gt">＞</li><li><span class="chip ">神の祝福</span></li><li class="gt">＞</li><li><span class="chip ">勝負師<small>（単独陣営選択時）</small></span></li><li class="gt">＞</li><li><span class="chip ">シャッフラー<small>（第三陣営変化時）</small></span></li><li class="gt">＞</li><li><span class="chip ">静観者</span></li><li class="gt">＞</li><li><span class="chip ">名探偵</span></li><li class="gt">＞</li><li><span class="chip ">予想屋</span></li><li class="gt">＞</li><li><span class="chip ">魔界公爵</span></li><li class="gt">＞</li><li><span class="chip ">賞金稼ぎ</span></li><li class="gt">＞</li><li><span class="chip ">バランサー</span></li><li class="gt">＞</li><li><span class="chip ">てるてる坊主＝一目惚れしてるてる＝処刑人</span></li><li class="gt">＞</li><li><span class="chip ">糸紡ぎ</span></li><li class="gt">＞</li><li><span class="chip ">恋人</span></li><li class="gt">＞</li><li><span class="chip ">神</span></li><li class="gt">＞</li><li><span class="chip ">弁護士<small>（単独勝利時）</small></span></li><li class="gt">＞</li><li><span class="chip ">妖狸＝妖狐</span></li><li class="gt">＞</li><li><span class="chip ">アサシン<small>（暗殺成功）</small>＝道化の狂人</span></li><li class="gt">＞</li><li><span class="chip chip--end">村人陣営＝人狼陣営</span></li>
+      </ol>
+    </section>
+    <section class="panel rules-sec rules-sec--order">
+      <h2>役職の処理順</h2>
+      <p class="rules-note">夜が明けるときに、左から順に処理される。</p>
+      <ol class="rules-prio rules-prio--chips">
+        <li><span class="chip">エルフリンデ</span></li><li class="gt">→</li><li><span class="chip">封印の狂人</span></li><li class="gt">→</li><li><span class="chip">役職変動系以外の役職</span></li><li class="gt">→</li><li><span class="chip">純愛者</span></li><li class="gt">→</li><li><span class="chip">悪女</span></li><li class="gt">→</li><li><span class="chip">キューピッド</span></li><li class="gt">→</li><li><span class="chip">破局師</span></li><li class="gt">→</li><li><span class="chip">鍵師</span></li><li class="gt">→</li><li><span class="chip">コピリスト</span></li><li class="gt">→</li><li><span class="chip">ホタル</span></li><li class="gt">→</li><li><span class="chip">なのか</span></li><li class="gt">→</li><li><span class="chip">コスプレイヤー</span></li><li class="gt">→</li><li><span class="chip">パッチ</span></li><li class="gt">→</li><li><span class="chip">墓荒らし</span></li><li class="gt">→</li><li><span class="chip">ドッペル</span></li><li class="gt">→</li><li><span class="chip">シャッフラー</span></li><li class="gt">→</li><li><span class="chip">グレムリン</span></li><li class="gt">→</li><li><span class="chip">マティアス</span></li><li class="gt">→</li><li><span class="chip">怪盗</span></li><li class="gt">→</li><li><span class="chip">いたずらっ子</span></li><li class="gt">→</li><li><span class="chip">愉悦開拓者</span></li><li class="gt">→</li><li><span class="chip">抹消の人狼</span></li><li class="gt">→</li><li><span class="chip">少佐</span></li><li class="gt">→</li><li><span class="chip">姫君(女王昇格)</span></li><li class="gt">→</li><li><span class="chip">弁護士(オポ変化)</span></li><li class="gt">→</li><li><span class="chip">背徳者(狂人変化)</span></li><li class="gt">→</li><li><span class="chip">反転者</span></li>
+      </ol>
+    </section>
+    <section class="panel rules-sec rules-sec--assign">
+      <h2>アサイン設定</h2>
+      <ul class="rules-list">
+      <li class="rule rule--common"><span class="rule__tag">オフ（初期値）</span><p>配役設定の枚数が<strong>そのまま配役</strong>になる。</p></li>
+      <li class="rule rule--common"><span class="rule__tag">オン</span><p>配役設定の枚数は<strong>候補</strong>になり、開始時に配役数ぶんだけ抽選される。村人・人狼・第三陣営ごとに<strong>最少人数〜最大人数</strong>を決められる。どんな範囲でも、配役される役職数は必ずプレイヤー数＋墓地の枚数と同じ。</p></li>
+      <li class="rule rule--common"><span class="rule__tag">出る確率</span><p>2枚以上の役職は、1枚目・2枚目…ごとに<strong>出る確率</strong>を決められる。</p></li>
+      <li class="rule rule--common"><span class="rule__tag">欠け</span><p>選ばれなかった候補は、結果の役職履歴の下に<strong>欠け</strong>として出る。</p></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="onw-footer">
+    <span>ルールの細かい例外は、各役職の説明と闇鍋シナジーのページも見てください。</span>
+  </footer>
+
+  <script>
+    (function () {
+      if (!/[?&]embed=1(&|$)/.test(location.search)) return;
+      document.body.classList.add("is-embed");
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && window.parent !== window) window.parent.postMessage({ onwWiki: "close" }, "*");
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -140,7 +140,8 @@
   /** 封印の狂人の画面: 封印した相手のカードにお札が貼られる */
   const revealPut = (ids) => ({ kind: "seal", mode: "put", ids: [].concat(ids) });
   // ---- CPUの発言・投票（4of4。マイクラ版 _cpuCoOnlyMaybeSealResult を参考） ----
-  const SEALED_CLAIM = () => ({ short: "封印されていた", text: "封印されていました。", claim: { kind: "sealed" } });
+  /** 「〇〇に封印されていました。」（2026-11-07: 必ず「誰に」を付ける）。本当に封印されたときは、封印通知(NOTICE_TEXT)と同じ「封印の狂人」。騙りは配役・変化公開にいる封印の役職(by)から選ぶ */
+  const SEALED_CLAIM = (by) => { const id = by || "seal_madman", nm = (ONW.ROLE_INFO[id] || {}).name || (id === "elfrinde" ? "エルフリンデ" : "封印の狂人"); return { short: `${nm}に封印されていた`, text: `${nm}に封印されていました。`, claim: { kind: "sealed", by: id } }; };
   const FAKE_SEALED_RATE = 0.35;   // 封印されていない人外が「封印されていました。」と騙る確率（封印の狂人が配役にいるときだけ）
   /** 封印されたと言えるCO（夜の能力か保安官・盗賊の昼の能力がある役職。封印されると能力が失敗して結果が出ない） */
   const sealTalkable = (co) => !!co && co !== R_() && (ONW.roleIsActive(co) || co === "sheriff" || co === "thief");
@@ -153,7 +154,10 @@
     if (c.result && c.result.claim && c.result.claim.kind === "visited") return false;
     if (!noticeable(g, p.id)) {
       const lying = k.isWolfSide(r) || c.co !== r;
-      if (!lying || !k.roleInSetup(g, R_()) || Math.random() >= FAKE_SEALED_RATE) return false;
+      const sealers = k.sealerRoles ? k.sealerRoles(g) : [];   // 配役・変化公開にいる封印の狂人 / エルフリンデ
+      if (!lying || !sealers.length || Math.random() >= FAKE_SEALED_RATE) return false;
+      c.result = SEALED_CLAIM(k.pick(sealers)); c.extra = null;   // 誰に封印されたかは嘘（いる封印の役職から選ぶ）
+      return true;
     }
     c.result = SEALED_CLAIM(); c.extra = null;
     return true;
@@ -166,7 +170,7 @@
     if (wolfSide || q.id === p.id) return 0;
     const claims = (g.cpuClaims || []).filter((c) => c.from === q.id);
     const co = (g.coBoard && g.coBoard[q.id] && g.coBoard[q.id].co) || null;
-    const pSealed = noticeable(g, p.id), known = k.roleInSetup(g, R_());
+    const pSealed = noticeable(g, p.id), known = k.roleInSetup(g, R_()) || k.roleInSetup(g, "elfrinde");   // エルフリンデがいるときも「封印されていました」は成り立つ
     let s = 0;
     if (co === R_()) s += known ? 2.0 : 3.0;
     claims.forEach((c) => {

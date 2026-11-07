@@ -4,7 +4,7 @@
  * 「ワンナイト人狼ガイド」を「ゲーム画面に重ねて」表示するオーバーレイ。
  * 本家(マイクラ版)の「ワンナイト人狼ガイド」と同じく、ゲーム中でも見られる。
  *
- *   ルーム設定  … 今のルームの設定(人数・タイマー・詳細設定・変化先の有無)。見るだけ
+ *   ルーム設定  … 今のルームの設定(人数・タイマー・役職の詳細設定・システム設定・変化先の有無)。見るだけ
  *   現在の配役  … 今のルームに入っている役職と枚数(本家の「配役役職の説明」と同じ考え方)
  *   全役職      … 全役職の一覧(同梱している wiki/index.html?embed=1 を iframe で表示)
  *   シナジー    … 闇鍋シナジーの一覧(wiki/synergy.html?embed=1 を iframe で表示。ゲーム本体の最新のルールを直接読む)
@@ -25,8 +25,9 @@ window.ONW = window.ONW || {};
   const wikiView = {};
   const WIKI_URL = "wiki/index.html?embed=1";
   const SYNERGY_URL = "wiki/synergy.html?embed=1";
-  const TABS = [["room", "ルーム設定"], ["deck", "現在の配役"], ["all", "全役職"], ["synergy", "全シナジー"]];
-  let root = null, frame = null, frame2 = null, lastFocus = null, tab = null;
+  const RULES_URL = "wiki/rules.html?embed=1";
+  const TABS = [["rules", "ルールまとめ"], ["room", "ルーム設定"], ["deck", "現在の配役"], ["all", "全役職"], ["synergy", "全シナジー"]];
+  let root = null, frame = null, frame2 = null, frame3 = null, lastFocus = null, tab = null;
   const openRoles = new Set();   // 「現在の配役」で説明を開いている役職(再描画しても開いたままにする)
 
   const esc = (s) => ONW.utils.esc(s);
@@ -54,6 +55,15 @@ window.ONW = window.ONW || {};
 
   /** 重複役職の設定表示: 「2人（確率100%）」/ 0なら「なし」 */
   const dupText = (n, unit, chance) => (n > 0 ? `${n}${unit}（${unit === "組" ? "恋人になる" : "酔っ払いになる"}確率 ${chance ?? 100}%）` : "なし");
+  /** ルーム設定タブ: アサイン設定の表示（ONなら、陣営の人数の範囲と、100%でない役職の確率） */
+  function asgLines(g) {
+    const A = ONW.assign, R = A.ranges(g), on = !!g.assignOn;
+    if (!on) return line("アサイン設定", onoff(false));
+    const circ = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+    const ch = ONW.sortByRoleOrder(Object.keys(g.roleCounts || {}).filter((r) => (g.roleCounts[r] || 0) > 0 && Array.from({ length: g.roleCounts[r] }, (_, k) => A.chance(g, r, k)).some((v) => v !== 100)));
+    return line("アサイン設定", onoff(true)) + A.TEAMS.map((t) => line(A.TEAM_NAME[t], `${R[t][0]}〜${R[t][1]}人`)).join("")
+      + ch.map((r) => line(`${esc(info(r).name)}の出る確率`, Array.from({ length: g.roleCounts[r] }, (_, k) => `${circ[k] || k + 1}${A.chance(g, r, k)}%`).join(" "))).join("");
+  }
   function roomHtml() {
     const g = ONW.game, P = ONW.PHASE;
     const cpu = g.cpuCount || 0;
@@ -78,13 +88,15 @@ window.ONW = window.ONW || {};
           const on = !off.includes(`${b}:${r}`);
           return `<span class="gd-chip ${on ? "gd-chip--on" : "gd-chip--off"}">${esc(info(r).name)} ${on ? "ON" : "OFF"}</span>`;
         }).join("")}</div></div>`).join("");
-    const seerMax = g.seerGraveCount ?? 2;
+    const seerMax = g.seerGraveCount ?? 2, fakeSeerMax = g.fakeSeerGraveCount ?? seerMax, madSeerMax = g.madSeerGraveCount ?? seerMax;
     return `
       <p class="gd-note">${g.phase === P.LOBBY ? "設定の変更はホストが、ロビーの「ルーム設定」から行います。" : "試合中は設定を変更できません(確認のみ)。"}</p>
       ${sec("人数設定", line("参加人数", `${total}人${cpu ? `（CPU ${cpu}人を含む）` : ""}`) + line("墓地の枚数", `${g.graveCount ?? 0}枚`) + line("CPU人数", `${cpu}人`))}
       ${sec("タイマー設定", line("役職配布(演出のあとの待ち)", `${t.deal ?? 5}秒`) + line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("待機時間", `${t.settle ?? 5}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
       ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", g.drunkChance)) + line("恋人", dupText(g.loverCount, "組", g.loverChance)))}
-      ${sec("詳細設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("変化公開", onoff(g.revealTransforms)) + line("手動配役を変化公開に表示", onoff(g.revealManualRoles)) + line("デバッグモード", onoff(g.debugOn)))}
+      ${sec("役職設定（アサイン設定）", asgLines(g))}
+      ${sec("役職設定（詳細設定）", line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("偽占い師が占える墓地の枚数", `${fakeSeerMax}枚`) + line("狂った占い師が占える墓地の枚数", `${madSeerMax}枚`) + line("メイヤーの投票数", `${g.mayorVoteCount ?? 2}票`) + line("狂ったメイヤーの投票数", `${g.madMayorVoteCount ?? 2}票`) + line("煙幕: 能力対象のプレイヤー名を隠す", onoff(g.smokeHideAbility === true)) + line("煙幕: 投票対象のプレイヤー名を隠す", onoff(g.smokeHideVote === true)))}
+      ${sec("システム設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("変化公開", onoff(g.revealTransforms)) + line("手動配役を変化公開に表示", onoff(g.revealManualRoles)) + line("勝利の乗っ取り演出", onoff(g.winLadderFx !== false)) + line("デバッグモード", onoff(g.debugOn)))}
       ${sec("変化先の有無", tf)}`;
   }
 
@@ -95,15 +107,17 @@ window.ONW = window.ONW || {};
   //   ・変化公開OFFなら、光の使徒・闇の化身・銀色の影がいるとき「変化候補」も並べる
   // ---------------------------------------------------------
   const ORDER = {
-    village: ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]),
-    wolf: ONW.sortByRoleOrder(["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman"]),
-    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer"]),
+    village: ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet"]),
+    wolf: ONW.sortByRoleOrder(["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]),
+    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher"]),
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
   function deckCounts() {
     const g = ONW.game; let counts = {};
-    Object.entries(g.roleCounts || {}).forEach(([r, n]) => { if (n > 0) counts[r] = n; });
+    // アサイン設定ON: ロビーでは「候補」（配役設定の枚数）、試合中は抽選後の枚数（候補全部を出すと、欠けた役職が分かってしまう）
+    const inGame = g.phase !== ONW.PHASE.LOBBY, src = (inGame && (g.deckCnt || (g.specInfo && g.specInfo.dcnt))) || g.roleCounts || {};
+    Object.entries(src).forEach(([r, n]) => { if (n > 0) counts[r] = n; });
     // 手動配役を変化公開に表示(マイクラ版 roleCountsForPreGameDisplay): 変化役でない役職は、陣営の変化役にまとめて数える。昼の開始後は変化公開の組(tfPairs)で本当の役職に数え直す
     if (g.revealTransforms && g.revealManualRoles) {
       const BASE = { village: "light_apostle", wolf: "dark_avatar", third: "silver_shadow" }, folded = {};
@@ -195,8 +209,8 @@ window.ONW = window.ONW || {};
     const dupBlock = () => (counts.drunk > 0 || counts.lover > 0) ? `<section class="gd-team t-dup"><h3 class="gd-h">重複役職</h3>
         ${counts.drunk > 0 ? rowOf("drunk", `<span class="gd-n">×${counts.drunk}人</span><span class="gd-n gd-n--cand">確率${g.drunkChance ?? 100}%</span>`) : ""}${counts.lover > 0 ? rowOf("lover", `<span class="gd-n">×${counts.lover}組</span><span class="gd-n gd-n--cand">確率${g.loverChance ?? 100}%</span>`) : ""}</section>` : "";
     return `
-      <p class="gd-summary">現在の配役設定 <b>${Math.max(0, totalRoles - grave)}人村 / 墓地${grave}枚 / 役職${totalRoles}枚</b></p>
-      <p class="gd-note">現在の配役に含まれる役職です。役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? (g.revealManualRoles ? "手動配役を変化公開に表示する設定がONなので、各役職は変化役にまとめて表示しています。本当の役職は昼の開始時に反映されます。" : "変化公開がONなので、変化後の役職は昼の開始時に反映されます。") : ""}</p>
+      <p class="gd-summary">${g.assignOn && g.phase === ONW.PHASE.LOBBY ? `アサイン設定ON <b>候補${totalRoles}枚 → ${Math.max(0, (g.villageSize || 0))}人村 / 墓地${grave}枚の${Math.max(0, (g.villageSize || 0)) + grave}枚を抽選</b>` : `現在の配役設定 <b>${Math.max(0, totalRoles - grave)}人村 / 墓地${grave}枚 / 役職${totalRoles}枚</b>`}</p>
+      <p class="gd-note">${g.assignOn && g.phase === ONW.PHASE.LOBBY ? "アサイン設定がONなので、ここに出ているのは配役の「候補」です（ゲーム開始のときに抽選され、選ばれなかった役職は結果で「欠け」になります）。" : "現在の配役に含まれる役職です。"}役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? (g.revealManualRoles ? "手動配役を変化公開に表示する設定がONなので、各役職は変化役にまとめて表示しています。本当の役職は昼の開始時に反映されます。" : "変化公開がONなので、変化後の役職は昼の開始時に反映されます。") : ""}</p>
       ${["village", "wolf", "third"].map(teamBlock).join("")}${dupBlock()}${synergyHtml(baseCounts)}`;
   }
 
@@ -215,10 +229,14 @@ window.ONW = window.ONW || {};
           <span class="wikiv__title">📖 ワンナイト人狼ガイド</span>
           <button class="wikiv__close" type="button" aria-label="閉じる" title="閉じる">✕</button>
         </div>
+        <div class="wikiv__tabs wikiv__tabs--top" role="tablist">
+          ${TABS.filter(([k]) => k === "rules").map(([k, l]) => `<button class="wikiv__tab" type="button" role="tab" data-tab="${k}">${l}</button>`).join("")}
+        </div>
         <div class="wikiv__tabs" role="tablist">
-          ${TABS.map(([k, l]) => `<button class="wikiv__tab" type="button" role="tab" data-tab="${k}">${l}</button>`).join("")}
+          ${TABS.filter(([k]) => k !== "rules").map(([k, l]) => `<button class="wikiv__tab" type="button" role="tab" data-tab="${k}">${l}</button>`).join("")}
         </div>
         <div class="wikiv__body">
+          <iframe class="wikiv__frame" data-pane="rules" title="ルールまとめ"></iframe>
           <div class="wikiv__pane" data-pane="room"></div>
           <div class="wikiv__pane" data-pane="deck"></div>
           <iframe class="wikiv__frame" data-pane="all" title="全役職"></iframe>
@@ -228,6 +246,7 @@ window.ONW = window.ONW || {};
     document.body.appendChild(root);
     frame = root.querySelector('.wikiv__frame[data-pane="all"]');
     frame2 = root.querySelector('.wikiv__frame[data-pane="synergy"]');
+    frame3 = root.querySelector('.wikiv__frame[data-pane="rules"]');
 
     root.querySelector(".wikiv__close").addEventListener("click", wikiView.close);
     root.querySelectorAll(".wikiv__tab").forEach((b) => b.addEventListener("click", () => wikiView.setTab(b.getAttribute("data-tab"))));
@@ -240,7 +259,7 @@ window.ONW = window.ONW || {};
     // Esc(ゲーム側にフォーカスがある時 / iframe 内で押された時の通知)
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && wikiView.isOpen()) wikiView.close(); });
     window.addEventListener("message", (e) => {
-      if (((frame && e.source === frame.contentWindow) || (frame2 && e.source === frame2.contentWindow)) && e.data && e.data.onwWiki === "close") wikiView.close();
+      if (((frame && e.source === frame.contentWindow) || (frame2 && e.source === frame2.contentWindow) || (frame3 && e.source === frame3.contentWindow)) && e.data && e.data.onwWiki === "close") wikiView.close();
     });
   }
 
@@ -252,6 +271,10 @@ window.ONW = window.ONW || {};
       b.setAttribute("aria-selected", on ? "true" : "false");
     });
     root.querySelectorAll("[data-pane]").forEach((p) => p.classList.toggle("on", p.getAttribute("data-pane") === tab));
+    if (tab === "rules") {
+      if (!frame3.getAttribute("src")) frame3.setAttribute("src", RULES_URL);   // 初回だけ読み込む
+      return;
+    }
     if (tab === "all") {
       if (!frame.getAttribute("src")) frame.setAttribute("src", WIKI_URL);   // 初回だけ読み込む
       return;
@@ -282,7 +305,7 @@ window.ONW = window.ONW || {};
     if (!root) build();
     if (t && TABS.some(([k]) => k === t)) tab = t;
     else if (!tab) tab = inRoom() ? "deck" : "all";
-    if (!inRoom() && tab !== "all" && tab !== "synergy") tab = "all";   // ルームの外では「全役職」「全シナジー」から
+    if (!inRoom() && tab !== "all" && tab !== "synergy" && tab !== "rules") tab = "all";   // ルームの外では「ルールまとめ」「全役職」「全シナジー」から
     paint();
     lastFocus = document.activeElement;
     root.classList.add("open");

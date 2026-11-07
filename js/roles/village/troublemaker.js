@@ -10,15 +10,22 @@
     let pair = (f.players || []).filter((id, k, arr) => n.validPlayer(p, id) && arr.indexOf(id) === k).slice(0, 2);
     if (pair.length < 2) pair = [...pair, ...ONW.utils.shuffle(others.filter((q) => !pair.includes(q.id))).slice(0, 2 - pair.length).map((q) => q.id)];
     const [a, b] = pair.map((id) => g.players.find((q) => q.id === id));
-    const why = ONW.keymaster.gate(g, p.id, [a.id, b.id]);   // 鍵師のロック: 自分か選んだどちらかの席がロック中なら🔒に弾かれて失敗（入れ替えはキューに積まない）
+    const sp = ONW.watcher.shiftPair(g, p.id, a.id, b.id);   // 静観者を選んだら、実際に入れ替える席は別の人（選んだ本人には静観者を選んだように見える。docs/watcher.md）
+    if (!sp.ok) {   // 入れ替える相手が足りなければ入れ替わらない（静観者を選んだことは「能力を使われた」に数える）
+      i.mode = "tm"; i.keyFail = { kind: "shift", pair: [a.id, b.id] };
+      n.hold(p.id, ONW.watcher.noneLine("入れ替え"));
+      return;
+    }
+    const why = ONW.keymaster.gate(g, p.id, [sp.a, sp.b]);   // 鍵師のロック: 自分か選んだどちらかの席がロック中なら🔒に弾かれて失敗（入れ替えはキューに積まない）
     if (why) {
       i.mode = "tm"; i.keyFail = { kind: why, pair: [a.id, b.id] };
       n.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a.id, b.id], `${label} ${p.name}`, true));
+      ONW.watcher.keyFailShown(g, p.id, [a.id, b.id], [sp.a, sp.b]);
       return;
     }
-    g.tmQueue.push({ id: p.id, a: a.id, b: b.id });     // 反映は夜の終わり（net.js）
+    g.tmQueue.push({ id: p.id, a: sp.a, b: sp.b });     // 反映は夜の終わり（net.js）
     i.mode = "tm"; i.pair = [a.id, b.id];
-    g.nightLogsAll.push(`${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);
+    g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${label} ${p.name}`, (id) => (g.players.find((q) => q.id === id) || {}).name || "?", a.id, b.id, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);   // 静観者にずれたときは「〇〇と△△の役職を入れ替えようとしましたが、〇〇は静観者だったため□□に変わり、…を入れ替えました。」
     n.hold(p.id, `${a.name} と ${b.name} の役職を入れ替えました。`);
     n.ob(p.id, [a.id, b.id]);
     n.nn(rid);
@@ -36,7 +43,9 @@
     c.co = "troublemaker";
     if (i.keyFail) {   // ロックされて入れ替えに失敗した: 正直に「失敗した」と言う
       const [x, y] = (i.keyFail.pair || []).map((id) => nameOf(g, id));
-      c.result = i.keyFail.kind === "self"
+      c.result = i.keyFail.kind === "shift"
+        ? { short: `${x} ⇄ ${y} 変化なし`, text: `${x} と ${y} を選びましたが、入れ替える相手が足りず役職は変化しませんでした。`, claim: null }
+        : i.keyFail.kind === "self"
         ? { short: "ロックで失敗", text: "自身の役職がロックされていたため入れ替えに失敗しました。", claim: null }
         : { short: `${x} ⇄ ${y} ロックで失敗`, text: `${x} と ${y} を選びましたが、どちらかの役職がロックされていたため入れ替えできませんでした。`, claim: null };
       return;
@@ -97,13 +106,15 @@
       normalize: (c, players) => ({ players: players.slice(0, 2), graves: [] }),
       resolve(c, p) {
         const g = c.g, rn = c.rn, nameOf = c.nameOf;
-        const [a, b] = c.selOf(p).players; if (!a || !b) return;
-        const why = ONW.keymaster.gate(g, p.id, [a, b]);   // 鍵師のロック（先の段階で済んでいる）: 自分かどちらかの席がロック中なら失敗。入れ替えず、新聞・観測にも載らない
-        if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a, b], `${rn(c.eff(p))} ${p.name}`, true)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
-        g.tmQueue.push({ id: p.id, a, b });
+        const [a, b] = c.selOf(p).players; if (!a || !b) return;   // a, b = 選んだ2人（文章・演出・ログはこの2人で出す）
+        const sp = ONW.watcher.shiftPair(g, p.id, a, b);   // 静観者を選んだら、実際に入れ替える席は別の人（選んだ本人には静観者を選んだように見える。docs/watcher.md）
+        if (!sp.ok) { c.hold(p.id, ONW.watcher.noneLine("入れ替え")); return; }   // 入れ替える相手が足りなければ入れ替わらない（新聞・観測にも載らない）
+        const why = ONW.keymaster.gate(g, p.id, [sp.a, sp.b]);   // 鍵師のロック（先の段階で済んでいる）: 自分かどちらかの席がロック中なら失敗。入れ替えず、新聞・観測にも載らない
+        if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a, b], `${rn(c.eff(p))} ${p.name}`, true)); ONW.watcher.keyFailShown(g, p.id, [a, b], [sp.a, sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
+        g.tmQueue.push({ id: p.id, a: sp.a, b: sp.b });
         ONW.observeNote(g, p.id, [a, b], null, "troublemaker");
         ONW.newsNote(g, "troublemaker");
-        g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
+        g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${rn(c.eff(p))} ${p.name}`, nameOf, a, b, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${rn(c.eff(p))} ${p.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         c.hold(p.id, `${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         c.rev[p.id] = { kind: "tm", a, b };
       },
@@ -112,11 +123,13 @@
       run(c) {
         if (c.players.length < 2) return null;
         const g = c.g, id = c.id, nameOf = c.nameOf;
-        const [a, b] = c.players;
-        const why = ONW.keymaster.gate(g, id, [a, b]);   // 朝のうち・酔い覚めの入れ替えにもロックは効く
-        if (why) return { lines: [ONW.keymaster.fail(g, id, why, "入れ替え", [a, b], `${c.label} ${c.me.name}`, true)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };
-        ONW.swapPlayers(g, a, b);
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
+        const [a, b] = c.players;   // a, b = 選んだ2人（文章・演出はこの2人）
+        const sp = ONW.watcher.shiftPair(g, id, a, b);   // 静観者を選んだら、実際に入れ替える席は別の人（墓荒らし・ドッペル・酔い覚め経由でも同じ）
+        if (!sp.ok) return { lines: [ONW.watcher.noneLine("入れ替え")], reveal: null, nextChain: null, failed: true };
+        const why = ONW.keymaster.gate(g, id, [sp.a, sp.b]);   // 朝のうち・酔い覚めの入れ替えにもロックは効く
+        if (why) { const fl = ONW.keymaster.fail(g, id, why, "入れ替え", [a, b], `${c.label} ${c.me.name}`, true); ONW.watcher.keyFailShown(g, id, [a, b], [sp.a, sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
+        ONW.swapPlayers(g, sp.a, sp.b);
+        g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${c.label} ${c.me.name}`, nameOf, a, b, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${c.label} ${c.me.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         return { lines: [`${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`], reveal: { kind: "tm", a, b }, nextChain: null };
       },
     },

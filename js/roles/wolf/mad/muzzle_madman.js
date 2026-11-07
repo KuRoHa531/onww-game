@@ -24,6 +24,7 @@
       const f = ONW.debug && ONW.debug.randTarget ? ONW.debug.randTarget(g, "muzzle", id) : null;   // デバッグ: 口封じ先の指定（自分自身も可。いなければランダムに戻す）
       const t = f && g.players.some((q) => q.id === f) ? f : g.players[Math.floor(Math.random() * g.players.length)].id;
       g.muzzleTargets[id] = t;
+      if (ONW.watcher) ONW.watcher.touch(g, id, [t]);   // 静観者: 口封じの対象に決まったら「能力を使われた」（マイクラ版 assignMuzzleTarget）
       return t;
     },
     /** 最終盤面で口封じの狂人になっている人(酔いが覚めている)のうち、対象が決まっていない人に対象を決める。新しく決まった [{ from, to }] を返す */

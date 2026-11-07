@@ -11,7 +11,8 @@ window.ONW = window.ONW || {};
   const rc = (r) => `<span class="t-${ONW.roles.getInfo(r).team}">${esc(rn(r))}</span>`;   // 役職名は陣営の色（村人=緑 / 人狼=赤 / 第三=薄い灰色。COのラベルと同じ t-<陣営>）
   const pn = (n) => `<span class="rs-pl">${esc(n)}</span>`;   // プレイヤー名はオレンジ（夜行動結果などの画面と同じ rs-pl）
   const nameOf = (id) => (id && id === ONW.net.myId() ? "自分" : ((G().others || []).find((p) => p.id === id) || {}).name || "?");   // 自分を選べる結果開示（シャッフラー）では「自分」
-  const graveNeed = () => ONW.seerGraveMax(G());
+  const seerLike = (r) => r === "seer" || r === "fake_seer" || r === "mad_seer";
+  const graveNeed = () => { const g = G(); return ONW.seerGraveMax(g, seerLike(g.myRole) ? g.myRole : seerLike(g.myCo) ? g.myCo : "seer"); };   // 結果開示で言う墓地の枚数: 自分の役職（占い師・偽・狂は別の設定）
 
   // 役職COのあとに結果開示が必要な役職 → 結果開示の種類。各役職ファイルの coResult.kind(狂った占い師は like で占い師と同じ形)
   const coOf = (role) => { const d = ONW.roleDef(role); return d && d.coResult ? d.coResult : null; };
@@ -62,7 +63,7 @@ window.ONW = window.ONW || {};
     if (!role || role === "hide") return null;
     const c = coOf(role);
     if (!c || c.noChain) return null;
-    if (c.kind === "relic") return via === "doppel" ? c.kind : null;
+    if (c.kind === "relic") return via === "doppel" || via === "cosplay" ? c.kind : null;   // コスプレイヤーが墓荒らしにコスプレしたときも、墓地の交換結果 → 手にした役職の結果へ続く
     if (c.kind === "doppel") return via === "relic" ? c.kind : null;
     return ONW.cpu && ONW.cpu.hasChainResult && ONW.cpu.hasChainResult(role) ? c.kind : null;
   };
@@ -75,6 +76,7 @@ window.ONW = window.ONW || {};
   /** 結果開示の最初の画面（種類ごと）。seer/robber: 相手を選ぶ / relic: 墓地を選ぶ / tm: 2人選ぶ / insom: 最終役職を選ぶ */
   function startResult(kind, chain) {
     if (kind === "relic") return set({ step: "rgrave", kind, chain });
+    if (kind === "cosplay") return set({ step: "crole", kind, chain });   // コスプレイヤー: コスプレした役職を選ぶ（山札の役職 / コスプレしなかった / ロックで失敗）
     if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid") return set({ step: "tm", kind, chain, sel: [] });
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
@@ -101,6 +103,9 @@ co.poetPick = function (id) {
   co.relicRole = function (role) {
     doneChain(hookOfKind("relic").relicRole(role, G().co, K), role, "relic");   // 墓荒らし → 手にした役職の結果（占い師なら占い結果 など）
   };
+  // コスプレイヤーの結果開示: 山札から3枚めくってコスプレした役職を選ぶ → コスプレ先に結果開示があれば続ける（コスプレ→占い師→占い結果、コスプレ→墓荒らし→墓地の交換結果）。「コスプレしなかった」・ロックで失敗・伏せるも言える（CPUの発言と同じ文言）
+  co.cosRole = function (role) { doneChain(hookOfKind("cosplay").cosRole(role, K), role, "cosplay"); };
+  co.cosNone = () => { const h = hookOfKind("cosplay"); done(h.noneText, null, null, "disclose", "コスプレなし"); };
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
@@ -176,7 +181,7 @@ co.poetPick = function (id) {
   co.lockPlain = () => done("役職がロックされていて、能力に失敗しました。", null, null, "disclose", "ロックされて失敗");
   co.lockFailed = function () {
     const s = G().co || {}, kind = s.kind;
-    if (kind === "relic") return co.lockPlain();   // 墓地を選ぶだけで、ロックされるのは自分の役職だけ
+    if (kind === "relic" || kind === "cosplay") return co.lockPlain();   // 墓地・山札のカードを選ぶだけで、ロックされるのは自分の役職だけ
     if (kind === "tm" || kind === "gremlin") return set({ step: "lock2", kind, chain: s.chain, sel: [] });
     set({ step: "lock1", kind, chain: s.chain });
   };
@@ -194,7 +199,7 @@ co.poetPick = function (id) {
     done(`${a} と ${b} を選びましたが、どちらかの役職がロックされていたため${v}できませんでした。`, null, null, "disclose", `${a} ⇄ ${b} ロックで失敗`);
   };
   // 封印の狂人に封印されていたことを伝える（情報開示。封印された人のCO）。封印の狂人のCOは役職CO → 結果開示（封印した相手）
-  co.sealedInfo = () => done("封印されていました。", { kind: "sealed" }, null, "disclose", "封印されていた");   // 4of4: claim を付けて、CPUの投票判断が真偽を見られるようにする
+  co.sealedInfo = () => done("封印の狂人に封印されていました。", { kind: "sealed", by: "seal_madman" }, null, "disclose", "封印の狂人に封印されていた");   // 2026-11-07: 必ず「封印の狂人に」を付ける（封印通知と同じ）   // 4of4: claim を付けて、CPUの投票判断が真偽を見られるようにする
   co.pickChanged = (i) => { const x = CHANGED_LINES[i]; if (x) done(x[1], null, null, "disclose", x[2]); };
 
   // 情報開示のページは、戻るボタンを上（見出しの横）に置く。下まで押し下げてスクロールしなくても戻れる
@@ -202,7 +207,7 @@ co.poetPick = function (id) {
   const infoBackFn = (step) => ({ back: "ONW.co.back()", info: "ONW.co.info()", freeterInfo: "ONW.co.freeterInfo()" }[INFO_BACK[step]]);
 
   // ---- 描画 ----
-  const LOCKABLE = ["robber", "relic", "tm", "doppel", "shuffler", "gremlin", "eraser"];   // 鍵師のロックで能力が弾かれることがある役職（結果開示の最初の画面に「ロックされて失敗」を出す）
+  const LOCKABLE = ["robber", "relic", "cosplay", "tm", "doppel", "shuffler", "gremlin", "eraser"];   // 鍵師のロックで能力が弾かれることがある役職（結果開示の最初の画面に「ロックされて失敗」を出す）
   const lockBtn = (kind) => (LOCKABLE.includes(kind) ? btn("ロックされて失敗", "ONW.co.lockFailed()") : "");
   const btn = (label, fn) => `<button class="btn co-btn" onclick="${fn}">${label}</button>`;
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
@@ -210,6 +215,27 @@ co.poetPick = function (id) {
   const teamRank = (r) => { const t = (ONW.roles.getInfo(r) || {}).team; return t in TEAM_ORDER ? TEAM_ORDER[t] : 3; };
   const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin").map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || ONW.roleRank(a.x.r) - ONW.roleRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）
   const roleBtns = (fn, extra = "", skip = []) => deckList().filter((x) => !skip.includes(x.r)).map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.${fn}('${x.r}')`)).join("") + extra;
+
+  /** COパネルの高さを、ボタンの上の「見える範囲」に収める（2026-11-07）。
+   *  パネルはボタンの上に重ねて上へ伸びる（#co-panel は bottom:100%）。役職の一覧が長い（コスプレイヤーの結果開示など）と、
+   *  画面の上・ヘッダー・overflow:hidden の外へはみ出して、上の役職が見切れて押せなかった。
+   *  上へ伸びられる高さ（ボタンの上端 − はみ出しを切る親の上端）に max-height を合わせ、中だけスクロールさせる。 */
+  function fitPanel() {
+    const host = document.getElementById("co-panel"), panel = host && host.querySelector(".co-panel");
+    if (!panel) return;
+    panel.style.maxHeight = "";
+    const dock = host.parentElement; if (!dock) return;
+    let top = 0;   // 見える範囲の上端（画面の上。親に overflow を切るものがあれば、その上端）
+    for (let n = dock.parentElement; n && n !== document.documentElement; n = n.parentElement) {
+      const o = getComputedStyle(n);
+      if (/(hidden|auto|scroll|clip)/.test(o.overflowY)) { top = Math.max(top, n.getBoundingClientRect().top); }
+    }
+    const hd = document.querySelector(".onw-header"); if (hd) top = Math.max(top, hd.getBoundingClientRect().bottom);   // ヘッダーの下まで
+    const room = Math.floor(dock.getBoundingClientRect().top - top - 8);
+    if (room > 120 && panel.getBoundingClientRect().height > room) panel.style.maxHeight = room + "px";
+    else if (room <= 120 && room > 0) panel.style.maxHeight = Math.max(room, 80) + "px";
+  }
+  window.addEventListener("resize", () => { try { fitPanel(); } catch (e) { /* 画面の大きさが変わったとき、開いているパネルだけ合わせ直す */ } });
 
   co.render = function () {
     const el = document.getElementById("co-panel");
@@ -245,6 +271,10 @@ co.poetPick = function (id) {
     } else if (s.step === "rrole") {
       title = "結果開示";
       body = `<p class="night-step__hint">墓地${s.idx + 1} と交換して、新しくなった役職を選んでください。</p>` + roleBtns("relicRole", btn("伏せる", "ONW.co.relicRole('hide')")) + back;
+    } else if (s.step === "crole") {
+      title = "結果開示";
+      const hc = hookOfKind("cosplay") || {};
+      body = `<p class="night-step__hint">山札から3枚めくって、コスプレした役職を選んでください。</p>` + (hc.roleList ? hc.roleList().map((r) => btn(rc(r), `ONW.co.cosRole('${r}')`)).join("") : "") + btn("コスプレしなかった", "ONW.co.cosNone()") + lockBtn(s.kind) + btn("伏せる", "ONW.co.cosRole('hide')") + back;   // 一覧は配役ではなく山札(ELIGIBLE)の役職
     } else if (s.step === "tm") {
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).twoHint || "入れ替えた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
@@ -312,6 +342,7 @@ co.poetPick = function (id) {
     const isInfo = !!INFO_BACK[s.step];
     const backBtn = isInfo ? `<button class="co-back" type="button" onclick="${infoBackFn(s.step)}">← 戻る</button>` : "";
     el.innerHTML = `<div class="co-panel"><div class="co-title">${backBtn}<span class="co-title__t">${title}</span><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.co.close()">✕</button></div><div class="co-grid${isInfo ? " co-grid--2" : ""}">${body}</div></div>`;
+    try { fitPanel(); } catch (e) { /* 高さ合わせに失敗してもパネルは出す */ }
   };
 
   ONW.co = co;

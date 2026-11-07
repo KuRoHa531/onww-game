@@ -183,6 +183,7 @@ window.ONW = window.ONW || {};
   }
   function pickable(k, m, g) {
     if (!m) return false;
+    if (k.startsWith("c:")) return (m.type === "night" || m.type === "morning") && m.role === "cosplayer";   // コスプレイヤー: 山札から出た3枚だけ押せる
     const me = ONW.net.myId(), isP = k.startsWith("p:");
     if (m.type === "straw") return isP && g.strawPick.some((c) => c.id === k.slice(2));   // 選べるのは、まだめくれていない人だけ
     if (m.type === "predict") return isP;   // 予想屋: 死亡した人も含めて誰でも選べる（自分も。2of4-b）
@@ -310,7 +311,60 @@ window.ONW = window.ONW || {};
     box.classList.toggle("dn-a", t === "a" || t === "both"); box.classList.toggle("dn-b", t === "b" || t === "both");
   }
 
+
+  // ---------------------------------------------------------
+  // コスプレイヤー: 山札から出た3枚をテーブルの中央（山札・墓地の下）に並べる。夜・朝の連鎖・昼能力（酔い覚め）で、押して選ぶ（c:0〜c:2）。
+  //   朝の演出（cosplayer.js の stageMorning）: 選ばなかった2枚が裏返って山札へ戻り、選んだカードが自分の席へ飛んで置かれる。
+  // ---------------------------------------------------------
+  let cosKeep = false;   // 朝の演出中は、押せる状態でなくても3枚を残す
+  function cosWant(g) {
+    if (g.isSpectator || g.isDead || hostWatching(g) || !Array.isArray(g.cosplayCards) || !g.cosplayCards.length) return null;
+    const P = ONW.PHASE;
+    if (g.phase === P.ONLINE_NIGHT && !g.nightDone && g.actRole === "cosplayer") return g.cosplayCards;
+    if (((g.phase === P.ONLINE_MORNING && !g.settling) || (g.phase === P.ONLINE_DAY && g.abilityOpen)) && g.morningChain === "cosplayer" && g.morningChainReady && !g.morningChainDone) return g.cosplayCards;
+    return null;
+  }
+  function cosClear() {
+    const el = $t(), row = el && el.querySelector(".tb-cosplay");
+    if (row) row.remove();
+    [0, 1, 2].forEach((i) => { delete up[`c:${i}`]; delete glow[`c:${i}`]; });
+  }
+  /** 3枚の席を作る（すでに同じ並びがあれば何もしない）。faceUp: すぐ表にする（朝の演出） / しない: 山札から飛び出してめくれる */
+  function cosEnsure(cards, faceUp) {
+    const el = $t(), tbl = el && el.querySelector(".tb-table"), center = tbl && tbl.querySelector(".tb-center");
+    if (!center) return null;
+    let row = tbl.querySelector(".tb-cosplay");
+    const sig = cards.join(",");
+    if (row && row.dataset.s === sig) { if (faceUp) cards.forEach((r, i) => { up[`c:${i}`] = r; }); return row; }
+    if (row) row.remove();
+    row = document.createElement("div");
+    row.className = "tb-row tb-cosplay"; row.dataset.s = sig;
+    row.innerHTML = cards.map((r, i) => seatHtml(`c:${i}`, "&nbsp;", "tb-cos")).join("");
+    center.insertAdjacentElement("afterend", row);
+    const pile = center.querySelector(".tb-pile .tb-card");
+    cards.forEach((r, i) => {
+      const k = `c:${i}`;
+      if (faceUp) { up[k] = r; return; }
+      const card = row.querySelector(`[data-k="${k}"] .tb-card`);
+      if (pile && card && card.animate) {   // 山札のいちばん上から1枚ずつ出てくる
+        const a = pile.getBoundingClientRect(), b = card.getBoundingClientRect();
+        card.animate([{ transform: `translate(${a.left - b.left}px,${a.top - b.top}px) scale(.8)`, opacity: 0.2 }, { transform: "translate(0,0) scale(1)", opacity: 1 }], { duration: 520, delay: i * 200, easing: "ease-out", fill: "backwards" });
+      }
+      later(() => { if (!row.isConnected) return; up[k] = r; paint(G()); }, 560 + i * 200);   // 出てきたあと、めくれて役職が見える
+    });
+    return row;
+  }
+  function cosRow(g) {
+    const want = cosWant(g);
+    const hold = g.phase === ONW.PHASE.ONLINE_MORNING && g.morningReveal && g.morningReveal.kind === "cosplay" && g.cosAnim !== "done";   // 朝の演出が始まるまで（めくれた3枚をそのまま残す）
+    if (!want && !cosKeep && !hold) { cosClear(); return; }
+    if (want) cosEnsure(want, false);
+    else if (g.morningReveal && g.morningReveal.cards) cosEnsure(g.morningReveal.cards, true);
+  }
+  stage.cosplay = { ensure: cosEnsure, clear: cosClear, keep(v) { cosKeep = !!v; } };
+
   function paint(g) {
+    cosRow(g);   // コスプレイヤーの3枚（あれば）を先に作る
     const el = $t(), m = mode(g), me = ONW.net.myId();
     const hideOthers = !!(g.strawPick && (g.strawKind === "assassin" || g.strawKind === "bounty"));   // アサシン・賞金稼ぎが選んでいる間は、他のめくれたカードを見せない
     const hideAll = !hideOthers && !!g.strawWait && !!g.strawHide;   // アサシンか賞金稼ぎが現世にいる試合では、選択待ちの間、選んでいない人の画面も、めくれたカードは全員同じ「？」（誰が死んだか・マーリンかどうかを見せない）
@@ -338,7 +392,7 @@ window.ONW = window.ONW || {};
         f.innerHTML = faceHtml(role, k);
         f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK || role === CUPID_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === FOX_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : ONW.roles.getInfo(role).team}`;
       }
-      const sel = (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning" || m.type === "dictate" || m.type === "shoot" || m.type === "steal" || m.type === "rejob" || m.type === "mind" || m.type === "exchange" || m.type === "libra" || m.type === "predict") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
+      const sel = (k.startsWith("c:") && !!m && (m.type === "night" || m.type === "morning") && !!g.nightSel && g.nightSel.pick === +k.slice(2)) || (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning" || m.type === "dictate" || m.type === "shoot" || m.type === "steal" || m.type === "rejob" || m.type === "mind" || m.type === "exchange" || m.type === "libra" || m.type === "predict") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
       { // 反転者: 反転された人のカードは裏面のまま180度回転（自分の席は待機時間から / 結果発表では、めくれるときに回った状態で公開）。反転N回なら 180×N 度（docs/reverser.md）
         const isMe = isP && k.slice(2) === me && !g.isSpectator;
@@ -446,8 +500,10 @@ window.ONW = window.ONW || {};
   stage.sync = function (g) {
     const el = $t();
     if (!el) return;
+    smokeSync(g, false);
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
+      smkN.group = null; smkN.perm = null; smkN.sig = "";
       if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
@@ -455,6 +511,7 @@ window.ONW = window.ONW || {};
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
     if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
+    smkNamesSync(g);   // 煙幕の名前隠し: 名前が ？？？ になる・席の並びがシャッフルされる（詳細設定がONのときだけ）
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
     if ((g.isSpectator || hostWatching(g)) && g.specInfo && g.phase !== ONW.PHASE.ONLINE_RESULT) specSync(g);
     // 保安官に撃たれた席: カードに銃痕とひび（結果発表でめくれたあとも残る）。撃たれた瞬間に見ていた画面だけ演出つき（最初の同期＝再入室・観戦の途中参加は演出なし）
@@ -567,6 +624,12 @@ window.ONW = window.ONW || {};
     const m = mode(g);
     if (!pickable(k, m, g)) return;
     const id = k.slice(2);
+    if (k.startsWith("c:")) {   // コスプレイヤー: 山札から出た3枚から1枚選ぶ（同じカードをもう一度押すと解除。夜は朝まで何度でも選び直せる）
+      const sel = g.nightSel = g.nightSel || { players: [], graves: [] };
+      sel.pick = sel.pick === +id ? null : +id; sel.players = []; sel.graves = [];
+      if (m.type === "night") ONW.net.setSel(sel);
+      ONW.ui.render(g); return;
+    }
     if (m.type === "straw") { ONW.net.strawPick(id); ONW.stage.sync(g); ONW.ui.render(g); return; }
     if (m.type === "exchange" || m.type === "libra") {   // 交換者・天秤: 押したカードを2人まで選ぶ（もう一度押すと解除。3人目を押すと古い方が外れる）。確定は画面の「交換する」ボタン（ui.exchConfirm）
       const sel = g.nightSel = g.nightSel || { players: [], graves: [] };
@@ -597,7 +660,7 @@ window.ONW = window.ONW || {};
         toggle(sel.players, id, max);
         if (pk && pk.exclusive) sel.graves = [];     // 墓地とプレイヤーは同時に占えない(占い師・狂った占い師)
       } else {
-        const max = pk && pk.graveMax ? pk.graveMax(g) : 1;
+        const max = pk && pk.graveMax ? pk.graveMax(g, m.role) : 1;
         if (max <= 0) return;
         toggle(sel.graves, +id, max);
         sel.players = [];
@@ -709,6 +772,7 @@ window.ONW = window.ONW || {};
     get mindKeys() { return mindKeys; }, get senseKeys() { return senseKeys; }, senseMark: (key) => SENSE_PRE + key, get starKeys() { return starKeys; }, get queenKeys() { return queenKeys; }, get flashKeys() { return flashKeys; }, get queenFlashKeys() { return queenFlashKeys; }, get kingKeys() { return kingKeys; }, get kingFlashKeys() { return kingFlashKeys; },
     WOLF_MARK, FOX_MARK, FOXX_MARK, FOXSEE_MARK, deadMark, DUO_MARK, MASTER_MARK, BONE_MARK, TARGET_MARK, AVENGER_MARK, MUTE_MARK, LOVE_MARK, CUPID_MARK, BREAK_MARK, KEEP_MARK, KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK, BLANK_MARK, BLANKX_MARK, SEAL_MARK,
     /** 席 k のカードを左右に揺らす（失敗の演出。鍵師の「🔒に弾かれる」と同じ揺れ） */
+    cosplay: { ensure: (c, f) => cosEnsure(c, f), clear: () => cosClear(), keep: (v) => { cosKeep = !!v; } },
     shake(k) { const el = $t(), card = el && el.querySelector(`[data-k="${k}"] .tb-card`); if (card && card.animate) card.animate([{ transform: "translateX(0)" }, { transform: "translateX(-9px) rotate(-4deg)" }, { transform: "translateX(9px) rotate(4deg)" }, { transform: "translateX(-6px) rotate(-2deg)" }, { transform: "translateX(0)" }], { duration: 520, easing: "ease-in-out" }); },
     later, paint, show, swap, G, $t, esc, setCap, gxStars, face: faceHtml, breakHtml,
     /** 札を付けた席の一覧(starKeys など)から、席 k を取り除く(その場で書き換える) */
@@ -732,9 +796,9 @@ window.ONW = window.ONW || {};
   }
   const winTeamCls = (t) => (t.startsWith("村人") ? "village" : t.startsWith("人狼") ? "wolf" : t.startsWith("恋人") ? "lover" : "third");
   /** 勝利の貼り重ね（res.ladder。docs/win-ladder.md）: 乗っ取られた下の勝利を、小さく・薄く・取り消し線で上に残す。最終結果（梯子の最後の段）と今の結果が同じときだけ（チキンの逆転・愉快犯のあとは出さない） */
-  const ladderUnder = (res) => { const lad = res.ladder || []; return lad.length >= 2 && lad[lad.length - 1].title === res.title ? lad.slice(0, -1).map((st) => `<div class="rs-win rs-under t-${winTeamCls(st.title)}">${esc(st.title)}</div>`).join("") : ""; };
+  const ladderUnder = (res) => { const lad = res.ladderOff ? [] : (res.ladder || []); return lad.length >= 2 && lad[lad.length - 1].title === res.title ? lad.slice(0, -1).map((st) => `<div class="rs-win rs-under t-${winTeamCls(st.title)}">${esc(st.title)}</div>`).join("") : ""; };
   function winHtml(res, fresh) {
-    return `${ladderUnder(res)}<div class="rs-win t-${winTeamCls(res.title)}${fresh && (res.ladder || []).length > 1 ? " rs-paste" : ""}">${esc(res.title)}</div>`;
+    return `${ladderUnder(res)}<div class="rs-win t-${winTeamCls(res.title)}${fresh && !res.ladderOff && (res.ladder || []).length > 1 ? " rs-paste" : ""}">${esc(res.title)}</div>`;
   }
   /** 追加勝利の役職（res.extraWin。勝利陣営の字幕のあとに、1つずつ貼り足していく。docs/extra-win-fx.md）。n 個目までを字幕の下に並べる。g.resultCap にも足すので、再描画しても消えない */
   function addExtraWin(res, n) {
@@ -749,7 +813,7 @@ window.ONW = window.ONW || {};
   /** 勝利の貼り重ね（res.ladder。docs/win-ladder.md）: 下の勝利から順に、上へ貼り付けられていく。貼られた勝利は、次の勝利に重ねられて小さく・薄く・取り消し線になる（追加勝利は途中の段では出さない）。最後の段（最終結果）は従来の字幕が出す（winHtml が下の勝利を残す） */
   const ladderPasteHtml = (lad, i) => `${lad.slice(0, i).map((x) => `<div class="rs-win rs-under t-${winTeamCls(x.title)}">${esc(x.title)}</div>`).join("")}<div class="rs-win rs-paste t-${winTeamCls(lad[i].title)}">${esc(lad[i].title)}</div>`;
   function playLadder(res, R) {
-    const lad = res.ladder || []; if (lad.length < 2) return;
+    const lad = res.ladder || []; if (res.ladderOff || lad.length < 2) return;   // 設定でOFFのときは出さない
     for (let i = 0; i < lad.length - 1; i++) {
       later(() => { const html = ladderPasteHtml(lad, i), g = G(), c = document.getElementById("res-cap"); g.resultCap = html; if (c) c.innerHTML = html; }, R.t); R.t += 1400;   // この段の勝利を貼る（コンテナのポップなし。前の勝利は重ねられて薄くなる）
     }
@@ -935,7 +999,8 @@ window.ONW = window.ONW || {};
     g.revRes = {}; res.history.forEach((h) => { if (h.rev > 0) g.revRes[`p:${h.id}`] = h.rev; });
     clearAll(); Object.keys(gx).forEach((k) => { if (gx[k] === "bomb" || gx[k] === "boom") delete gx[k]; }); alm = {}; veil = {}; hk("clear").forEach((h) => h.fn(stage.kit));   // 身代わりの「めくれそう」演出・処刑人の演出も止める
     const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.keep) kp[`p:${h.id}`] = true; if (h.prom) wf[`p:${h.id}`] = true; if (h.drunk) bd[`p:${h.id}`] = true; if (h.day) { delete curse[`p:${h.id}`]; dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.dayLabel || "死亡"; } if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.duke ? "魔界断罪" : skipIds.has(h.id) || h.sub || h.dukeDead ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : h.dict ? (h.coup ? "クーデター" : "独裁処刑") : "追放"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
+    const skBmb = new Set(((res.bomber || {}).bombers || []).map((x) => x.id));   // 道化の爆弾魔: 演出なしの最終形でも、自爆した爆弾魔の死因は「[追放]→[自爆]」
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.keep) kp[`p:${h.id}`] = true; if (h.prom) wf[`p:${h.id}`] = true; if (h.drunk) bd[`p:${h.id}`] = true; if (h.day) { delete curse[`p:${h.id}`]; dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.dayLabel || "死亡"; } if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.duke ? "魔界断罪" : skipIds.has(h.id) || h.sub || h.dukeDead ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : h.dict ? (h.coup ? "クーデター" : "独裁処刑") : "追放"; if (skBmb.has(h.id) && !h.sub) badge[`p:${h.id}`] = `[${badge[`p:${h.id}`]}]→[自爆]`; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     const R = Object.create(stage.kit); R.res = res;
     libraTilt = libraTiltOf(res);   // 天秤: 演出なしの最終形（つられた皿が下がったまま）
@@ -1373,6 +1438,123 @@ window.ONW = window.ONW || {};
   };
   stage.muzzledEnd = function () { muteTimers.forEach(clearTimeout); muteTimers = []; document.querySelectorAll(".mute-wrap").forEach((w) => w.remove()); };
   stage.muzzledMs = function () { return MUTE_MS; };
+
+
+  // ---------------------------------------------------------
+  // 煙幕の狂人: 画面がもくもくしはじめて、白い半透明の画面になる（カード・プレイヤー名の光る飾りは廃止。情報確認/COボタンと変化公開の欄は曇らない）。
+  //   g.smokeOn のあいだ（待機時間・昼・投票）だけ。観戦者には出さない（全員の動きが見えるので）。結果発表・ロビー・次の朝で消える。
+  //   stage.smoke(g, d): 煙幕が焚かれた瞬間（d.quiet でなければ、もくもくと広がる演出つき）。stage.sync からも毎回整える（再入室は演出なしで戻る）
+  // ---------------------------------------------------------
+  const SMK_PUFFS = [[8, 78, 46, 0], [30, 92, 52, .3], [58, 84, 48, .15], [86, 76, 44, .45], [4, 40, 40, .6], [92, 36, 42, .25], [20, 12, 44, .5], [50, 4, 50, .1], [80, 10, 42, .7], [48, 46, 56, .35]];
+  function smokeWant(g) {
+    if (!g.smokeOn || g.isSpectator || hostWatching(g)) return false;
+    return [ONW.PHASE.ONLINE_MORNING, ONW.PHASE.ONLINE_DAY, ONW.PHASE.ONLINE_VOTE].includes(ph(g));
+  }
+  function smokeSync(g, fresh) {
+    const cur = document.querySelector(".smk-screen");
+    if (!smokeWant(g)) { if (cur) cur.remove(); document.body.classList.remove("smoke-on"); return; }
+    document.body.classList.add("smoke-on");
+    if (cur) return;
+    const box = document.createElement("div"); box.className = "smk-screen" + (fresh ? " smk-fresh" : "");
+    box.setAttribute("aria-hidden", "true");
+    box.innerHTML = `<div class="smk-fog"></div>` + SMK_PUFFS.map(([x, y, sz, dl], i) => `<i class="smk-puff" style="left:${x}%;top:${y}%;--sz:${sz}vmax;--dl:${dl}s;--dx:${i % 2 ? -1 : 1}"></i>`).join("");
+    document.body.appendChild(box);
+  }
+  stage.smoke = function (g, d) { if (!(d && d.quiet)) smkN.freshAt = Date.now(); smokeSync(g || G(), !(d && d.quiet)); };
+
+  // ---------------------------------------------------------
+  // 煙幕の名前隠し（詳細設定: 煙幕の狂人 > 能力対象のプレイヤー名も隠す / 投票対象のプレイヤー名も隠す。どちらも初期値OFF。docs/smoke-madman.md）
+  //   隠れている場合: 煙幕がもくもくと広がったあと、カードの名前が「？？？」になって、席の並びがシャッフルされる。
+  //   席の並びは、この画面だけのランダム（CSS の order で入れ替えるので、カードの中身・押したときの対象は変わらない）。
+  //   グループ "day"（待機時間・昼。能力対象の設定）: 能力（酔い覚め夜能力・昼能力）の対象を選ぶために開くたびにも、並びがランダムに入れ替わる。
+  //   グループ "vote"（投票。投票対象の設定）: 投票が始まるとき（妖狐投票のあとの本投票も）に、昼のあいだとは別のランダムな並びに入れ替わる。投票のあいだは動かない。
+  //   2つの設定は別々: 能力だけON → 投票が始まると名前と並びが元に戻る / 投票だけON → 昼は名前そのまま、投票が始まると ？？？ とシャッフル。
+  //   自分のカードの名前だけは隠さない（自分の席が分かるように）。観戦者・観戦中のホストには出さない（煙幕自体が出ないため）。
+  // ---------------------------------------------------------
+  const NMASK = "？？？";
+  const SMK_NAME_DELAY = 2400;   // 煙幕が焚かれてから名前が変わるまで（もくもくが広がりきるまで。.smk-fresh の広がりは約2.8秒）
+  let smkN = { tk: null, group: null, perm: null, sig: "", ready: false, freshAt: 0, pending: false };
+  /** いま名前を隠す場面か: null（隠さない）/ "day"（待機時間・昼）/ "vote"（投票） */
+  function smkGroup(g) {
+    if (!smokeWant(g)) return null;
+    if (ph(g) === ONW.PHASE.ONLINE_VOTE) return g.smokeHideVote === true ? "vote" : null;   // 投票（妖狐投票・魔界公爵追放会議・わら人形などの選択も含む。投票のあいだはこの設定に従う）
+    return g.smokeHideAbility === true ? "day" : null;
+  }
+  /** 昼の能力対象を選ぶために開いている操作の目印（開いていなければ ""。開くたびに変わる → 並びを入れ替える） */
+  function smkAbilitySig(g) {
+    if (g.phase !== ONW.PHASE.ONLINE_DAY) return "";
+    for (const f of ["dictOpen", "thiefOpen", "sheriffOpen", "exchOpen", "predOpen", "libraOpen", "mindOpen", "rejobOpen"]) if (g[f]) return f;
+    if (g.abilityOpen && g.morningChain && g.morningChainReady && !g.morningChainDone) return "morning:" + g.morningChain;
+    return "";
+  }
+  /** 投票の開始の目印（投票が始まるたびに変わる。妖狐投票のあとの本投票でも変わる → 並びを入れ替える）。net.js の vote_start が数える */
+  const smkVoteSig = (g) => (g.phase === ONW.PHASE.ONLINE_VOTE ? `v${g.voteStartN || 0}` : "");
+  /** keys をランダムに並べ替える（なるべく前と違う並びにする） */
+  function smkShuffled(keys, prev) {
+    const a = keys.slice();
+    for (let t = 0; t < 6; t++) {
+      for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+      if (a.length < 2 || !prev || a.some((k, i) => k !== prev[i])) break;
+    }
+    return a;
+  }
+  /** 名前（？？？）と並び（order）を、いまの smkN に合わせる。
+   *  animate: 席が中央に集まる → 名前が切り替わる → 新しい並びに広がる（演出）。animate でない（再入室・試合の始まり・動きを減らす設定）ときは、すぐに切り替える */
+  const SMK_GATHER = 1250, SMK_SWAP = 0.42;   // 集まって広がる全体の長さ（ms）/ 名前が切り替わるタイミング（全体の割合。いちばん集まったとき）
+  function smkSetName(x) {
+    const nm = x.querySelector(".tb-name"); if (!nm) return;
+    const mask = !!smkN.group && x.dataset.k !== `p:${ONW.net.myId()}`, was = x.classList.contains("smk-hid");
+    if (mask && !was) { x.dataset.nm = nm.innerHTML; nm.textContent = NMASK; } else if (!mask && was) { nm.innerHTML = x.dataset.nm || ""; }
+    x.classList.toggle("smk-hid", mask);
+  }
+  function smkApply(animate) {
+    const el = $t(), row = el && el.querySelector(".tb-players"); if (!row) return;
+    const seats = Array.from(el.querySelectorAll('.tb-seat[data-k^="p:"]'));
+    const calm = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const fx = animate && !calm && seats.length > 1;
+    const before = fx ? new Map(seats.map((x) => [x, x.getBoundingClientRect()])) : null;
+    seats.forEach((x) => {
+      if (!fx) smkSetName(x);   // 演出なし: すぐ ？？？ / 元の名前
+      const i = smkN.perm ? smkN.perm.indexOf(x.dataset.k) : -1;
+      if (i >= 0) x.style.order = String(i); else x.style.removeProperty("order");
+    });
+    if (!fx) return;
+    const rr = row.getBoundingClientRect(), cx = rr.left + rr.width / 2, cy = rr.top + rr.height / 2;
+    seats.forEach((x, n) => {
+      const b = before.get(x), a = x.getBoundingClientRect();
+      const sx = b.left - a.left, sy = b.top - a.top;                                          // いまの席の位置（動く前）
+      const mx = cx - (a.left + a.width / 2), my = cy - (a.top + a.height / 2);                // 中央へ（新しい席の位置から見た中央）
+      const d = SMK_GATHER, dl = n * 25;
+      if (x.animate) x.animate([
+        { transform: `translate(${sx}px,${sy}px) scale(1)`, offset: 0, easing: "cubic-bezier(.5,0,.7,.4)" },
+        { transform: `translate(${mx}px,${my}px) scale(.55)`, offset: SMK_SWAP, easing: "cubic-bezier(.2,.7,.3,1)" },
+        { transform: "none", offset: 1 },
+      ], { duration: d, delay: dl, easing: "linear", fill: "backwards" });
+      setTimeout(() => { if (x.isConnected) smkSetName(x); }, dl + d * SMK_SWAP);   // stage の timers には入れない（途中で消えると名前が戻らなくなるため）
+      //   // いちばん集まったところで名前を切り替える
+    });
+  }
+  /** stage.sync から毎回呼ぶ（何度呼んでも同じ結果）。隠す場面が変わったとき / 能力対象を選ぶために開いたときだけ、名前と並びを変える */
+  function smkNamesSync(g) {
+    if (smkN.tk !== key) smkN = { tk: key, group: null, perm: null, sig: "", ready: false, freshAt: smkN.freshAt || 0, pending: false };   // 新しい試合（テーブルの作り直し）
+    const grp = smkGroup(g), sig = grp === "day" ? smkAbilitySig(g) : grp === "vote" ? smkVoteSig(g) : "";
+    if (grp && smkN.group !== grp && smkN.freshAt) {   // 煙幕が焚かれた直後: もくもくが広がってから名前を変える
+      const wait = smkN.freshAt + SMK_NAME_DELAY - Date.now();
+      if (wait > 0) { if (!smkN.pending) { smkN.pending = true; later(() => { smkN.pending = false; smkNamesSync(G()); }, wait + 30); } return; }
+    }
+    const regroup = grp !== smkN.group, reopen = !!grp && !!sig && sig !== smkN.sig;   // 隠す場面が変わった（昼→投票など）/ 能力対象を選ぶために開いた・投票が始まった
+    if (regroup || reopen) {
+      const el = $t(), keys = Array.from((el && el.querySelectorAll(".tb-players > .tb-seat[data-k^=\"p:\"]")) || []).map((x) => x.dataset.k);
+      smkN.group = grp;
+      smkN.perm = grp ? smkShuffled(keys, smkN.perm) : null;
+      smkApply(smkN.ready);   // 最初の同期（再入室・試合の始まり）は演出なし
+      if (ONW.ui && ONW.ui.render) setTimeout(() => { if (G() === g) ONW.ui.render(g); }, 0);   // 能力の操作欄の「選択中: 名前」も ？？？ に合わせて描き直す
+    }
+    smkN.sig = grp ? sig : "";   // 閉じたら "" に戻る（次に開いたとき・次の投票が始まったとき、また入れ替える）
+    smkN.ready = true;
+  }
+  /** この席の名前がいま「？？？」で隠れているか（ui.js の「選択中: 〇〇」「現在の投票先: 〇〇」などの文章用。自分は隠さない） */
+  stage.nameHidden = (id) => !!smkN.group && !!id && id !== ONW.net.myId();
 
   stage.breakHtml = breakHtml;   // ui.js の配布カード・js/roles/neutral/detective.js のカードが、役職名の改行表(NAME_BREAKS)を通すために引く
   stage.nameLines = (name) => (NAME_BREAKS[name] ? NAME_BREAKS[name].slice() : [String(name || "")]);

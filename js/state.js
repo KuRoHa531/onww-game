@@ -44,6 +44,8 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   // roles/base.js が同じ入れ物のまま集めて作る(新しい役職はファイルに groups を書くだけ。ここは触らない)。
   ONW.WOLF_KIND = [];       // 人狼系(人狼判定になる役職)。groups.wolf
   ONW.VISIBLE_WOLF = [];    // 夜に仲間から「人狼」として見える人狼系(一匹狼は誰からも見えない: hiddenWolf)
+  ONW.WOLF_LOOK = [];       // 夜に「人狼」のカードとして見える役職 = VISIBLE_WOLF + 役職ファイルの wolfLook: true（スパイ）。人狼・狂信者・墓荒らし/ドッペル経由・酔い覚めの「仲間の人狼/人狼の気配」の対象
+  ONW.WOLF_LOOK_ALL = [];   // WOLF_KIND（一匹狼も含む） + wolfLook: true（スパイ）。マーリン・魔界公爵に見える人狼の判定
   // 占い師が占ったときに見える役職 ONW.seerSees は roles/base.js(役職ファイルの seerSees: "<見える役職>" から)
   /** 本人が見る自分の役職(忘却の人狼・狼憑きは村人、狼夢人は人狼だと思い込んでいる。怪盗・墓荒らし・後覚者で手にしたときも同じ) */
   /** 思い込み系: 本人は別の役職だと思い込んでいる役職。今後増やすときはここに足す(配布の演出で、変化前を本人の自認の陣営の変化役に見せる判定にも使われる) */
@@ -142,7 +144,9 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     return d.length + Math.max(0, ...Object.values((g && g.pureLoverNoU) || {})) + 1 + Math.max(0, pi);
   };
   /** 占い師・狂った占い師が占える墓地の枚数（設定値と墓地の枚数の小さい方） */
-  ONW.seerGraveMax = (g) => Math.max(0, Math.min(Number.isFinite(+g.seerGraveCount) ? +g.seerGraveCount : 2, g.graveCount || g.graveTotal || 0));
+  // 占い師・偽占い師・狂った占い師は「墓地を占える枚数」を別々に持つ（role: "seer" / "fake_seer" / "mad_seer"。省略・それ以外は占い師）。偽・狂のほうが未設定なら占い師の設定を使う（古い保存・古い通信の互換）
+  ONW.seerGraveKey = (role) => role === "fake_seer" ? "fakeSeerGraveCount" : role === "mad_seer" ? "madSeerGraveCount" : "seerGraveCount";
+  ONW.seerGraveMax = (g, role) => { const v = g[ONW.seerGraveKey(role)] ?? g.seerGraveCount; return Math.max(0, Math.min(Number.isFinite(+v) ? +v : 2, g.graveCount || g.graveTotal || 0)); };
   /* =====================================================================================
    * 【必読・今後の役職追加で必ず守ること】役職の移動と「役職に紐づく状態」(role-bound state)
    *
@@ -318,6 +322,22 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (ONW.pureLover) ONW.pureLover.note(g, [toId]);
     return role;
   };
+  /** コスプレイヤー: 山札から選んだカード(role)を、id 自身のカードの上に置く（役職はそのカードの上で書き換わる。カードそのものは動かない）。
+   *  上書きされた役職（コスプレイヤー）に紐づく記録は消す（copyRole と同じ）。履歴(roleTrail)には「置かれた役職」を1回分として積む。新しい役職が従者・処刑人ならご主人・ターゲットが決まる。戻り値: 置かれた役職 */
+  ONW.cosplayPlace = (g, id, role) => {
+    const cd = cards(g);
+    g.currentRoles[id] = role;
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole"].forEach((k) => { if (g[k]) delete g[k][id]; });
+    if (g.shufflerMarks) delete g.shufflerMarks[cd.at[id]];   // 上書きされたカードの上のシャッフラーの印は消える
+    const t = (g.roleTrail = g.roleTrail || {});
+    (t[id] = t[id] || []).push(role);
+    (cd.trail[id] = cd.trail[id] || []).push(cd.at[id]);   // カードは同じ（役職だけが変わる）
+    if (role === ONW.ROLE.MIMIC_WOLF && ONW.mimic) ONW.mimic.choose(g, id);
+    ONW.fixServants(g); if (ONW.avenger) ONW.avenger.fix(g); if (ONW.prankster) ONW.prankster.fix(g);
+    if (ONW.fixExecutioners) ONW.fixExecutioners(g);
+    if (ONW.pureLover) ONW.pureLover.note(g, [id]);
+    return role;
+  };
   /** 結果画面の「(+シャッフラー)」: いま印の付いたカードを持っている人の「最新の段階」(roleTrail の末尾)を記録する。g.shufflerStamp[\"人ID|roleTrailの番号\"] = true。
    *  印が付いたカードが怪盗・いたずらっ子・墓荒らしなどで動いたあとの段階にも付く（動く前の段階には付かない）。あとで上書きされて印が消えても、すでに付いた段階は履歴として残る */
   ONW.shufflerStamp = (g, id) => {
@@ -355,6 +375,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       const want = pl.length ? "player" : "grave", have = ((ONW.ROLE_INFO || {})[role] || {}).observe;
       if (have !== want && have !== "player") { ONW._observeWarned = ONW._observeWarned || {}; if (!ONW._observeWarned[role]) { ONW._observeWarned[role] = 1; if (typeof console !== "undefined") console.warn("[observe] " + role + " は ONW.observeNote を呼んでいますが info.observe が " + (have || "未設定") + " です（期待: \"" + want + "\"）。役職ファイルの info に observe を足してください（docs/observe-synergy.md）"); } }
     }
+    if (pl.length && ONW.watcher) ONW.watcher.touch(g, from, pl);   // 静観者: 能力を使われた記録（夜・朝のうちの能力は、実際に使われたときだけここを通る。鍵師のロックなどで不発の能力は数えない。docs/watcher.md）
     (g.observeLog = g.observeLog || []).push({ from, players: pl, graves: gr, role: role || null });   // role = そのとき使われた役職（詩人の通知用。観測の人狼は使わない。模倣の人狼は模倣先、墓荒らし・ドッペル経由は手にした役職）
   };
   /** 詩人通知の件数の上限（マイクラ版 poetVisibleRoleLimit の初期値。1〜5） */
@@ -456,7 +477,10 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       // --- セットアップ内容 ---
       roleCounts: ONW.defaultRoleCounts ? ONW.defaultRoleCounts() : {},   // 初期枚数・並びは各役職ファイルの info.deck / info.count(roles/base.js)
       revealTransforms: true,         // 変化公開（昼開始時に「変化前 → 変化後」を公開）
-      revealManualRoles: false,       // 配役した役職(変化していないカード)も変化公開に出す（マイクラ版 revealManualRolesAsTransforms）。変化公開がONのときだけ有効
+      smokeHideAbility: false,          // 煙幕の狂人の詳細設定: 煙幕のあいだ、昼の能力対象（酔い覚め夜能力・昼能力）のプレイヤー名を ？？？ にして席をシャッフルする（初期値OFF。投票とは別の設定）
+      smokeHideVote: false,             // 煙幕の狂人の詳細設定: 煙幕のあいだ、投票対象のプレイヤー名を ？？？ にして投票開始時に席をシャッフルする（初期値OFF。能力対象とは別の設定）
+      winLadderFx: true,                // 勝利の乗っ取り演出（結果発表で、成立した勝利が低い順に貼り重ねられる）。OFFなら最終結果だけ
+  revealManualRoles: false,       // 配役した役職(変化していないカード)も変化公開に出す（マイクラ版 revealManualRolesAsTransforms）。変化公開がONのときだけ有効
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）
       transformFrom: {}, centerTransformFrom: {}, winnerIds: null, // ルーム設定の配役枚数
@@ -470,8 +494,14 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       graveCount: 2,                  // 墓地の枚数（マイクラ版の初期値）
       mayorVoteCount: 2,              // メイヤーの投票数（2〜10票。本家の mayorVoteCount と同じ初期値）
       madMayorVoteCount: 2,           // 狂ったメイヤーの投票数（2〜10票。本家の madMayorVoteCount と同じ初期値。メイヤーとは別の設定）
-      seerGraveCount: 2,              // 占い師・狂った占い師が一度に占える墓地の枚数（マイクラ版の初期値 seerCenterCount）
+      seerGraveCount: 2,              // 占い師が一度に占える墓地の枚数（マイクラ版の初期値 seerCenterCount）
+      fakeSeerGraveCount: 2,          // 偽占い師が一度に占える墓地の枚数（占い師とは別の設定）
+      madSeerGraveCount: 2,           // 狂った占い師が一度に占える墓地の枚数（占い師とは別の設定）
       drunkChance: 100,               // 酔っ払いの枠1つごとに、実際に酔う確率(%)
+      assignOn: false,                // アサイン設定（役職設定 > アサイン設定）。OFFなら従来どおり配役設定の枚数がそのまま配役 / ONなら配役設定の枚数が候補になり、陣営ごとの最少〜最大人数と役職ごとの確率で配役数ぶんを抽選（js/assign.js, docs/assign.md）
+      assignRange: { village: [0, 0], wolf: [0, 0], third: [0, 0] },   // アサイン設定: 陣営ごとの [最少人数, 最大人数]（初期値は 0/0。ON/OFFを切り替えても残る）
+      assignChance: {},               // アサイン設定: 役職ID → [①の確率, ②の確率, …]（%。書いていない札は100%）
+      missingRoles: [],               // アサイン設定: 試合で選ばれなかった候補（欠け。結果の役職履歴の下に出る）
       drunkCount: 0,                  // 酔っ払い(重複役職)の人数。配役の枚数には数えない
       loverCount: 0,                  // 恋人(重複役職)の組数。配役の枚数には数えない
       loverChance: 100,               // 恋人1組ごとに、実際に恋人になる確率(%)

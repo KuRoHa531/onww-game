@@ -22,6 +22,7 @@
  *       村人系 → "transform:light_apostle"（光の使徒）/ 人狼系 → "transform:dark_avatar"（闇の化身）/ 狂人系 → "transform:dark_avatar"（闇の化身）/ 第三陣営 → "transform:silver_shadow"（銀色の影）
  *       番号 n は同じ変化役の中での並び順。入れたか確認は node _wip/groupcheck.js .（登録もれがあると FAIL）
  *   hiddenWolf: true            人狼系だが夜に仲間から見えない(一匹狼)。ONW.VISIBLE_WOLF から外れる
+ *   wolfLook: true              人狼系ではない(村人陣営など)が、人狼が分かる役職(人狼・狂信者・マーリン・魔界公爵など)からは「人狼」の🐺として見える(スパイ)。ONW.WOLF_LOOK / ONW.WOLF_LOOK_ALL に入る。夜の仲間表示・墓荒らし/ドッペル・酔い覚めは、VISIBLE_WOLF でなく ONW.WOLF_LOOK を見ること
  *   descFor(desc, g)            説明文をルーム設定などで差し替えたいとき(メイヤーの票数)。ONW.roleDesc から呼ばれる
  *   night: {                    夜に自分で能力を使う役職
  *     kind:  "seal"|"seer"|"relic"|"doppel"|"shuffler"|"gremlin"|"robber"|"tm"   夜が明けるときに実行される段階(net.js の NIGHT_STAGES。"seal" は封印の狂人(とエルフリンデ)だけの最初の段階)
@@ -113,13 +114,22 @@ window.ONW = window.ONW || {};
     return steps.sort((a, b) => a.order - b.order || a.idx - b.idx);
   };
 
+  /** 「人狼」の🐺として見える席のID（初期役職で判定。自分は除く）。all=true なら一匹狼も含む(マーリン・魔界公爵用 = WOLF_LOOK_ALL)。スパイ(wolfLook)も含む。
+   *  夜の仲間表示・墓荒らし/ドッペル・酔い覚めは、この関数か ONW.WOLF_LOOK を使うこと（VISIBLE_WOLF を直接見るとスパイが抜ける） */
+  ONW.wolfLookIds = (g, selfId, all) => {
+    const set = all ? ONW.WOLF_LOOK_ALL : ONW.WOLF_LOOK;
+    return g.players.filter((q) => q.id !== selfId && set.includes(g.initialRoles[q.id])).map((q) => q.id);
+  };
+  /** その役職が「人狼」の🐺として見えるか（all=true は一匹狼も含む） */
+  ONW.isWolfLook = (role, all) => (all ? ONW.WOLF_LOOK_ALL : ONW.WOLF_LOOK).includes(role);
+
   /** 役職ファイルが共有する小道具(役職固有ではない) */
   ONW.roleKit = ONW.roleKit || {};
   /** 墓荒らし・ドッペルゲンガーで役職を手にしたときの情報(got フック)用の道具箱 */
   ONW.roleKit.gotTools = (c, p, rev, opts) => {
     const g = c.g, o = opts || {}, i = o.skipGrave, eff = () => g.initialRoles[p.id];
     const nameOf = (id) => (g.players.find((q) => q.id === id) || {}).name || "?";
-    const wolfIds = (self) => g.players.filter((q) => q.id !== self && ONW.VISIBLE_WOLF.includes(g.initialRoles[q.id])).map((q) => q.id);
+    const wolfIds = (self) => g.players.filter((q) => q.id !== self && ONW.WOLF_LOOK.includes(g.initialRoles[q.id])).map((q) => q.id);   // スパイも🐺として見える(WOLF_LOOK)
     const names = (xs) => xs.map(nameOf).join("、");
     const seeGraves = (own) => g.center0.map((cr, j) => [j, cr]).filter(([j]) => j !== own);   // 交換した墓地以外の、配役直後（初期役職）の墓地
     const r = rev[p.id];
@@ -170,6 +180,11 @@ window.ONW = window.ONW || {};
       .sort((a, b) => rk(a.id) - rk(b.id) || raw[a.id].groups[name] - raw[b.id].groups[name] || list.indexOf(a) - list.indexOf(b)).map((x) => x.id);
     fill(ONW.WOLF_KIND, members("wolf"));
     fill(ONW.VISIBLE_WOLF, ONW.WOLF_KIND.filter((r) => !(raw[r] && raw[r].hiddenWolf)));
+    // 「人狼」の🐺として見える役職: 見える人狼系(VISIBLE_WOLF) + wolfLook の役職（スパイ）。並びは ROLE_ORDER 順
+    const lookOnly = list.filter((x) => raw[x.id] && raw[x.id].wolfLook).map((x) => x.id);
+    const byRank = (arr) => arr.map((id, i) => ({ id, i })).sort((a, b) => rk(a.id) - rk(b.id) || a.i - b.i).map((x) => x.id);
+    fill(ONW.WOLF_LOOK, byRank([...ONW.VISIBLE_WOLF, ...lookOnly.filter((r) => !ONW.VISIBLE_WOLF.includes(r))]));
+    fill(ONW.WOLF_LOOK_ALL, byRank([...ONW.WOLF_KIND, ...lookOnly.filter((r) => !ONW.WOLF_KIND.includes(r))]));
     fill(ONW.MAD_KIND, members("mad"));
     fill(ONW.TOMO_ROLES, members("tomo"));
     fill(ONW.SELF_AS_VILLAGER, members("selfAsVillager"));

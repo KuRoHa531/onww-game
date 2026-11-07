@@ -17,17 +17,24 @@
     let pair = (f.players || []).filter((id, k, arr) => n.validPlayer(p, id) && arr.indexOf(id) === k).slice(0, 2);
     if (pair.length < 2) pair = [...pair, ...ONW.utils.shuffle(g.players.filter((q) => q.id !== p.id && !pair.includes(q.id))).slice(0, 2 - pair.length).map((q) => q.id)];
     if (pair.length < 2) return;
-    const [a, b] = pair;
-    if (ONW.keymaster.locked(g, b)) {   // 鍵師のロック: コピー先の席がロック中なら🔒に弾かれて失敗（コピーしない・追加勝利の記録もしない）
-      i.mode = "gremlin"; i.keyFail = { kind: "target", from: a, to: b };
-      n.hold(p.id, ONW.keymaster.fail(g, p.id, "target", "コピー", [b], `${label} ${p.name}`));
+    const [a, b] = pair;   // a, b = 選んだ2人（文章・ログ・記録はこの2人で出す）
+    const sp = ONW.watcher.shiftPair(g, p.id, a, b);   // 静観者を選んだら、実際にコピー元・コピー先になる席は別の人（選んだ本人には静観者を選んだように見える。docs/watcher.md）
+    if (!sp.ok) {   // 移す先が足りなければコピーしない（静観者を選んだことは「能力を使われた」に数える）
+      i.mode = "gremlin"; i.keyFail = { kind: "shift", from: a, to: b };
+      n.hold(p.id, ONW.watcher.noneLine("入れ替え"));
       return;
     }
-    const seen = g.currentRoles[a], got = ONW.gremlinCopy(g, a, b), shown = ONW.shownRole(got), sa = ONW.shownRole(seen);
+    if (ONW.keymaster.locked(g, sp.b)) {   // 鍵師のロック: コピー先の席がロック中なら🔒に弾かれて失敗（コピーしない・追加勝利の記録もしない）
+      i.mode = "gremlin"; i.keyFail = { kind: "target", from: a, to: b };
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, "target", "コピー", [b], `${label} ${p.name}`));
+      ONW.watcher.keyFailShown(g, p.id, [b], [sp.b]);
+      return;
+    }
+    const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b), shown = ONW.shownRole(got), sa = ONW.shownRole(seen);
     ONW.setRoleBound(g, "gremlinPicks", p.id, [a, b]);
     i.mode = "gremlin"; i.gremlin = { from: a, to: b, role: sa };
     i.known[a] = sa; i.known[b] = shown;
-    g.nightLogsAll.push(`${label} ${p.name} は ${n.nameOf(a)} の役職を ${n.nameOf(b)} にコピーしました（${n.rn(got)}）。`);
+    g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${label} ${p.name}`, n.nameOf, a, b, (x, y) => `${x} の役職を ${y} にコピーしよう`, (x, y) => `${x} の役職を ${y} にコピーしました（${n.rn(got)}）。`) || `${label} ${p.name} は ${n.nameOf(a)} の役職を ${n.nameOf(b)} にコピーしました（${n.rn(got)}）。`);   // 静観者にずれたときは「〇〇の役職を△△にコピーしようとしましたが、〇〇は静観者だったため□□に変わり、…にコピーしました。」
     n.hold(p.id, `${n.nameOf(a)} の役職「${n.rn(sa)}」を ${n.nameOf(b)} にコピーしました。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
     n.ob(p.id, [a, b]);
     n.nn(rid);
@@ -91,13 +98,15 @@
       normalize: (c, players) => ({ players: players.slice(0, 2), graves: [] }),
       resolve(c, p) {   // その時点のコピー元の役職を、コピー先にコピーする（コピー元は動かない）。いたずらっ子の前
         const g = c.g, rn = c.rn, nameOf = c.nameOf;
-        const [a, b] = c.selOf(p).players; if (!a || !b || a === b) return;
-        if (ONW.keymaster.locked(g, b)) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "target", "コピー", [b], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: コピー先の席がロック中なら失敗。コピーせず、追加勝利の記録・新聞・観測にも載らない
-        const seen = g.currentRoles[a], got = ONW.gremlinCopy(g, a, b);
+        const [a, b] = c.selOf(p).players; if (!a || !b || a === b) return;   // a, b = 選んだ2人（文章・演出・ログ・記録はこの2人で出す）
+        const sp = ONW.watcher.shiftPair(g, p.id, a, b);   // 静観者を選んだら、実際にコピー元・コピー先になる席は別の人（選んだ本人には静観者を選んだように見える。docs/watcher.md）
+        if (!sp.ok) { c.hold(p.id, ONW.watcher.noneLine("入れ替え")); return; }   // 移す先が足りなければコピーしない（新聞・観測にも載らない）
+        if (ONW.keymaster.locked(g, sp.b)) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "target", "コピー", [b], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [b], [sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: コピー先の席がロック中なら失敗。コピーせず、追加勝利の記録・新聞・観測にも載らない
+        const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b);
         ONW.setRoleBound(g, "gremlinPicks", p.id, [a, b]);   // 選択は役職の持ち主に記録（カードについていく）
         ONW.observeNote(g, p.id, [a, b], null, "gremlin");
         ONW.newsNote(g, "gremlin");
-        g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は ${nameOf(a)} の役職を ${nameOf(b)} にコピーしました（${rn(got)}）。`);
+        g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${rn(c.eff(p))} ${p.name}`, nameOf, a, b, (x, y) => `${x} の役職を ${y} にコピーしよう`, (x, y) => `${x} の役職を ${y} にコピーしました（${rn(got)}）。`) || `${rn(c.eff(p))} ${p.name} は ${nameOf(a)} の役職を ${nameOf(b)} にコピーしました（${rn(got)}）。`);
         c.hold(p.id, `${nameOf(a)} の役職「${rn(ONW.shownRole(seen))}」を ${nameOf(b)} にコピーしました。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`);
         c.rev[p.id] = { kind: "gremlin", from: a, to: b, role: ONW.shownRole(seen), copied: ONW.shownRole(got) };   // コピー元のカードが表になり、コピー先にコピーされていく
       },
@@ -106,12 +115,14 @@
       run(c) {
         if (c.players.length < 2) return null;
         const g = c.g, rn = c.rn, id = c.id, nameOf = c.nameOf;
-        const [a, b] = c.players;
-        if (ONW.keymaster.locked(g, b)) return { lines: [ONW.keymaster.fail(g, id, "target", "コピー", [b], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
-        const seen = g.currentRoles[a], got = ONW.gremlinCopy(g, a, b);   // 朝の時点のコピー元の役職を、コピー先にコピー
+        const [a, b] = c.players;   // a, b = 選んだ2人（文章・演出はこの2人）
+        const sp = ONW.watcher.shiftPair(g, id, a, b);   // 静観者を選んだら、実際にコピー元・コピー先になる席は別の人（墓荒らし・ドッペル・酔い覚め経由でも同じ）
+        if (!sp.ok) return { lines: [ONW.watcher.noneLine("入れ替え")], reveal: null, nextChain: null, failed: true };
+        if (ONW.keymaster.locked(g, sp.b)) { const fl = ONW.keymaster.fail(g, id, "target", "コピー", [b], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [b], [sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }   // 朝のうち・酔い覚めにもロックは効く
+        const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b);   // 朝の時点のコピー元の役職を、コピー先にコピー
         ONW.setRoleBound(g, "gremlinPicks", id, [a, b]);
         const lines = [`${nameOf(a)} の役職「${rn(ONW.shownRole(seen))}」を ${nameOf(b)} にコピーしました。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${nameOf(a)} の役職を ${nameOf(b)} にコピーしました（${rn(got)}）。`);
+        g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${c.label} ${c.me.name}`, nameOf, a, b, (x, y) => `${x} の役職を ${y} にコピーしよう`, (x, y) => `${x} の役職を ${y} にコピーしました（${rn(got)}）。`) || `${c.label} ${c.me.name} は ${nameOf(a)} の役職を ${nameOf(b)} にコピーしました（${rn(got)}）。`);
         return { lines, reveal: { kind: "gremlin", from: a, to: b, role: ONW.shownRole(seen), copied: ONW.shownRole(got) }, nextChain: null };
       },
     },

@@ -35,7 +35,7 @@
     "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]);
   /** 狂人系（マイクラ版 isMadRole のうち Web版にある役職） */
   const MAD_ROLES = new Set(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen",
-    "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman"]);
+    "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]);
 
   /** 役職 role（持ち主 id）の気配の種類（蜃気狼・恋人は見ない。そこは judge）。昇格した狂人は人狼 */
   function classify(g, role, id) {

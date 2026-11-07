@@ -412,7 +412,7 @@ body {
 .rs-info { color: #6fd3e0; }
 .rs-wname { color: #ff9a3c; }   /* 結果シートの勝者・敗者の名前（陣営の色＝緑・赤・灰色・ピンクとは別の色） */
 .rs-lname { color: #6b86d6; }
-.rs-extra-name { color: #ffd3a1; font-weight: 700; }   /* 結果シートの勝者欄: 陣営の勝者のほかに追加で勝った人（追加勝利）の名前 */
+.rs-extra-name { color: #ff9a3c; opacity: .6; font-weight: inherit; }   /* 結果シートの勝者欄: 陣営の勝者のほかに追加で勝った人（追加勝利）の名前 */
 .rs-pl { color: #ffb86b; }   /* 結果画面: 夜行動結果・昼行動結果・役職情報の文章中のプレイヤー名（役職名は陣営の色 t-village / t-wolf / t-third） */
 .rs-gv { color: #5aa9ff; }   /* 結果画面: 墓地名（墓地1 など）。プレイヤー名・役職名・得票の色とは別 */
 .rs-me { color: #c792ff; font-weight: 700; }   /* 結果画面・チャット: 自分の名前（他の人のプレイヤー名 rs-pl のオレンジと区別する。rs-pl の後に書いて上書き） */
@@ -2164,3 +2164,98 @@ body.duke-meeting::before, body.dk-result::before { content: ""; position: fixed
 .res-cap .rs-under { font-size: 16px; opacity: .5; text-decoration: line-through; text-decoration-thickness: 2px; filter: saturate(.6); }
 .res-cap .rs-paste { animation: rs-paste .5s cubic-bezier(.2, 1.3, .4, 1) both; text-shadow: 0 3px 10px rgba(0, 0, 0, .55); }
 @keyframes rs-paste { 0% { opacity: 0; transform: translateY(-26px) scale(1.7) rotate(-5deg); } 60% { opacity: 1; transform: translateY(2px) scale(.96) rotate(1deg); } 100% { opacity: 1; transform: none; } }
+
+/* 結果画面の役職履歴: 同じ人の「名前 → 役職 → 役職 状態」を1行に保つ（PC・スマホ共通）。長すぎるときだけ行ごと横にスクロール */
+.result-sheet .rs-hist { white-space: nowrap; word-break: normal; overflow-wrap: normal; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.result-sheet .rs-hist::-webkit-scrollbar { display: none; }
+@media (max-width: 600px) { .result-sheet .rs-hist { font-size: 13px; } }
+
+/* デバッグ「固定役」の役職・変化後の選択: 行をずらさず、デバッグパネルの上に重ねる（半透明の背景＋右上の×） */
+.dbg-ovl { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(8,8,16,.72); border-radius: 12px; }   /* 開いているあいだ、後ろのデバッグパネルは暗く薄くなる */
+.dbg-ovl__box { width: min(94%, 680px); height: auto; max-height: 96%; display: flex; flex-direction: column; background: rgba(35,37,57,.97); border: 1px solid #9b5ac8; border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.5); text-align: left; }
+.dbg-ovl__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 8px 6px 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.dbg-ovl__ttl { font-weight: 700; color: var(--gold); }
+.dbg-ovl__x { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; font-size: 20px; line-height: 1; border-radius: 50%; touch-action: manipulation; }
+.dbg-ovl__body { flex: 1 1 auto; align-content: flex-start; min-height: 0; overflow-y: auto; padding: 6px 8px 10px; display: flex; flex-wrap: wrap; -webkit-overflow-scrolling: touch; }
+
+/* 変化後の選択: 固定役の選択の、さらに上に重ねる（ひとまわり小さく。背景はもう一段暗く） */
+.dbg-ovl--2 { z-index: 6; background: rgba(8,8,16,.6); }
+.dbg-ovl--2 .dbg-ovl__box { width: min(88%, 600px); border-color: #c08ae8; }
+/* 選択パネルは中身の量に合わせて高さが伸び、それでも収まらないときは debug.js の fitOvl が --fit（ボタン・見出しの縮小率）を下げて、スクロールなしで全部見えるようにする（役職が増えても自動） */
+.dbg-ovl__body { --bs: 13px; --bp: 6px; --bpx: 10px; --bm: 2px; --gs: 12px; }
+.dbg-ovl__body .dbg-b { font-size: calc(var(--bs) * var(--fit, 1)); padding: calc(var(--bp) * var(--fit, 1)) calc(var(--bpx) * var(--fit, 1)); margin: calc(var(--bm) * var(--fit, 1)); }
+.dbg-ovl__body .dbg-grp, .dbg-ovl__body .dbg-sub { font-size: calc(var(--gs) * var(--fit, 1)); margin-top: calc(6px * var(--fit, 1)); }
+@media (min-width: 900px) { .dbg-ovl__body { --bs: 15px; --bp: 8px; --bpx: 14px; --gs: 14px; } }
+
+/* ---- コスプレイヤー: 山札から出た3枚（テーブルの山札・墓地の下） ---- */
+.tb-cosplay { margin-bottom: 6px; padding: 4px 8px 2px; border-radius: 10px; background: rgba(201,170,92,.07); box-shadow: inset 0 0 0 1px rgba(201,170,92,.25); }
+.tb-cosplay .tb-seat .tb-name { color: var(--gold-dim); font-size: .72em; }
+
+/* =========================================================
+   煙幕の狂人（js/stage.js の stage.smoke / smokeSync）
+   画面がもくもくしはじめて、白い半透明の画面になる。（カードの縁・プレイヤー名の光る飾りは2026-11-07に廃止）
+   白い画面(.smk-screen)は #app より上・テーブルより下(z-index 2)。操作は通す。設定・情報確認・チャットなどの窓(z-index 800〜)は煙の上なので読める
+   ========================================================= */
+.smk-screen { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.smk-fog { position: absolute; inset: 0; background: rgba(246, 247, 252, .6); }
+.smk-puff { position: absolute; width: var(--sz); height: var(--sz); margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.75) 0, rgba(255,255,255,.35) 45%, rgba(255,255,255,0) 70%); animation: smk-drift 9s ease-in-out var(--dl) infinite alternate; will-change: transform; }
+@keyframes smk-drift { from { transform: translate(calc(var(--dx) * -2.5vmax), 1.5vmax) scale(.92); } to { transform: translate(calc(var(--dx) * 2.5vmax), -2vmax) scale(1.08); } }
+/* 焚かれた瞬間: 下からもくもくと湧いて、白く広がっていく */
+.smk-fresh .smk-fog { animation: smk-fog-in 2.8s ease-out both; }
+.smk-fresh .smk-puff { animation: smk-puff-in 2.4s cubic-bezier(.2,.7,.3,1) var(--dl) both, smk-drift 9s ease-in-out calc(2.4s + var(--dl)) infinite alternate; }
+@keyframes smk-fog-in { from { opacity: 0; } 35% { opacity: .3; } to { opacity: 1; } }
+@keyframes smk-puff-in { from { opacity: 0; transform: translateY(14vmax) scale(.2); } 60% { opacity: 1; } to { opacity: 1; transform: none; } }
+/* テーブルを煙より手前へ（PC は左の列ごと、スマホは .tb-wrap）。テーブルの中にも薄い白をかける */
+body.smoke-on .tb-wrap { z-index: 3; }
+body.smoke-on .stage-col { z-index: 3; }
+body.smoke-on .tb-table { position: relative; background: radial-gradient(ellipse at 50% 35%, #7b7f99, #565a74 78%); }
+body.smoke-on .tb-table::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(255,255,255,.34); pointer-events: none; }
+body.smoke-on .tb-row { position: relative; z-index: 1; }
+/* 2026-11-07: カード・役職名（プレイヤー名）の光る飾りは廃止。ボタン（情報確認・COボタン）と変化公開の欄は煙で曇らせない:
+   #app（.onw-app）は z-index:1 の層を作り、煙(z-index 2)の下になって曇っていた。煙幕中だけ層を作らない(auto)にして、下の .co-dock(z-index 10)を煙の上に出す。
+   ほかの中身（チャット・投票ボタンなど）は今までどおり煙の下で曇る */
+body.smoke-on .onw-app { z-index: auto; }
+/* 「議論タイム」の見出しと「誰が人狼か話し合いましょう」の案内も曇らせない（煙の上に出す。白い煙の上で読めるよう、COボタンの欄と同じ暗い地を敷く） */
+body.smoke-on .onw-app .panel > h2, body.smoke-on .onw-app .panel > .lede { position: relative; z-index: 3; padding: 2px 8px; border-radius: 8px; background: rgba(18,19,28,.97); }
+/* 2026-11-07(3): 煙幕中でも、チャットの文字と、墓地名・プレイヤー名（.tb-name）は普通に読める。光らせない（発光・影・縁取りなし）。
+   チャット(.chat-log / .chat-input)は煙(z-index 2)の上に出す。名前は、テーブルの薄い白の上でも通常と同じ読みやすさになるよう、通常の色のまま暗い地だけ敷く */
+body.smoke-on .onw-app .chat-log:not(.result-chat), body.smoke-on .onw-app .chat-input { position: relative; z-index: 3; }
+/* 送信ボタン: 入力欄の行(.chat-input)ごと煙の上に出ているが、地が透明で白い煙が透けて見えにくかったので、ほかの欄と同じ暗い地を敷く */
+body.smoke-on .onw-app .chat-input { padding: 4px 6px; border-radius: 8px; background: rgba(18,19,28,.97); }
+body.smoke-on .onw-app .chat-input .btn { position: relative; z-index: 1; text-shadow: none; box-shadow: none; }
+body.smoke-on .tb-name { padding: 1px 6px; border-radius: 8px; background: rgba(18,19,28,.9); box-sizing: border-box; text-shadow: none; box-shadow: none; }
+/* 2026-11-07(4): タイマーも曇らせない（光らせない）。議論タイムの大きな時計(.timer-display)・ヘッダーの時間表示(#phase-label / #day-clock)・PC版の左の大きなタイマー(#big-timer。stage-col が z-index 3 で煙の上）。
+   ヘッダーは z-index:1 の層を作って煙の下になっていたので、煙幕中だけ層を作らない(auto)にして、時間表示の2つを煙の上に出す。議論タイムの時計は見出し・案内と同じ暗い地を敷く */
+body.smoke-on .onw-header { z-index: auto; }
+body.smoke-on .onw-header__phase, body.smoke-on .onw-header__day { position: relative; z-index: 3; }
+body.smoke-on .onw-app .timer-display { position: relative; z-index: 3; display: table; margin-left: auto; margin-right: auto; padding: 2px 16px; border-radius: 10px; background: rgba(18,19,28,.97); }
+@media (prefers-reduced-motion: reduce) { .smk-puff, .smk-fresh .smk-puff, .smk-fresh .smk-fog { animation: none; } }
+
+/* 役職設定 > 詳細設定: 役職を押すと、画面をずらさず上に重なって出る設定メニュー（ロビーの名前メニュー #pm-overlay と同じ重ね方。設定ウィンドウ(z-index 800)より上） */
+#rs-overlay, #rg-overlay { position: fixed; inset: 0; z-index: 970; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
+.rs-card, .rg-card { width: min(340px, 100%); max-height: min(520px, calc(100vh - 28px)); max-height: min(520px, 80dvh); overflow-y: auto; overscroll-behavior: contain; text-align: left; }
+.rs-card .pm-title, .rg-card .pm-title { padding: 0 38px 4px; }
+.rg-label { margin: 8px 8px 2px; font-size: .85em; opacity: .75; }   /* 配役設定の陣営メニュー（#rg-overlay）の中の「人狼系」「狂人系」の小見出し */
+.rs-role { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; margin: 4px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel); color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.rs-role .rg-count b { font-size: 18px; line-height: 1; }
+.rs-role--none { opacity: .5; border-style: dashed; cursor: default; }
+
+/* ゲーム内ガイド: 「ルールまとめ」は4つのタブの上に、1段だけ別に置く */
+.wikiv__tabs--top { padding-bottom: 6px; border-bottom: 0; }
+.wikiv__tabs--top .wikiv__tab { border-bottom: 1px solid var(--line); border-radius: 8px; }
+
+/* 役職設定 > アサイン設定: 役職ごとの出る確率（役職の枚数ぶん ①②… の行が並ぶ） */
+.asg-role { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 6px 0; background: var(--bg-panel); color: var(--ink); }
+.asg-role__name { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+.asg-role .field-row { margin: 2px 0; }
+.role-group__title .rg-count { font-weight: 400; font-size: 12px; color: var(--ink-dim); }
+
+/* 役職設定 > 配役設定 / 詳細設定 / アサイン設定: 画面をずらさず上に重なるメニュー（設定ウィンドウ(800)より上、役職ごとの設定メニュー #rs-overlay(970)より下） */
+#rm-overlay { position: fixed; inset: 0; z-index: 965; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
+.rm-card { width: min(360px, 100%); max-height: min(560px, calc(100vh - 28px)); max-height: min(560px, 84dvh); overflow-y: auto; overscroll-behavior: contain; text-align: left; }
+.rm-card .pm-title { padding: 0 38px 4px; text-align: center; }
+@media (min-width: 1000px) { .rm-card { zoom: 1.3; max-height: calc(84dvh / 1.3); } }
+.rm-search { width: 100%; box-sizing: border-box; margin: 2px 0 6px; }   /* 配役設定・詳細設定・アサイン設定の一番上の検索ボックス（役職名。wikiと同じ部分一致） */
+
+/* 煙幕の名前隠し（詳細設定。js/stage.js の smkNamesSync）: 名前が「？？？」になった席。並びは CSS の order で入れ替える */
+.tb-seat.smk-hid .tb-name { letter-spacing: .14em; }

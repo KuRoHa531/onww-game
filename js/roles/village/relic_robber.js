@@ -12,10 +12,10 @@
       return;
     }
     const fg = (n.forced(p).graves || []).filter((k) => k >= 0 && k < g.center.length);   // デバッグ: 交換する墓地の指定
-    const idx = fg.length ? fg[0] : n.pick([...g.center.keys()]), got = g.center[idx], seen = ONW.shownRole(got);   // seen: 本人が思う新しい役職（忘却の人狼・狼憑きは村人、狼夢人は人狼）
+    const idx0 = fg.length ? fg[0] : n.pick([...g.center.keys()]), idx = ONW.watcher.shiftGrave(g, idx0), got = g.center[idx], seen = ONW.shownRole(got);   // 静観者の札の墓地を選んだら、静観者でない別の墓地と交換する（docs/watcher.md）。   // seen: 本人が思う新しい役職（忘却の人狼・狼憑きは村人、狼夢人は人狼）
     ONW.swapGrave(g, p.id, idx);
     i.mode = "relic"; i.graveIdx = idx; i.newRole = seen; i.known[p.id] = seen;
-    g.nightLogsAll.push(`${n.rn("relic_robber")} ${p.name} は 墓地${idx + 1} と役職を交換し、${n.rn(got)} になりました。`);
+    g.nightLogsAll.push(ONW.watcher.graveText(`${n.rn("relic_robber")} ${p.name}`, idx0, idx, n.rn(got)) || `${n.rn("relic_robber")} ${p.name} は 墓地${idx + 1} と役職を交換し、${n.rn(got)} になりました。`);   // 静観者の札の墓地にずれたときは「墓地1と交換しようとしましたが、静観者だったため墓地3の…と交換しました。」
     n.hold(p.id, `墓地${idx + 1}枚目と役職を交換しました。あなたの新しい役職は「${n.rn(seen)}」です。`);
     i.relic = { graveIdx: idx, newRole: seen };
     if (got === ONW.ROLE.EXECUTIONER) { const tid = ONW.execTarget(g, p.id); if (tid) i.execTarget = tid; }   // 墓地から引いた処刑人: 新しいターゲットが決まっていて、引いた本人は朝に知る
@@ -92,11 +92,12 @@
       normalize: (c, players, graves) => ({ players: [], graves: graves.slice(0, 1) }),
       resolve(c, p) {   // 選んだ墓地と役職を交換（起床順。交換後の役職の能力は朝に使う）
         const g = c.g, rn = c.rn, hold = c.hold, rev = c.rev;
-        const i = c.selOf(p).graves[0]; if (i === undefined || i < 0 || i >= g.center.length) return;
+        let i = c.selOf(p).graves[0]; if (i === undefined || i < 0 || i >= g.center.length) return;
+        const i0 = i; i = ONW.watcher.shiftGrave(g, i);   // 静観者の札の墓地を選んだら、静観者でない別の墓地と交換する（移す先がなければ選んだまま。マイクラ版 resolveWatcherShiftCenterIndex。docs/watcher.md）
         if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "交換", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中なら失敗。墓地は動かず、新聞・観測にも載らない
         const got = g.center[i];
         ONW.swapGrave(g, p.id, i);
-        g.nightLogsAll.push(`${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
+        g.nightLogsAll.push(ONW.watcher.graveText(`${rn(c.eff(p))} ${p.name}`, i0, i, rn(got)) || `${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
         hold(p.id, `墓地${i + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
         const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を朝のうちに使える（ga = 使う能力の役職。「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
         if (ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; }
@@ -109,12 +110,12 @@
     morning: {
       run(c) {   // ドッペルゲンガーがコピーした墓荒らし / 昼に酔いが覚めた墓荒らし
         if (!c.graves.length) return null;
-        const g = c.g, rn = c.rn, id = c.id, idx = c.graves[0];
+        const g = c.g, rn = c.rn, id = c.id, idx0 = c.graves[0], idx = ONW.watcher.shiftGrave(c.g, idx0);   // 静観者の札の墓地を選んだら別の墓地（ドッペル経由・酔い覚めでも同じ）
         if (ONW.keymaster.gate(g, id, [])) return { lines: [ONW.keymaster.fail(g, id, "self", "交換", [], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
         ONW.swapGrave(g, id, idx);
         const got = g.currentRoles[id];
         const lines = [`墓地${idx + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`];
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は 墓地${idx + 1} と役職を交換し、${rn(got)} になりました。`);
+        g.nightLogsAll.push(ONW.watcher.graveText(`${c.label} ${c.me.name}`, idx0, idx, rn(got)) || `${c.label} ${c.me.name} は 墓地${idx + 1} と役職を交換し、${rn(got)} になりました。`);
         lines.push(...c.soberInfoLines(g, id, got));   // 模倣の人狼を引いたら「〜を模倣しています。」もここに入る（mimic_wolf.soberLines）
         const reveal = ONW.mimic.tag(g, id, got, { kind: "relic", target: idx, role: ONW.shownRole(got) });   // 墓地と入れ替わる演出（朝も、昼に酔いが覚めたときも出す。昼は hostRecv が reveal.day を立て、数秒後に閉じる）
         return { lines, reveal, nextChain: null };
