@@ -95,7 +95,7 @@ window.ONW = window.ONW || {};
       ${sec("タイマー設定", line("役職配布(演出のあとの待ち)", `${t.deal ?? 5}秒`) + line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("待機時間", `${t.settle ?? 5}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
       ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", g.drunkChance)) + line("恋人", dupText(g.loverCount, "組", g.loverChance)))}
       ${sec("役職設定（アサイン設定）", asgLines(g))}
-      ${sec("役職設定（詳細設定）", line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("偽占い師が占える墓地の枚数", `${fakeSeerMax}枚`) + line("狂った占い師が占える墓地の枚数", `${madSeerMax}枚`) + line("メイヤーの投票数", `${g.mayorVoteCount ?? 2}票`) + line("狂ったメイヤーの投票数", `${g.madMayorVoteCount ?? 2}票`) + line("煙幕: 能力対象のプレイヤー名を隠す", onoff(g.smokeHideAbility === true)) + line("煙幕: 投票対象のプレイヤー名を隠す", onoff(g.smokeHideVote === true)))}
+      ${sec("役職設定（詳細設定）", line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("偽占い師が占える墓地の枚数", `${fakeSeerMax}枚`) + line("狂った占い師が占える墓地の枚数", `${madSeerMax}枚`) + line("メイヤーの投票数", `${g.mayorVoteCount ?? 2}票`) + line("狂ったメイヤーの投票数", `${g.madMayorVoteCount ?? 2}票`) + line("煙幕: 能力対象のプレイヤー名も隠す", onoff(g.smokeHideAbility === true)) + line("煙幕: 投票対象のプレイヤー名も隠す", onoff(g.smokeHideVote === true)))}
       ${sec("システム設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("変化公開", onoff(g.revealTransforms)) + line("手動配役を変化公開に表示", onoff(g.revealManualRoles)) + line("勝利の乗っ取り演出", onoff(g.winLadderFx !== false)) + line("デバッグモード", onoff(g.debugOn)))}
       ${sec("変化先の有無", tf)}`;
   }
