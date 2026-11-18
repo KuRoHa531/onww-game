@@ -181,7 +181,9 @@ window.ONW = window.ONW || {};
   cpu.afterNight = function (g) {
     g.players.filter((p) => p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id])).forEach((p) => {
       const h = ONW.roleHook(ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]), "cpuAfter");   // 後覚者を模倣したCPUも最終役職を知る（9of9）
-      if (h) h(g, p.id, cpu.kit);
+      if (h) { h(g, p.id, cpu.kit); return; }
+      // 後から後覚者になったCPU（ドッペルゲンガーのコピー・怪盗・いたずらっ子などで、最終役職が後覚者。手にしたあとシャッフルなどで別の役職に変わっていても、夜のうちに一度手にしていれば発動）も最終役職を知る。人間側 insomniac.js の results() と同じ条件（封印中は除く）
+      if ((ONW.mimic.eff(g, p.id) === "insomniac" || (((g.roleTrail || {})[p.id]) || []).includes("insomniac")) && !(ONW.seal && ONW.seal.is(g, p.id))) { const ha = ONW.roleHook("insomniac", "cpuAfter"); if (ha) ha(g, p.id, cpu.kit); }
     });
   };
 
@@ -195,6 +197,20 @@ window.ONW = window.ONW || {};
   const AVOID_RESULT = ["tanner", "love_tanner", "bounty_hunter", "opportunist", "amanojaku", "winner", "freeter", "servant", "fox", "jester_bomber", "martyr"];   // 投票を避ける結果役職（本家 cpuVoteAvoidResultRoles。殉職者も入っている。COルール3/3で 天邪鬼・勝ち組・フリーター・従者 を追加）
   const setupRoles = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])];   // 占い結果に出してよい（実在する）役職
   const roleInSetup = (g, role) => setupRoles(g).includes(role) || (g.coDeck || []).some((x) => x.r === role);
+  /** みんなが知っている範囲の役職（配役 selectedRoles + COの一覧 coDeck）。騙りで名乗る役職は、ここにあるものだけにする（2026-11-17）。
+   *  roleInSetup は配られたカード(initialRoles・墓地)も見るので、光の使徒などが変化した先の役職（公開されていない）まで「いる」ことになり、
+   *  配役にも公開にも無い占い師を人外のCPUが名乗れてしまう（CPUが隠れた情報を覗いた形で、嘘も透ける） */
+  const publicRoles = (g) => [...((g && g.selectedRoles) || setupRoles(g)), ...((g && g.coDeck) || []).map((x) => x.r)];
+  const roleCoable = (g, role) => publicRoles(g).includes(role);
+  /** 名乗って即破綻しない役職か。自分の本当の役職・陣営CO・公開範囲（配役 + COの一覧）にいる役職・配役に村人がいるときの村人・煙幕のスターは名乗ってよい */
+  function coSurvives(g, p, r, co) {
+    if (!co || String(co).startsWith("team:")) return true;
+    if (co === r || co === (g.currentRoles || {})[p.id] || co === (g.initialRoles || {})[p.id]) return true;   // 本当の役職（変化先の候補にしか無い役職でも、本人が持っていれば本当）
+    if (co === "drunk") return true;
+    if (co === "villager") return villagerAppears(g);
+    if (co === "star" && starLieOk(g)) return true;
+    return roleCoable(g, co);
+  }
   /** 「村人CO」をしてよいか: 配役(selectedRoles)か、変化公開で公開された役職(coDeck の cand でないもの)に、村人・忘却の人狼・狼憑き(本人は村人だと思い込む役職)がいるときだけ。
    *  変化後の本当の役職(initialRoles)は公開されていないと分からないので見ない（見ると、配役にも公開にも村人がいないのに村人COできてしまう） */
   const villagerAppears = (g) => [...(g.selectedRoles || setupRoles(g)), ...(g.coDeck || []).filter((x) => !x.cand).map((x) => x.r)]
@@ -245,7 +261,13 @@ window.ONW = window.ONW || {};
     return pick(pref.length ? pref : pool.length ? pool : ["villager"]);
   }
   const wolfLikeResult = (g) => pickResultRole(g, WOLF_LIKE());
-  const villageLikeResult = (g, ok) => pickResultRole(g, ["villager", "mason", "seer", "robber", "troublemaker", "insomniac"], (r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && (!ok || ok(r)));   // 村人側の結果は必ず村人陣営の役職から（候補が無いときに人狼などを言って自白しない）
+  const villageLikeResult = (g, ok) => pickResultRole(g, ["villager", "mason", "seer", "robber", "troublemaker", "insomniac"], (r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && !noLie(r, g) && (!ok || ok(r)));   // 村人側の結果は必ず村人陣営の役職から（候補が無いときに人狼などを言って自白しない）。思い込み系（狼夢人・狼憑き・忘却の人狼など）は本人が自覚できないので「〇〇になりました」と言わない（騙りの怪盗が「狼夢人を奪った」と言う不具合の修正）
+  /** 占い結果として言ってよい役職か: 占い師に占われたとき「その役職のまま」見える役職だけ（白狼・姫君は村人、狼憑き・黒狼の狂人は人狼、狐憑きは妖狐と出る。蜃気狼はランダム）。
+   *  白狼などを偽の占い結果で言うと、本物の占い師に見える結果と食い違ってすぐ嘘とバレる（「占い結果が白狼」の不具合の修正） */
+  const seerShowable = (r) => r !== "mirage_wolf" && (!ONW.seerSees || ONW.seerSees(r) === r);
+  /** 占い師の偽の結果で「人狼」と言うときの役職（見える人狼系が配役にいなければ、村人側の結果にする） */
+  const seerWolfLikeResult = (g) => (WOLF_LIKE().some((r) => seerShowable(r) && setupRoles(g).includes(r))
+    ? pickResultRole(g, WOLF_LIKE().filter(seerShowable), seerShowable) : villageLikeResult(g, seerShowable));
   /** 騙り占いの対象: 人狼陣営は本物の人狼を避ける（本家 chooseFakeSeerTarget） */
   function fakeSeerTarget(g, p) {
     const others = g.players.filter((q) => q.id !== p.id);
@@ -256,16 +278,16 @@ window.ONW = window.ONW || {};
   function fakeSeerResult(g, p, t, selfRole) {
     const tr = g.currentRoles[t.id];
     if (selfRole === "mad_seer") {   // 狂った占い師: 人狼・狂人には村人っぽい結果、それ以外には本当の結果
-      if (isWolf(tr) || isMad(tr) || (g.promotedWolfIds || []).includes(t.id)) return villageLikeResult(g);
-      const real = g.initialRoles[t.id];
-      return setupRoles(g).includes(real) && (real !== "seer" || setupRoles(g).filter((r) => r === "seer").length >= 2) ? real : villageLikeResult(g);
+      if (isWolf(tr) || isMad(tr) || (g.promotedWolfIds || []).includes(t.id)) return villageLikeResult(g, seerShowable);
+      const real = ONW.seerSees ? ONW.seerSees(g.initialRoles[t.id]) : g.initialRoles[t.id];   // 占い師に見える役職（白狼・姫君は村人）
+      return setupRoles(g).includes(real) && (real !== "seer" || setupRoles(g).filter((r) => r === "seer").length >= 2) ? real : villageLikeResult(g, seerShowable);
     }
     if (isWolfSide(selfRole)) {
-      if (isWolf(tr)) return villageLikeResult(g);                                // 仲間の人狼は白と言う
+      if (isWolf(tr)) return villageLikeResult(g, seerShowable);                                // 仲間の人狼は白と言う
       if ((roleCount(g, "fox") + roleCount(g, "fox_marked")) > 0 && Math.random() < 0.15) return "fox";           // 妖狐が実在するときは、「妖狐でした」と言うことがある（マイクラ版 cpuPickSeerResultRole の候補に妖狐がある）。投票はされにくくなるが、人狼が吊られる流れを乱せる
-      return Math.random() < 0.72 ? wolfLikeResult(g) : villageLikeResult(g);      // 72%で人狼だと告発
+      return Math.random() < 0.72 ? seerWolfLikeResult(g) : villageLikeResult(g, seerShowable);      // 72%で人狼だと告発
     }
-    return Math.random() < 0.5 ? wolfLikeResult(g) : villageLikeResult(g);         // 非人狼の騙り（てるてる系）
+    return Math.random() < 0.5 ? seerWolfLikeResult(g) : villageLikeResult(g, seerShowable);         // 非人狼の騙り（てるてる系）
   }
   /** 騙りで名乗る役職の抽選（本家 makeClaimPlan の人狼陣営の分）。山札に無い役職は名乗らない。マーリンは騙り禁止 */
   /** 騙りで名乗る役職の抽選表 [[役職ID, 重み], ...]（各役職ファイルの cpuLie.weight を order の小さい順に並べたもの） */
@@ -273,8 +295,8 @@ window.ONW = window.ONW || {};
     .sort((a, b) => a.nd.order - b.nd.order || a.idx - b.idx).map((x) => [x.id, x.nd.weight]);
   function pickLieRole(g) {
     const chosen = weighted([...lieTable(), ...(starLieOk(g) || sealLieOk(g) ? [["star", 4]] : []), ...(sealLieOk(g) ? [["baker", 4]] : [])]);   // 煙幕のとき・封印の狂人かエルフリンデがいるときだけ、スター(重み4)・パン屋(重み4。封印のときだけ)も抽選に入る（ほかの騙り役職と同じくらい）   // 重みは各役職ファイルの cpuLie(order 順)。従者は村人陣営以外だけが騙れる（本家も配役にいるときだけ、低めの確率）
-    if (chosen === "villager" ? villagerAppears(g) : roleInSetup(g, chosen)) return chosen;   // 村人も、配役か変化公開に村人・忘却の人狼・狼憑きがいるときだけ名乗る
-    const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleInSetup(g, r));
+    if (chosen === "villager" ? villagerAppears(g) : roleCoable(g, chosen)) return chosen;   // 村人も、配役か変化公開に村人・忘却の人狼・狼憑きがいるときだけ名乗る
+    const fb = ["seer", "troublemaker", "robber", "mason"].filter((r) => r !== chosen && roleCoable(g, r));
     if (fb.length) return pick(fb);
     const pool = villageLieRoles(g);
     return pool.length ? pick(pool) : TEAM_CO;   // 名乗れる役職が1つもなければ村人陣営CO
@@ -282,9 +304,9 @@ window.ONW = window.ONW || {};
   /** あり得る村役職 = この試合に実在する村人陣営の役職（変化後の役職・墓地・COの候補）。村人も、配役に入っているときだけ含む */
   /** 騙りで名乗れる村役職（実在する村人陣営の役職。マーリン・女王・チキンは含めない）。なければ空配列 */
   function villageLieRoles(g, ok) {
-    return [...new Set([...setupRoles(g), ...(g.coDeck || []).map((x) => x.r), ...(villagerAppears(g) ? ["villager"] : [])])]
+    return [...new Set([...publicRoles(g), ...(villagerAppears(g) ? ["villager"] : [])])]
       .filter((r) => r !== "villager" || villagerAppears(g))
-      .filter((r) => ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && !noLie(r, g) && (!ok || ok(r)));   // 思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない
+      .filter((r) => r !== "finger_reader" && ONW.roles.getInfo(r).team === "village" && !ONW.TRANSFORM_GROUPS[r] && !noLie(r, g) && (!ok || ok(r)));   // 思い込み系(狼憑き・狼夢人)は本人が名乗れないので騙りにも使わない。指読みもCO禁止なので名乗らない
   }
   /** あり得る村役職 = 上の一覧。空のときは「手にした役職」の嘘などで役職名が要るので、最終手段として村人を返す（COの発言には使わない: CO は bareCo / pickLieRole が村人陣営COにする） */
   function villageRolesInPlay(g, ok) {
@@ -296,8 +318,8 @@ window.ONW = window.ONW || {};
   function bareCo(g, pref) {
     if (pref === TEAM_CO) return TEAM_CO;
     if (villagerAppears(g)) return "villager";
-    if (pref && pref !== "villager" && !noLie(pref, g)) return pref;
-    const found = ["seer", "troublemaker", "robber", "mason", "insomniac"].find((r) => roleInSetup(g, r));
+    if (pref && pref !== "villager" && pref !== "finger_reader" && !noLie(pref, g)) return pref;   // 指読みはCO禁止なので、騙りでも名乗らない
+    const found = ["seer", "troublemaker", "robber", "mason", "insomniac"].find((r) => roleCoable(g, r));
     if (found) return found;
     const pool = villageLieRoles(g);
     return pool.length ? pick(pool) : TEAM_CO;   // 名乗れる役職がなければ村人陣営CO
@@ -305,7 +327,7 @@ window.ONW = window.ONW || {};
   /** 「ただの村人のふり」をしたいときのCO。村人がいなければ、いる村役職の騙り（占い師なら偽結果つき）にする */
   function plainLie(g, p, selfRole) {
     if (villagerAppears(g)) return { co: "villager", result: null };
-    const pool = ["seer", "troublemaker", "robber", "mason"].filter((r) => roleInSetup(g, r));
+    const pool = ["seer", "troublemaker", "robber", "mason"].filter((r) => roleCoable(g, r));   // 公開されている範囲だけ（2026-11-17）
     return pool.length ? lieClaim(g, p, selfRole, pick(pool)) : { co: bareCo(g), result: null };
   }
   /**
@@ -339,13 +361,78 @@ window.ONW = window.ONW || {};
   function nonVillageLie(g, p, roleId, i, now) {   // roleId: 手にした人外の「元の役職」(robber / relic_robber / doppelganger / insomniac)。嘘の中身は各役職ファイルの cpuFakeGot
     const fg = (ONW.roleDef(roleId) || {}).cpuFakeGot;
     if (Math.random() < 0.5) {
-      const role = fakeVillageRole(g, (r) => canGetByClaim(g, fg.kind, r));   // 怪盗→怪盗 / 墓荒らし→墓荒らしは、そのカードが2枚以上あるときだけ
-      return fg.make(cpu.kit, g, i, role);
+      let res = null;
+      for (let n = 0; n < 40; n++) {
+        const role = fakeVillageRole(g, (r) => canGetByClaim(g, fg.kind, r));   // 怪盗→怪盗 / 墓荒らし→墓荒らしは、そのカードが2枚以上あるときだけ
+        res = fg.make(cpu.kit, g, i, role);
+        if (!claimIsTrue(g, res)) break;   // 人外の嘘は、手にした役職が本当の（元の持ち主の）役職と一致しないものだけ
+      }
+      return res;
     }
     return lieClaim(g, p, now, fakeVillageRole(g));
   }
   /** 騙りの CO と結果開示（本家の mem.fakeRole）。戻り値: { co, result }（resultはnullのこともある） */
+  /**
+   * 騙りの結果が「たまたま真実と一致している」か。見る結果: 占い・怪盗・ドッペル（対象の役職）／感覚の占い師（対象の気配）／いたずらっ子（入れ替えた2人）／墓荒らし（墓地Nのカード）。訪問者・番犬・少佐・鍵師など、結果が行動の報告だけで真偽を決められないものは対象外。
+   *   真実 = 対象の席の、夜の初めの役職と今の役職（どちらも本人に見せる役職 ONW.shownRole）。人外・自認人狼のCPUの騙りは、これと一致させない。
+   *   （村人側の騙り・偽占いは、たまたま本当の結果になってもよい）
+   */
+  function claimIsTrue(g, res) {
+    const c = res && res.result && res.result.claim;
+    if (!c) return false;
+    const sh = ONW.shownRole;
+    if (c.target && c.role && ["seer", "robber", "doppel"].includes(c.kind))
+      return [g.initialRoles && g.initialRoles[c.target], g.currentRoles && g.currentRoles[c.target]].some((r) => r && sh(r) === c.role);
+    if (c.kind === "sense" && c.target && c.key && ONW.senseSeer) {   // 感覚の占い師: 言った気配が、対象の本当の気配（最終盤面）と同じなら真実
+      const r = g.currentRoles && g.currentRoles[c.target];
+      return !!r && ONW.senseSeer.realKey(g, c.target) === c.key;   // 恋人・(+シャッフラー)・(+反転) も含めた本当の気配（2026-11-17）
+    }
+    if (c.kind === "troublemaker" && c.pair && c.pair.length === 2) {   // いたずらっ子: 言った2人が、夜のはじめと今で本当に役職を入れ替えた形（別々の役職で、互いに入れ替わっている）なら真実
+      const [a, b] = c.pair, ir = g.initialRoles || {}, cr = g.currentRoles || {};
+      return !!ir[a] && !!ir[b] && ir[a] !== ir[b] && cr[a] === ir[b] && cr[b] === ir[a];
+    }
+    if (c.kind === "relic" && c.role && c.graveIdx != null) {   // 墓荒らし: その墓地にある（あった）カードが、言った役職なら真実
+      const cards = [(g.center || [])[c.graveIdx], ...(((g.centerTrail || {})[c.graveIdx]) || [])];
+      return cards.some((r) => r && sh(r) === c.role);
+    }
+    return false;
+  }
+  /** 人外（自認人狼の狼夢人を含む。selfRole は本人に見せる役職）の騙りなら、真実と一致しない結果が出るまで引き直す。どうしても出なければ結果なしのCOだけにする */
+  const TRUE_LIE_RATE = 0.5;   // ニワトリ・女王など(noLie)が騙るとき、結果を真実にする確率
+  /** 人外が「本当の能力を持つ役職」として名乗るときの、その役職（2026-11-17）。狂った占い師 = 占い師 / 模倣の人狼 = 模倣している役職。それ以外は null。
+   *  この役職を名乗るときだけ、人外の騙りでも、利敵にならない範囲で本当のことを言ってよい（必ず嘘、にはしない）。 */
+  function ownAbilityRole(g, p, selfRole) {
+    if (selfRole === "mad_seer") return "seer";
+    if (ONW.mimic && ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id])) return ONW.mimic.roleOf(g, p.id);
+    return null;
+  }
+  const wolfSideId = (g, id) => !!g.currentRoles[id] && (isWolfSide(g.currentRoles[id]) || (g.promotedWolfIds || []).includes(id));
+  /** 言った内容が本当でも、人狼陣営に不利にならないか（人狼陣営の人・人狼陣営の役職を対象や中身に含まない） */
+  function claimHarmless(g, res) {
+    const c = res && res.result && res.result.claim;
+    if (!c) return true;
+    const ids = [c.target, ...(Array.isArray(c.pair) ? c.pair : []), ...(Array.isArray(c.targets) ? c.targets : []), c.freeter, c.from].filter((x) => typeof x === "string");
+    if (ids.some((id) => wolfSideId(g, id))) return false;
+    if (typeof c.role === "string" && isWolfSide(c.role)) return false;
+    return true;
+  }
+  const TRUTH_TELL_RATE = 0.35;   // 狂った占い師・模倣の人狼が、能力の役職を名乗るとき「本当のこと（利敵にならない範囲）を言う」確率。残りは今までどおりの嘘
   function lieClaim(g, p, selfRole, forceCo) {
+    const own = ownAbilityRole(g, p, selfRole);
+    const liar = selfRole === "mad_seer" ? "madman" : selfRole;   // 嘘の結果の作り方は、ふつうの人外と同じ（狂った占い師の「本当の結果」の作り方は、本当のことを言う分だけで使う）
+    let res = lieClaimRaw(g, p, liar, forceCo);
+    if (!isNonVillage(selfRole)) {   // 村人側。ただし本当の役職をCOできない思い込み系の役職（ニワトリ・女王・マーリンなど = noLie）は、騙りの結果を50%で「真実」にする（たまたまではなく狙って。結果が真偽を決められない役職は対象外）
+      if (noLie(selfRole, g) && Math.random() < TRUE_LIE_RATE && !claimIsTrue(g, res)) for (let n = 0; n < 60; n++) { const r2 = lieClaimRaw(g, p, selfRole, forceCo); if (claimIsTrue(g, r2)) return r2; }
+      return res;
+    }
+    if (own && res.co === own && Math.random() < TRUTH_TELL_RATE) {   // 狂った占い師が占い師を / 模倣の人狼が模倣先の役職を名乗るときだけ、本当のことを言うこともある（利敵にならない範囲）
+      const real = own === "seer" ? "mad_seer" : selfRole;   // 占い師の結果は、狂った占い師と同じ作り方（人狼・狂人には村人っぽい結果、それ以外には本当の結果）
+      for (let n = 0; n < 40; n++) { const r2 = lieClaimRaw(g, p, real, res.co); if (r2 && r2.co === own && r2.result && r2.result.claim && claimIsTrue(g, r2) && claimHarmless(g, r2)) return r2; }
+    }
+    for (let n = 0; n < 40 && claimIsTrue(g, res); n++) res = lieClaimRaw(g, p, liar, forceCo);
+    return claimIsTrue(g, res) ? { co: res.co, result: null } : res;
+  }
+  function lieClaimRaw(g, p, selfRole, forceCo) {
     const others = g.players.filter((q) => q.id !== p.id);
     const co = forceCo || pickLieRole(g);
     if (!forceCo && needSealLie(g, co)) return { co, result: sealedByLie(g) };
@@ -462,6 +549,7 @@ window.ONW = window.ONW || {};
       }
       const hf = c.co ? ONW.roleHook(c.co, "cpuCoFollow") : null;   // 名乗った役職ごとの後処理（後覚者: 結果を言わないと騙りだと透けるので、嘘の結果開示もする）
       if (hf) hf(cpu.kit, g, p, r, i, c);
+      if (c.co && !coSurvives(g, p, r, c.co)) { c.co = bareCo(g); c.result = null; c.extra = null; }   // 最後の安全装置（2026-11-17）: この試合に無い（公開されている範囲に無い）役職は、どの経路で決まっても名乗らない。名乗ると、占い師でなくても即破綻する
       if (c.co && ONW.seal && ONW.seal.cpuSealResult) ONW.seal.cpuSealResult(cpu.kit, g, p, r, i, c);   // 封印の狂人(4of4): 封印されているCPUは、結果のかわりに「封印されていました。」と言う（騙りが言うこともある）
       if (c.co && c.result && !c.extra && !i.keyFail) c.extra = chainedResult(g, p, i, c, r);   // 墓荒らし・ドッペルで手にした役職の結果も続けて言う（番犬なら飼い主）
       if (!c.co) return;                                              // COしない
@@ -633,6 +721,6 @@ window.ONW = window.ONW || {};
   cpu.decideVote = function (g, p) { return chooseVote(g, p); };
 
   // 役職ファイルのCPUフック(cpuClaim / cpuLie / cpuFakeGot など)が使う、役職をまたぐ道具
-  Object.assign(cpu.kit, { revFlip, rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, sealerRoles, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
+  Object.assign(cpu.kit, { revFlip, rn, weighted, isNonVillage, isWolfSide, WOLF_LIKE, roleInSetup, roleCoable, sealerRoles, bareCo, plainLie, lieClaim, nonVillageLie, fakeSeerTarget, fakeSeerResult, villageLikeResult, wolfLikeResult, fakeVillageRole, canGetByClaim, selfRole, coTruth, coverLie, optionalCo, coText, TEAM_CO });
   ONW.cpu = cpu;
 })(window.ONW);

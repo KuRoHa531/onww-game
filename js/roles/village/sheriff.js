@@ -161,7 +161,8 @@
   function lines(g, nm) {
     return (g.sheriffShots || []).map((e) => {
       const by = nm(e.by), tg = nm(e.target), sub = e.sub ? nm(e.sub) : "";
-      const lose = "勝利条件と投票権を失いました";
+      const revived = e.mode === "execute" && !e.sub && (g.steveLog || []).some((x) => x.when === "day" && (e.victims || []).includes(x.id) && !(g.deadIds || []).includes(x.id));   // 撃たれたスティーブが不死のトーテムで復活した（3of4）
+      const lose = revived ? "不死のトーテムで復活し、勝利条件も投票権も失いませんでした" : "勝利条件と投票権を失いました";
       let info = "";
       if (e.rev && e.mode === "execute" && e.sub) info = `${by} は模倣保安官です。${tg} は人狼陣営ではありませんでしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
       else if (e.rev && e.mode === "execute") info = `${by} は模倣保安官です。${tg} は人狼陣営ではありませんでした。${tg} が撃たれ、${lose}。`;

@@ -17,7 +17,8 @@
  *
  * 【気配の判定（マイクラ版 main.js senseSeerMessage と同じ順）】対象の最終役職（g.currentRoles）で決める:
  *   1. 蜃気狼（模倣先が蜃気狼の模倣の人狼も）: 盤面にあり得るランダムな役職（ONW.mirage.dayRole。心眼の人狼と同じ）の気配に見える（1回の能力につき1回だけ引く）。恋人の判定は飛ばす
- *   2. (+恋人) がついている人 → 「恋人陣営の気配」（(+反転) は Web版に無い。入れるときは 反転 ＞ 恋人 の順 = docs/overlay-role-priority.md）
+ *   2. (+恋人) がついている人 → 「恋人陣営の気配」（(+シャッフラー)・(+反転) がついていてもいなくても、元の役職が何でも恋人。2026-11-17 ユーザー指定）
+ *   2.5 (+シャッフラー)（有効な印）か (+反転)（1回以上）がついている人（恋人でない） → 「第三陣営の気配」（元の役職が何でも。2026-11-17 ユーザー指定）
  *   3. 昇格した狂人（g.promotedWolfIds）・人狼系 → 「人狼の気配」 / 狂人系 → 「狂っている気配」 / 第三陣営（ドッペルゲンガー含む）→ 「第三陣営の気配」 / それ以外 → 「村人の気配」
  *      ・白狼・忘却の人狼・模倣の人狼も、カード自体が人狼系なので「人狼の気配」（占い師の見え方とは違う。マイクラ版の isRealWolfRole）
  *      ・闇の化身・狼憑き・狐憑き・呪われし者・お姫様は、マイクラ版の分類どおり「村人の気配」
@@ -47,6 +48,17 @@
     return "village";
   }
   /**
+   * 蜃気狼を除いた「本当の気配」（最終盤面 g.currentRoles で）。元の役職が何であっても、次の順で決める（2026-11-17 修正）:
+   *   1. (+恋人) がついている → 恋人陣営（(+シャッフラー)・(+反転) がついていてもいなくても、元の役職が何でも）
+   *   2. (+シャッフラー)（有効なシャッフラーの印）または (+反転)（反転が1回以上）がついている → 第三陣営（元の役職が何でも）
+   *   3. それ以外は役職そのもの（classify）
+   */
+  function realKey(g, target) {
+    if (ONW.isLover(g, target)) return "lover";
+    if ((ONW.shuffler && ONW.shuffler.tagged(g, target)) || (ONW.reverser && ONW.reverser.count(g, target) > 0)) return "third";
+    return classify(g, (g.currentRoles || {})[target], target);
+  }
+  /**
    * target の気配を決める（最終盤面 g.currentRoles で）。戻り値: { key, mirage }。
    * 蜃気狼のときは「ランダムな役職」を1回だけ引き、その役職の気配（心眼の人狼と同じ ONW.mirage.dayRole）。1回の能力につき1回だけ呼ぶこと。
    */
@@ -56,8 +68,7 @@
       ONW.mirage.noteInspect(g, target, "sense_seer");   // 蜃気狼に確認された記録（実績 mirage_wolf_inspected 用）
       return { key: classify(g, ONW.mirage.dayRole(g), null), mirage: true };
     }
-    if (ONW.isLover(g, target)) return { key: "lover", mirage: false };
-    return { key: classify(g, role, target), mirage: false };
+    return { key: realKey(g, target), mirage: false };
   }
   /** 本人への文（人間の画面・情報確認・CPUの記憶で完全に一致させる）: 「〇〇 から人狼の気配を感じました。」 */
   const resultText = (name, key) => `${name} から${FEEL[key] || FEEL.village}を感じました。`;
@@ -122,7 +133,7 @@
     const { fakeSeerTarget, bareCo, isWolfSide } = k;
     const t = fakeSeerTarget(g, p);
     if (!t) return { co: bareCo(g, co), result: null };
-    const real = classify(g, g.currentRoles[t.id], t.id);
+    const real = realKey(g, t.id);
     let key;
     if (isWolfSide(selfRole)) key = real === "wolf" ? "village" : Math.random() < 0.72 ? "wolf" : "village";
     else key = Math.random() < 0.5 ? "wolf" : "village";
@@ -146,7 +157,7 @@
     return out.filter((x, k) => out.indexOf(x) === k);
   }
 
-  ONW.senseSeer = { achievements, FEEL, classify, judge, resultText, feelLabel, coText, coHideText, coOptions, canUse, targets, used, targetOf, apply, doneText, specLines };
+  ONW.senseSeer = { achievements, FEEL, classify, realKey, judge, resultText, feelLabel, coText, coHideText, coOptions, canUse, targets, used, targetOf, apply, doneText, specLines };
 
   ONW.defineRole("sense_seer", {
     info: { sealTarget: true, deck: 86, name: "感覚の占い師", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.98,

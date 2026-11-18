@@ -178,7 +178,7 @@
       intro: { order: 20, run(R) {
         const { res, P, later, setCap, esc, paint, G, alm } = R;
         const seen = new Set();
-        const gs = (res.watchdogs || []).filter((x) => x.votes > 0 && x.hang && !x.bite && !seen.has(x.ownerId) && seen.add(x.ownerId));   // 守られていなければ追放されていた(最多得票だった)ときだけ。そうでない飼い主は、ただ「N票」が出るだけ
+        const gs = (res.watchdogs || []).filter((x) => x.votes > 0 && x.hang && !x.bite && !x.steveBite && !seen.has(x.ownerId) && seen.add(x.ownerId));   // 守られていなければ追放されていた(最多得票だった)ときだけ。そうでない飼い主は、ただ「N票」が出るだけ
         gs.forEach((x) => {
           const mk = P(x.ownerId);
           later(() => { setCap(`<div class="res-cap__t t-village">番犬の飼い主</div><div>${esc(x.owner)} が追放されそうになりました…</div>`); R.alm[mk] = true; paint(G()); }, R.t);
@@ -200,7 +200,7 @@
       biteFx: { order: 20, run(R, h) {
         const { later, P, G, paint } = R;
         const { setCap, esc } = R;
-        const ws = (R.res.watchdogs || []).filter((x) => x.bite && x.ownerId === h.id);   // 同時噛み: この飼い主に噛み付いた犬（番犬・模倣番犬・今後の犬の狂人）が全員
+        const ws = (R.res.watchdogs || []).filter((x) => (x.bite || x.steveBite) && x.ownerId === h.id);   // 同時噛み: この飼い主に噛み付いた犬（番犬・模倣番犬・今後の犬の狂人）が全員
         const back = !ws.length && (R.res.watchdogs || []).find((x) => x.back && x.byId === h.id);
         if (!ws.length && !back) return 0;
         const n = ws.length, simul = n > 1, k = P(h.id), face = back ? "🎃" : "🐕", t0 = R.t;

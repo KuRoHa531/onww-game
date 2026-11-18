@@ -36,7 +36,7 @@
     if (others.length < 2) return null;
     const { pick } = k;
     const a = pick(others), b = pick(others.filter((q) => q.id !== a.id));
-    return { co, result: { short: `${a.name} ⇄ ${b.name}`, text: `${a.name} と ${b.name} を入れ替えました。`, claim: { kind: "troublemaker" } } };
+    return { co, result: { short: `${a.name} ⇄ ${b.name}`, text: `${a.name} と ${b.name} を入れ替えました。`, claim: { kind: "troublemaker", pair: [a.id, b.id] } } };   // pair: 嘘の入れ替え先（人外の騙りが、たまたま本当の入れ替えと一致しないかの判定に使う）
   }
   function cpuClaim(k, g, p, r, i, c) {
     const { nameOf } = k;
@@ -47,6 +47,8 @@
         ? { short: `${x} ⇄ ${y} 変化なし`, text: `${x} と ${y} を選びましたが、入れ替える相手が足りず役職は変化しませんでした。`, claim: null }
         : i.keyFail.kind === "self"
         ? { short: "ロックで失敗", text: "自身の役職がロックされていたため入れ替えに失敗しました。", claim: null }
+        : i.keyFail.kind === "aa"
+        ? { short: `${x} ⇄ ${y} 特殊な力で失敗`, text: `${x} と ${y} を選びましたが、どちらかの特殊な力により入れ替えできませんでした。`, claim: null }
         : { short: `${x} ⇄ ${y} ロックで失敗`, text: `${x} と ${y} を選びましたが、どちらかの役職がロックされていたため入れ替えできませんでした。`, claim: null };
       return;
     }

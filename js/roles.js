@@ -51,13 +51,13 @@ window.ONW = window.ONW || {};
   };
 
   /**
-   * CPU は昼能力（独裁者・交換者・狂った交換者・盗賊）を自分では使わないので、固定していない CPU がこれらを引いたら、人間の参加者と役職を入れ替える（マイクラ版 avoidUnfixedCpuDayRoles と同じ）。
+   * CPU は昼能力（独裁者・交換者・狂った交換者・盗賊・妖精さん）を自分では使わないので、固定していない CPU がこれらを引いたら、人間の参加者と役職を入れ替える（マイクラ版 avoidUnfixedCpuDayRoles と同じ）。
    * 「固定している」= デバッグの固定役で指定した席。昼能力はデバッグの「昼能力」タブで、リアルタイムに発動する（ONW.net.debugDayAbility。事前の対象指定は廃止）。
    * 光の使徒などの変化で昼能力の役職になった CPU も同じ（変化前の記録 transformFrom は人間のほうへ付け替える）。人間が1人もいない（全員 CPU）ときは入れ替えない。
-   * 入れ替え先の人間は、独裁者・交換者・狂った交換者・盗賊を持っていない人から選ぶ（昼能力の役職を別の CPU へ移さないため）。
+   * 入れ替え先の人間は、独裁者・交換者・狂った交換者・盗賊・妖精さんを持っていない人から選ぶ（昼能力の役職を別の CPU へ移さないため）。
    */
   roles.avoidCpuDictator = function avoidCpuDictator(game) {
-    const DAY = [[ONW.ROLE.DICTATOR], [ONW.ROLE.EXCHANGER], [ONW.ROLE.MAD_EXCHANGER], [ONW.ROLE.THIEF]];   // CPU が自分では使わない昼能力の役職
+    const DAY = [[ONW.ROLE.YOMI], [ONW.ROLE.DICTATOR], [ONW.ROLE.EXCHANGER], [ONW.ROLE.MAD_EXCHANGER], [ONW.ROLE.THIEF], [ONW.ROLE.FAIRY], [ONW.ROLE.GORANSHIN], [ONW.ROLE.ICARUS]];   // CPU が自分では使わない昼能力の役職（妖精さんも。マイクラ版 hasDayActionRole / avoidUnfixedCpuDayRoles に入っている）
     const dbg = game.debugOn && game.dbg ? game.dbg : null;
     const fixed = (id) => !!(dbg && (dbg.roles || {})[id]);
     const isDay = (id) => DAY.some(([r]) => game.initialRoles[id] === r);
@@ -418,7 +418,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.ASSASSIN,       required: [ONW.ROLE.MERLIN] },   // アサシンが出る闇鍋には、狙う相手のマーリンも最低1枚出す
     { trigger: ONW.ROLE.MERLIN,         required: [ONW.ROLE.ASSASSIN], priority: [ONW.ROLE.ASSASSIN] }, // マーリンが出る闇鍋には、狙うアサシンも最低1枚出す（アサシン↔マーリンの相互シナジー）
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
-    { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF], priority: [ONW.ROLE.VILLAGER] },     // 狼憑きが出る闇鍋には、村人と人狼も最低1枚ずつ出す
+    { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF, ONW.ROLE.SEER], priority: [ONW.ROLE.VILLAGER] },     // 狼憑きが出る闇鍋には、村人・人狼・占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面）
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
     { trigger: ONW.ROLE.FAKE_SEER,      required: [ONW.ROLE.SEER] },                             // 偽占い師が出る闇鍋には、占い師も最低1枚出す（偽占い師の結果は占い師と見比べて初めて意味が出る。マイクラ版 YAMINABE の偽占い師シナジー）
     { trigger: ONW.ROLE.MIRAGE_WOLF,    required: [ONW.ROLE.SEER] },                             // 蜃気狼が出る闇鍋には、占い師も最低1枚出す（占われてランダムな役職に見えるのが活きる盤面。マイクラ版 YAMINABE の蜃気狼シナジー: 占い師・偽占い師・感覚の占い師・指読みのどれか。Web版にあるのは占い師）
@@ -429,6 +429,8 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.FOX_MARKED,     required: [ONW.ROLE.SEER, ONW.ROLE.FOX, ONW.ROLE.VILLAGER], priority: [ONW.ROLE.VILLAGER] },   // 狐憑きが出る闇鍋には、占い師・妖狐・村人も最低1枚ずつ出す（占われて「妖狐」と出る相手と、本物の妖狐。自分を村人だと思い込む狐憑きに、本物の村人が1人は並ぶように）
     { trigger: ONW.ROLE.FANATIC,        required: [ONW.ROLE.FOX, ONW.ROLE.SEER] },               // 背徳者が出る闇鍋には、ご主人の妖狐と占い師も最低1枚ずつ出す（妖狐を呪殺できる占い師がいる盤面にする）
     { trigger: ONW.ROLE.PRINCESS,       required: [ONW.ROLE.VILLAGER, ONW.ROLE.QUEEN], priority: [ONW.ROLE.VILLAGER] },   // 姫君が出る闇鍋には、村人（自認村人の相方）と女王も最低1枚ずつ出す（マイクラ版 YAMINABE の姫君シナジー。昇格する相手・夜に姫君を知る女王がいる盤面）
+    { trigger: ONW.ROLE.PRIEST,         required: [ONW.ROLE.GOD] },                              // 神官が出る闇鍋には、銀色の影から変化した神も最低1枚出す（神官は神がいてこそ働く。マイクラ版 YAMINABE の ensureSilverGodForPriest）
+    { trigger: ONW.ROLE.AA,             required: [ONW.ROLE.KEYMASTER] },                        // A.A.が出る闇鍋には、鍵師も最低1枚出す（A.A.は鍵師にロックされて初めて役職変化が通る。マイクラ版 YAMINABE_TRANSFORM_SYNERGY_RULES）
     { trigger: ONW.ROLE.MASON,          required: [ONW.ROLE.MASON, ONW.ROLE.MASON] },           // 共有者が出る闇鍋には、光の使徒から変化した共有者を合わせて最低2枚出す（共有者が1人だけにならない）
   ];
   /** 闇鍋シナジー一覧。SYNERGY_RULES に、自認村人の役職(ONW.SELF_AS_VILLAGER)で村人のルールがまだ無いものを自動で足す（優先度高め）。新しい自認村人の役職を足しても、村人が出るシナジーが自動でつく */
@@ -459,14 +461,19 @@ window.ONW = window.ONW || {};
   /** 封印の効果を受ける役職（マイクラ版 YAMINABE_SEAL_TARGET_ROLES のうち、このWeb版にある役職）。各役職ファイルの info.sealTarget: true から自動で作る（ROLE_ORDER 順）。
    *  封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足す・移植するときは、マイクラ版の一覧に入っている役職の info に sealTarget: true を付けるだけでよい（docs/seal-target.md） */
   Object.defineProperty(ONW, "SEAL_TARGET_ROLES", { configurable: true, enumerable: true, get() { return ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO || {}).filter((r) => ONW.ROLE_INFO[r].sealTarget === true)); } });
+  /** 黄泉が断ち切れる「状態」が付く役職（マイクラ版 YAMINABE_YOMI_TARGET_ROLES のうち Web版にある役職。ない役職は、Web版に入ったときに足す）。黄泉が出る闇鍋に最低3枚 */
+  ONW.YOMI_TARGET_ROLES = ["shuffler", "reverser", "pure_lover", "evil_woman", "cupid", "executioner", "avenger", "love_tanner", "exchanger", "mad_exchanger", "goranshin", "icarus", "fairy", "servant", "freeter", "forgetful_wolf", "wolf_dreamer", "gremlin"];
   ONW.SYNERGY_COUNT_RULES = [
     { trigger: ONW.ROLE.INSOMNIAC, label: "役職を変える役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
     { trigger: ONW.ROLE.KEYMASTER, label: "ロック対象の役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, "cosplayer", ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・コスプレイヤー・ドッペルゲンガー・シャッフラー・グレムリン。コスプレイヤーは役職ファイルが後から読み込まれるので文字列で書く）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
+    { trigger: ONW.ROLE.AA, label: "A.A.が弾く役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, "cosplayer", ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // A.A.が出る闇鍋には、A.A.の力（役職変化を弾く）が活きる役職変化系を合わせて最低2枚出す（マイクラ版 YAMINABE_AA_TARGET_ROLES = 鍵師と同じ一覧を2枚）
     { trigger: ONW.ROLE.POET, label: "詩人が見られる役職", get anyOf() { return ONW.observableRoles("poet"); }, min: 2 },   // 詩人が出る闇鍋には、詩人の通知に出る役職（夜に対象を選ぶ能力を使い ONW.observeNote に記録される役職。墓地だけを対象にする墓荒らしは除く）を合わせて最低2枚。対象は各役職ファイルの info.observe（"player"）から自動で作る＝役職を足すときは observeNote を呼ぶ役職に info.observe を付ける
     { trigger: ONW.ROLE.OBSERVER_WOLF, label: "観測の人狼が見られる役職", get anyOf() { return ONW.observableRoles("observer"); }, min: 2 },   // 観測の人狼が出る闇鍋には、観測結果に出る役職（info.observe が "player" か "grave"。墓荒らしなど墓地だけを対象にする役職も含む）を合わせて最低2枚（詩人と同じ考え方。個数は詩人と同じ2枚）
     { trigger: ONW.ROLE.HEARTBREAKER, label: "恋人系役職", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
     { trigger: ONW.ROLE.MAPO_WOLF, label: "麻婆対抗役", get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
     { trigger: ONW.ROLE.SEAL_MADMAN, label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES; }, min: 3 },   // 封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE の封印の狂人シナジー: YAMINABE_SEAL_TARGET_ROLES を3枚。Web版にある役職の分）
+    { trigger: "moses", label: "能力を使われる役職", get anyOf() { return ONW.SEAL_TARGET_ROLES.filter((r) => r !== "moses"); }, min: 4 },   // モーゼスが出る闇鍋には、能力を使われる（選ばれて票が増える）役職を最低4枚出す（マイクラ版 YAMINABE の優先度なしシナジー: YAMINABE_MOSES_TOUCH_ROLES = 封印の対象からモーゼス自身を除いたものを4枚。Web版にある役職の分。モーゼスは役職ファイルが後から読み込まれるので trigger は文字列で書く。対象は info.sealTarget から自動）
+    { trigger: "yomi", label: "状態が付く役職", get anyOf() { return ONW.YOMI_TARGET_ROLES.filter((r) => ONW.ROLE_INFO[r]); }, min: 3 },   // 黄泉が出る闇鍋には、断ち切れる状態（反転・恋人・シャッフラー・各役職の対象・思い込みなど）が付く役職を最低3枚出す（マイクラ版 YAMINABE の黄泉シナジー: YAMINABE_YOMI_TARGET_ROLES を3枚。Web版にある役職の分）。黄泉は役職ファイルが後から読み込まれるので trigger は文字列
     { trigger: ONW.ROLE.SPY, label: "人狼系（一匹狼以外）", get anyOf() { return ONW.sortByRoleOrder((ONW.VISIBLE_WOLF || []).slice()); }, min: 2 },   // スパイが出る闇鍋には、闇の化身から「一匹狼以外の人狼系」を合計2人以上出す（人狼が1人だけだと、狼マークに見えるスパイが確定してしまうため。一匹狼は誰からも見えないので数えない。マイクラ版 ensureDarkWolvesForLightSpy）。ONW.VISIBLE_WOLF から自動で作る（人狼系を足したら自動で入る）
     { always: true, label: "悪女・純愛者・キューピッド", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
     { always: true, label: "マーリン", anyOf: [ONW.ROLE.MERLIN], min: 0, max: 1, early: true },   // マーリンは1人まで（光の使徒などの変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）

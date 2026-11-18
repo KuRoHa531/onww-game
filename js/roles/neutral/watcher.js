@@ -62,6 +62,7 @@
   /** 静観者の席に能力を使った記録を残す。actor = 能力を使った人のID / targets = 対象にした席のID（静観者でない席は何もしない）。同じ人は1回だけ */
   W.touch = function touch(g, actor, targets) {
     if (!g || !actor) return;
+    if (ONW.moses) ONW.moses.touch(g, actor, targets);   // モーゼス: 能力を使われた回数 +1（夜・朝のうち・昼の能力の共通の入口。静観者と同じく、実際に使われたときだけここを通る。docs/moses.md）
     const m = g.watcherTouched = g.watcherTouched || {};
     [...new Set(targets || [])].filter(Boolean).forEach((t) => {
       if (!W.isSeat(g, t)) return;
@@ -161,7 +162,7 @@
   W.keyFailShown = function keyFailShown(g, actor, shown, actual) {
     const f = ((g && g.keyFails) || {})[ONW.cardAt(g, actor)];
     if (!f || f.kind === "self" || !ONW.keymaster) return;
-    f.targets = shown.slice(); f.locked = shown.filter((s, k) => ONW.keymaster.locked(g, actual[k]));
+    f.targets = shown.slice(); f.locked = f.kind === "aa" ? [] : shown.filter((s, k) => ONW.keymaster.lockBlocked(g, actual[k]));
   };
 
   // ---- 票を入れられた ----

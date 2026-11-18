@@ -8,6 +8,11 @@
     const f = n.forced(p), i = n.infoOf(p.id);
     const t = n.validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : n.pick(g.players.filter((q) => q.id !== p.id));
     if (!t) return;
+    if (ONW.keymaster.aaBlocks(g, t.id)) {   // A.A.: 選んだ席がロックされていないA.A.ならコピーに失敗（ロックされたA.A.はコピーできる。マイクラ版は自分のロック判定より先）
+      i.mode = "doppel"; i.target = t.id; i.keyFail = { kind: "aa", target: t.id };
+      n.hold(p.id, ONW.keymaster.fail(g, p.id, "aa", "コピー", [t.id], `${label} ${p.name}`));
+      return;
+    }
     if (ONW.keymaster.gate(g, p.id, [])) {   // 鍵師のロック: 自分の席がロック中ならコピーに失敗（選ばれた人の役職はコピーするだけで動かないので、相手がロック中でもコピーできる）
       i.mode = "doppel"; i.target = t.id; i.keyFail = { kind: "self", target: t.id };
       n.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${label} ${p.name}`));
@@ -19,6 +24,7 @@
       n.hold(p.id, ONW.watcher.noneLine("コピー"));
       return;
     }
+    if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);   // モーゼス: コピー元に使われた回数 +1 してからコピー（コピー先にもその票数が入る）
     const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id), shown = ONW.shownRole(got);
     i.mode = "doppel"; i.target = t.id; i.newRole = shown; i.known[p.id] = shown; i.known[t.id] = ONW.shownRole(seen);
     i.doppel = { target: t.id, newRole: shown };
@@ -36,6 +42,7 @@
     const { rn, nameOf, isNonVillage, nonVillageLie } = k;
     c.co = "doppelganger";
     if (i.keyFail && i.keyFail.kind === "shift") { c.result = { short: "コピーできず", text: "コピーできる相手がおらず、コピーできませんでした。", claim: null }; return; }
+    if (i.keyFail && i.keyFail.kind === "aa") { c.result = { short: "特殊な力で失敗", text: "選んだ人の特殊な力によりコピーに失敗しました。", claim: null }; return; }   // A.A.に弾かれた
     if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたためコピーに失敗しました。", claim: null }; return; }   // ロックされてコピーに失敗した: 正直に言う
     if (!i.doppel) return;   // コピー情報なし: COだけする
     const dt = nameOf(g, i.doppel.target), dn = i.doppel.newRole;
@@ -117,9 +124,11 @@
       resolve(c, p) {
         const g = c.g, rn = c.rn, nameOf = c.nameOf, rev = c.rev;
         const t = c.selOf(p).players[0]; if (!t || t === p.id || !g.players.some((q) => q.id === t)) return;
+        if (ONW.keymaster.aaBlocks(g, t)) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "aa", "コピー", [t], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // A.A.: 選んだ席がロックされていないA.A.ならコピー失敗（ロックされたA.A.はコピーできる）。新聞・観測にも載らない
         if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "コピー", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中ならコピー失敗。新聞・観測にも載らない
         const ch = ONW.watcher.shiftChain(g, p.id, t), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。文章・演出は選んだ席 t で出す。ログだけ「静観者だったため」を書く。docs/watcher.md）
         if (!ta) { c.hold(p.id, ONW.watcher.noneLine("コピー")); return; }   // 移す先がなければコピーできない（新聞・観測にも載らない）
+        if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);   // モーゼス: コピー元に +1 してからコピー
         const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
         ONW.observeNote(g, p.id, [t], null, "doppelganger");
         ONW.newsNote(g, "doppelganger");
@@ -135,9 +144,11 @@
       run(c) {   // 墓荒らしが墓地から引いたドッペルゲンガー: 朝にコピーする（その時点の役職）
         if (!c.players.length) return null;
         const g = c.g, rn = c.rn, id = c.id, t = c.players[0];
+        if (ONW.keymaster.aaBlocks(g, t)) return { lines: [ONW.keymaster.fail(g, id, "aa", "コピー", [t], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // A.A.: 朝のうち・酔い覚めも同じ
         if (ONW.keymaster.gate(g, id, [])) return { lines: [ONW.keymaster.fail(g, id, "self", "コピー", [], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
         const ch = ONW.watcher.shiftChain(g, id, t), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。墓荒らしが引いたドッペル・酔い覚めでも同じ）
         if (!ta) return { lines: [ONW.watcher.noneLine("コピー")], reveal: null, nextChain: null, failed: true };
+        if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);   // モーゼス: コピー元に +1 してからコピー
         const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, id);
         const lines = [`${c.nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
         g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.label} ${c.me.name}`, c.nameOf, (x) => `${x} をコピーしよう`, (x) => `${x} の役職をコピーしよう`, (x) => `${x} の役職をコピーし、${rn(got)} になりました。`) || `${c.label} ${c.me.name} は ${c.nameOf(t)} をコピーし、${rn(got)} になりました。`);

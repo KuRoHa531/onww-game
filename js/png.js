@@ -34,7 +34,7 @@ window.ONW = window.ONW || {};
     }
     // 【道連れ・後追い】投票結果のすぐ下（画面の最終結果と同じ）
     const cr = ONW.chainRows(res);
-    if (cr.length) { sep(); head("道連れ・後追い"); cr.forEach((r) => r.k === "sub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の身代わりになりました。`)) : r.k === "chainSub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の道連れの身代わりになりました。`)) : add(...(r.by ? [T(r.by), T(" → ", C.dim)] : []), T(r.name), T(" "), T(r.label, C.dead))); }
+    if (cr.length) { sep(); head("道連れ・後追い"); cr.forEach((r) => r.k === "sub" ? add(T(r.major ? "少佐: " : "従者: ", C.info), T(`${r.name} が ${r.master} の身代わりになりました。`)) : r.k === "chainSub" ? add(T("従者: ", C.info), T(`${r.name} が ${r.master} の道連れの身代わりになりました。`)) : add(...(r.by ? [T(r.by), T(" → ", C.dim)] : []), T(r.name), T(" "), T(r.label, C.dead))); }
     sep();
     const wt = res.abandoned ? C.dim : res.title.startsWith("村人") ? C.village : res.title.startsWith("人狼") ? C.wolf : C.third;
     L.push({ segs: [{ t: res.title, c: wt, b: true }], big: true });
@@ -52,7 +52,8 @@ window.ONW = window.ONW || {};
     res.history.forEach((h) => {
       const segs = [T(h.name + " ", C.ink)];
       h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : t.k === "keep" ? "#ff9ec9" : t.k === "cat" ? C.third : t.k === "reverse" ? "#6fc3ff" : "#ffaa00"))); });
-      segs.push(T(" " + h.status, h.dead || h.day ? C.dead : C.alive));
+      if (h.statusParts) { segs.push(T(" " + h.statusParts.death, C.dead), T(" → ", C.dim), T(h.statusParts.revive, C.alive)); if (h.statusParts.tail) segs.push(T(h.statusParts.tail, C.dead)); }   // スティーブ: ［死因］（赤）→ ［復活］（生存の水色）
+      else segs.push(T(" " + h.status, h.dead || h.day ? C.dead : C.alive));
       L.push({ segs, fit: true });   // 1人ぶんの役職履歴は、長くても1行に収める（画像の横幅を広げる）
     });
     sep();

@@ -636,6 +636,9 @@ body {
 /* 左上の□（全画面） */
 .top-right { position: absolute; top: 4px; right: 6px; z-index: 450; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }   /* 固定せず、スクロールしたら一緒に流れて見えなくなる。上: ログイン / 下: 📕 */
 .wiki-btn { flex: 0 0 auto; order: 2; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--gold-dim); background: rgba(27,29,43,.9); display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; text-decoration: none; }
+.wiki-row { flex: 0 0 auto; order: 2; display: flex; gap: 6px; align-items: center; }   /* 📕役職確認(左)・📖ガイド(右)を横に並べる */
+.wiki-row .wiki-btn { order: 0; }
+.wiki-row .rb-btn[hidden] { display: none; }
 .wiki-btn { padding: 0; cursor: pointer; color: inherit; font-family: inherit; }   /* <a> から <button> に変えた分の見た目合わせ */
 
 /* ---- ワンナイト人狼ガイドのオーバーレイ（js/wikiview.js） ---- */
@@ -884,7 +887,8 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .rs-extra { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 8px; }
 .rs-extra__h { font-size: 13px; letter-spacing: .2em; color: var(--gold); opacity: .85; width: 100%; }
 .rs-extra__chip { display: inline-block; font-size: 16px; font-weight: 700; padding: 3px 10px; border: 1px solid var(--gold); border-radius: 4px; color: var(--gold); background: rgba(0, 0, 0, .35); animation: ex-stamp .45s cubic-bezier(.2, 1.4, .4, 1) both; }
-.rs-extra__chip b { color: #fff; }
+.rs-extra__chip b { color: #fff; white-space: nowrap; }   /* 役職名は途中で改行しない */
+.res-cap .rs-win, .res-cap .rs-under, .rs-extra__chip { white-space: nowrap; }   /* 勝利演出: 字幕・役職名は折り返さない（はみ出すときは stage.js fitResCap が文字サイズを縮める） */
 @keyframes ex-stamp { from { opacity: 0; transform: scale(2.4) rotate(-6deg); } to { opacity: 1; transform: none; } }
 
 /* ---- 変化公開: 古びた紙 ---- */
@@ -892,7 +896,7 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .tfp-dim { position: absolute; inset: 0; background: rgba(5, 6, 12, .8); transition: opacity .9s ease; animation: tfp-dim-in .2s ease both; }
 @keyframes tfp-dim-in { from { opacity: 0; } to { opacity: 1; } }
 .tfp-paper {
-  position: relative; width: min(88vw, 430px); padding: 36px 26px 30px; text-align: center; color: #2d1a0b; font-family: var(--font-display);
+  position: relative; width: min(88vw, 430px); padding: calc(var(--tfp-fs, 26px) * 1.38) 26px calc(var(--tfp-fs, 26px) * 1.15); text-align: center; color: #2d1a0b; font-family: var(--font-display);   /* 上下の余白・行間・題字は文字の大きさ(--tfp-fs)に比例（行が多い・画面が低いとき、文字を小さくすると紙も縮んで収まる） */
   transform: rotate(-1.5deg); transform-origin: center;
   background:
     radial-gradient(ellipse at 18% 12%, rgba(255, 247, 218, .85), transparent 55%),
@@ -904,11 +908,11 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
   animation: tfp-in .3s cubic-bezier(.2,.8,.3,1) both;
 }
 @keyframes tfp-in { from { opacity: 0; transform: rotate(-4deg) translateY(30px) scale(.92); } to { opacity: 1; transform: rotate(-1.5deg); } }
-.tfp-title { font-size: 22px; font-weight: 800; letter-spacing: .3em; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid rgba(60, 34, 12, .45); color: #4a2a0e; }
-.tfp-line { font-size: var(--tfp-fs, 26px); font-weight: 700; margin: 16px 0; min-height: 1.4em; white-space: nowrap; }   /* 役名が長くても改行しない（文字の大きさは stage.js の fitPaper が画面幅に合わせる） */
+.tfp-title { font-size: min(22px, calc(var(--tfp-fs, 26px) * 1.1)); font-weight: 800; letter-spacing: .3em; padding-bottom: calc(var(--tfp-fs, 26px) * .46); margin-bottom: calc(var(--tfp-fs, 26px) * .3); border-bottom: 1px solid rgba(60, 34, 12, .45); color: #4a2a0e; }
+.tfp-line { font-size: var(--tfp-fs, 26px); font-weight: 700; margin: calc(var(--tfp-fs, 26px) * .6) 0; min-height: 1.4em; white-space: nowrap; }   /* 役名が長くても改行しない（文字の大きさは stage.js の fitPaper が画面幅に合わせる） */
 .tfp-title span, .tfp-line span { display: inline-block; padding-right: .12em; clip-path: inset(-6px 100% -6px -2px); text-shadow: 0 0 1px rgba(45, 26, 11, .7), .6px .6px 0 rgba(45, 26, 11, .35); animation: tfp-write var(--dur) steps(var(--n)) var(--d) forwards; }
 @keyframes tfp-write { to { clip-path: inset(-12px -80px -12px -12px); } }   /* 書き終わりは箱の外まで広く開ける（フォントの太字・入れ替わりで字が箱からはみ出しても、最後の字が途切れないように） */
-.tfp-hint { margin-top: 18px; font-family: var(--font-body); font-size: 11px; color: rgba(60, 34, 12, .55); }
+.tfp-hint { margin-top: calc(var(--tfp-fs, 26px) * .5); font-family: var(--font-body); font-size: 11px; color: rgba(60, 34, 12, .55); }
 
 /* 固定欄に収まった変化公開（古紙の見た目のまま小さくなる） */
 .cb-tf--paper { margin-top: calc(6px * var(--cb-s, 1)); padding: calc(6px * var(--cb-s, 1)) calc(12px * var(--cb-s, 1)); border: 0; border-radius: 3px; background: linear-gradient(160deg, #dcc48f, #c8a869); box-shadow: inset 0 0 14px rgba(105, 62, 18, .55); color: #2d1a0b; font-family: var(--font-display); }
@@ -922,7 +926,7 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .nwp-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: default; }
 .nwp-dim { position: absolute; inset: 0; background: rgba(5, 6, 12, .8); transition: opacity .9s ease; animation: tfp-dim-in .2s ease both; }
 .nwp-paper {
-  position: relative; width: min(88vw, 430px); padding: 22px 24px 26px; text-align: center; color: #1b1a17;
+  position: relative; width: min(88vw, 430px); padding: calc(var(--nwp-fs, 24px) * .92) 24px calc(var(--nwp-fs, 24px) * 1.08); text-align: center; color: #1b1a17;
   font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif;
   transform: rotate(1deg); transform-origin: center;
   background:
@@ -936,12 +940,12 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
   animation: nwp-in .3s cubic-bezier(.2, .8, .3, 1) both;
 }
 @keyframes nwp-in { from { opacity: 0; transform: rotate(4deg) translateY(36px) scale(.92); } to { opacity: 1; transform: rotate(1deg); } }
-.nwp-masthead { font-size: 34px; font-weight: 900; letter-spacing: .22em; padding: 4px 0 8px; border-top: 4px double #1b1a17; border-bottom: 1px solid #1b1a17; }
-.nwp-edition { font-size: 11px; letter-spacing: .3em; padding: 5px 0; margin-bottom: 14px; border-bottom: 3px double #1b1a17; color: #3a362c; }
-.nwp-line { font-size: var(--nwp-fs, 24px); font-weight: 800; margin: 12px 0; min-height: 1.4em; white-space: nowrap; }
-.nwp-line--head { font-size: calc(var(--nwp-fs, 24px) * .8); letter-spacing: .08em; padding-bottom: 8px; margin-bottom: 16px; border-bottom: 1px solid rgba(27, 26, 23, .55); }
+.nwp-masthead { font-size: min(34px, calc(var(--nwp-fs, 24px) * 1.42)); font-weight: 900; letter-spacing: .22em; padding: 4px 0 calc(var(--nwp-fs, 24px) * .33); border-top: 4px double #1b1a17; border-bottom: 1px solid #1b1a17; }
+.nwp-edition { font-size: min(11px, calc(var(--nwp-fs, 24px) * .6)); letter-spacing: .3em; padding: 5px 0; margin-bottom: calc(var(--nwp-fs, 24px) * .58); border-bottom: 3px double #1b1a17; color: #3a362c; }
+.nwp-line { font-size: var(--nwp-fs, 24px); font-weight: 800; margin: calc(var(--nwp-fs, 24px) * .5) 0; min-height: 1.4em; white-space: nowrap; }
+.nwp-line--head { font-size: calc(var(--nwp-fs, 24px) * .8); letter-spacing: .08em; padding-bottom: calc(var(--nwp-fs, 24px) * .33); margin-bottom: calc(var(--nwp-fs, 24px) * .66); border-bottom: 1px solid rgba(27, 26, 23, .55); }
 .nwp-masthead span, .nwp-line span { display: inline-block; padding-right: .12em; clip-path: inset(-6px 100% -6px -2px); animation: tfp-write var(--dur) steps(var(--n)) var(--d) forwards; }
-.nwp-hint { margin-top: 16px; font-family: var(--font-body); font-size: 11px; color: rgba(27, 26, 23, .55); }
+.nwp-hint { margin-top: calc(var(--nwp-fs, 24px) * .5); font-family: var(--font-body); font-size: 11px; color: rgba(27, 26, 23, .55); }
 
 /* 情報確認に載る新聞 */
 .info-news { margin-top: 8px; padding: 10px 14px 8px; background: linear-gradient(170deg, #ece8da, #d9d4c1); color: #1b1a17; border-radius: 3px; box-shadow: inset 0 0 14px rgba(70, 62, 44, .4); font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif; }
@@ -1880,6 +1884,20 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 
 /* ---- ペンギンの滑り（結果発表。js/roles/village/penguin.js の stageResult。交換者の .ex-* と同じ要領で、画面の上に重ねる） ---- */
 .tb-seat.gx-pgsel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(140,205,255,.95)); }
+.tb-seat.gx-fairysel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(255,215,120,.95)); }   /* 妖精さん: バリアを付与された人のカード（結果発表。3of4） */
+.tb-seat.gx-goransel .tb-card { transform: translateY(-6px) rotate(-3deg); filter: drop-shadow(0 0 10px rgba(190,120,255,.95)); }   /* 御乱心: 投票先を変えられた人のカード（結果発表。3of4） */
+/* 妖精さん: 🧚が飛んできてバリアの膜を張り、票バッジが1減る（結果発表。3of4-b。js/roles/village/fairy.js の flyFairy） */
+.fa-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
+.fa-fairy { position: absolute; left: 0; top: 0; font-size: clamp(30px, 3.2vw, 48px); line-height: 1; opacity: 0; will-change: transform; filter: drop-shadow(0 0 8px rgba(255,236,160,.95)) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.fa-spark { position: absolute; margin: -8px 0 0 -8px; font-style: normal; font-size: 16px; line-height: 1; color: #fff3b8; text-shadow: 0 0 6px rgba(255,226,138,.95), 0 0 12px rgba(255,214,102,.7); opacity: 0; animation: fa-spark .9s ease-out both; }
+@keyframes fa-spark { 0% { transform: scale(0) rotate(0deg); opacity: 0; } 30% { transform: scale(1.3) rotate(40deg); opacity: 1; } 100% { transform: scale(.3) translateY(8px) rotate(120deg); opacity: 0; } }
+.fa-shield { position: absolute; box-sizing: border-box; border-radius: 50%; opacity: 0; will-change: transform, opacity;
+  border: 2px solid rgba(255,244,190,.95); background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.55) 0%, rgba(190,235,255,.22) 38%, rgba(255,226,140,.16) 70%, rgba(255,226,140,.05) 100%);
+  box-shadow: 0 0 18px 4px rgba(255,226,140,.65), inset 0 0 18px rgba(190,235,255,.55); }
+.fa-shield--none { border-color: rgba(200,210,225,.85); box-shadow: 0 0 12px 2px rgba(200,210,225,.5), inset 0 0 14px rgba(200,215,235,.4); }
+.fa-minus { position: absolute; transform: translate(-50%, -50%); font-size: clamp(14px, 1.3vw, 22px); font-weight: 800; color: #fff6c8; opacity: 0; text-shadow: 0 0 8px rgba(255,214,102,.95), 0 1px 2px rgba(0,0,0,.7); animation: fa-minus 1s ease-out both; }
+@keyframes fa-minus { 0% { transform: translate(-50%, -30%) scale(.5); opacity: 0; } 20% { transform: translate(-50%, -90%) scale(1.3); opacity: 1; } 100% { transform: translate(-50%, -260%) scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fa-fx { display: none; } }
 .pg-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
 .pg-peng { position: absolute; left: 0; top: 0; width: 64px; height: 34px; opacity: 0; will-change: transform; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
 .pg-peng svg, .pg-peng img { width: 100%; height: 100%; display: block; }
@@ -2156,6 +2174,10 @@ body.duke-meeting::before, body.dk-result::before { content: ""; position: fixed
 /* 反転者: 反転された人のカードは裏面のまま180度回転（--rot = 180deg × 反転の回数）。めくれたときも回ったまま */
 .tb-seat.rev .tb-inner { transform: rotate(var(--rot, 180deg)); }
 .tb-seat.up.rev .tb-inner { transform: rotateY(180deg) rotate(var(--rot, 180deg)); }
+/* 反転者: カードの外にあるマーク（.tb-marks: 昇格した狂人🐺・恋人❤・キープ♡・シャッフラー🔀・酔っ払い🍺）も、カードと同じ角度で回す。昼の酔っ払いタイマー（.tb-drunk: 🍺と残り秒数）は回さない（反転しても正位置のまま）。
+   奇数回の反転（.rev-odd）は、左上 → 右下で上下逆（先に付いたマークほど右下の端）。偶数回は正位置のまま */
+.tb-seat.rev .tb-marks { transform: rotate(var(--rot, 180deg)); }
+.tb-seat.rev-odd .tb-marks { top: auto; left: auto; bottom: -5px; right: -5px; }
 .result-sheet .rs-tag-reverse { color: #6fc3ff; }   /* 反転者: 「(+反転1)」 */
 
 .servant-banner.lawyer-banner { top: 30%; }   /* 弁護士: 従者バナーと重ならない */
@@ -2259,3 +2281,109 @@ body.smoke-on .onw-app .timer-display { position: relative; z-index: 3; display:
 
 /* 煙幕の名前隠し（詳細設定。js/stage.js の smkNamesSync）: 名前が「？？？」になった席。並びは CSS の order で入れ替える */
 .tb-seat.smk-hid .tb-name { letter-spacing: .14em; }
+
+/* ---- スマホ: 残り時間を大きく（ヘッダーの #phase-label。js/ui.js updateTimer が .ph-name / .ph-rem / .ph-time に分ける）----
+   PC(1000px〜)は左の大きなタイマー(#big-timer)があるので、ここは 999px 以下だけ。議論中(chat-mode)・結果の縮小表示でも時間は大きいまま。 */
+@keyframes ph-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+#day-clock.ph-off { display: none; }
+@media (max-width: 999px) {
+  #phase-label { display: flex; align-items: baseline; justify-content: center; gap: 6px; white-space: nowrap; max-width: 100%; min-width: 0; }
+  #phase-label .ph-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #phase-label .ph-rem { font-size: 11px; opacity: .75; flex: 0 0 auto; }
+  #phase-label .ph-time { flex: 0 0 auto; font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 1.1; letter-spacing: .04em; font-variant-numeric: tabular-nums; color: var(--gold); text-shadow: 0 0 14px rgba(217, 196, 143, .3); }
+  #phase-label.low .ph-time { color: var(--blood); text-shadow: 0 0 14px rgba(201, 70, 61, .55); display: inline-block; animation: ph-pulse 1s ease-in-out infinite; }
+  body.chat-mode #phase-label, body.res-compact #phase-label { padding: 2px 12px; }
+  body.chat-mode #phase-label .ph-time, body.res-compact #phase-label .ph-time { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { #phase-label.low .ph-time { animation: none; } }
+
+/* スティーブ: 不死のトーテムの演出（js/stage.js stage.totem）。閃光 → トーテムがポンと出て震える → 粒が飛び散る → 字幕 */
+.totem-wrap { position: fixed; inset: 0; z-index: 1012; pointer-events: none; overflow: hidden; }
+.totem-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 46%, rgba(255, 236, 120, .85), rgba(110, 220, 90, .38) 46%, rgba(0, 0, 0, 0) 74%); animation: totem-flash 2.4s ease-out both; }
+.totem-item { position: absolute; left: 50%; top: 46%; width: min(36vw, 180px); transform: translate(-50%, -50%); filter: drop-shadow(0 0 16px rgba(255, 222, 90, .95)); animation: totem-pop 2.4s cubic-bezier(.2, .9, .3, 1) both; }
+.totem-item svg { display: block; width: 100%; height: auto; }
+.totem-p { position: absolute; left: 50%; top: 46%; width: 9px; height: 9px; border-radius: 2px; background: var(--c, #2fd24a); opacity: 0; animation: totem-p 1.7s ease-out var(--d, .3s) both; }
+.totem-cap { position: absolute; left: 50%; top: calc(46% + min(30vw, 150px)); transform: translateX(-50%); width: max-content; max-width: 92vw; text-align: center; color: #ffeaa0; font-weight: 800; letter-spacing: .06em; font-size: clamp(16px, 4.4vw, 26px); text-shadow: 0 2px 8px rgba(0, 0, 0, .8), 0 0 14px rgba(60, 200, 80, .8); animation: totem-cap 2.4s ease both; }
+@keyframes totem-flash { 0% { opacity: 0; } 12% { opacity: 1; } 45% { opacity: .75; } 100% { opacity: 0; } }
+@keyframes totem-pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(-12deg); } 22% { opacity: 1; transform: translate(-50%, -50%) scale(1.25) rotate(6deg); } 32% { transform: translate(-50%, -50%) scale(1) rotate(-4deg); } 42% { transform: translate(-50%, -50%) scale(1.06) rotate(3deg); } 52% { transform: translate(-50%, -50%) scale(1) rotate(0); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -58%) scale(1.15); } }
+@keyframes totem-p { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 14% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--r)) scale(1); } }
+@keyframes totem-cap { 0%, 28% { opacity: 0; transform: translate(-50%, 8px); } 42% { opacity: 1; transform: translate(-50%, 0); } 82% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .totem-item { animation-name: totem-pop-calm; } .totem-p { display: none; } }
+@keyframes totem-pop-calm { 0% { opacity: 0; } 25% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* イカロス: 票を分け与えたときの演出（js/stage.js stage.icarusFx）。全員の画面に、太陽へ翼が飛び上がる（3.4秒）。だれが・だれにかは出さない */
+.icarus-wrap { position: fixed; inset: 0; z-index: 1012; pointer-events: none; overflow: hidden; }
+.icarus-sky { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255, 200, 90, .42), rgba(255, 150, 60, .12) 46%, rgba(0, 0, 0, 0) 78%); animation: icarus-sky 3.4s ease both; }
+.icarus-sun { position: absolute; left: 50%; top: 21%; width: min(52vw, 260px); aspect-ratio: 1; transform: translate(-50%, -50%); animation: icarus-sun 3.4s ease both; }
+.icarus-rays { position: absolute; inset: -34%; border-radius: 50%; background: repeating-conic-gradient(from 0deg, rgba(255, 226, 120, .6) 0 7deg, rgba(255, 226, 120, 0) 7deg 20deg); -webkit-mask-image: radial-gradient(circle, #000 28%, transparent 68%); mask-image: radial-gradient(circle, #000 28%, transparent 68%); animation: icarus-spin 3.4s linear both; }
+.icarus-core { position: absolute; inset: 22%; border-radius: 50%; background: radial-gradient(circle at 42% 38%, #fffbe6, #ffd54a 55%, #ff9f1c 100%); box-shadow: 0 0 40px 18px rgba(255, 200, 70, .85), 0 0 110px 50px rgba(255, 150, 40, .5); }
+.icarus-wings { position: absolute; left: 50%; top: 0; width: min(48vw, 240px); transform: translate(-50%, 104vh); filter: drop-shadow(0 0 10px rgba(255, 230, 140, .95)); animation: icarus-rise 3.4s cubic-bezier(.25, .1, .3, 1) both; }
+.icarus-wings svg { display: block; width: 100%; height: auto; overflow: visible; }
+.icarus-wl { transform-origin: 100px 74px; animation: icarus-flap-l .3s ease-in-out infinite alternate; }
+.icarus-wr { transform-origin: 100px 74px; animation: icarus-flap-r .3s ease-in-out infinite alternate; }
+.icarus-p { position: absolute; left: 50%; top: 21%; width: 10px; height: 18px; border-radius: 50% 50% 50% 50% / 70% 70% 30% 30%; background: var(--c, #fff); opacity: 0; box-shadow: 0 0 6px rgba(255, 220, 110, .9); animation: icarus-p 1.3s ease-out 1.95s both; }
+.icarus-cap { position: absolute; left: 50%; bottom: 17%; padding: 4px 14px; border-radius: 999px; background: rgba(0, 0, 0, .42); transform: translateX(-50%); width: max-content; max-width: 92vw; text-align: center; color: #fff4c4; font-weight: 800; letter-spacing: .05em; font-size: clamp(15px, 4.2vw, 24px); text-shadow: 0 2px 8px rgba(0, 0, 0, .85), 0 0 14px rgba(255, 170, 40, .85); animation: icarus-cap 3.4s ease both; }
+@keyframes icarus-sky { 0% { opacity: 0; } 14% { opacity: 1; } 62% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes icarus-sun { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.55); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 58% { transform: translate(-50%, -50%) scale(1.02); } 66% { transform: translate(-50%, -50%) scale(1.45); filter: brightness(1.7); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); filter: brightness(1); } }
+@keyframes icarus-spin { from { transform: rotate(0deg); } to { transform: rotate(80deg); } }
+@keyframes icarus-rise { 0% { opacity: 0; transform: translate(-50%, 104vh) scale(1.1); } 8% { opacity: 1; } 58% { opacity: 1; transform: translate(-50%, 8vh) scale(.5); } 66% { opacity: .9; transform: translate(-50%, 3vh) scale(.36); } 74% { opacity: 0; transform: translate(-50%, 1vh) scale(.2); } 100% { opacity: 0; transform: translate(-50%, 1vh) scale(.2); } }
+@keyframes icarus-flap-l { from { transform: rotate(-24deg); } to { transform: rotate(16deg); } }
+@keyframes icarus-flap-r { from { transform: rotate(24deg); } to { transform: rotate(-16deg); } }
+@keyframes icarus-p { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 14% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--r)) scale(1); } }
+@keyframes icarus-cap { 0%, 22% { opacity: 0; transform: translate(-50%, 8px); } 36% { opacity: 1; transform: translate(-50%, 0); } 84% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .icarus-wings, .icarus-wl, .icarus-wr { animation-name: icarus-calm; transform: translate(-50%, 10vh); } .icarus-rays { animation: none; } .icarus-p { display: none; } }
+@keyframes icarus-calm { 0% { opacity: 0; } 25% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* =========================================================
+   選挙管理委員の矢印（js/stage.js の emDraw）: 投票の時間中、投票した人のカードから投票先のカードへ。カードの上に重ねる（押せるのはそのまま）
+   ========================================================= */
+.em-arrows { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 6; }
+.em-line { fill: none; stroke-width: 2.6; stroke-linecap: butt; opacity: .92; stroke-dasharray: 1 1; }
+.em-line--bg { stroke: rgba(8,10,24,.85); stroke-width: 5.4; opacity: .75; }
+.em-head--bg { fill: rgba(8,10,24,.85); stroke: rgba(8,10,24,.85); stroke-width: 3; stroke-linejoin: round; }
+.em-head { stroke: none; }
+body.chat-mode .em-line { stroke-width: 2; }
+body.chat-mode .em-line--bg { stroke-width: 4.2; }
+/* すっーと線が伸びて（pathLength=1 の線を 0→1）、最後に矢じりの三角が先端から生える。消えるときはその逆再生（矢じりが縮む → 線が縮む） */
+.em-in .em-line { animation: emLineIn .5s cubic-bezier(.3,.6,.3,1) both; }
+.em-in .em-head { transform-box: view-box; animation: emHeadIn .22s ease-out .46s both; }
+.em-out .em-head { transform-box: view-box; animation: emHeadOut .22s ease-in both; }
+.em-out .em-line { animation: emLineOut .42s cubic-bezier(.7,0,.7,.4) .2s both; }
+@keyframes emLineIn  { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes emLineOut { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
+@keyframes emHeadIn  { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes emHeadOut { from { transform: scale(1); } to { transform: scale(0); } }
+
+/* 矢印が出ている間だけ、卓の下に余白を足す（左向きの矢印は下へ弧を描くので、カードに重ならないように） */
+.tb-wrap.em-room .tb-table { padding-bottom: 54px; }
+
+/* 黄泉: 刀で切りつける演出（3of4。js/roles/village/yomi.js の slash） */
+.yo-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
+.yo-sword { position: absolute; left: 0; top: 0; font-size: clamp(34px, 4vw, 56px); line-height: 1; opacity: 0; will-change: transform, opacity; filter: drop-shadow(0 0 8px rgba(255,255,255,.95)) drop-shadow(0 0 14px rgba(255,60,60,.7)) drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.yo-line { position: absolute; height: 5px; border-radius: 3px; opacity: 0; transform-origin: 50% 50%; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #fff 18%, #fff 82%, rgba(255,255,255,0) 100%); box-shadow: 0 0 10px 3px rgba(255,70,70,.95), 0 0 22px 6px rgba(255,40,40,.55); will-change: transform, opacity; }
+.yo-fx--target .yo-line { box-shadow: 0 0 10px 3px rgba(255,40,90,.95), 0 0 26px 8px rgba(190,0,40,.6); }
+
+/* 昼能力・夜能力ボタンのハイライト（いま使える能力があるとき。使い終わると消える）docs/ability-highlight.md */
+.co-bar .btn.btn--hl { border-color: #ffd54a; color: #ffe9a6; box-shadow: 0 0 0 2px rgba(255, 213, 74, .55), 0 0 12px 2px rgba(255, 213, 74, .55); animation: ab-hl-pulse 1.4s ease-in-out infinite; }
+@keyframes ab-hl-pulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(255, 213, 74, .45), 0 0 8px 1px rgba(255, 213, 74, .35); } 50% { box-shadow: 0 0 0 3px rgba(255, 213, 74, .9), 0 0 18px 4px rgba(255, 213, 74, .8); } }
+@media (prefers-reduced-motion: reduce) { .co-bar .btn.btn--hl { animation: none; } }
+
+/* 役職履歴・墓地が長いとき: 折り返さず1行のまま。スマホ（タッチ）は行ごとに横スワイプ。
+   PC（マウス）は横スクロールする手段が無くて右側が見えなかったので、履歴全体を1つの箱にして、見えるスクロールバーを出す（まとめて横に動く。Shift+ホイール・トラックパッドの横スワイプも使える） */
+@media (hover: hover) and (pointer: fine) {
+  .result-sheet .rs-hist-box { overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; scrollbar-width: thin; scrollbar-color: #888 transparent; }
+  .result-sheet .rs-hist-box::-webkit-scrollbar { display: block; height: 8px; }
+  .result-sheet .rs-hist-box::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+  .result-sheet .rs-hist-box .rs-hist { overflow: visible; width: max-content; min-width: 100%; }
+}
+
+
+/* ---- 役職確認ボタン(js/rolebook.js): 重ね画面は情報確認(.info-overlay)と同じ。中身だけ ---- */
+.rb-overlay { z-index: 890; }
+.rb-h { margin: 10px 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
+.rb-h:first-child { margin-top: 2px; }
+.rb-arrow { margin: 2px 0; text-align: center; color: var(--ink-dim); font-size: 14px; line-height: 1; }
+.rb-role { margin: 0; border-top: 1px solid var(--line); }   /* 役職名の下（.gd-role の線）だけでなく上にも区切り線。続けて並ぶ役職は線が二重にならないよう、直前が役職のときは上の線を省く */
+.rb-role + .rb-role { border-top: 0; }
+.rb-role .gd-desc { margin: 4px 0 6px; padding: 6px 10px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); white-space: pre-wrap; }
+.rb-btn { border-color: var(--gold); }

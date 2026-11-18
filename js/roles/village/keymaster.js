@@ -16,6 +16,7 @@
  * 実装の進み具合は _wip/鍵師_依頼文.txt を参照。
  *  1of4: 登録・夜の選択(自分も可)・ロックの記録(切り替え)・役職移動への追従・ルールコード・処理順・CPUの夜の行動・闇鍋シナジー【済】
  *  2of4: ロックの効果【済】= 2of4a(怪盗・いたずらっ子・墓荒らし・ドッペル。共通部品 gate / failLine / fail) + 2of4b(シャッフラー・グレムリン・背徳者・情報確認・新聞)
+ *  A.A.（docs/aa.md）: blocks / gate / toggle は A.A.の席だけ反転（ロックされていないと変化を弾く・1回目は「ロック解除」の文と演出）。
  *  3of4: 朝の演出(🔓→🔑→🔒)・失敗の演出(🔒に弾かれる)・酔い・昼のうち【済】
  *  4of4: CPU(発言=本当の鍵師は鍵をかけた相手をCO・人外は鍵師の騙り / 投票の加点)・COボタンの結果開示(鍵をかけた相手 / 情報開示「ロックされて失敗した」)・ガイド・総合テスト【済】
  */
@@ -28,10 +29,21 @@
   const locked = (g, id) => (((g && g.keyLocks) || {})[id] || 0) % 2 === 1;
   /** ロック中の席すべて */
   const lockedIds = (g) => g.players.filter((p) => locked(g, p.id)).map((p) => p.id);
-  /** 鍵をかける（もう一度かけると解除）。holderId = 鍵師のカードの持ち主、t = 対象の席。戻り値 = "lock" | "unlock"（かけたあとの状態） */
+  /** A.A.（いま働いているもの。ONW.aa.is）の席か */
+  const isAA = (g, id) => !!(ONW.aa && ONW.aa.is(g, id));
+  /** 変化系の能力がこの席の役職を変えられないか: 通常はロック中なら true。A.A.は反転（ロックされていないと true・ロックされていると false。docs/aa.md） */
+  const blocks = (g, id) => (isAA(g, id) ? !locked(g, id) : locked(g, id));
+  /** コピー専用の判定（ドッペルゲンガー）: 選んだ席が「ロックされていないA.A.」か（コピーは対象の役職が動かないので、通常のロックは関係なく、A.A.だけがコピーを弾く。ロックされたA.A.はコピーできる） */
+  const aaBlocks = (g, id) => isAA(g, id) && !locked(g, id);
+  /** 弾かれた席の失敗の種類（gate と同じ言い方）: A.A.なら "aa"、通常のロックなら "target" */
+  const kindOf = (g, id) => (isAA(g, id) ? "aa" : "target");
+  /** 通常のロックで弾かれている席（A.A.を除く。🔒の演出・「ロックされて失敗」の文に使う） */
+  const lockBlocked = (g, id) => !isAA(g, id) && locked(g, id);
+  /** 鍵をかける（もう一度かけると解除）。holderId = 鍵師のカードの持ち主、t = 対象の席。戻り値 = "lock" | "unlock"（鍵師から見えるかけたあとの状態）。
+   *  A.A.の席は見せ方が反転する（鍵の状態は同じ。1回目 = ロック状態になるが「ロック解除」、2回目 = 解除状態になるが「ロック」。マイクラ版 keymasterEffectiveActionForTarget） */
   function toggle(g, holderId, t) {
     (g.keyLocks = g.keyLocks || {})[t] = ((g.keyLocks || {})[t] || 0) + 1;
-    const act = locked(g, t) ? "lock" : "unlock";
+    const act = (isAA(g, t) ? !locked(g, t) : locked(g, t)) ? "lock" : "unlock";
     ONW.setRoleBound(g, "keyTargets", holderId, t);
     (g.keyActs = g.keyActs || {})[ONW.cardAt(g, holderId)] = { target: t, action: act };   // カード単位（朝の演出・結果開示用）
     (g.keyLog = g.keyLog || []).push({ by: holderId, target: t, action: act });
@@ -50,15 +62,18 @@
   }
   // ---- ロックの効果（2of4）: 役職変化系は「ロックに弾かれて」失敗する ----
   /** 変化できるか。actor = 能力を使う人の席、targets = 変化の対象にする席（墓荒らしの墓地・ドッペルのコピー元など、役職が動かない相手は渡さない）
-   *  戻り値: null = できる / "self" = 自分の席の役職がロックされている / "target" = 対象の席のどれかがロックされている（自分が先） */
+   *  戻り値: null = できる / "self" = 自分の席の役職がロックされている / "target" = 対象の席のどれかがロックされている（自分が先）/
+   *  "aa" = 対象の席が（ロックされていない）A.A.で弾かれた（通常のロックで弾かれた席があれば "target"）。ロックされたA.A.は弾かない */
   function gate(g, actor, targets) {
     if (locked(g, actor)) return "self";
-    if ((targets || []).some((t) => locked(g, t))) return "target";
-    return null;
+    const bl = (targets || []).filter((t) => blocks(g, t));
+    if (!bl.length) return null;
+    return bl.some((t) => !isAA(g, t)) ? "target" : "aa";
   }
   /** 失敗の文章（本人に朝に届く）。verb = 交換 / 入れ替え / コピー、two = 対象が2人（いたずらっ子） */
   function failLine(kind, verb, two) {
     if (kind === "self") return `自身の役職がロックされていたため${verb}に失敗しました。`;
+    if (kind === "aa") return verb === "コピー" ? "選んだプレイヤーの特殊な力によりコピーに失敗しました。" : two ? `選んだプレイヤーのどちらかの特殊な力により${verb}できませんでした。` : `選んだプレイヤーの特殊な力により${verb}できませんでした。`;   // A.A.に弾かれた（役職は動かない。ロックとは言わない）
     if (verb === "コピー") return "選んだプレイヤーの役職がロックされていたためコピーに失敗しました。";
     return two ? `選んだプレイヤーのどちらかの役職がロックされていたため${verb}できませんでした。` : `選んだプレイヤーの役職がロックされていたため${verb}できませんでした。`;
   }
@@ -66,9 +81,9 @@
    *  ログは g.nightLogsAll に積む（label = 「怪盗 ○○」のような名乗り） */
   function fail(g, actor, kind, verb, targets, label, two) {
     const line = failLine(kind, verb, two);
-    (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : (targets || []).filter((t) => locked(g, t)) };
+    (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : kind === "aa" ? [] : (targets || []).filter((t) => lockBlocked(g, t)) };
     const tn = (targets || []).map((t) => nm(g, t)).join(" と ");
-    g.nightLogsAll.push(kind === "self" ? `${label} は 自身の役職がロックされていたため${verb}に失敗しました。` : `${label} は ${tn} の役職がロックされていたため${verb}に失敗しました。`);
+    g.nightLogsAll.push(kind === "self" ? `${label} は 自身の役職がロックされていたため${verb}に失敗しました。` : kind === "aa" ? `${label} は ${tn} の特殊な力により${verb}に失敗しました。` : `${label} は ${tn} の役職がロックされていたため${verb}に失敗しました。`);
     return line;
   }
   /** 失敗の演出（朝。本人の画面だけ）: g.keyFails から作る。actor = fail に渡した席、viewer = 演出を見る人の席。
@@ -78,13 +93,14 @@
     const f = (g.keyFails || {})[ONW.cardAt(g, actor)];
     if (!f) return null;
     if (f.kind === "self") return { kind: "key", mode: "fail", ids: [viewer], lock: true };
+    if (f.kind === "aa") return { kind: "key", mode: "fail", ids: (f.targets || []).slice(), lock: false };   // A.A.に弾かれた: 🔒は出さず、カードが揺れるだけ（ロックされているわけではない）
     const lk = f.locked || [], tg = f.targets || [];
     if (tg.length > 1 && lk.length < tg.length) return { kind: "key", mode: "fail", ids: tg.slice(), lock: false };
     return { kind: "key", mode: "fail", ids: lk.slice(), lock: true };
   }
   const verb = (act) => (act === "unlock" ? "のロックを解除" : "の役職をロック");
   const lineOf = (g, t, act) => `${nm(g, t)} ${verb(act)}しました。`;
-  ONW.keymaster = { locked, lockedIds, toggle, picks, lineOf, verb, nm, gate, failLine, fail, failRev };
+  ONW.keymaster = { locked, lockedIds, toggle, picks, lineOf, verb, nm, gate, failLine, fail, failRev, isAA, blocks, lockBlocked, aaBlocks, kindOf };
 
   // ---- CPUの夜の行動: 自分を含む全員からランダムに1人（デバッグの指定があればそれ。自分も指定できる） ----
   function cpuRun(n, p, label, cur, rid) {
@@ -118,7 +134,7 @@
     let s = 0;
     const co = (g.coBoard && g.coBoard[q.id] && g.coBoard[q.id].co) || null;
     if (i.keyLock && co === "keymaster" && q.id !== p.id) s += 2.5;
-    if (i.keyLock && i.keyLock.action === "lock" && q.id === i.keyLock.target) {
+    if (i.keyLock && blocks(g, q.id) && q.id === i.keyLock.target) {   // 変化を弾いているはず（A.A.は反転。ロックされたA.A.は変化が通るので疑わない）
       const claims = g.cpuClaims || [];
       if (claims.some((c) => c.from === q.id && ["robber", "relic", "troublemaker", "doppel"].includes(c.kind))) s += 1.2;
     }
@@ -126,7 +142,7 @@
   }
   ONW.defineRole("keymaster", {
     info: { observe: "player", sealTarget: true, deck: 63, name: "鍵師", team: ONW.TEAM.VILLAGE, wakeOrder: 45, sort: 24,
-      desc: "村人陣営。夜に自分を含むプレイヤーを1人選び、その人の役職にロック（鍵）をかけます。ロックされた役職は、怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリンなどの役職変化系の影響を受けません。ロックされた人の変化も、ロックされた人が使う変化も、🔒に弾かれて失敗します。鍵師は変化役より先に処理されるので、他の人の夜の画面に影響せず、鍵師がいることは透けません。朝、鍵師から見て選んだ人のカードが🔓から🔑で鍵がかかって🔒になり、ロックされて失敗した人のカードは🔒に弾かれます。同じ人に鍵師が2人かけると、2回目はロック解除になります。ご主人のいない背徳者がロックされると、狂人に変化できず発狂して死亡します。" },
+      desc: "村人陣営。夜に自分を含むプレイヤーを1人選び、その人の役職にロック（鍵）をかけます。ロックされた役職は、怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリンなどの役職変化系の影響を受けません。ロックされた人の変化も、ロックされた人が使う変化も、🔒に弾かれて失敗します。鍵師は変化役より先に処理されるので、他の人の夜の画面に影響せず、鍵師がいることは透けません。朝、鍵師から見て選んだ人のカードが🔓から🔑で鍵がかかって🔒になり、ロックされて失敗した人のカードは🔒に弾かれます。同じ人に鍵師が2人かけると、2回目はロック解除になります。A.A.にかけたときだけは見え方が反転し、1回目が「ロック解除」、2回目が「ロック」に見えます（A.A.はロックされると役職変化が通るようになるため）。ご主人のいない背徳者がロックされると、狂人に変化できず発狂して死亡します。" },
     groups: { "transform:light_apostle": 4.5 },   // 光の使徒の変化先（墓荒らしの次・いたずらっ子の前あたり）
     uiNight: {
       action(X) {

@@ -94,9 +94,10 @@
     });
   }
   /**
-   * 妖狐投票の票数の演出（追放の演出より前に流す。全員の画面）。fx = { first, pg, ex }:
-   *   first = 最初に出す票数（ペンギンが滑る前）[{id,c}] / pg = { slides, steps }（ペンギンの滑り。なければ null）/ ex = { exchanges, steps }（交換者の入れ替え。なければ null）
-   * 流れ: 「N票」が1枚ずつ出る → ペンギンが滑る → 交換者が入れ替える（本投票の結果発表と同じ順・同じ動き。字幕なし）→ 票数の札を外す。戻り値 = かかる時間(ms)
+   * 妖狐投票の票数の演出（追放の演出より前に流す。全員の画面）。fx = { first, go, pg, ex, fa }:
+   *   first = 最初に出す票数（御乱心がいれば書き換え前・いなければペンギンが滑る前）[{id,c}] / go = { list, steps }（御乱心。ONW.goranshin.resultData と同じ形。なければ null）/ pg = { slides, steps }（ペンギンの滑り。なければ null）/ ex = { exchanges, steps }（交換者の入れ替え。なければ null）/
+   *   fa = { list, steps }（妖精さんのバリア。ONW.fairy.resultData と同じ形。なければ null）
+   * 流れ: 「N票」が1枚ずつ出る → ペンギンが滑る → 交換者が入れ替える → 🧚が来て票を1減らす（本投票の結果発表と同じ順・同じ動き。字幕なし）→ 票数の札を外す。戻り値 = かかる時間(ms)
    */
   const SHOW_MS = 350, HOLD_MS = 1000, END_MS = 1000;   // 票数を1枚ずつ出す間隔 / 出し終えてから動き出すまで / 動き終えて札を外すまで
   function playCounts(fx, SK) {
@@ -105,15 +106,19 @@
     const first = (fx.first || []).filter((c) => c.c > 0).sort((a, b) => b.c - a.c);
     first.forEach((c, i) => R.later(() => { R.badge[`p:${c.id}`] = `${c.c}票`; R.paint(R.G()); }, i * SHOW_MS));
     R.t = first.length * SHOW_MS + HOLD_MS;
+    if (fx.go && ONW.goranshin) ONW.goranshin.run2(R, fx.go, false);   // 御乱心: 一番先（本投票の結果発表と同じ順。字幕は出さない）
     if (fx.pg) ONW.penguin.run(R, fx.pg.slides || [], fx.pg.steps || [], false);
     if (fx.ex) ONW.exchanger.run(R, fx.ex.exchanges || [], fx.ex.steps || [], false);
+    if (fx.fa && ONW.fairy) ONW.fairy.run(R, fx.fa, false);   // 妖精さん: 交換者のあと（本投票の結果発表と同じ順。字幕は出さない）
     const ids = new Set();
+    if (fx.go) (fx.go.steps || []).forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));   // 御乱心で増えた票数の札も外す
     [fx.first || [], ...((fx.pg && fx.pg.steps) || []), ...((fx.ex && fx.ex.steps) || [])].forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));
     if (fx.pg) (fx.pg.steps || []).forEach((st) => st.forEach((c) => ids.add(c.id)));
+    if (fx.fa) (fx.fa.steps || []).forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));   // バリアで減った票数の札も外す
     R.later(() => { ids.forEach((id) => { if (/^\d+票$/.test(R.badge[`p:${id}`] || "")) delete R.badge[`p:${id}`]; }); R.paint(R.G()); }, R.t + 700);
     return R.t + END_MS;
   }
   /** playCounts にかかる時間(ms。動きを減らさない場合)。ホストが追放までの待ち時間に足す */
-  const countsMs = (fx) => (fx.first || []).filter((c) => c.c > 0).length * SHOW_MS + HOLD_MS + (fx.pg ? ONW.penguin.ms(fx.pg.slides) : 0) + (fx.ex ? ONW.exchanger.ms(fx.ex.exchanges) : 0) + END_MS;
+  const countsMs = (fx) => (fx.first || []).filter((c) => c.c > 0).length * SHOW_MS + HOLD_MS + (fx.go && ONW.goranshin ? ONW.goranshin.ms(fx.go) : 0) + (fx.pg ? ONW.penguin.ms(fx.pg.slides) : 0) + (fx.ex ? ONW.exchanger.ms(fx.ex.exchanges) : 0) + (fx.fa && ONW.fairy ? ONW.fairy.ms(fx.fa) : 0) + END_MS;
   ONW.foxVote = { living, needed, resolve, view, cpuTarget, labelOf, plan, execute, play, playCounts, countsMs };
 })(window.ONW);

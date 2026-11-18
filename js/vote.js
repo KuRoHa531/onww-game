@@ -111,13 +111,20 @@ window.ONW = window.ONW || {};
   };
 
   /**
-   * 1人の投票が何票ぶんか。最終盤面でメイヤーを持っている人は、ルーム設定の票数（2〜10票）ぶん。狂ったメイヤーは別の設定（狂ったメイヤーの投票数。2〜10票）ぶん。それ以外は1票。
+   * 1人の投票が何票ぶんか。最終盤面でメイヤーを持っている人は、ルーム設定の票数（2〜10票）ぶん。狂ったメイヤーは別の設定（狂ったメイヤーの投票数。2〜10票）ぶん。それ以外は1票。ギャンブラーは試合ごとに0〜3票（g.gamblerWeights）。
    * 酔いが覚めていない酔っ払いは、まだ自分の役職の能力を使えないので1票（新聞配達員・チキンの逆転と同じ扱い）。
+   * モーゼスは元の票数が0で、能力を使われた回数ぶんの票（封印中・酔い中は1票）。
    */
   vote.weightOf = function weightOf(game, voterId) {
     if (ONW.fanatic && ONW.fanatic.lostBy(game, voterId) && !ONW.hiddenDrunk(game, voterId)) return 0;   // 鍵師のロックで狂人になれなかった背徳者: 投票権を失う
     // 盗賊（js/roles/village/thief.js）: 元の票数に、盗んだ分(+)と盗まれた分(−)を反映する（下限0）。マイクラ版 vote.js の盗賊と同じ
-    const thief = (w) => (ONW.thief ? ONW.thief.adjust(game, voterId, w) : w);
+    // イカロス（js/roles/village/icarus.js）: 盗賊の増減を反映したあとで、分け与えられた票数を足す（マイクラ版 vote.js: 盗賊のあとで icarusVoteBonus を足す）。メイヤー・ギャンブラーなど全ての票数に足される。投票権を失った人（背徳者）は上で 0 を返す
+    const ic = ONW.icarus ? ONW.icarus.bonusOf(game, voterId) : 0;
+    const thief = (w) => (ONW.thief ? ONW.thief.adjust(game, voterId, w) : w) + ic;
+    // ギャンブラー（js/roles/village/gambler.js）: 最終盤面で持っていて酔いが覚めている人は、試合開始時に引いた0〜3票（人についた票数）。封印は見ない（マイクラ版 vote.js と同じ）
+    if (ONW.gambler && ONW.gambler.active(game, voterId)) return thief(ONW.gambler.of(game, voterId));
+    // モーゼス（js/roles/village/moses.js）: 元の票数は0。能力を使われた回数ぶんの票（役職＝カードに付属）。封印中・酔いが覚めていない酔っ払いは1票。盗賊の増減・イカロスの分は他の役職と同じく足される
+    if (game.currentRoles && E(game, voterId) === ONW.ROLE.MOSES && ONW.moses) return thief(ONW.moses.weight(game, voterId));
     if (game.currentRoles && E(game, voterId) === ONW.ROLE.MAYOR && !ONW.hiddenDrunk(game, voterId) && !ONW.seal.is(game, voterId)) return thief(ONW.mayorVotes(game));
     if (game.currentRoles && E(game, voterId) === ONW.ROLE.MAD_MAYOR && !ONW.hiddenDrunk(game, voterId) && !ONW.seal.is(game, voterId)) return thief(ONW.madMayorVotes(game));   // 狂ったメイヤー: メイヤーと同じ作りで、票数は別の設定（madMayorVoteCount）
     // 麻婆の人狼（本家 MAPO_WOLF）が盤面にいる間、豆腐の人狼は2票持ち
@@ -148,6 +155,37 @@ window.ONW = window.ONW || {};
   };
 
   /**
+   * 御乱心（マイクラ版 scripts/vote.js effectiveVoteRecords の最初。js/roles/village/goranshin.js）。
+   * 御乱心に選ばれた人（投票者）の投票先を、生きている全員からランダムに1人へ書き換える。ペンギン・交換者・番犬・妖精さんより先に働く。
+   * 戻り値: { votes: 書き換えたあとの投票先 { 投票者ID: 投票先ID }, list: [{ by, voterId, fromId, toId, w }（使った順）] }（game.votes は書き換えない）。御乱心が使われていなければ votes は game.votes と同じ内容・list は空。
+   */
+  vote.goranshinRun = function goranshinRun(game) {
+    return ONW.goranshin ? ONW.goranshin.run(game, game.votes || {}) : { votes: { ...(game.votes || {}) }, list: [] };
+  };
+  /**
+   * 御乱心の途中経過（結果発表の演出用）: { list: [{ by, voterId, fromId, toId, w }（使った順）], steps: [書き換える前の得票数, 1つ目を書き換えた後, ...] }
+   * 最初の要素は元の投票（game.votes）の得票数、最後の要素は vote.tally(game, { pre: true }) と同じ（＝ペンギンが滑らせる前の得票数）。番犬の飼い主への票は表示から外す（penguinSteps と同じ）。
+   * 御乱心が使われていない（または効果のなかった）試合は list が空で steps は1つだけ。
+   */
+  vote.goranshinSteps = function goranshinSteps(game) {
+    const guard = vote.guardedIds(game), shown = (c) => { const o = { ...c }; guard.forEach((id) => { delete o[id]; }); return o; };
+    const list = vote.goranshinRun(game).list;
+    let counts = {};
+    Object.entries(game.votes || {}).forEach(([voterId, targetId]) => { const w = vote.weightOf(game, voterId); if (w > 0) counts[targetId] = (counts[targetId] || 0) + w; });
+    const steps = [shown(counts)];
+    list.forEach((x) => {
+      counts = { ...counts };
+      if (x.w > 0) {
+        const left = (counts[x.fromId] || 0) - x.w;
+        if (left > 0) counts[x.fromId] = left; else delete counts[x.fromId];
+        counts[x.toId] = (counts[x.toId] || 0) + x.w;   // 票数0の人（盗賊に盗まれた人）の票は動かない（0票の項目は作らない）
+      }
+      steps.push(shown(counts));
+    });
+    return { list: list.map((x) => ({ by: x.by, voterId: x.voterId, fromId: x.fromId, toId: x.toId, w: x.w })), steps };
+  };
+
+  /**
    * ペンギン（マイクラ版 scripts/vote.js の「ペンギン」の処理と同じ。js/roles/village/penguin.js）。
    * 投票の集計の最初に、投票先を書き換える: ペンギンに投票した人の票は、ペンギンが投票した先へ「滑って移動」する（入れ替えではなく移動。票の重みはそのまま）。
    *   ・働くペンギン: 最終盤面でペンギンを持っている人（模倣の人狼が模倣していれば模倣先＝E）で、酔いが覚めていて、封印されていない人。投票していなければ何も起きない。
@@ -162,7 +200,7 @@ window.ONW = window.ONW || {};
     return !!game.currentRoles && E(game, id) === ONW.ROLE.PENGUIN && !ONW.hiddenDrunk(game, id) && !(ONW.seal && ONW.seal.is(game, id));
   };
   vote.penguinRun = function penguinRun(game) {
-    const votes = { ...(game.votes || {}) }, slides = [];
+    const votes = vote.goranshinRun(game).votes, slides = [];   // 御乱心（投票先のランダム化）が一番先。そのあとにペンギンが滑らせる（マイクラ版 effectiveVoteRecords と同じ順）
     if (!game.currentRoles || !ONW.ROLE.PENGUIN) return { slides, votes };
     (game.players || []).forEach((p) => {
       if (!vote.penguinOn(game, p.id)) return;
@@ -211,15 +249,15 @@ window.ONW = window.ONW || {};
     if (ca > 0) out[b] = ca; else delete out[b];
     return out;
   };
-  /** 得票数を集計する（メイヤーの1票は、設定した票数ぶんとして数える）。raw:true ならペンギンが滑ったあと・交換者の入れ替えをする前の得票数 / pre:true ならペンギンが滑らせる前の得票数 */
+  /** 得票数を集計する（メイヤーの1票は、設定した票数ぶんとして数える）。raw:true ならペンギンが滑ったあと・交換者の入れ替えをする前の得票数 / pre:true なら御乱心のあと・ペンギンが滑らせる前の得票数 / orig:true なら御乱心の前（元の投票）の得票数 */
   vote.tally = function tally(game, opts) {
     let counts = {};
     const pen = vote.penguinRun(game);   // ペンギンの滑り（最初に働く。票の重みは投票者のまま）
-    Object.entries((opts && opts.pre) ? game.votes : pen.votes).forEach(([voterId, targetId]) => {
+    Object.entries((opts && opts.orig) ? (game.votes || {}) : (opts && opts.pre) ? vote.goranshinRun(game).votes : pen.votes).forEach(([voterId, targetId]) => {
       const w = ONW.vote.weightOf(game, voterId);   // 投票数0票（盗賊に盗まれて0票になった人など）の票は、得票数に何も足さない（0票の項目も作らない）
       if (w > 0) counts[targetId] = (counts[targetId] || 0) + w;
     });
-    if (opts && opts.pre) return counts;   // ペンギンが滑らせる前の得票数（結果発表の最初に出す票数。ペンギンがいなければ raw と同じ）
+    if (opts && (opts.pre || opts.orig)) return counts;   // pre: 御乱心のあと・ペンギンが滑らせる前の得票数 / orig: 御乱心の前（元の投票）の得票数（結果発表の最初に出す票数。ペンギンがいなければ raw と同じ）
     if (pen.slides.length) (game.deadIds || []).forEach((id) => { delete counts[id]; });   // 滑った先が昼中に死亡している人なら、その票は無効（交換者と同じ扱い）
     if (opts && opts.raw) return counts;   // ペンギンが滑ったあと・交換者の入れ替え前の得票数
     // 交換者: 使った順に1つずつ、2人の得票数を入れ替える。入れ替わった先が昼中に死亡している人なら、その票は無効（マイクラ版: 死亡した相手への票は無効）
@@ -228,7 +266,9 @@ window.ONW = window.ONW || {};
     // 番犬: 飼い主への票は無効（最終盤面の番犬の飼い主は追放されない。入れ替え後の得票数で見る＝マイクラ版 protectedOwnerIds と同じ）
     if (opts && opts.unguarded) return counts;   // 無効になる前の得票数（結果発表の「無効票」表示用）
     vote.guardedIds(game).forEach((id) => { delete counts[id]; });
-    return counts;
+    // 妖精さん（js/roles/village/fairy.js）: バリアがついた人は、入った票が1票ぶん防がれる（得票数を1減らす。0票の人は何も起きない）。交換者・番犬を反映したあとに引く（マイクラ版 vote.js countVotes と同じ順）。バリアは「人」についた記録を見る（付与した人がいまどの役職でも変わらない）
+    if (opts && opts.nofairy) return counts;   // バリアを反映する前の得票数（結果発表の「本来の得票数」）
+    return ONW.fairy ? ONW.fairy.reduce(game, counts).counts : counts;
   };
   /** 番犬の飼い主として票が無効になる人（最終盤面で番犬を持っていて酔いが覚めている人の飼い主）。番犬の役職ファイルがない場合は空 */
   vote.guardedIds = function guardedIds(game) {
@@ -245,6 +285,17 @@ window.ONW = window.ONW || {};
       steps.push(shown(counts));
     });
     return steps;
+  };
+
+  /**
+   * 妖精さんのバリアの途中経過（結果発表の演出用）: { list: [{ byId, targetId, ok, from, to }（付与した順）], steps: [バリア前の得票数, 1つ目のバリア後, ...] }
+   * 最初の要素は vote.tally(game, { nofairy: true })（本来の得票数）、最後の要素は vote.tally(game) と同じ。バリアがなければ list は空・steps は1つだけ。
+   */
+  vote.fairySteps = function fairySteps(game) {
+    const base = vote.tally(game, { nofairy: true });
+    if (!ONW.fairy || !(game.fairyBarriers || []).length) return { list: [], steps: [base] };
+    const r = ONW.fairy.reduce(game, base);
+    return { list: r.list.map((x) => ({ byId: x.by, targetId: x.target, ok: x.ok, from: x.from, to: x.to })), steps: r.steps };
   };
 
   /**
@@ -277,6 +328,7 @@ window.ONW = window.ONW || {};
     game.mentalIds = [];
     game.shockIds = [];
     game.servantSubs = [];
+    game.majorSacrificed = [];
     game.toughBounces = [];
     game.kingGuards = [];
     if (maxVotes === 0) {
@@ -295,9 +347,11 @@ window.ONW = window.ONW || {};
     // チキン: 1票でも入ったら、つられている人と同時にショック死（追放扱い）
     game.shockIds = game.players.map((p) => p.id).filter((id) => E(game, id) === ONW.ROLE.CHICKEN && counts[id] > 0 && !gone0.has(id) && !ONW.seal.is(game, id));   // 封印されているチキンはショック死しない（2of4b）
     game.shockIds.forEach((id) => { if (!game.eliminated.includes(id)) game.eliminated.push(id); });
-    // 独裁処刑(game.dictator): 本家(applyServantSubstitution の先頭)どおり、従者は身代わりにならない。選ばれた人だけが処刑される（議論を打ち切って投票は行わない。票は独裁者→対象の1票だけ）
-    if (game.dictator) game.servantSubs = [];
-    else ONW.vote.applyServantSubstitution(game);   // 本家の順序どおり: 豆腐の人狼のメンタル崩壊 → 従者の身代わり → 連鎖（resolveChain）
+    // 独裁処刑(game.dictator): 議論を打ち切って投票は行わない（票は独裁者→対象の1票だけ）。
+    //   2026-11-17 ユーザー指定: 独裁処刑の対象（ご主人）にも従者の身代わりが働く（結果発表は通常の追放と同じ「身代わり」演出: ご主人のカードがめくれそうになる → 従者のカードがめくれる）。少佐の身代わりは従来どおり独裁処刑では働かない。
+    //   クーデター（反逆の狂人が独裁を跳ね返して独裁者本人が処刑される）は従来どおり身代わりなし（docs/rebel-madman.md）。
+    if (game.dictator) { game.servantSubs = []; if (!game.dictator.coup) ONW.vote.applyServantSubstitution(game); }
+    else { ONW.vote.applyServantSubstitution(game); ONW.vote.applyMajorSubstitution(game); }   // 本家の順序どおり: 豆腐の人狼のメンタル崩壊 → 従者の身代わり → 少佐の身代わり → 連鎖（resolveChain）
     return game.eliminated;
   };
 
@@ -332,6 +386,30 @@ window.ONW = window.ONW || {};
         changed = true;
       });
     }
+    return game.servantSubs;
+  };
+
+  /**
+   * 少佐の身代わり（マイクラ版 applyMajorSubstitution。従者の身代わりのあとに1回）。
+   * 救済が成功した救済先(g.majorResults)が追放されていたら、その救済先を救済先に持つ生存中の少佐（最終役職が少佐。模倣の人狼の少佐も）のうち1人（ランダム）が代わりに追放される。
+   *   ・身代わりにならない少佐: 救済先本人 / すでに追放されている / 昼中に死亡している / 封印されている / 酔いが覚めていない
+   *   ・従者の身代わりで追放された従者が救済先なら、その従者の代わりに少佐が追放される（従者の記録を少佐に付け替える）
+   *   ・記録は従者と同じ game.servantSubs に { servant: 少佐, master: 救済先, major: true } で積む（処刑人・賞金稼ぎの判定・結果画面がそのまま使える）
+   */
+  vote.applyMajorSubstitution = function applyMajorSubstitution(game) {
+    const gone = new Set(game.deadIds || []);
+    (ONW.major ? ONW.major.rescued(game) : []).forEach((t) => {
+      if (!game.eliminated.includes(t)) return;
+      const cands = (game.players || []).map((p) => p.id).filter((h) => h !== t && ONW.mimic.eff(game, h) === ONW.ROLE.MAJOR && ONW.major.targetOf(game, h) === t && !game.eliminated.includes(h) && !gone.has(h) && !ONW.hiddenDrunk(game, h) && !(ONW.seal && ONW.seal.is(game, h)));
+      if (!cands.length) return;
+      const m = ONW.utils.randomChoice(cands);
+      game.eliminated = game.eliminated.filter((x) => x !== t); game.eliminated.push(m);
+      game.mentalIds = (game.mentalIds || []).filter((x) => x !== t);
+      game.shockIds = (game.shockIds || []).filter((x) => x !== t);
+      const e = (game.servantSubs || []).find((x) => x.servant === t);
+      if (e) { e.via = t; e.servant = m; e.major = true; } else (game.servantSubs = game.servantSubs || []).push({ servant: m, master: t, major: true });
+      game.majorSacrificed = (game.majorSacrificed || []).concat([{ majorId: m, targetId: t }]);
+    });
     return game.servantSubs;
   };
 
@@ -465,7 +543,7 @@ window.ONW = window.ONW || {};
     // 始めの心中: 追放・メンタル崩壊・ショック死・昼中の死亡など、resolveChain の前にすでに死んでいる人の相方も、ここで一緒に死ぬ
     [...game.eliminated, ...gone].forEach((id) => {
       cupidFollowers(id).forEach((h) => kill(h, id, "follow", false));   // キューピッド: 選んだ2人の一方がすでに死んでいる（追放・昼中の死亡）なら、後を追う
-      ONW.loverMates(game, id).forEach((mate) => kill(mate, id, "lovers"));
+      ONW.loverMates(game, id).forEach((mate) => { if (ONW.steve && ONW.steve.keepsAfterMate(game, mate, id)) return; kill(mate, id, "lovers"); });   // 昼に復活したスティーブは、自分の死で心中した相方のせいで、もう一度は死なない（ONW.steve.keepsAfterMate）
       if (game.currentRoles[id] === R.FOX && ONW.fanatic) ONW.fanatic.followersOf(game).forEach((f) => kill(f, id, "follow", false));   // すでに死んでいる妖狐（追放など）のあとを背徳者が追う
     });
     // 「めくれた順」の波で処理する。同じ波（同時にめくれた人たち）のわら人形・アサシンは、同じ時点の候補から同時に選ぶ
@@ -566,6 +644,8 @@ window.ONW = window.ONW || {};
       if (!changed) break;   // 新しく倒れた人がいなければ終わり（いれば、その心中で新しい女王が倒れていないか、もう一度見る）
     }
     late = false;
+    // スティーブ（マイクラ版 reviveStevePlayers）: 噛殺・爆殺・独裁処刑で死亡したスティーブは、連鎖がすべて終わったあとに1度だけ不死のトーテムで復活する（js/roles/village/steve.js）
+    if (ONW.steve) ONW.steve.reviveAtChain(game, { done, gone });
     return [...done];
   };
 
@@ -730,6 +810,7 @@ window.ONW = window.ONW || {};
     game.jesterMadmanWin = [];   // 道化の狂人: 追放・道連れで死亡して人狼陣営の勝利を作った人（分岐 1.9。結果の説明用）
     game.tenaciousCut = [];   // 執念の狂人: 死亡したため人狼陣営（または神の祝福）の勝利から外れた人（勝敗の説明用。下の 1 / 3.8 / 4 の分岐が決める）
     const gods = ids.filter((id) => role(id) === R.GOD);
+    game.priestMode = null; game.priestIds = [];   // 神官（docs/priest.md）: "block"（生存している神官が神降臨を無効にした）/ "help"（死亡している神官のおかげで村人陣営も追加勝利）/ null。結果の演出・説明用
     game.godMode = null; game.godIds = []; game.godBlown = [];   // 結果の演出用: "bless"（神の祝福）/ "descend"（神降臨）/ null
     // 無理心中で巻き込まれたてるてる系は、自分のてるてる勝利は発動しない（相手の一目惚れしてるてると「一緒に勝った」扱いになるだけ）
     const byLove = (id) => ["love", "lovers"].includes((game.chainKind || {})[id]);   // 無理心中・心中で死んだてるてる系も同じ扱い
@@ -770,7 +851,15 @@ window.ONW = window.ONW || {};
     });
     const shotLostIds = ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : [];   // 保安官に撃たれて死に、勝利条件を失った人（身代わりで撃たれた従者は含まない）
     const godAlive = gods.filter((id) => !executed.includes(id) && !shotLostIds.includes(id));   // 撃たれて死んだ神は降臨しない（マイクラ版 teamVictoryBreaks.god）
-    if (!godBless.length && godAlive.length) { game.godMode = "descend"; game.godIds = godAlive.slice(); }   // 生存している神は、結果発表でめくれるときに降臨の演出（どの勝敗でも）
+    // 神官（js/roles/village/priest.js・docs/priest.md。マイクラ版 getGodOverrideResult）: 神の祝福（追放・道連れ）は無効にしない。神降臨（神が追放されなかった）だけが対象。
+    //   最終盤面の神官が1人でも死んでいない → 神降臨は起きない / 神官がいて全員死亡 → 神降臨で村人陣営も追加勝利（恋人・(+反転)・シャッフラーの印がついた人は除く）。神がいない盤面では何も起きない
+    const priestHolders = ONW.priest ? ONW.priest.holders(game) : [];
+    const priestBlocks = !godBless.length && !!godAlive.length && priestHolders.some((id) => !dead.has(id));   // 神の祝福が起きるとき（神が追放・道連れ）は神官の演出も出さない（別の神が生存していても祝福が先）
+    const priestHelps = !godBless.length && !!godAlive.length && priestHolders.length > 0 && !priestBlocks;
+    const godDescends = godAlive.length > 0 && !priestBlocks;   // 神降臨が成立しうるか（神官が生存していなければ）
+    if (priestBlocks) { game.priestMode = "block"; game.priestIds = priestHolders.filter((id) => !dead.has(id)); }
+    else if (priestHelps) { game.priestMode = "help"; game.priestIds = priestHolders.slice(); }
+    if (!godBless.length && godDescends) { game.godMode = "descend"; game.godIds = godAlive.slice(); }   // 神官が生存していると降臨しない（演出も出さない）   // 生存している神は、結果発表でめくれるときに降臨の演出（どの勝敗でも）
 
     // 殉職者（docs/martyr.md）: 最終盤面で殉職者を持っていて死亡した人は、死因を問わず追加勝利（追放・道連れ・番犬の噛殺・爆殺・保安官の執行 など）。
     //   保安官に撃たれても・道化の爆弾魔に爆殺されても勝利条件を失わない（ユーザー指定。マイクラ版 sheriffDeathKeepsVictory）。王国滅亡で倒れた人だけは他の人と同じく勝てない。
@@ -782,7 +871,7 @@ window.ONW = window.ONW || {};
       if (game.foxTake) { title = "妖狐陣営勝利"; teams = ["妖狐陣営"]; game.foxTake.fanatics = ONW.fanatic ? ONW.fanatic.partners(game, dead) : []; winners = [...game.foxTake.ids, ...game.foxTake.fanatics]; detail = ONW.fox.takeoverText(game, game.foxTake.ids); winnerTeams = [ONW.TEAM.THIRD]; }   // 妖狐の乗っ取り（determineWinnersCore が成立を確かめたときだけ game.foxTake を付けて、もう一度ここへ来る）
       if (game.lawyerTake) { title = "弁護士勝利"; teams = ["弁護士"]; winners = game.lawyerTake.ids.slice(); detail = `依頼人が勝利し、弁護士 ${nm(game.lawyerTake.ids)} が生存していたため、弁護士の単独勝利です。（元の結果: ${game.lawyerTake.from}）`; winnerTeams = [ONW.TEAM.THIRD]; }   // 弁護士の単独勝利（docs/lawyer.md。勝利優先度: 神 ＞ 弁護士(単独勝利時) ＞ 妖狐）
       if (game.shufflerTake) { title = "シャッフラー勝利"; teams = ["シャッフラー"]; winners = game.shufflerTake.ids.slice(); detail = ONW.shuffler.takeoverText(game, game.shufflerTake, game.shufflerBase); winnerTeams = [ONW.TEAM.THIRD]; }
-      game.winTitle = title; game.winTeams = teams; game.winDetail = detail; game.winners = winnerTeams;
+      game.winTitle = title; game.winTitleStage = null; game.winTeams = teams; game.winDetail = detail; game.winners = winnerTeams;   // winTitleStage: 勝利演出の字幕用。追加勝利の「＆〇〇勝利」を付ける前のタイトル（追加勝利は役職の札で出すので、字幕には重ねない）
       const w = new Set(winners);
       game.winBaseIds = [...w];   // 追加勝利の演出用（docs/extra-win-fx.md）: 陣営の勝者としてここまでに決まっていた人。最終の勝者（game.winnerIds）のうちここにいない人が「追加勝利」
       const shotLoseIds = shotLostIds.filter((id) => role(id) !== R.MARTYR);   // 殉職者は撃たれても勝利条件を失わない（下の shotCut / 追加勝利の後ろの除外から外す）
@@ -990,8 +1079,13 @@ window.ONW = window.ONW || {};
         `恋人 ${loverSurvive.map(([a, b]) => `${nm([a])} ❤ ${nm([b])}`).join("、")} が二人とも死亡しませんでした。恋人以外は敗北です。`, [ONW.TEAM.THIRD]);
     }
     // 3. 神降臨（処刑人より後）（神が追放されなかった）
-    if (hit(11, !game.chickenForce && godAlive.length)) {
+    if (hit(11, !game.chickenForce && godDescends)) {
       game.godMode = "descend"; game.godIds = godAlive.slice();
+      if (priestHelps) {   // 死亡している神官: 村人陣営も追加で勝つ（マイクラ版 priestTeamWinners。恋人・(+反転)・シャッフラーの印がついた人は受けられない）
+        const canRecv = (id) => !isLover(id) && !(ONW.reverse && ONW.reverse.is && ONW.reverse.is(game, id)) && !(ONW.shuffler && ONW.shuffler.tagged && ONW.shuffler.tagged(game, id));
+        const vill = ids.filter((id) => !(game.cursedWolfIds || []).includes(id) && ONW.roles.getInfo(role(id)).team === ONW.TEAM.VILLAGE && canRecv(id));
+        return set("神降臨", ["神", "村人陣営"], [...new Set([...godAlive, ...vill])], `神が追放されませんでした。 死亡している神官 ${nm(priestHolders)} により村人陣営も追加勝利します。`, [ONW.TEAM.THIRD, ONW.TEAM.VILLAGE]);
+      }
       return set("神降臨", ["神"], godAlive, "神が追放されませんでした。", [ONW.TEAM.THIRD]);
     }
     // 3.5 道化の狂人の勝利（2026-11-07 から アサシンと同順位。恋人・神降臨より下）（js/roles/wolf/mad/jester_madman.js・docs/jester-madman.md）: 追放または道連れで死亡した道化の狂人がいれば、人狼が1人以上死んでいても人狼陣営の勝利（マイクラ版 buildJesterMadmanPriorityResult）。
@@ -1079,7 +1173,7 @@ window.ONW = window.ONW || {};
     // 弁護士（勝利優先度: 神 ＞ 弁護士(単独勝利時) ＞ 妖狐）: 通常の結果（村人陣営 / 人狼陣営 / 妖狐陣営の勝ちだけ）に依頼人が勝者にいる、生存した弁護士がいれば単独勝利。妖狐より上なので、どちらも成立するときは弁護士が最後に乗っ取る
     // （条件は、どちらも「乗っ取られる前の通常の結果」で見る。梯子: 基本勝敗 → 妖狐 → 弁護士）。シャッフラーより先に判定する。チキンの逆転の再判定（chickenForce）では乗っ取らない
     if (!game.chickenForce) {
-      const fx = ONW.fox && ONW.fox.takeover && ((game.winTeams || []).includes("村人陣営") || (game.winTeams || []).includes("人狼陣営")) ? ONW.fox.takeover(game) : [];
+      const fx = ONW.fox && ONW.fox.takeover && game.winTitle !== "神降臨" && ((game.winTeams || []).includes("村人陣営") || (game.winTeams || []).includes("人狼陣営")) ? ONW.fox.takeover(game) : [];   // 神降臨（神官が死亡していて村人陣営も追加勝利するとき winTeams に村人陣営が入る）は妖狐の乗っ取り対象外（神 ＞ 妖狐）
       const lw = ONW.lawyer && ONW.lawyer.takeover ? ONW.lawyer.takeover(game) : null;
       if (fx.length) { game.foxTake = { ids: fx, from: game.winTitle }; ONW.vote.determineWinnersCoreBase(game); step("fox"); }
       if (lw) { const from = game.winTitle; game.foxTake = null; game.lawyerTake = { ids: lw.ids, from }; ONW.vote.determineWinnersCoreBase(game); step("lawyer"); }
@@ -1128,7 +1222,7 @@ window.ONW = window.ONW || {};
     game.chickenForce = toWolf ? "wolf" : true;
     ONW.vote.determineWinnersCore(game);
     game.chickenForce = false;
-    game.godMode = null; game.godIds = []; game.godBlown = [];   // 逆転後は神の演出は出さない
+    game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = [];   // 逆転後は神の演出は出さない
     game.chickenReverse = { fromTitle: from.title, fromTeams: from.teams, ids: list, names: list.map((id) => (ONW.utils.playerById(game, id) || {}).name), toWolf };
     game.winDetail = toWolf
       ? `生存した模倣チキン ${nm(list)} が人狼陣営の敗北を逆転させました。（逆転前: ${from.title}）`
@@ -1190,7 +1284,7 @@ window.ONW = window.ONW || {};
     if (chickens.length) {
       const from = { title: game.winTitle, teams: [...teams] };
       game.chickenForce = true; ONW.vote.determineWinnersCore(game); game.chickenForce = false;
-      game.godMode = null; game.godIds = []; game.godBlown = [];
+      game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = [];
       game.chickenReverse = { fromTitle: from.title, fromTeams: from.teams, ids: chickens, names: chickens.map(nm), toWolf: false };
       game.winDetail = `生存したチキン ${chickens.map(nm).join("、")} が愉快犯の影響を逆転させました。（逆転前: ${from.title}）`;
       saved = true;
@@ -1201,7 +1295,7 @@ window.ONW = window.ONW || {};
       if (mc.length) {
         const from = { title: game.winTitle, teams: [...(game.winTeams || [])] };
         game.chickenForce = "wolf"; ONW.vote.determineWinnersCore(game); game.chickenForce = false;
-        game.godMode = null; game.godIds = []; game.godBlown = [];
+        game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = [];
         game.chickenReverse = { fromTitle: from.title, fromTeams: from.teams, ids: mc, names: mc.map(nm), toWolf: true };
         game.winDetail = `生存した模倣チキン ${mc.map(nm).join("、")} が愉快犯の影響を逆転させました。（逆転前: ${from.title}）`;
         saved = true;
@@ -1239,7 +1333,7 @@ window.ONW = window.ONW || {};
       if (!had) teams.push("道化の爆弾魔");
       if (!keys.includes(T.THIRD)) keys.push(T.THIRD);
       if (!others.length) { teams = ["道化の爆弾魔"]; keys = [T.THIRD]; game.winTitle = "道化の爆弾魔勝利"; game.winBaseIds = winBombers.slice(); }   // 爆弾魔以外に勝者がいなくなった（全員爆発・もともと勝者なし）
-      else if (!had && /勝利$/.test(game.winTitle || "") && game.winTitle !== "全員勝利") game.winTitle = game.winTitle.replace(/勝利$/, "＆道化の爆弾魔勝利");   // 追加勝利: 勝利タイトルも「村人陣営＆道化の爆弾魔勝利」にする（愉快犯の追加勝利と同じ）
+      else if (!had && /勝利$/.test(game.winTitle || "") && game.winTitle !== "全員勝利") { game.winTitleStage = game.winTitleStage || game.winTitle; game.winTitle = game.winTitle.replace(/勝利$/, "＆道化の爆弾魔勝利"); }   // 追加勝利: 勝利タイトルも「村人陣営＆道化の爆弾魔勝利」にする（愉快犯の追加勝利と同じ）
     }
     const lines = hanged.map((b) => { const x = game.bombs.find((q) => q.bomber === b), lose = x.ids.filter((id) => game.currentRoles[id] !== R.MARTYR), keep = x.ids.filter((id) => game.currentRoles[id] === R.MARTYR); return `道化の爆弾魔 ${nm(b)} が吊られて自爆したため、${x.ids.length ? `${lose.length ? `${lose.map(nm).join("、")} が爆発して敗北しました。` : ""}${keep.length ? `殉職者 ${keep.map(nm).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`; });
     game.winDetail = `${game.winDetail || ""}${game.winDetail ? "\n" : ""}${lines.join("\n")}`;
@@ -1252,6 +1346,7 @@ window.ONW = window.ONW || {};
     determineWinnersInner(game);
     ONW.vote.applyPrankster(game);
     ONW.vote.applyBomber(game);
+    if (game.priestMode === "block" && !game.abandoned && game.winTitle !== "神降臨") game.winDetail = `${game.winDetail ? game.winDetail + " " : ""}（神は追放されませんでしたが、神官 ${(game.priestIds || []).map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、")} が生存しているため、神降臨は起きませんでした。）`;   // 神官（docs/priest.md）: 神官が生存していて神降臨が無効になったことを結果の説明に残す
     return game.winners;
   };
 

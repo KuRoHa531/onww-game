@@ -65,6 +65,14 @@
       desc: "人狼陣営。夜に1人を選びます。昼の始まりに、その人の最終役職だけが全員に公開されます（選んだ相手の名前や暴露狂人本人は公開されません）。恋人や酔っ払いなどの付加情報も一緒に公開されます。人狼が誰かは分かりません。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.5, "transform:dark_avatar": 14 },
     uiNight: uiPick,
+    // 結果開示(COボタン)の流れ(co.js が kind で引く): 暴露した相手を選ぶ → その人の最終役職を選ぶ（「伏せる」も言える。マイクラ版 main.js の暴露狂人CO と同じ）
+    coResult: {
+      kind: "expose", targetLabel: "暴露した相手", roleHint: "の最終役職",
+      pickRole(role, who, s, K) {
+        if (role === "hide") return [`${who} を暴露しました。役職は伏せます。`, null, null, "disclose", `${who} → 伏せ`];
+        return [`${who} を暴露して ${K.rn(role)} でした。`, { kind: "expose", target: s.target, role }, null, "disclose", `${who} → ${K.rn(role)}`];
+      },
+    },
     cpuNight: { order: 60, stage: "seer", chain: true, run: cpuRun },   // CPUの夜の行動(chain: 墓荒らし・ドッペル・酔い覚めの後に朝のうちに使える)
     stagePick: {},   // 夜(と朝の連鎖)にカードを押して行動する: プレイヤー1人
     /** 昼の始まり(変化公開 → 新聞 のあと、麻婆豆腐の前): 暴露の紙を出す。戻り値: 紙が出終わるまでの待ち時間(ms)。出さないときは 0 */

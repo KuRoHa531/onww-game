@@ -16,8 +16,8 @@
    * （人狼陣営の騙りと違って、本物の人狼を庇わない）。
    */
   function merlinLie(k, g, p, i) {
-    const { rn, pick, weighted, roleInSetup, bareCo, isWolf, WOLF_LIKE, wolfLikeResult, villageLikeResult, lieClaim } = k;
-    const opts = [["seer", 45], ["villager", 25], ["troublemaker", 10], ["robber", 10], ["mason", 10]].filter(([r]) => roleInSetup(g, r));
+    const { rn, pick, weighted, roleInSetup, roleCoable, bareCo, isWolf, WOLF_LIKE, wolfLikeResult, villageLikeResult, lieClaim } = k;
+    const opts = [["seer", 45], ["villager", 25], ["troublemaker", 10], ["robber", 10], ["mason", 10]].filter(([r]) => roleCoable(g, r));   // 騙りで名乗る役職は公開されている範囲だけ（2026-11-17）
     const co = opts.length ? weighted(opts) : bareCo(g);
     if (co === "seer") {
       const others = g.players.filter((q) => q.id !== p.id);

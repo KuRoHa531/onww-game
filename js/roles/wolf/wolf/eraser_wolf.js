@@ -26,7 +26,7 @@
  *
  * 【状態】g.eraserWolfTarget[能力を使った人のID] = 抹消対象のID（マイクラ版 eraserWolfTarget と同じ。試合ごとに net.startGame が {} に戻す）
  *         g.eraserWolfResults = [{ actorId, targetId, beforeRole, afterRole, hadLover }]（成功した抹消。マイクラ版 eraserWolfResults）
- *         g.eraserWolfFailed[actorId] = "target_locked" | "dead"（失敗の理由。マイクラ版 eraserWolfFailed）
+ *         g.eraserWolfFailed[actorId] = "target_locked" | "aa_blocked"（ロックされていないA.A.・本人への通知なし）| "dead"（失敗の理由。マイクラ版 eraserWolfFailed）
  *
  * 【抹消の中身(2of5)】待機時間のはじめ（ONW.roleHooks("settlePre") order 1。後覚者・CPUが最終役職を知る前）に、最終盤面(g.currentRoles)で対象が持つ役職を書き換える。
  *   ・失敗: 対象の席がロック中(ONW.keymaster.locked) → 失敗（本人に「抹消通知」）。対象が昼になる前に死んでいる(g.deadIds / g.foxCursed) → 何もしない。
@@ -66,7 +66,7 @@
   function overwrite(g, t, role) {
     const card = ONW.cardAt(g, t), changed = g.currentRoles[t] !== role;
     g.currentRoles[t] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen", "senseSeerTarget", "senseSeerSeen", "reverserTarget"].forEach((k) => { if (g[k]) delete g[k][t]; });
+    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen", "senseSeerTarget", "senseSeerSeen", "reverserTarget", "mosesBonus"].forEach((k) => { if (g[k]) delete g[k][t]; });
     if (g.reverserTarget) Object.keys(g.reverserTarget).forEach((h) => { if (g.reverserTarget[h] === t) delete g.reverserTarget[h]; });   // 対象についていた (+反転) も消える（反転者の持ち主の記録のうち、対象に付けたもの。docs/reverser.md）
     if (g.shufflerMarks) delete g.shufflerMarks[card];   // シャッフラーの印も消える
     if (g.drunkOverlay) delete g.drunkOverlay[t];        // 酔っ払い(重複役職)も消える
@@ -94,7 +94,12 @@
       if (!t || !g.players.some((q) => q.id === t)) return;
       if ((g.eraserWolfResults || []).some((x) => x.actorId === actorId && x.targetId === t) || g.eraserWolfFailed[actorId]) return;
       if (dead(g, t)) { g.eraserWolfFailed[actorId] = "dead"; return; }
-      if (ONW.keymaster && ONW.keymaster.locked(g, t)) {
+      if (ONW.keymaster && ONW.keymaster.isAA(g, t) && ONW.keymaster.blocks(g, t)) {   // A.A.（ロックされていない）: 抹消できない。マイクラ版どおり本人への通知は無し（夜ログと観戦者の欄にだけ残る）
+        g.eraserWolfFailed[actorId] = "aa_blocked";
+        g.nightLogsAll.push(`抹消の人狼 ${nm(g, actorId)} は ${nm(g, t)} の特殊な力により、抹消に失敗しました。`);
+        return;
+      }
+      if (ONW.keymaster && ONW.keymaster.blocks(g, t)) {
         g.eraserWolfFailed[actorId] = "target_locked";
         g.nightLogsAll.push(`抹消の人狼 ${nm(g, actorId)} は ${nm(g, t)} の役職がロックされていたため、抹消に失敗しました。`);
         return;

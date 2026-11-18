@@ -2,8 +2,8 @@
  * シャッフラー（マイクラ版 SHUFFLER を参考）: 第三陣営。
  * 夜に「自分を含む」プレイヤー1人を選ぶ。朝に山札から1枚を引いてめくり、選んだ人のカードの上に置く（＝その人の役職が引いたカードの役職に変わる）。
  *   ・山札 = 「一部を除いたランダムな役職」（マイクラ版 shufflerEligibleRoles と同じ考え方。除外は ONW.shuffler.BLOCKED）。
- *   ・「カードの上に置いた」記録は g.shufflerMarks[置かれたカードのID] = { by: シャッフラーのカードID, role: 引いた役職 }（カード単位）。
- *     カードが怪盗・いたずらっ子・墓荒らし・グレムリンなどで人から人へ動いても、カードIDで追うので、記録は自然についていく（ONW.cardAt / state.js の cards）。
+ *   ・「カードの上に置いた」記録は g.shufflerMarks[置かれたカードのID] = { by: シャッフラーのカードID, role: 引いた役職 }（席のカードIDで持つ）。
+ *     印はプレイヤー（席）につく。カードが怪盗・いたずらっ子・墓荒らしなどで人から人へ動いても、印は動かず元の席に残る（state.js の keepMarksOnSeat。2026-11-17 修正）。置いたシャッフラーのカード(by)は役職なので、カードについて動く。
  *     選んだ「人」ではなく「置かれたカード」で追うので、置いたあとにそのカードが別の人の手に渡れば、渡った先の人がシャッフラーの対象になる（本家は選んだプレイヤー単位。カードが動いた場合だけ違う）。
  *     自分自身も選べる: 自分のカードの上に置く（by = そのカード自身）。役職は変わるのでシャッフラーではなくなるが、カードの印で「自分を変化させたシャッフラー」と分かる。
  *     上書きされた（ドッペル・グレムリンのコピー・別のシャッフラーが上に置いた）カードの印は消える。陣営の乗っ取りは 3of4。
@@ -35,6 +35,7 @@
     "avenger",   // 復讐者（夜に復讐対象を選ぶ役職。マイクラ版 shufflerEligibleRoles の除外どおり）
     "prankster",   // 愉快犯（夜に対象を選ぶ役職。復讐者と同じ扱いで山札から外す。※マイクラ版 shufflerEligibleRoles の確認は 4of4）
     "watcher",   // 静観者（マイクラ版 shufflerEligibleRoles の除外どおり。静観者のカードは交換・コピー・変化されない）
+    "priest",   // 神官（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補にも入っていない）
     "mimic_wolf", "mirage_wolf",   // 模倣の人狼・蜃気楼の人狼（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
@@ -98,7 +99,7 @@
     return segs;
   }
   const rnOf = (r) => ONW.roles.getInfo(r).name;
-  // ---- 勝敗（マイクラ版 vote.js の shufflerFailsByDeathRule / enforceShufflerFailureRules / 乗っ取り勝利 を、Web版のカード単位の印(picks)に当てはめたもの）----
+  // ---- 勝敗（マイクラ版 vote.js の shufflerFailsByDeathRule / enforceShufflerFailureRules / 乗っ取り勝利 を、Web版の席の印(picks)に当てはめたもの）----
   //  ・失敗条件: 追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる・賞金稼ぎ）以外に変化させたのに、変化させた対象が死亡したら、シャッフラー陣営（シャッフラーと対象）は勝てない。
   //    村人陣営・人狼陣営の役職に変化させた場合は、シャッフラー本人が死亡しても失敗。自分に変化させた場合は、自分が変化後の役職として死亡すれば失敗。
   //  ・乗っ取り勝利: 失敗していない組で、対象が（変化後の役職として）勝利していれば、シャッフラーと対象が「シャッフラー勝利」。元の勝者のうち、この2人以外は敗北（追加勝利の役職・勝ち組などは通常どおり）。
@@ -193,6 +194,7 @@
       ONW.watcher.keyFailShown(g, holderOf(g, p.id), [t], [ta]);
       return;
     }
+    if (ONW.moses) ONW.moses.before(g, p.id, [], [t]);   // モーゼス: 置かれた新しいモーゼスは0票から（touch で+1しない）
     const r = shuffle(g, holderOf(g, p.id), ta), shown = ONW.shownRole(r.role);
     i.shuffle = { target: t, role: shown };   // 発言(cpuClaim)・投票(cpuVoteScore)が使う。朝に墓荒らし・ドッペルで手にした連鎖(cur)でも、本人の怪盗などの記録(mode / target)は上書きしない
     if (!cur) { i.mode = "shuffler"; i.target = t; }
@@ -251,6 +253,7 @@
         if (!ta) { c.hold(p.id, ONW.watcher.noneLine("変化")); return; }   // 移す先がなければ変化しない（新聞・観測にも載らない）
         const why = ONW.keymaster.gate(g, holderOf(g, p.id), [ta]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら失敗。山札から引かず、新聞・観測にも載らない
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${c.rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, holderOf(g, p.id), [t], [ta]); c.rev[p.id] = ONW.keymaster.failRev(g, holderOf(g, p.id), p.id); return; }
+        if (ONW.moses) ONW.moses.before(g, p.id, [], [t]);   // モーゼス: 置かれた新しいモーゼスは0票から
         const r = shuffle(g, holderOf(g, p.id), ta);
         g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.rn(c.eff(p))} ${p.name}`, nameOf, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${c.rn(r.role)}」に変化させました。`) || `${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         c.hold(p.id, `${nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`);
@@ -268,6 +271,7 @@
         if (!ta) return { lines: [ONW.watcher.noneLine("変化")], reveal: null, nextChain: null, failed: true };
         const why = ONW.keymaster.gate(g, id, [ta]);   // 朝のうち(墓荒らし・ドッペル経由)・酔い覚めにもロックは効く
         if (why) { const fl = ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [t], [ta]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
+        if (ONW.moses) ONW.moses.before(g, id, [], [t]);   // モーゼス: 置かれた新しいモーゼスは0票から
         const r = shuffle(g, id, ta);
         g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.label} ${c.me.name}`, c.nameOf, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${c.rn(r.role)}」に変化させました。`) || `${c.label} ${c.me.name} は ${c.nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         const lines = [`${c.nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`];

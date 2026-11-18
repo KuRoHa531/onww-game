@@ -106,7 +106,7 @@
   }
   /** コスプレして手にした役職 role の「続けて言う結果」（占い師なら占い結果）。墓荒らしにコスプレしたときは、墓地と交換した結果（墓荒らし自身は cpuChainResult を持たないのでここで補う） */
   function afterResult(k, g, p, i, role) {
-    if (role === "relic_robber") { const x = i.relic; return x && x.newRole ? { short: `墓地${x.graveIdx + 1} → ${k.rn(x.newRole)}`, text: `墓地${x.graveIdx + 1} と役職を交換して ${k.rn(x.newRole)} になりました。`, claim: { kind: "relic", role: x.newRole } } : null; }
+    if (role === "relic_robber") { const x = i.relic; return x && x.newRole ? { short: `墓地${x.graveIdx + 1} → ${k.rn(x.newRole)}`, text: `墓地${x.graveIdx + 1} と役職を交換して ${k.rn(x.newRole)} になりました。`, claim: { kind: "relic", role: x.newRole, graveIdx: x.graveIdx } } : null; }
     const h = ONW.roleHook(role, "cpuChainResult");
     return h ? (h(k, g, p, i) || null) : null;
   }

@@ -88,11 +88,11 @@
         R.subN = subs.length;
         subs.forEach((x) => {
           const mk = P(x.masterId), sk = P(x.servantId), sh = res.history.find((h) => h.id === x.servantId);
-          later(() => { setCap(`<div class="res-cap__t t-wolf">従者の身代わり</div><div>${esc(x.master)} が追放されそうになりました…</div>`); R.alm[mk] = true; paint(G()); }, R.t);
+          later(() => { setCap(`<div class="res-cap__t t-wolf">${x.major ? "少佐" : "従者"}の身代わり</div><div>${esc(x.master)} が追放されそうになりました…</div>`); R.alm[mk] = true; paint(G()); }, R.t);
           later(() => {
             delete R.alm[mk];
             up[sk] = (sh && sh.role) || "servant"; lovOn(x.servantId); dead[sk] = true; badge[sk] = "身代わり";
-            setCap(`<div class="res-cap__t t-wolf">従者の身代わり</div><div>${esc(x.servant)} が ${esc(x.master)} の身代わりになりました</div>`);
+            setCap(`<div class="res-cap__t t-wolf">${x.major ? "少佐" : "従者"}の身代わり</div><div>${esc(x.servant)} が ${esc(x.major ? x.target : x.master)} の身代わりになりました</div>`);
             paint(G());
           }, R.t + 1900);
           R.t += 4300;

@@ -109,8 +109,10 @@ co.poetPick = function (id) {
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
+    if (s.kind === "gremlin") return set({ step: "gcopy", kind: "gremlin", chain: s.chain, sel });   // グレムリン: 2人(コピー元 → コピー先)を選んだら、コピーした役職を選ぶ
     done(...(hookOfKind(s.kind === "gremlin" || s.kind === "evil_woman" || s.kind === "cupid" ? s.kind : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先 / 悪女: 1人目が本命、2人目がキープ / キューピッド: 恋人にした2人
   };
+  co.gremlinRole = (role) => done(...hookOfKind("gremlin").pickRole(role, (G().co || {}).sel || [], K));   // コピーした役職（または「伏せる」）
   co.pickMason = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     set({ ...s, sel });
@@ -213,8 +215,8 @@ co.poetPick = function (id) {
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
   const TEAM_ORDER = { village: 0, wolf: 1, third: 2 };   // COボタンの並び: 村人陣営 → 人狼陣営 → 第三陣営（同じ陣営の中は、基準の並び ONW.ROLE_ORDER=wikiの順。同じ役職どうしはもとの並び）
   const teamRank = (r) => { const t = (ONW.roles.getInfo(r) || {}).team; return t in TEAM_ORDER ? TEAM_ORDER[t] : 3; };
-  const deckList = () => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin").map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || ONW.roleRank(a.x.r) - ONW.roleRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）
-  const roleBtns = (fn, extra = "", skip = []) => deckList().filter((x) => !skip.includes(x.r)).map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.${fn}('${x.r}')`)).join("") + extra;
+  const deckList = (noCo) => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin" && !(noCo && x.r === "finger_reader")).map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || ONW.roleRank(a.x.r) - ONW.roleRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）。指読みは役職COボタン(noCo)にだけ出さない（指読みCO禁止）が、占い師などの結果役職の一覧には出す（マイクラ版 availableCoRoles / availableSeerResultRoles）
+  const roleBtns = (fn, extra = "", skip = []) => deckList(fn === "roleCo").filter((x) => !skip.includes(x.r)).map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.${fn}('${x.r}')`)).join("") + extra;
 
   /** COパネルの高さを、ボタンの上の「見える範囲」に収める（2026-11-07）。
    *  パネルはボタンの上に重ねて上へ伸びる（#co-panel は bottom:100%）。役職の一覧が長い（コスプレイヤーの結果開示など）と、
@@ -279,6 +281,9 @@ co.poetPick = function (id) {
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).twoHint || "入れ替えた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
         (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.pickTm('${p.id}')`)).join("") + (s.sel.length ? "" : lockBtn(s.kind)) + back;
+    } else if (s.step === "gcopy") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">${pn(nameOf(s.sel[0]))} の役職を ${pn(nameOf(s.sel[1]))} にコピーして、コピーした役職を選んでください。</p>` + roleBtns("gremlinRole", btn("伏せる", "ONW.co.gremlinRole('hide')")) + btn("2人を選び直す", "ONW.co.lockBack()") + back;
     } else if (s.step === "lock1") {
       title = "ロックされて失敗";
       const sf = (hookOfKind(s.kind) || {}).self;   // 自分も選べる結果開示（シャッフラー）

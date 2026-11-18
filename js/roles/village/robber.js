@@ -19,6 +19,7 @@
       ONW.watcher.keyFailShown(g, p.id, [t.id], [ta]);
       return;
     }
+    if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);   // モーゼス: 入れ替える「前」に使われた回数 +1（票数はカードについて動く）
     ONW.swapPlayers(g, p.id, ta);
     i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]);
     i.known[p.id] = i.newRole; i.known[t.id] = "robber";
@@ -46,6 +47,8 @@
         ? { short: `${t} → 変化なし`, text: `${t} を選びましたが、交換できる相手がおらず役職は変化しませんでした。`, claim: null }
         : i.keyFail.kind === "self"
         ? { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }
+        : i.keyFail.kind === "aa"
+        ? { short: `${t} → 特殊な力で失敗`, text: `${t} を選びましたが、特殊な力により交換できませんでした。`, claim: null }
         : { short: `${t} → ロックで失敗`, text: `${t} を選びましたが、役職がロックされていたため交換できませんでした。`, claim: null };
       return;
     }
@@ -106,6 +109,7 @@
         if (!ta) { c.hold(p.id, ONW.watcher.noneLine("交換")); return; }   // 移す先がなければ交換できない（新聞・観測にも載らない）
         const why = ONW.keymaster.gate(g, p.id, [ta]);   // 鍵師のロック（鍵師は先の段階で済んでいる）: 自分か相手の席がロック中なら失敗。役職は動かず、新聞・観測にも載らない
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [t], [ta]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
+        if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, p.id, ta);
         const got = g.currentRoles[p.id];
         g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${rn(c.eff(p))} ${p.name}`, c.nameOf, rn(got), "交換") || `${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
@@ -124,6 +128,7 @@
         if (!ta) return { lines: [ONW.watcher.noneLine("交換")], reveal: null, nextChain: null, failed: true };
         const why = ONW.keymaster.gate(g, id, [ta]);   // 朝のうち（墓荒らし・ドッペルで手にした怪盗 / 酔い覚め）もロックは効く
         if (why) { const fl = ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [t], [ta]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
+        if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, id, ta);
         const got = g.currentRoles[id];
         g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${c.label} ${c.me.name}`, c.nameOf, rn(got), "交換") || `${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」

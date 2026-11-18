@@ -7,13 +7,13 @@
  *   ・使えるのは、最終盤面で独裁者を持っていて（酔っ払いは酔いが覚めてから）、生きている人だけ。昼に1回だけ。昼のタイマーが動き出す前(変化公開・新聞の紙が出ている間)は使えない。
  *   ・選べるのは、生きている自分以外の人。
  *   ・使った瞬間に議論・投票は終わり、結果発表へ（妖狐投票もしない）。票は「独裁者 → 対象」の1票だけが入った扱い（マイクラ版の game.votes[独裁者] = 対象）。
- *   ・処刑されるのは対象だけ。タフガイ(はじき返す・次点はいないので誰も死なない)・人狼王(他に人狼判定の人がいればガード)は通常の追放と同じ。従者は身代わりにならない（連鎖の道連れでは従者の身代わりは従来どおり）。
+ *   ・処刑されるのは対象だけ。タフガイ(はじき返す・次点はいないので誰も死なない)・人狼王(他に人狼判定の人がいればガード)は通常の追放と同じ。従者は身代わりになる（2026-11-17 ユーザー指定。対象がご主人なら従者が代わりに処刑され、結果発表で身代わり演出が出る。クーデターは身代わりなし。少佐の身代わりは働かない）。
  *   ・処刑後の連鎖（道連れ・恋人の心中・アサシン・賞金稼ぎなど）と勝敗は、通常の追放と同じ。
  *   ・反逆の狂人（js/roles/wolf/mad/rebel_madman.js）がいるとクーデターになる: 独裁を宣言した瞬間、選んだ相手ではなく独裁者本人が処刑される（ONW.rebel.coupFor が判定。選ばれたのが反逆の狂人本人のときは反転しない）。
  *     g.dictator.target は「実際に処刑される人」（クーデターなら独裁者本人）、g.dictator.chosen は独裁者が選んだ相手。
  *
  * 状態: g.dictator = null | { by: 独裁者のID, target: 実際に処刑される人のID, chosen: 独裁者が選んだ人のID, coup: クーデターか, rebels: クーデターを起こした反逆の狂人のID[] }（試合ごとに net.startGame が null に戻す）
- * 呼び出し: net.js の hostDictate(ホスト) → ONW.dictator.canUse / targets / declare。vote.js の resolveElimination は g.dictator を見て従者の身代わりを飛ばす。
+ * 呼び出し: net.js の hostDictate(ホスト) → ONW.dictator.canUse / targets / declare。vote.js の resolveElimination は g.dictator を見て、クーデター以外は従者の身代わりを働かせ、少佐の身代わりは飛ばす。
  */
 (function (ONW) {
   const R = () => ONW.ROLE;
@@ -48,7 +48,7 @@
 
   ONW.defineRole("dictator", {
     info: { sealTarget: true, deck: 64, name: "独裁者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.8,
-      desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから独裁を宣言すると、すぐに議論を打ち切り（投票はしません）、選んだ相手だけを処刑します。従者は身代わりになれません。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に独裁者を持っている人が使えます。" },
+      desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから独裁を宣言すると、すぐに議論を打ち切り（投票はしません）、選んだ相手だけを処刑します。従者がご主人の身代わりになることがあります（クーデターのときは身代わりになれません）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に独裁者を持っている人が使えます。" },
     groups: { "transform:light_apostle": 25 },   // 光の使徒の変化先（村人系）
 
     // 結果発表の演出（stage.js の startResult / skipResult が引く）
@@ -75,7 +75,8 @@
         if (!d || d.coup) return;   // クーデターのときは反逆の狂人の役職ファイル(rebel_madman.js)の skip と、履歴の「クーデター」の札に任せる
         R.badge[`p:${d.byId}`] = "独裁";
         const h = R.res.history.find((q) => q.id === d.targetId);
-        if (h && !h.dead && !R.badge[`p:${d.targetId}`]) R.badge[`p:${d.targetId}`] = "処刑対象";
+        const subbed = (R.res.servantSubs || []).some((x) => x.masterId === d.targetId);   // 従者が身代わりになったご主人は、処刑対象の札を残さない（従者に「身代わり」が付く）
+        if (h && !h.dead && !subbed && !R.badge[`p:${d.targetId}`]) R.badge[`p:${d.targetId}`] = "処刑対象";
       },
       clear(R) { document.querySelectorAll(".dc-burst").forEach((e) => e.remove()); if (R && R.gx) Object.keys(R.gx).forEach((k) => { if (/^dictdecree|^dicttarget/.test(R.gx[k])) delete R.gx[k]; }); },
     },

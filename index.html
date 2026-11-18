@@ -55,7 +55,11 @@
 
   <!-- 右上: 📖（ワンナイト人狼ガイド）・アカウント表示・🛠（デバッグ、ホストでONの時だけ）を縦に並べる（js/account-ui.js の acct-fixed / js/debug.js の dbg-fab もここに入る） -->
   <div id="top-right" class="top-right">
+  <!-- 📕📖が並ぶ: 左 = 📕役職確認ボタン(js/rolebook.js。試合中の夜・朝・昼だけ出る) / 右 = ワンナイト人狼ガイド -->
+  <div class="wiki-row">
+  <button type="button" id="rb-btn" class="wiki-btn rb-btn" hidden onclick="ONW.roleBook.open()" aria-label="自分が知った役職の説明を見る（役職確認）" title="役職確認">📕</button>
   <button type="button" class="wiki-btn" onclick="ONW.wikiView.open()" aria-label="ワンナイト人狼ガイドを見る" title="ワンナイト人狼ガイド">📖</button>
+  </div>
   </div>
 
   <!-- ゲーム中ずっと出ているカードのテーブル（js/stage.js が管理。#app の再描画では消えない） -->
@@ -129,6 +133,18 @@
   <script src="js/roles/village/poet.js"></script>
   <script src="js/roles/village/spy.js"></script>
   <script src="js/roles/village/cosplayer.js"></script>
+<script src="js/roles/village/major.js"></script>
+  <script src="js/roles/village/finger_reader.js"></script>
+  <script src="js/roles/village/gambler.js"></script>
+  <script src="js/roles/village/priest.js"></script>
+  <script src="js/roles/village/fairy.js"></script>
+  <script src="js/roles/village/aa.js"></script>
+  <script src="js/roles/village/goranshin.js"></script>
+  <script src="js/roles/village/steve.js"></script>
+  <script src="js/roles/village/icarus.js"></script>
+   <script src="js/roles/village/election_manager.js"></script>
+  <script src="js/roles/village/moses.js"></script>
+  <script src="js/roles/village/yomi.js"></script>
   <!-- 人狼陣営 -->
   <!-- 　人狼系 -->
   <script src="js/roles/wolf/wolf/assassin.js"></script>
@@ -211,6 +227,7 @@
   <script src="js/co.js"></script>
   <script src="js/debug.js"></script>
   <script src="js/wikiview.js"></script>
+  <script src="js/rolebook.js"></script>
   <script>
     /* スマホのキーボードで画面の高さが縮んでも、レイアウトをずらさない: --app-h に「キーボードが無い時の高さ」を保持する */
     (function () {
