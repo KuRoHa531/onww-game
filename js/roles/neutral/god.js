@@ -12,7 +12,7 @@
       restUp(R, k, hid) {
         const { res, later, setCap, esc, paint, G } = R, god = res.god || {};
         if (god.mode === "descend" && hid && (god.ids || []).includes(hid)) {
-          R.gx[k] = "descend"; setCap(`<div class="res-cap__t t-third">神降臨</div><div>${esc((res.history.find((h) => h.id === hid) || {}).name || "")}</div>`);
+          R.gx[k] = "descend"; if (!(res.priest && res.priest.mode === "help")) setCap(`<div class="res-cap__t t-third">神降臨</div><div>${esc((res.history.find((h) => h.id === hid) || {}).name || "")}</div>`);   // 死んだ神官のおかげで村人陣営も追加勝利するとき（help）は、先に「神降臨」の字幕を出さない（人狼陣営勝利 → 神降臨 → 神官 → 追加勝利 の順にするため。降臨の光の演出だけ出す）
           later(() => { if (R.gx[k] === "descend") { delete R.gx[k]; paint(G()); } }, 2400);
         }
       },

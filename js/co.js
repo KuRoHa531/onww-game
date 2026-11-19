@@ -77,6 +77,7 @@ window.ONW = window.ONW || {};
   function startResult(kind, chain) {
     if (kind === "relic") return set({ step: "rgrave", kind, chain });
     if (kind === "cosplay") return set({ step: "crole", kind, chain });   // コスプレイヤー: コスプレした役職を選ぶ（山札の役職 / コスプレしなかった / ロックで失敗）
+    if (kind === "trailblazer") return set({ step: "tfate", kind, chain });   // 開拓者: 歩んでいる運命を選ぶ（調和・愉悦はそのあと、カルメン・いたずらっ子の結果開示へ続く）
     if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid") return set({ step: "tm", kind, chain, sel: [] });
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
@@ -106,6 +107,17 @@ co.poetPick = function (id) {
   // コスプレイヤーの結果開示: 山札から3枚めくってコスプレした役職を選ぶ → コスプレ先に結果開示があれば続ける（コスプレ→占い師→占い結果、コスプレ→墓荒らし→墓地の交換結果）。「コスプレしなかった」・ロックで失敗・伏せるも言える（CPUの発言と同じ文言）
   co.cosRole = function (role) { doneChain(hookOfKind("cosplay").cosRole(role, K), role, "cosplay"); };
   co.cosNone = () => { const h = hookOfKind("cosplay"); done(h.noneText, null, null, "disclose", "コスプレなし"); };
+  // 開拓者の結果開示（4of4-b。マイクラ版・CPUの発言と同じ文「私は○○の運命を歩んでいます。」）: 運命を5つから選ぶ。
+  //   壊滅・存護・記憶はこの1行で終わり。調和は続けてカルメンの結果開示（囁いた相手）、愉悦は続けていたずらっ子の結果開示（入れ替えた2人）へ進む（その間CPUは割り込まない）。
+  //   続きの結果は、カルメン・いたずらっ子本人の結果開示と同じ文・同じ claim（kind: carmen / troublemaker）で送られる
+  co.trailFate = function (fate) {
+    const h = hookOfKind("trailblazer");
+    if (!h || !h.pickFate) return;
+    const r = h.pickFate(fate), a = r.args;
+    if (!r.follow) return done(...a);
+    ONW.net.sendCo(a[0], a[1], a[2], "holddisclose", a[4]);   // 運命の発言を残しつつ、次の結果開示へ続ける
+    startResult(r.follow, true);
+  };
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
@@ -166,12 +178,17 @@ co.poetPick = function (id) {
   // 従者がいる（本家: 「自分の従者がいます。」）
   co.reversedInfo = () => done(...hookOfKind("reverser").infoReversed(K));   // 反転されている（情報開示）
   co.servantInfo = () => done(...hookOfKind("servant").infoHas());
+  // 囁かれていた（情報開示。マイクラ版 openCarmenWhisperInfoCoMenu）: 誰に囁かれていたか = カルメン / 調和開拓者（運命が調和の開拓者）。文は「〇〇に囁かれていました。」
+  const WHISPER_SRC = [["carmen", "カルメン"], ["harmony", "調和開拓者"]];
+  co.whisperInfo = () => set({ step: "whisper" });
+  co.pickWhisper = (i) => { const x = WHISPER_SRC[i]; if (x) done(`${x[1]}に囁かれていました。`, null, null, "disclose", `${x[1]}に囁かれていた`); };
 
   // 役職が変わっていることを伝える（本家 openChangedRoleInfoCoMenu のうち、Web版にある役職の分。文言は本家のまま）
   const CHANGED_LINES = [
     ["eraser_wolf", "抹消に消されていそうです。", "抹消に消された"],   // マイクラ版の並びは先頭が抹消
     ["robber", "怪盗に交換されていそうです。", "怪盗に交換された"],
     ["troublemaker", "いたずらっ子に交換されていそうです。", "いたずらっ子に交換された"],
+    ["trailblazer", "愉悦開拓者に交換されていそうです。", "愉悦開拓者に交換された"],   // 運命が愉悦の開拓者（いたずらっ子の能力）に交換された。いたずらっ子と区別して伝える（マイクラ版の並びどおり いたずらっ子の次）
     ["shuffler", "シャッフラーに変えられていそうです。", "シャッフラーに変えられた"],
     ["gremlin", "グレムリンに上書きされていそうです。", "グレムリンに上書きされた"],
   ];
@@ -205,7 +222,7 @@ co.poetPick = function (id) {
   co.pickChanged = (i) => { const x = CHANGED_LINES[i]; if (x) done(x[1], null, null, "disclose", x[2]); };
 
   // 情報開示のページは、戻るボタンを上（見出しの横）に置く。下まで押し下げてスクロールしなくても戻れる
-  const INFO_BACK = { info: "back", visited: "info", fjob: "info", fwho: "freeterInfo", chg: "info" };
+  const INFO_BACK = { info: "back", visited: "info", fjob: "info", fwho: "freeterInfo", chg: "info", whisper: "info" };
   const infoBackFn = (step) => ({ back: "ONW.co.back()", info: "ONW.co.info()", freeterInfo: "ONW.co.freeterInfo()" }[INFO_BACK[step]]);
 
   // ---- 描画 ----
@@ -277,6 +294,11 @@ co.poetPick = function (id) {
       title = "結果開示";
       const hc = hookOfKind("cosplay") || {};
       body = `<p class="night-step__hint">山札から3枚めくって、コスプレした役職を選んでください。</p>` + (hc.roleList ? hc.roleList().map((r) => btn(rc(r), `ONW.co.cosRole('${r}')`)).join("") : "") + btn("コスプレしなかった", "ONW.co.cosNone()") + lockBtn(s.kind) + btn("伏せる", "ONW.co.cosRole('hide')") + back;   // 一覧は配役ではなく山札(ELIGIBLE)の役職
+    } else if (s.step === "tfate") {
+      title = "結果開示";
+      const hf = hookOfKind("trailblazer") || {};
+      body = `<p class="night-step__hint">${esc(hf.fateHint || "歩んでいる運命を選んでください。")}（調和ならカルメン、愉悦ならいたずらっ子の結果へ続きます）</p>` +
+        (hf.fates ? hf.fates().map((x) => btn(`<span class="t-village">${esc(x.name)}</span>`, `ONW.co.trailFate('${x.fate}')`)).join("") : "") + back;
     } else if (s.step === "tm") {
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).twoHint || "入れ替えた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
@@ -315,7 +337,7 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedInfo()") + btn("反転されている", "ONW.co.reversedInfo()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedInfo()") + btn("反転されている", "ONW.co.reversedInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()");
     } else if (s.step === "visited") {
       title = "訪問された";
       body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("");
@@ -325,6 +347,9 @@ co.poetPick = function (id) {
     } else if (s.step === "fwho") {
       title = "フリーター情報";
       body = `<p class="night-step__hint">誰がフリーターですか？</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickFreeter('${p.id}')`)).join("");
+    } else if (s.step === "whisper") {
+      title = "囁き情報";
+      body = `<p class="night-step__hint">誰に囁かれていましたか？</p>` + WHISPER_SRC.map((x, i) => btn(ONW.utils.tintCo(`${x[1]}に囁かれていた`, []), `ONW.co.pickWhisper(${i})`)).join("");
     } else if (s.step === "chg") {
       title = "役職が変わっている";
       body = `<p class="night-step__hint">誰に変えられたと思いますか？（伝える内容を選んでください）</p>` + CHANGED_LINES.map((x, i) => btn(ONW.utils.tintCo(x[2], []), `ONW.co.pickChanged(${i})`)).join("");

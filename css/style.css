@@ -1128,7 +1128,15 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
 .pf-sum span { font-size: 11px; color: var(--ink-dim); }
 .pf-row { display: grid; grid-template-columns: 1fr auto 64px; gap: 10px; align-items: center; padding: 5px 2px; border-bottom: 1px solid rgba(52, 54, 77, .6); font-size: 14px; }
 .pf-row b { text-align: right; color: var(--gold); }
-.pf-roles { max-height: 240px; overflow-y: auto; }
+.pf-roles { max-height: 280px; overflow-y: auto; margin-top: 6px; }
+.pf-teams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pf-team { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-night); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.pf-team small { font-size: 11px; font-weight: 400; color: var(--ink-dim); }
+.pf-team b { font-size: 15px; color: var(--gold); }
+.pf-team:hover { background: rgba(217, 196, 143, .08); }
+.pf-team.on { border-color: var(--gold); background: rgba(217, 196, 143, .14); }
+.pf-sub { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 0 2px; padding: 3px 8px; border-left: 3px solid #ff5555; background: rgba(255, 85, 85, .08); font-size: 13px; font-weight: 700; }
+.pf-sub small { font-weight: 400; color: var(--ink-dim); }
 .pf-card .t-village { color: #55ff55; } .pf-card .t-wolf { color: #ff5555; } .pf-card .t-third { color: #cfcfd6; }
 .pf-recent { display: flex; flex-wrap: wrap; gap: 6px; }
 .pf-chip { display: inline-flex; flex-direction: column; align-items: center; min-width: 44px; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; font-weight: 700; }
@@ -1515,6 +1523,9 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .tb-seat.gx-blow[data-gn="6"]::before { font-size: max(6px, calc(var(--cw) * .135)); }   /* 点線カードの役職名も、通常のカードと同じ改行・文字サイズの決まり */
 @keyframes gx-blow { 0% { transform: none; opacity: 1; } 100% { transform: translate(90vw, -130vh) rotate(520deg) scale(.4); opacity: 1; } }   /* 透明にはならず、画面の外まで飛んでいく */
 @keyframes gx-blow2 { 0% { transform: none; opacity: 1; } 100% { transform: translate(-90vw, -130vh) rotate(-520deg) scale(.4); opacity: 1; } }
+/* 追加勝利で勝つ人（神官の祈りで勝つ村人陣営など）のカードは、陣営の色ではなく追加勝利の色（橙。結果シートの勝者欄 .rs-extra-name と同じ） */
+.tb-seat.gx-extra .tb-front { border-color: #ff9a3c; } .tb-seat.gx-extra .tb-front b { color: #ff9a3c; }
+.tb-seat.gx-extra .tb-card { filter: drop-shadow(0 0 6px rgba(255,154,60,.55)); }
 /* 祝福で勝つ人のカードは金色に光る */
 .tb-seat.gx-win .tb-card { animation: gx-win 1.6s ease-in-out infinite; }
 @keyframes gx-win { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255,214,102,.7)); } 50% { filter: drop-shadow(0 0 13px rgba(255,236,160,1)); } }
@@ -1562,6 +1573,10 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .tb-seat.gx-kingguard .tb-card { animation: tg-clang 1.1s ease-out both; filter: drop-shadow(0 0 14px rgba(255,200,90,.95)); }
 .tb-seat.gx-kingguard .tb-front, .tb-seat.gx-kingguard .tb-back { border-color: #ffd36b; box-shadow: 0 0 20px rgba(255,200,90,.95), inset 0 0 12px rgba(255,255,255,.6); }
 .tb-seat.gx-kingguard .tb-badge { background: #9b1c1c; border-color: #ffd36b; color: #fff6dd; }
+/* 騎士の守り（結果発表の 🛡️ 演出。人狼王のガード = kingguard と同じ動き・青白い光） */
+.tb-seat.gx-knightguard .tb-card { animation: tg-clang 1.1s ease-out both; filter: drop-shadow(0 0 14px rgba(130,195,255,.95)); }
+.tb-seat.gx-knightguard .tb-front, .tb-seat.gx-knightguard .tb-back { border-color: #a9d8ff; box-shadow: 0 0 20px rgba(130,195,255,.95), inset 0 0 12px rgba(255,255,255,.6); }
+.tb-seat.gx-knightguard .tb-badge { background: #1f4f86; border-color: #a9d8ff; color: #eef7ff; }
 .tg-burst { position: fixed; z-index: 9998; width: 0; height: 0; pointer-events: none; }
 .tg-burst .tg-ring { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(220,240,255,.95); box-shadow: 0 0 12px rgba(200,230,255,.9); animation: tg-ring .8s ease-out both; }
 .tg-burst .tg-ring2 { animation-delay: .15s; border-color: rgba(255,200,120,.9); }
@@ -2180,7 +2195,8 @@ body.duke-meeting::before, body.dk-result::before { content: ""; position: fixed
 .tb-seat.rev-odd .tb-marks { top: auto; left: auto; bottom: -5px; right: -5px; }
 .result-sheet .rs-tag-reverse { color: #6fc3ff; }   /* 反転者: 「(+反転1)」 */
 
-.servant-banner.lawyer-banner { top: 30%; }   /* 弁護士: 従者バナーと重ならない */
+.servant-banner.lawyer-banner { top: 30%; }
+.servant-banner.carmen-banner { top: 24%; }   /* カルメン: 囁かれた村人陣営の人に出る。従者・弁護士のバナーと重ならない */   /* 弁護士: 従者バナーと重ならない */
 
 /* 勝利の貼り重ね（docs/win-ladder.md）: 新しい勝利が上から貼り付けられ、前の勝利は重ねられて小さく・薄く・取り消し線になる */
 .res-cap .rs-under { font-size: 16px; opacity: .5; text-decoration: line-through; text-decoration-thickness: 2px; filter: saturate(.6); }
@@ -2379,11 +2395,46 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 
 
 /* ---- 役職確認ボタン(js/rolebook.js): 重ね画面は情報確認(.info-overlay)と同じ。中身だけ ---- */
-.rb-overlay { z-index: 890; }
+.rb-overlay { z-index: 890; --rb-line: rgba(217,196,143,.6); }   /* 役職確認の区切り線の色（金色・背景から見分けがつく明るさ） */
 .rb-h { margin: 10px 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
 .rb-h:first-child { margin-top: 2px; }
-.rb-arrow { margin: 2px 0; text-align: center; color: var(--ink-dim); font-size: 14px; line-height: 1; }
-.rb-role { margin: 0; border-top: 1px solid var(--line); }   /* 役職名の下（.gd-role の線）だけでなく上にも区切り線。続けて並ぶ役職は線が二重にならないよう、直前が役職のときは上の線を省く */
+/* 自認の流れの矢印（↓）: 小さい灰色で背景に埋もれていたので、大きく・金色・太字にして上下に余白をとる */
+.rb-arrow { margin: 6px 0; text-align: center; color: var(--gold); font-size: 24px; font-weight: 700; line-height: 1; text-shadow: 0 0 6px rgba(217,196,143,.35); }
+/* 役職の区切り線: 既定の線(--line #34364d)は背景(#1b1d2b)とほぼ同じ暗さで見えなかったので、役職確認の中だけ明るい線にする（役職名の上と下。続けて並ぶ役職は線が二重にならないよう、直前が役職のときは上の線を省く） */
+.rb-role { margin: 0; border-top: 2px solid var(--rb-line); border-bottom: 2px solid var(--rb-line); }
 .rb-role + .rb-role { border-top: 0; }
 .rb-role .gd-desc { margin: 4px 0 6px; padding: 6px 10px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); white-space: pre-wrap; }
 .rb-btn { border-color: var(--gold); }
+/* ロビーの部屋コード: 伏せ字（＊＊＊＊）の右に「コピー」だけのボタンを横並びで置く */
+.room-code-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 4px 0 10px; }
+.room-code-row .room-code-mask { letter-spacing: .3em; margin: 0; }
+.room-code-row .room-code-copy { min-width: 6.5em; white-space: nowrap; }   /* 「コピーしました」に変わっても幅が動かない */
+
+/* 開拓者: 運命の枠（模倣の人狼の模倣先の枠と同じ形。村人陣営の色） */
+.tb-front .tb-mimic.tb-fate { border-color: #4fd18b; background: rgba(79,209,139,.12); color: #d4f7e3; }
+.dl-face .tb-mimic.dl-mimic.tb-fate { border-color: #4fd18b; background: rgba(79,209,139,.12); color: #d4f7e3; }
+
+/* 役職確認(📕): 開拓者の運命の欄（開いた説明の下）。運命の枠(tb-fate)と同じ緑 */
+.rb-role .gd-desc.rb-fate { margin-top: 0; border-left: 3px solid #4fd18b; color: var(--ink); }
+.rb-fate__h { margin-bottom: 2px; font-size: 13px; font-weight: 700; color: #4fd18b; letter-spacing: .04em; }
+
+/* ---- 吹き出しチャット（ルーム設定 ON のとき。アモアス風: アイコン+名前+白い吹き出し） ---- */
+.chat-log--bub { background: #1b2233; }
+.chat-log--bub .chat-line { text-align: center; font-size: 12px; padding: 3px 0; }
+.bub { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; max-width: 88%; }
+.bub--me { flex-direction: row-reverse; margin-left: auto; }
+.bub .av--bub { flex: 0 0 auto; width: 32px; height: 32px; font-size: 15px; }
+.bub__body { min-width: 0; }
+.bub--me .bub__body { text-align: right; }
+.bub__name { font-size: 11px; font-weight: 700; color: #c9d2e6; margin: 0 4px 2px; word-break: break-all; }
+.bub__text { display: inline-block; text-align: left; padding: 7px 12px; border-radius: 14px; border-top-left-radius: 4px; background: #f3f5fa; color: #14171f; font-size: 14px; line-height: 1.45; word-break: break-all; }
+.bub--me .bub__text { border-top-left-radius: 14px; border-top-right-radius: 4px; background: #cfe4ff; }
+.bub--ghost .bub__text { background: rgba(47, 123, 255, .18); color: #bcd3ff; border: 1px solid #2f7bff; }
+.bub--ghost .chat-ghost__tag { color: #2f7bff; -webkit-text-stroke: 0; }
+.bub--co .bub__text { background: #d5f3fa; color: #0d3c4a; border: 1px solid #7fd3e6; font-weight: 700; }   /* COボタンの発言: 水色の吹き出し（役職名は陣営の色のまま。濃い背景用に色を落とす） */
+.chat-log--bub .bub--co .t-village { color: #0b7a1f; } .chat-log--bub .bub--co .t-wolf { color: #c0201a; } .chat-log--bub .bub--co .t-third { color: #5d6270; }
+.chat-log--bub .bub--co .rs-pl { color: #b3560a; } .chat-log--bub .bub--co .rs-me { color: #6a2fc0; }
+.chat-log--bub .bub--co .rs-gv { color: #5d6270; }
+
+/* 御乱心: 票数の数字が、元の先から新しい先へ飛ぶ（js/roles/village/goranshin.js の flyNumber） */
+.gr-fly { position: fixed; z-index: 9999; pointer-events: none; font-weight: 900; font-size: 22px; color: #fff; text-shadow: 0 0 8px rgba(190,120,255,.95), 0 0 3px #000; }

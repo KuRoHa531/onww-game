@@ -21,19 +21,27 @@
   }
 
   ONW.defineRole("priest", {
-    // 結果発表の演出(stage.js の startResult が引く): 全員のカードがめくれたあと、神官のカードが光り、字幕で「神官が生きているので神は降臨できない」/「死んだ神官のおかげで村人陣営も勝つ」を見せる（res.priest。net.js が渡す）。神の降臨の演出(god.js)のあと
+    // 結果発表の演出(stage.js の startResult が引く)。res.priest は net.js が渡す。
+    //   afterRest: 神官が生きていて神が降臨できないとき（block）だけ、全員がめくれたあと（神降臨の位置）に、神官のカードが光り、字幕で見せる
+    //   winNote:   死んだ神官のおかげで村人陣営も追加勝利するとき（help）は、勝利の貼り重ね（人狼陣営勝利 → 神降臨）と最終結果の字幕のあと、追加勝利の札（村人陣営）が貼られる前に出す
     stageResult: {
       afterRest(R) {
         const { res, later, setCap, esc, paint, G, P } = R, pr = res.priest;
-        if (!pr || !pr.mode || !(pr.ids || []).length) return;
-        const block = pr.mode === "block", nm = esc((pr.names || []).join("、"));
+        if (!pr || pr.mode !== "block" || !(pr.ids || []).length) return;
+        const nm = esc((pr.names || []).join("、"));
         later(() => {
           pr.ids.forEach((id) => { R.gx[P(id)] = "spark"; });
-          setCap(`<div class="res-cap__t t-village">神官</div><div>${block ? `神官 ${nm} が生きているため、神は降臨できません` : `死亡した神官 ${nm} の祝福で、村人陣営も神と一緒に勝利します`}</div>`);
+          setCap(`<div class="res-cap__t t-village">神官</div><div>神官 ${nm} が生きているため、神は降臨できません</div>`);
           paint(G());
         }, R.t);
         later(() => { pr.ids.forEach((id) => { if (R.gx[P(id)] === "spark") delete R.gx[P(id)]; }); paint(G()); }, R.t + 2400);
         R.t += 2600;
+      },
+      winNote(R) {
+        const { res, esc } = R, pr = res.priest;
+        if (!pr || pr.mode !== "help" || !(pr.ids || []).length || !(res.extraWin || []).length) return null;
+        const nm = esc((pr.names || []).join("、"));
+        return { ids: pr.ids, html: `<div class="res-cap__t t-village">神官</div><div>神官${nm}の祈りにより村人陣営も追加勝利しました。</div>` };
       },
     },
     cpuClaim,

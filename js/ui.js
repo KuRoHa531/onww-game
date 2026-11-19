@@ -180,7 +180,10 @@ window.ONW = window.ONW || {};
     // 改行表にない名前でも、5文字以上は折り返さず1行に収める（5文字=nb-s5 / 6文字以上=nb-s6。4文字以下は今までどおり）
     return h.includes("<br>") || n >= 5 ? `<span class="nb${n >= 5 ? ` nb-s${n > 5 ? 6 : 5}` : ""}">${h}</span>` : h;
   };
-  ui.mimicTag = (role, target) => role === "mimic_wolf" && target && ONW.ROLE_INFO[target] ? `<span class="tb-mimic dl-mimic">${ONW.stage && ONW.stage.breakHtml ? ONW.stage.breakHtml(ONW.ROLE_INFO[target].name) : esc(ONW.ROLE_INFO[target].name)}</span>` : "";
+  ui.mimicTag = (role, target) => {   // 模倣の人狼: 模倣先の役職名 / 開拓者: 運命の名前（"fate:destruction" → 壊滅）を、カードの名前の下に枠で出す
+    const fate = role === "trailblazer" && ONW.trailblazer.isView(target), nm = fate ? ONW.trailblazer.viewName(target) : role === "mimic_wolf" && target && ONW.ROLE_INFO[target] ? ONW.ROLE_INFO[target].name : "";
+    return nm ? `<span class="tb-mimic dl-mimic${fate ? " tb-fate" : ""}">${ONW.stage && ONW.stage.breakHtml ? ONW.stage.breakHtml(nm) : esc(nm)}</span>` : "";
+  };
   ui.toggleGroup = function (key) { const g = ONW.game; g.roleOpen = { ...(g.roleOpen || {}), [key]: !(g.roleOpen || {})[key] }; ONW.ui.render(g); };
   ui.toggleInvite = function () {
     const g = ONW.game;
@@ -207,7 +210,7 @@ window.ONW = window.ONW || {};
 
   /** 役職の一覧（配役設定・役職設定の詳細設定で共通）。並びは wiki 順（ONW.sortByRoleOrder = ONW.ROLE_ORDER） */
   function roleLists() {
-    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi"]);
+    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi", "carmen", "knight", "trailblazer"]);
     const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]), dark = ["dark_avatar"];
     const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher"]);
     return { village, wolfLike, madLike, dark, third };
@@ -549,6 +552,10 @@ window.ONW = window.ONW || {};
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('winLadderFx')">${game.winLadderFx !== false ? "ON" : "OFF"}</button>` : `<span>${game.winLadderFx !== false ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: 結果発表で、成立した勝利が陣営の乗っ取りごとに低い順（人狼陣営勝利 → 妖狐陣営勝利 …）に貼り重ねられて出ます。OFF: 最終的な勝利だけをすぐに出します。</p>
+          <div class="field-row"><label>吹き出しチャット</label>
+            ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('bubbleChat')">${game.bubbleChat === true ? "ON" : "OFF"}</button>` : `<span>${game.bubbleChat === true ? "ON" : "OFF"}</span>`}
+          </div>
+          <p class="night-step__hint">ON: チャットの発言を、アイコンと名前つきの吹き出しで表示します（自分の発言は右側）。OFF: 今までの「名前: 発言」の表示です。</p>
           ${isHost && (game.debugOn || (ONW.debug && ONW.debug.allowed())) ? `<div class="field-row"><label>デバッグモード</label>
             <button class="btn" onclick="ONW.debug.toggle()">${game.debugOn ? "ON" : "OFF"}</button>
           </div>
@@ -589,8 +596,7 @@ window.ONW = window.ONW || {};
     return `
       <section class="panel night-step">
         <p class="lede">部屋コード（友達に教えてください）</p>
-        <div class="night-step__role" style="letter-spacing:.3em;">＊＊＊＊</div>
-        <div class="btn-row" style="justify-content:center;margin:4px 0 10px;"><button class="btn tf-chip" onclick="ONW.ui.copyRoomCode(this)">📋 部屋コードをコピー</button></div>
+        <div class="room-code-row"><span class="night-step__role room-code-mask">＊＊＊＊</span><button class="btn tf-chip room-code-copy" onclick="ONW.ui.copyRoomCode(this)">コピー</button></div>
         <h2>参加者 ${total}/${size}</h2>
         ${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
         ${Array.from({ length: game.cpuCount || 0 }, (_, i) => `<div class="result-role"><span>${esc((game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`).join("")}
@@ -732,17 +738,18 @@ window.ONW = window.ONW || {};
       const votes = info.dict ? `<div class="si-h">独裁処刑</div>${row(esc(info.dict.by), `→ <strong>${esc(info.dict.target)}</strong>${info.dict.coup ? ` <span class="rs-dim">（反逆の狂人 ${(info.dict.rebels || []).map(esc).join("、")} のクーデター: 独裁者が処刑されます）</span>` : ""}`)}` : info.vote ? `<div class="si-h">投票状況（変更あり）</div>${info.votes.map((v) => row(esc(v.from), v.to ? `→ <strong>${esc(v.to)}</strong>${v.w > 1 ? ` <span class="rs-dim">(${v.w}票)</span>` : ""}` : v.x ? '<span class="rs-dead">投票無効</span>' : '<span class="rs-dim">未投票</span>')).join("")}` : "";
       const log = info.log.length ? `<div class="si-h">夜の行動ログ</div>${info.log.map((t) => `<div class="si-log">${esc(t)}</div>`).join("")}` : "";
       const mimicInfo = (info.mimicInfo || []).length ? `<div class="si-h">役職情報</div>${info.mimicInfo.map((x) => `<div class="si-log">模倣の人狼 ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。</div>`).join("")}` : "";
+      const trailInfo = (info.trailInfo || []).length ? `<div class="si-h">役職情報</div>${info.trailInfo.map((x) => `<div class="si-log">開拓者 ${esc(x.by)} は ${esc(x.name)}の運命を歩んでいました。</div>`).join("")}` : "";
       const mind = (info.mind || []).length ? `<div class="si-h">昼の行動（心眼の人狼）</div>${info.mind.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.role ? `最終役職: <strong>${esc(ONW.roles.getInfo(x.role).name)}</strong>` : "")).join("")}` : "";
       const libra = info.libra ? `<div class="si-h">昼の行動（天秤）</div>${row(esc(info.libra.by), `→ <strong>${esc(info.libra.a)}</strong> と <strong>${esc(info.libra.b)}</strong> に投票対象を制限`)}` : "";   // 観戦者には、使った人と選ばれた2人を出す
       const predict = (info.predict || []).length ? `<div class="si-h">昼の行動（予想屋）</div>${info.predict.map((x) => row(esc(x.by), `→ <strong>${esc(x.text)}</strong> と予想`)).join("")}` : "";   // 観戦者には、予想屋が決めた予想を出す（投票が始まるまで選び直せるので、そのときの最新）
       const sense = (info.sense || []).length ? `<div class="si-h">昼の行動（感覚の占い師）</div>${info.sense.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.key ? `気配: <strong>${esc(ONW.senseSeer.feelLabel(x.key))}</strong>` : "")).join("")}` : "";   // 観戦者には、使った事実と感じた気配を出す（観戦者は全員の役職が見える）
-      const rnm = (r) => esc(ONW.roles.getInfo(r).name), FAIL = { target_locked: "ロックされて失敗", aa_blocked: "特殊な力で失敗", dead: "対象が先に死亡" };
+      const rnm = (r) => esc(ONW.roles.getInfo(r).name), FAIL = { target_locked: "ロックされて失敗", aa_blocked: "ロックされて失敗", dead: "対象が先に死亡" };
       const eraser = (info.eraser || []).length ? `<div class="si-h">抹消（抹消の人狼）</div>${info.eraser.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.before ? (x.before === x.after ? `<span class=\"rs-dim\">変化なし</span>` : `<strong>${rnm(x.before)}</strong> → <strong>${rnm(x.after)}</strong>`) : `<span class="rs-dim">${esc(FAIL[x.fail] || "まだ抹消されていません")}</span>`)).join("")}` : "";
       const sl = info.seal || { rows: [], sealed: [] };
       const seal = sl.rows.length || sl.sealed.length ? `<div class="si-h">封印（封印の狂人）</div>${sl.rows.map((x) => row(`${esc(x.by)}${x.target ? ` → ${esc(x.target)}` : ""}`, x.fail ? `<span class="rs-dim">封印されていたため失敗</span>` : "封印しました")).join("")}${sl.sealed.length ? row("封印されている人", `<strong>${sl.sealed.map(esc).join("、")}</strong>`) : ""}` : "";
       const major = (info.major || []).length ? `<div class="si-h">救済（少佐）</div>${info.major.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.before ? (x.before === x.after ? `<span class="rs-dim">変化なし</span>` : `<strong>${rnm(x.before)}</strong> → <strong>${rnm(x.after)}</strong>`) : `<span class="rs-dim">${esc(x.fail === "target_locked" ? "ロックされていて失敗" : x.fail === "aa_blocked" ? "特殊な力で失敗" : x.fail === "dead" ? "昼になる前に死亡" : x.fail === "sealed" ? "封印されていて失敗" : "まだ救済されていません")}</span>`)).join("")}` : "";
       const finger = (info.finger || []).length ? `<div class="si-h">初期役職の確認（指読み）</div>${info.finger.map((x) => row(esc(x.by), (x.targets || []).map((y) => `${esc(y.name)}: <strong>${rnm(y.role)}</strong>`).join("、") || `<span class="rs-dim">まだ確認していません</span>`)).join("")}` : "";   // 観戦者には、確認した人と見えた役職を出す（蜃気狼はランダムに見えた役職）
-      body = live + votes + mind + sense + libra + predict + eraser + major + finger + seal + log + mimicInfo || `<div class="si-log">まだ記録はありません。</div>`;
+      body = live + votes + mind + sense + libra + predict + eraser + major + finger + seal + log + mimicInfo + trailInfo || `<div class="si-log">まだ記録はありません。</div>`;
     }
     const html = `<div class="night-info__head"><span>夜ログ</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
       (open && info ? `<div class="si-body">${body}</div>` : "");
@@ -1364,7 +1371,7 @@ window.ONW = window.ONW || {};
   /** イカロス: 選んだ相手に票を分け与える（確定）。取り消せない。議論は続く。昼能力ボタンからまた別の人に使える（使い切るまで） */
   ui.icarusConfirm = function () {
     const g = ONW.game, id = g.nightSel && g.nightSel.players && g.nightSel.players[0];
-    if (!g.icarusOpen || !id || (g.icarusGiven || []).includes(id)) return;
+    if (!g.icarusOpen || !id || (g.icarusGiven || []).filter((x) => x === id).length >= (g.icarusMax || 1)) return;
     g.icarusOpen = false; g.nightSel = { players: [], graves: [] };
     ONW.net.icarus(id);
     ONW.stage.sync(g); ui.render(g);
@@ -1382,8 +1389,8 @@ window.ONW = window.ONW || {};
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>イカロスの昼能力</strong>: 上のテーブルから、<strong>票を分け与える相手のカード</strong>を押してください（生きている自分以外の1人。もう分け与えた人は選べません）。</p>
-      <p class="night-step__hint">「票を分け与える」を押すと、選んだ相手の投票数が増えます（村人陣営の人には1票、それ以外の人には2票。増えた票数は誰にも公開されません）。使うと全員の画面に、太陽へ翼が飛び上がる演出が出ます（だれが・だれに使ったかは分かりません）。同じ人には1回だけで、取り消せません。昼のうちなら、昼能力ボタンからまた別の人にも使えます。</p>
+      <p class="night-step__hint"><strong>イカロスの昼能力</strong>: 上のテーブルから、<strong>票を分け与える相手のカード</strong>を押してください（生きている自分以外の1人。もう使い切った人は選べません）。</p>
+      <p class="night-step__hint">「票を分け与える」を押すと、選んだ相手の投票数が増えます（村人陣営の人には1票、それ以外の人には2票。増えた票数は誰にも公開されません）。使うと全員の画面に、太陽へ翼が飛び上がる演出が出ます（だれが・だれに使ったかは分かりません）。同じ人には1回だけ（カルメンに囁かれたときは各プレイヤーに2回ずつ）で、取り消せません。昼のうちなら、昼能力ボタンからまた別の人にも使えます。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
       <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.icarusConfirm()">票を分け与える</button><button class="btn" onclick="ONW.ui.icarusCancel()">キャンセル</button></div>
@@ -1448,7 +1455,16 @@ window.ONW = window.ONW || {};
     // 観戦者・死亡者には、議論と霊界の発言が時刻順に1本で流れる。生存者には議論だけ（霊界の発言は届かない）
     const src = ui.canGhost() ? mergedChat(game) : (game.chatLog || []);
     const names = ONW.utils.playerNames();   // COの文章の中のプレイヤー名をオレンジにする
-    const lines = src.map((c) => c.ghost
+    const bub = game.bubbleChat === true;   // 吹き出しチャット（ルーム設定）。ON のとき、発言をアイコン+名前つきの吹き出しにする
+    const meP = (game.lobbyPlayers || [])[game.meIndex], myName = meP ? meP.name : null;
+    const bubble = (c, extra) => `<div class="bub${c.name === myName ? " bub--me" : ""}${extra || ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(c.name, null, "av--bub") : ""}<div class="bub__body"><div class="bub__name">${extra ? `<span class="chat-ghost__tag">【霊界】</span>` : ""}${esc(c.name)}</div><div class="bub__text">${esc(c.text)}</div></div></div>`;
+    // COボタンの発言（「名前: 占い師CO」。name は無く text の先頭が発言者）も、吹き出しのとき発言者つきの吹き出しにする。発言者が取れない行（口封じの通知など）は今までの1行
+    const coBubble = (c) => {
+      const m = String(c.text == null ? "" : c.text).match(/^([^:：\s][^:：]{0,30}?)\s*[:：]\s*([\s\S]*)$/);
+      if (!m) return null;
+      return `<div class="bub bub--co${m[1] === myName ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(m[1], null, "av--bub") : ""}<div class="bub__body"><div class="bub__name">${esc(m[1])}</div><div class="bub__text">${ONW.utils.tintCo(m[2], names, false)}</div></div></div>`;
+    };
+    const lines = src.map((c) => bub && c.ghost ? bubble(c, " bub--ghost") : bub && c.kind === "co" && coBubble(c) ? coBubble(c) : c.ghost
       ? `<div class="chat-line chat-ghost"><span class="chat-ghost__tag">【霊界】</span><strong class="rs-pl rs-me">${esc(c.name)}</strong>: ${esc(c.text)}</div>`
       : c.kind === "death"
       ? `<div class="chat-line chat-death">${esc(c.text)}</div>`
@@ -1456,6 +1472,7 @@ window.ONW = window.ONW || {};
       ? `<div class="chat-line chat-sys">${esc(c.text)}</div>`
       : c.kind === "co"
       ? `<div class="chat-line chat-co">${ONW.utils.tintCo(c.text, names, true)}</div>`
+      : bub ? bubble(c)
       : `<div class="chat-line"><strong class="rs-pl rs-me">${esc(c.name)}</strong>: ${esc(c.text)}</div>`).join("");
     return lines || `<div class="chat-line chat-empty">まだ発言はありません。</div>`;
   }
@@ -1484,6 +1501,15 @@ window.ONW = window.ONW || {};
     const el = document.createElement("div");
     el.className = "servant-banner";
     el.innerHTML = `<span class="servant-banner__text">あなたの従者がいるようです</span>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
+  };
+  /** カルメン: 村人陣営として囁かれた人に「あなたはカルメンに囁かれました」のバナーを出す（従者通知と同じ作り・同じ長さ。誰が囁いたかは出さない。ほかのバナーと重ならない位置） */
+  ui.showCarmen = function (text) {   // text: 「あなたは調和開拓者に囁かれました」など（なければカルメン）
+    document.querySelectorAll(".carmen-banner").forEach((e) => e.remove());
+    const el = document.createElement("div");
+    el.className = "servant-banner carmen-banner";
+    el.innerHTML = `<span class="servant-banner__text">${esc(String(typeof text === "string" && text ? text : "あなたはカルメンに囁かれました。").replace(/。$/, ""))}</span>`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3600);
   };
@@ -1583,9 +1609,10 @@ window.ONW = window.ONW || {};
 
   ui.updateChat = function () {
     const big = document.getElementById("chat-log-big");
-    if (big) { big.innerHTML = chatHtml(ONW.game); big.scrollTop = big.scrollHeight; }
+    if (big) { big.classList.toggle("chat-log--bub", ONW.game.bubbleChat === true); big.innerHTML = chatHtml(ONW.game); big.scrollTop = big.scrollHeight; }
     const el = document.getElementById("chat-log");
     if (!el) return !!big;
+    el.classList.toggle("chat-log--bub", ONW.game.bubbleChat === true);
     el.innerHTML = chatHtml(ONW.game);
     el.scrollTop = el.scrollHeight;
     return true;
@@ -1712,10 +1739,10 @@ window.ONW = window.ONW || {};
     const b = document.getElementById("info-body");
     if (b) b.innerHTML = ui.infoBodyHtml();
   };
-  /** 部屋コードのコピー: ロビーの部屋コードは「＊＊＊＊」と伏せ字にして、コピーボタンだけでクリップボードに入れる（配信などで見えないように）。
+  /** 部屋コードのコピー: ロビーの部屋コードは「＊＊＊＊」と伏せ字にして、その右の「コピー」ボタンだけでクリップボードに入れる（配信などで見えないように）。
    *  押したボタンの文字が一瞬「コピーしました」に変わる（再描画で戻っても問題なし）。navigator.clipboard が使えないときは execCommand("copy") で試す */
   ui.copyRoomCode = function (btn) {
-    const code = String((ONW.net && ONW.net.code) || ""), label = "📋 部屋コードをコピー";
+    const code = String((ONW.net && ONW.net.code) || ""), label = "コピー";
     const done = (ok) => {
       if (!btn) return;
       btn.textContent = ok ? "コピーしました" : "コピーできませんでした";
@@ -1965,11 +1992,12 @@ window.ONW = window.ONW || {};
             ...(res.slides || []).map((x) => L(`<span class="rs-info">ペンギン:</span> ${esc(x.by)} に投票した ${(x.voters || []).map(esc).join("・")} の${x.w}票は、${esc(x.to)} へ滑りました。`))],   // ペンギンは昼能力ではないので、昼行動結果ではなく役職情報に出す（滑らせた順。処理の順番はペンギン → 交換者 → 番犬）
             [...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`))],
             [...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
+            [...(res.knightInfo || []).map((x) => L(`<span class="rs-info">${x.tb ? "存護" : "騎士"}:</span> ${esc(x.text)}`))],
             [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : []),
       ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${(x.loseNames || x.names).length ? `${(x.loseNames || x.names).map(esc).join("、")} が爆発して敗北しました。` : ""}${(x.keepNames || []).length ? `殉職者 ${x.keepNames.map(esc).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`))],
             [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
             [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`))],
-            [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
+            [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`)), ...(res.trails || []).map((x) => L(`<span class="rs-info">開拓者:</span> ${esc(x.by)} は ${esc(x.name)}の運命を歩んでいました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
             ...((res.detective && res.detective.boards) || []).map((b) => {   // 名探偵情報（マイクラ版 buildDetectiveResultLines と同じ。名探偵ごとに1組）
               const nmOf = (id) => ((res.detective.seats || []).find((q) => q.id === id) || {}).name || "?", rn = (r) => (ONW.roles.getInfo(r) || {}).name || r;
               return [L(`<span class="rs-info">名探偵:</span> ${esc(b.name)} は初期役職について`), ...b.cells.filter(Boolean).map((c) => L(`${esc(nmOf(c.id))} を ${esc(rn(c.guess))}`)), L(`と推測し、${b.success ? "成功" : "失敗"}していました。`)];

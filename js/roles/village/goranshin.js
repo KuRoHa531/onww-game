@@ -33,7 +33,7 @@
   const isDead = (g, id) => (g.deadIds || []).includes(id);
 
   /** この人が（もう）使ったか */
-  const used = (g, id) => (g.goranshins || []).some((e) => e.by === id);
+  const used = (g, id) => (g.goranshins || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
   /** 御乱心の昼能力を使える人か（最終盤面の役職が御乱心・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている・選べる人がいる） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
@@ -118,41 +118,65 @@
 
   // ---- 結果発表の演出 ----
   const reduced = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const PREP_MS = 450, HOLD_MS = 1100, POP_MS = 700, END_MS = 900;   // カードが持ち上がる / 票が動くまで / 札がはじける / 次まで
-  const R_HOLD = 800, R_END = 900;
+  // 時間割（1回の御乱心）: カードが持ち上がる → 🍄が票数のところに出る → 数字が元の先から新しい先へ飛ぶ → 新しい先の票数が増える → 🍄が消える
+  const PREP_MS = 450, SHROOM_MS = 600, FLY_MS = 800, LAND_MS = 500, END_MS = 500;
+  const R_HOLD = 800, R_END = 900;   // 動きを減らす設定: 飛ばさず、🍄のあと票数だけ切り替える
+  const ONE_MS = () => (reduced() ? R_HOLD + R_END : PREP_MS + SHROOM_MS + FLY_MS + LAND_MS + END_MS);
   const popBadge = (R, k) => {
     const t = R.$t && R.$t(), b = t && t.querySelector(`.tb-seat[data-k="${k}"] .tb-badge`);
     if (b && b.animate && b.textContent) b.animate([{ transform: "scale(1.9)", offset: 0 }, { transform: "scale(.82)", offset: 0.45 }, { transform: "scale(1.12)", offset: 0.75 }, { transform: "scale(1)", offset: 1 }], { duration: 520, easing: "ease-out" });
   };
-  /** 御乱心の時間割（結果発表の counts フックと妖狐投票の演出が共有）。R = stage.kit ベースの道具箱 / F = res.goranshin / cap = 字幕を出すか。
-   *  使った順に1つずつ: 字幕 → 投票者のカードが持ち上がる → 元の投票先の票が1（w）減り、ランダムな先の票が増える（変わらなければ何も動かない） */
+  const badgeEl = (R, k) => { const t = R.$t && R.$t(); return t && t.querySelector(`.tb-seat[data-k="${k}"] .tb-badge`); };
+  /** 票数の数字が、k1 の札から k2 の札へ飛ぶ（動きを減らす設定のときは呼ばない） */
+  function flyNumber(R, k1, k2, text) {
+    const a = badgeEl(R, k1), b = badgeEl(R, k2);
+    if (!a || !b || !document.body.animate) return;
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const el = document.createElement("div");
+    el.className = "gr-fly";
+    el.textContent = text;
+    el.style.left = ra.left + ra.width / 2 + "px"; el.style.top = ra.top + ra.height / 2 + "px";
+    document.body.appendChild(el);
+    const dx = rb.left + rb.width / 2 - (ra.left + ra.width / 2), dy = rb.top + rb.height / 2 - (ra.top + ra.height / 2);
+    const an = el.animate([{ transform: "translate(-50%,-50%) scale(1.3)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx / 2}px), calc(-50% + ${dy / 2 - 26}px)) scale(1.7)`, opacity: 1, offset: 0.5 }, { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`, opacity: 1 }], { duration: FLY_MS, easing: "ease-in-out", fill: "forwards" });
+    an.onfinish = () => el.remove();
+    setTimeout(() => el.remove(), FLY_MS + 400);
+  }
+  /** 御乱心の時間割（結果発表の counts フックと妖狐投票の演出が共有）。R = stage.kit ベースの道具箱 / F = res.goranshin / cap = 使わない（文章は出さない。互換のため残している）。
+   *  使った順に1つずつ: 投票者のカードが持ち上がる → 変わる2か所の票数に🍄が出る → 数字が元の先から新しい先へ飛ぶ → 票数が変わる → 🍄が消える（変わらなければ🍄だけ出て消える） */
   function runGoranshin(R, F, cap) {
     const list = (F && F.list) || [], steps = (F && F.steps) || [];
     if (!list.length || steps.length < list.length + 1) return;
-    const { P, later, setCap, esc, paint, gx, badge } = R;
+    const { P, later, paint, gx, badge } = R;
     const val = (st, id) => ((st || []).find((c) => c.id === id) || { c: 0 }).c;
     const txt = (c) => (c > 0 ? `${c}票` : "");
-    const fast = reduced(), hold = fast ? R_HOLD : PREP_MS + HOLD_MS, end = fast ? R_END : END_MS;
+    const mush = (c) => `🍄${txt(c)}`;
+    const fast = reduced();
     list.forEach((e, i) => {
       const t0 = R.t, kv = P(e.voterId), kf = P(e.fromId), kt = P(e.toId);
-      later(() => {
-        if (cap) setCap(`<div class="res-cap__t t-village">御乱心${list.length > 1 ? ` (${i + 1}/${list.length})` : ""}</div><div>${esc(e.by)}: ${esc(e.voter)} の投票先をランダムに</div>`);
-        gx[kv] = "goransel"; paint(R.G());
-      }, t0);
-      later(() => {   // 票が動く（変わらないときは何も起きない）
-        if (e.ok) {
-          const a = txt(val(steps[i + 1], e.fromId)), b = txt(val(steps[i + 1], e.toId));
-          if (a) badge[kf] = a; else delete badge[kf];
-          if (b) badge[kt] = b; else delete badge[kt];
-        }
+      const oldF = val(steps[i], e.fromId), oldT = val(steps[i], e.toId), newF = val(steps[i + 1], e.fromId), newT = val(steps[i + 1], e.toId);
+      const tM = t0 + (fast ? 0 : PREP_MS), tF = tM + (fast ? R_HOLD : SHROOM_MS), tL = tF + (fast ? 0 : FLY_MS);
+      later(() => { gx[kv] = "goransel"; paint(R.G()); }, t0);
+      later(() => {   // 🍄が、変わる票数のところに出る（変わらないときは、投票先の票数に出るだけ）
+        badge[kf] = mush(oldF);
+        if (e.ok) badge[kt] = mush(oldT);
         paint(R.G());
-        if (e.ok && !fast) { popBadge(R, kf); popBadge(R, kt); }
-      }, t0 + hold);
-      later(() => { delete gx[kv]; paint(R.G()); }, t0 + hold + (fast ? 600 : POP_MS));
-      R.t = t0 + hold + end;
+        if (!fast) { popBadge(R, kf); if (e.ok) popBadge(R, kt); }
+      }, tM);
+      if (e.ok) {
+        later(() => { badge[kf] = mush(newF); paint(R.G()); if (!fast) flyNumber(R, kf, kt, String(e.w || 1)); }, tF);   // 元の先の票数が減り、数字が新しい先へ飛ぶ
+        later(() => { badge[kt] = mush(newT); paint(R.G()); if (!fast) popBadge(R, kt); }, tL);
+      }
+      later(() => {   // 🍄が消えて、票数だけが残る
+        const a = txt(e.ok ? newF : oldF), b = txt(e.ok ? newT : oldT);
+        if (a) badge[kf] = a; else delete badge[kf];
+        if (e.ok) { if (b) badge[kt] = b; else delete badge[kt]; }
+        delete gx[kv]; paint(R.G());
+      }, tL + (fast ? R_END - 300 : LAND_MS));
+      R.t = t0 + ONE_MS();
     });
   }
-  const goranshinMs = (F) => ((F && F.list) || []).length * (reduced() ? R_HOLD + R_END : PREP_MS + HOLD_MS + END_MS);   // 妖狐投票の演出用: 御乱心にかかる時間(ms)
+  const goranshinMs = (F) => ((F && F.list) || []).length * ONE_MS();   // 妖狐投票の演出用: 御乱心にかかる時間(ms)
 
   ONW.goranshin = { canUse, targets, used, apply, run, changed, rand, doneText, resultData, actLines, runGoranshin, run2: (R, F, cap) => runGoranshin(R, F, cap), ms: (F) => goranshinMs(F) };
 
@@ -203,7 +227,7 @@
     //   skip   : なし（スキップ時の最終形は stage.js が res.counts（御乱心のあとの票数）で出す） / clear: 演出の部品を片付ける
     stageResult: {
       counts: { order: 2, run(R) { runGoranshin(R, R.res.goranshin, true); } },
-      clear(R) { if (R && R.gx) Object.keys(R.gx).forEach((k) => { if (R.gx[k] === "goransel") delete R.gx[k]; }); },
+      clear(R) { if (typeof document !== "undefined" && document.querySelectorAll) document.querySelectorAll(".gr-fly").forEach((e) => e.remove()); if (R && R.gx) Object.keys(R.gx).forEach((k) => { if (R.gx[k] === "goransel") delete R.gx[k]; }); },
     },
     groups: { "transform:light_apostle": 46 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER（wiki の order 44）で決まる（番号は所属を表すだけ）
   });

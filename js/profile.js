@@ -10,7 +10,7 @@ window.ONW = window.ONW || {};
   const pf = {};
   const esc = (s) => ONW.utils.esc(s);
   const TEAM = { village: ["村人陣営", "t-village"], wolf: ["人狼陣営", "t-wolf"], third: ["第三陣営", "t-third"] };
-  let token = 0, cur = null, frMsg = "";
+  let token = 0, cur = null, frMsg = "", lastSt = null, openTeam = null;   // openTeam: 戦績で開いている陣営（village / wolf / third / null=閉じている）
 
   const rn = (r) => { try { return ONW.roles.getInfo(r).name; } catch (e) { return r; } };
   const pct = (v) => `${v.toFixed(1)}%`;
@@ -153,17 +153,51 @@ window.ONW = window.ONW || {};
     if (r.ok) { refreshChip(); em.msg = "アイコンを削除しました。"; em.ok = true; shell(editHtml()); } else emsg(r.msg);
   };
 
+  /** 役職IDが属する区分: village / wolf(人狼系) / mad(狂人系) / third */
+  function kindOf(r) {
+    let team = "village"; try { team = ONW.roles.getInfo(r).team; } catch (e) {}
+    if (team !== "wolf") return team === "third" ? "third" : "village";
+    return (ONW.MAD_KIND || []).includes(r) ? "mad" : "wolf";   // 人狼陣営のうち groups.mad の役職が狂人系、それ以外は人狼系
+  }
+  const row = (cls, name, x, rateOf) => `<div class="pf-row"><span class="${cls}">${esc(name)}</span><span>${x.n}戦 ${x.w}勝</span><b>${pct(rateOf(x.w, x.n))}</b></div>`;
+  const sum = (list) => list.reduce((a, [, x]) => ({ n: a.n + x.n, w: a.w + x.w }), { n: 0, w: 0 });
+
+  /** 陣営ボタン + 押した陣営の役職別の戦績。人狼陣営は「人狼系」「狂人系」に分けて見せる */
+  function teamsHtml(st) {
+    const groups = { village: [], wolf: [], mad: [], third: [] };
+    Object.entries(st.roles).forEach(([r, x]) => groups[kindOf(r)].push([r, x]));
+    Object.values(groups).forEach((g) => g.sort((a, b) => b[1].n - a[1].n || ONW.roleRank(a[0]) - ONW.roleRank(b[0])));
+    const TABS = [["village", "村人陣営", ["village"]], ["wolf", "人狼陣営", ["wolf", "mad"]], ["third", "第三陣営", ["third"]]];
+    const list = (k) => groups[k].length
+      ? groups[k].map(([r, x]) => row(TEAM[k === "mad" ? "wolf" : k][1], rn(r), x, st.rateOf)).join("")
+      : `<p class="night-step__hint" style="margin:4px 0;">まだ戦績がありません。</p>`;
+    const tabs = TABS.map(([t, label, kinds]) => {
+      const tot = sum(kinds.flatMap((k) => groups[k])), on = openTeam === t;
+      return `<button type="button" class="pf-team ${TEAM[t][1]}${on ? " on" : ""}" aria-expanded="${on}" onclick="ONW.profile.toggleTeam('${t}')">
+        <span>${label}</span><small>${tot.n}戦 ${tot.w}勝</small><b>${pct(st.rateOf(tot.w, tot.n))}</b></button>`;
+    }).join("");
+    let body = "";
+    if (openTeam) {
+      const kinds = TABS.find((x) => x[0] === openTeam)[2];
+      body = `<div class="pf-roles">` + kinds.map((k) => {
+        if (kinds.length === 1) return list(k);
+        const t = sum(groups[k]);
+        return `<div class="pf-sub"><span>${k === "wolf" ? "人狼系" : "狂人系"}</span><small>${t.n}戦 ${t.w}勝 ${pct(st.rateOf(t.w, t.n))}</small></div>${list(k)}`;
+      }).join("") + `</div>`;
+    }
+    return `<div class="pf-teams">${tabs}</div>${body}`;
+  }
+  pf.toggleTeam = function (t) {
+    if (!lastSt) return;
+    openTeam = openTeam === t ? null : t;
+    const el = document.getElementById("pf-teams");
+    if (el) el.innerHTML = teamsHtml(lastSt);
+  };
+
   function statsHtml(st) {
+    lastSt = st && !st.error ? st : null; openTeam = null;
     if (!st || st.error) return `<h2>戦績</h2><p class="night-step__hint">戦績を読み込めませんでした。（管理者向け: setup.sql の「8.」を実行してください）</p>`;
     if (!st.total) return `<h2>戦績</h2><p class="night-step__hint">まだ戦績がありません。</p>`;
-    const teams = ["village", "wolf", "third"].filter((t) => st.teams[t]).map((t) => {
-      const x = st.teams[t];
-      return `<div class="pf-row"><span class="${TEAM[t][1]}">${TEAM[t][0]}</span><span>${x.n}戦 ${x.w}勝</span><b>${pct(st.rateOf(x.w, x.n))}</b></div>`;
-    }).join("");
-    const roles = Object.entries(st.roles).sort((a, b) => b[1].n - a[1].n).map(([r, x]) => {
-      let team = "village"; try { team = ONW.roles.getInfo(r).team; } catch (e) {}
-      return `<div class="pf-row"><span class="${TEAM[team][1]}">${esc(rn(r))}</span><span>${x.n}戦 ${x.w}勝</span><b>${pct(st.rateOf(x.w, x.n))}</b></div>`;
-    }).join("");
     const recent = st.recent.map((r) => `<span class="pf-chip ${r.won ? "win" : "lose"}" title="${esc(rn(r.initial_role))}">${r.won ? "勝" : "負"}<small>${esc(rn(r.initial_role))}</small></span>`).join("");
     return `
       <h2>戦績</h2>
@@ -172,8 +206,8 @@ window.ONW = window.ONW || {};
         <div><b>${st.losses}</b><span>敗北</span></div><div><b>${pct(st.rate)}</b><span>勝率</span></div>
       </div>
       <p class="night-step__hint" style="margin:6px 0 0;">追放された回数: ${st.executed}回（直近${st.total}戦・最大500戦）</p>
-      <h2>陣営別</h2>${teams}
-      <h2>役職別（配られた役職）</h2><div class="pf-roles">${roles}</div>
+      <h2>陣営別・役職別（配られた役職）</h2>
+      <div id="pf-teams">${teamsHtml(st)}</div>
       <h2>直近の戦い</h2><div class="pf-recent">${recent}</div>`;
   }
 

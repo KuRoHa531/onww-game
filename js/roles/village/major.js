@@ -85,7 +85,7 @@
       if (g.majorResults.some((x) => x.holderId === h && x.targetId === t) || g.majorFailed[h]) return;
       if (ONW.seal && ONW.seal.is(g, h)) { g.majorFailed[h] = "sealed"; return; }
       if (dead(g, t)) { g.majorFailed[h] = "dead"; return; }
-      if (ONW.keymaster && ONW.keymaster.isAA(g, t) && ONW.keymaster.blocks(g, t)) { g.majorFailed[h] = "aa_blocked"; g.nightLogsAll.push(`少佐 ${nm(g, h)} は ${nm(g, t)} の特殊な力により、救済に失敗しました。`); return; }   // A.A.（ロックされていない）: 救済できない（マイクラ版は何も起きない）
+      // A.A.（ロックされていない）もロックされた人と同じ扱い（下: target_locked。OJv26.11.19）
       if (ONW.keymaster && ONW.keymaster.blocks(g, t)) { g.majorFailed[h] = "target_locked"; g.nightLogsAll.push(`少佐 ${nm(g, h)} は ${nm(g, t)} の役職がロックされていたため、救済に失敗しました。`); return; }
       const beforeRole = g.currentRoles[t];
       const madman = isMimicActor(g, h);

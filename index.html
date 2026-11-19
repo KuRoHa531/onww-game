@@ -145,6 +145,9 @@
    <script src="js/roles/village/election_manager.js"></script>
   <script src="js/roles/village/moses.js"></script>
   <script src="js/roles/village/yomi.js"></script>
+  <script src="js/roles/village/carmen.js"></script>
+  <script src="js/roles/village/knight.js"></script>
+  <script src="js/roles/village/trailblazer.js"></script>
   <!-- 人狼陣営 -->
   <!-- 　人狼系 -->
   <script src="js/roles/wolf/wolf/assassin.js"></script>
@@ -237,6 +240,12 @@
       window.addEventListener("resize", function () {
         if (window.innerWidth !== w || window.innerHeight > h) { w = window.innerWidth; h = window.innerHeight; set(); }   // 向きの変更・キーボードが閉じた時だけ更新
       });
+      // 全画面(□)を入る/戻すときは、画面の高さそのものが変わる。戻したあとも全画面のときの高さのままだと、下の欄(変化公開・CO状況)が画面の外に押し出されるので、切り替えのたびに今の高さに取り直す
+      const refit = function () {
+        [0, 150, 400].forEach(function (ms) { setTimeout(function () { w = window.innerWidth; h = window.innerHeight; set(); if (window.ONW && ONW.ui && ONW.ui.fitBoard) ONW.ui.fitBoard(); }, ms); });
+      };
+      document.addEventListener("fullscreenchange", refit);
+      document.addEventListener("webkitfullscreenchange", refit);
     })();
   </script>
   <script src="js/main.js"></script>

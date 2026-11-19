@@ -28,7 +28,7 @@
       if (!O || !O.roles || !O.roles.synergyRules || !O.SYNERGY_COUNT_RULES) return null;
       return {
         rules: O.roles.synergyRules().map((r) => ({ trigger: r.trigger, required: r.required.slice(), priority: (r.priority || []).slice() })),
-        counts: O.SYNERGY_COUNT_RULES.map((c) => ({ trigger: c.trigger || null, always: !!c.always, label: c.label, anyOf: (c.anyOf || []).slice(), min: c.min, max: c.max == null ? null : c.max, force: !!c.force, early: !!c.early, unlessLover: !!c.unlessLover })),
+        counts: O.SYNERGY_COUNT_RULES.map((c) => ({ trigger: c.trigger || null, always: !!c.always, requires: c.requires || null, label: c.label, anyOf: (c.anyOf || []).slice(), min: c.min, max: c.max == null ? null : c.max, force: !!c.force, early: !!c.early, unlessLover: !!c.unlessLover })),
       };
     } catch (e) { return null; }
   }
@@ -69,7 +69,7 @@
     const long = c.anyOf.length > 8;
     const note = (SNAP.countNotes || {})[c.label];
     const flags = [c.unlessLover ? "恋人が配られているときは足さない" : "", c.force ? "必ず出す" : "", c.early ? "他のシナジーより先に適用" : ""].filter(Boolean);
-    const when = c.always ? `<span class="syn-label">常に</span><span class="syn-always">いつでも適用</span>` : `<span class="syn-label">出たら</span>${chip(c.trigger)}`;
+    const when = c.always ? `<span class="syn-label">常に</span><span class="syn-always">いつでも適用</span>` : `<span class="syn-label">出たら</span>${chip(c.trigger)}${c.requires ? `<span class="syn-label">かつ</span>${chip(c.requires)}` : ""}`;
     return `<article class="wiki-card syn-card" data-team="${c.always ? "third" : teamOf(c.trigger)}" data-q="${esc([c.label, c.trigger ? nameOf(c.trigger) : "", ...c.anyOf.map(nameOf)].join(" "))}">
       <div class="syn-row"><div class="syn-col">${when}</div><span class="syn-arrow">→</span><div class="syn-col syn-col--grow"><span class="syn-label">${esc(c.label)}（${esc(countText(c))}）</span>
         ${long ? `<details class="syn-more"><summary>対象の役職を見る（${c.anyOf.length}役職）</summary><div class="syn-chips">${chips}</div></details>` : `<div class="syn-chips">${chips}</div>`}</div></div>

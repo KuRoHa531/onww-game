@@ -29,7 +29,7 @@
   const isDead = (g, id) => (g.deadIds || []).includes(id);
 
   /** この人が（もう）バリアを付与したか */
-  const used = (g, id) => (g.fairyBarriers || []).some((e) => e.by === id);
+  const used = (g, id) => (g.fairyBarriers || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
   /** 妖精さんの昼能力を使える人か（最終盤面の役職が妖精さん・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている・選べる人がいる） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
@@ -267,7 +267,7 @@
     list.forEach((e, i) => {
       const t0 = R.t, kt = P(e.targetId), after = val(steps[i + 1], e.targetId);
       later(() => {
-        if (cap) setCap(`<div class="res-cap__t t-village">妖精さん${list.length > 1 ? ` (${i + 1}/${list.length})` : ""}</div><div>${esc(e.by)}: ${esc(e.target)} にバリア</div>`);
+        if (cap) setCap(`<div class="res-cap__t t-village">妖精さん${list.length > 1 ? ` (${i + 1}/${list.length})` : ""}</div><div>${esc(e.target)}は妖精のバリアによって守られました。</div>`);
         gx[kt] = "fairysel"; paint(R.G());
       }, t0);
       if (!fast) later(() => { flyFairy(R, kt, i, !!e.ok); }, t0 + prep);   // 🧚が飛んでくる（カードが持ち上がったあと）

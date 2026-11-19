@@ -211,7 +211,7 @@ window.ONW = window.ONW || {};
     const placed = new Set();   // シナジーで置いた枠（以降も守る）
     const countTriggers = new Set(ONW.SYNERGY_COUNT_RULES.map((r) => r.trigger).filter(Boolean));
     const hasLover = Object.keys(game.loverOf || {}).length > 0;
-    const active = (r) => (r.always || has(r.trigger)) && !(r.unlessLover && hasLover);
+    const active = (r) => (r.always || has(r.trigger)) && (!r.requires || has(r.requires)) && !(r.unlessLover && hasLover);   // requires: trigger に加えて、この役職も盤面にいるときだけ働くルール（スティーブが出ている闇鍋の模倣の人狼）
     // 守る枠を（今の盤面から）計算する。trigger が置き換えで消えたシナジーの必要役職は、守らなくなる
     const computeKept = () => {
       const kept = new Set(locked);
@@ -298,7 +298,8 @@ window.ONW = window.ONW || {};
         });
       });
     }
-    RULES.forEach((rule) => {
+    // 必要役職ルール（trigger がいるなら required も出す）。個数ルールで新しく trigger が出ることがあるので、個数ルールのあとにもう一度呼ぶ（詩人のシナジーで偽占い師が出たのに占い師がいない、を防ぐ）
+    const applyRequired = () => RULES.forEach((rule) => {
       if (!has(rule.trigger)) return;
       cur = { kind: "req", rule };
       const seen = {};
@@ -331,6 +332,7 @@ window.ONW = window.ONW || {};
         if (viaTrigger) kept = computeKept();   // trigger を置き換えたので、そのシナジーが守っていた枠（封印の狂人の対象役職・麻婆の豆腐など）を空き枠に戻す
       });
     });
+    applyRequired();
     // 個数ルール: 対象役職(anyOf のどれでもよい)が合計で min 枚以上、盤面に出るようにする。足りない分は、変化役から変化した枠を置き換えて足す
     ONW.SYNERGY_COUNT_RULES.forEach((rule) => {
       if (!active(rule)) return;
@@ -356,7 +358,10 @@ window.ONW = window.ONW || {};
         if (!cands.length) break;   // 固定した枠は置き換えない（役職固定が最優先）
         const slot = pickSlot(cands);
         // 対象役職の種類が偏らないよう、盤面での枚数がいちばん少ない役職から選ぶ
-        const cnt = (r) => slots.filter((s) => s.role === r).length, o = opts(slot), min = Math.min(...o.map(cnt));
+        // 偽占い師（占い師が必要）・白狼・アサシン・マーリンなど、必要役職がまだ盤面にいない役職は、ほかに選べる役職があるなら選ばない（詩人などの個数ルールで、必要役職のいない trigger を足さない）
+        const unmet = (r) => RULES.some((q) => q.trigger === r && q.required.some((x) => x !== r && !has(x)));
+        const o0 = opts(slot), oOk = o0.filter((r) => !unmet(r)), o = oOk.length ? oOk : o0;
+        const cnt = (r) => slots.filter((s) => s.role === r).length, min = Math.min(...o.map(cnt));
         set(slot, ONW.utils.randomChoice(o.filter((r) => cnt(r) === min)));
       }
       // 上限(max): 多すぎるときは、変化役から変化した枠の分だけ、対象役職でない役職（シナジーの trigger にならないもの）へ変え直す。最初から配役に入れた枠は動かさない
@@ -374,6 +379,7 @@ window.ONW = window.ONW || {};
         if (slot.id !== undefined) { game.initialRoles[slot.id] = pickR; game.currentRoles[slot.id] = pickR; } else game.center[slot.idx] = pickR;
       }
     });
+    applyRequired();   // 個数ルールで新しく出た役職（偽占い師など）の必要役職（占い師など）を、もう一度確保する
     cur = null;
     // ---- 最終の盤面でシナジーを判定して記録する（デバッグモードの結果画面「シナジー情報」用）----
     const present = (r) => slots.filter((s) => s.role === r).length;
@@ -462,18 +468,32 @@ window.ONW = window.ONW || {};
    *  封印の狂人が出る闇鍋には、このうち最低3枚が盤面(プレイヤー+墓地)に出る。今後Web版に役職を足す・移植するときは、マイクラ版の一覧に入っている役職の info に sealTarget: true を付けるだけでよい（docs/seal-target.md） */
   Object.defineProperty(ONW, "SEAL_TARGET_ROLES", { configurable: true, enumerable: true, get() { return ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO || {}).filter((r) => ONW.ROLE_INFO[r].sealTarget === true)); } });
   /** 黄泉が断ち切れる「状態」が付く役職（マイクラ版 YAMINABE_YOMI_TARGET_ROLES のうち Web版にある役職。ない役職は、Web版に入ったときに足す）。黄泉が出る闇鍋に最低3枚 */
-  ONW.YOMI_TARGET_ROLES = ["shuffler", "reverser", "pure_lover", "evil_woman", "cupid", "executioner", "avenger", "love_tanner", "exchanger", "mad_exchanger", "goranshin", "icarus", "fairy", "servant", "freeter", "forgetful_wolf", "wolf_dreamer", "gremlin"];
+  ONW.YOMI_TARGET_ROLES = ["shuffler", "reverser", "pure_lover", "evil_woman", "cupid", "nanoka", "executioner", "avenger", "love_tanner", "exchanger", "mad_exchanger", "goranshin", "icarus", "fairy", "carmen", "muzzle_madman", "servant", "freeter", "silver_wolf", "forgetful_wolf", "wolf_dreamer", "gremlin", "chesed", "thread_spinner", "matthias", "boar_madman", "bartender", "agent", "elfrinde"];   // マイクラ版 YAMINABE_YOMI_TARGET_ROLES を丸ごと（Web版にない役職は下の synergy で自動で除かれ、Web版に入った時点で自動で入る。役職を足したときにここを触る必要はない）
+  /** 鍵師・A.A.の闇鍋シナジーの対象（マイクラ版 YAMINABE_KEYMASTER_TARGET_ROLES = YAMINABE_AA_TARGET_ROLES を丸ごと）。Web版にない役職は自動で除かれ、Web版に入った時点で自動で対象になる（役職を足したときにここを触る必要はない）。コスプレイヤーなど後から読み込まれる役職は文字列 */
+  ONW.KEYMASTER_TARGET_ROLES = ["troublemaker", "robber", "relic_robber", "cosplayer", "major", "doppelganger", "shuffler", "gremlin", "matthias", "elfrinde", "beggar", "eraser_wolf", "magician", "silver_wolf", "hotaru"];   // 蜃気狼(mirage_wolf)は入れない: 役職変化の能力も鍵師のロックの対象もない（マイクラ版の一覧には入っているが、Web版では対象外）
+  /** カルメンの闇鍋シナジーの対象（マイクラ版 YAMINABE_CARMEN_TARGET_ROLES を丸ごと。夜能力・昼能力を持つ村人陣営の役職）。Web版にない役職は自動で除かれ、入った時点で自動で対象になる */
+  /** スティーブを倒せる「模倣先」の候補（模倣の人狼がこれを模倣すると、人狼陣営から村人のスティーブを執行・噛殺・独裁処刑できる）。保安官・番犬・独裁者が村人陣営に1人いるだけでは、スティーブを狙う側がいない。
+   *  ヴァニティなど、あとからWeb版に入る役職はここに名前を足しておけば、Web版に入った時点で自動で候補に入る。 */
+  ONW.STEVE_KILL_TARGETS = ["sheriff", "watchdog", "dictator", "vanity"];
+  /** スティーブが出る闇鍋で「スティーブを倒せる側」として数える役職（この中から最低2枚）。模倣の人狼（模倣保安官・模倣番犬・模倣独裁者になる）・番犬・独裁者・道化の爆弾魔。ヴァニティはWeb版に入った時点で自動で入る */
+  ONW.STEVE_KILLER_ROLES = ["mimic_wolf", "watchdog", "dictator", "jester_bomber", "vanity"];
+  ONW.CARMEN_TARGET_ROLES = ["seer", "whimsical_seer", "robber", "relic_robber", "troublemaker", "doppelganger", "visitor", "major", "finger_reader", "sense_seer", "libra", "sheriff", "dictator", "exchanger", "thief", "freeter", "fairy", "goranshin", "icarus", "knight", "trailblazer", "moses", "psychologist", "medium", "hokma"];
+  /** 名前の一覧から、いまWeb版にある役職だけを ROLE_ORDER 順で返す */
+  ONW.existingRoles = (names) => ONW.sortByRoleOrder(names.filter((r) => ONW.ROLE_INFO[r]));
   ONW.SYNERGY_COUNT_RULES = [
     { trigger: ONW.ROLE.INSOMNIAC, label: "役職を変える役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.GREMLIN, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER], min: 2, max: 2 },   // シャッフラー(役職を変える)も数える（マイクラ版 YAMINABE の後覚者シナジーに SHUFFLER が入っている）
-    { trigger: ONW.ROLE.KEYMASTER, label: "ロック対象の役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, "cosplayer", ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・コスプレイヤー・ドッペルゲンガー・シャッフラー・グレムリン。コスプレイヤーは役職ファイルが後から読み込まれるので文字列で書く）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
-    { trigger: ONW.ROLE.AA, label: "A.A.が弾く役職変化系", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.TROUBLEMAKER, ONW.ROLE.RELIC_ROBBER, "cosplayer", ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.GREMLIN], min: 2 },   // A.A.が出る闇鍋には、A.A.の力（役職変化を弾く）が活きる役職変化系を合わせて最低2枚出す（マイクラ版 YAMINABE_AA_TARGET_ROLES = 鍵師と同じ一覧を2枚）
+    { trigger: ONW.ROLE.KEYMASTER, label: "ロック対象の役職変化系", get anyOf() { return ONW.existingRoles(ONW.KEYMASTER_TARGET_ROLES); }, min: 2 },   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（マイクラ版 YAMINABE_KEYMASTER_TARGET_ROLES）を合わせて最低2枚出す。対象は ONW.KEYMASTER_TARGET_ROLES から自動（Web版にある役職だけ・新しく入った役職は自動で入る）   // 鍵師が出る闇鍋には、ロックの対象になる役職変化系（怪盗・いたずらっ子・墓荒らし・コスプレイヤー・ドッペルゲンガー・シャッフラー・グレムリン。コスプレイヤーは役職ファイルが後から読み込まれるので文字列で書く）を合わせて最低2枚出す（マイクラ版 YAMINABE の鍵師シナジー: YAMINABE_KEYMASTER_TARGET_ROLES を2枚。Web版にある役職の分）
+    { trigger: ONW.ROLE.AA, label: "A.A.が弾く役職変化系", get anyOf() { return ONW.existingRoles(ONW.KEYMASTER_TARGET_ROLES); }, min: 2 },   // A.A.が出る闇鍋には、A.A.の力（役職変化を弾く）が活きる役職変化系を合わせて最低2枚出す（マイクラ版 YAMINABE_AA_TARGET_ROLES = 鍵師と同じ一覧。自動）   // A.A.が出る闇鍋には、A.A.の力（役職変化を弾く）が活きる役職変化系を合わせて最低2枚出す（マイクラ版 YAMINABE_AA_TARGET_ROLES = 鍵師と同じ一覧を2枚）
     { trigger: ONW.ROLE.POET, label: "詩人が見られる役職", get anyOf() { return ONW.observableRoles("poet"); }, min: 2 },   // 詩人が出る闇鍋には、詩人の通知に出る役職（夜に対象を選ぶ能力を使い ONW.observeNote に記録される役職。墓地だけを対象にする墓荒らしは除く）を合わせて最低2枚。対象は各役職ファイルの info.observe（"player"）から自動で作る＝役職を足すときは observeNote を呼ぶ役職に info.observe を付ける
     { trigger: ONW.ROLE.OBSERVER_WOLF, label: "観測の人狼が見られる役職", get anyOf() { return ONW.observableRoles("observer"); }, min: 2 },   // 観測の人狼が出る闇鍋には、観測結果に出る役職（info.observe が "player" か "grave"。墓荒らしなど墓地だけを対象にする役職も含む）を合わせて最低2枚（詩人と同じ考え方。個数は詩人と同じ2枚）
     { trigger: ONW.ROLE.HEARTBREAKER, label: "恋人系役職", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
     { trigger: ONW.ROLE.MAPO_WOLF, label: "麻婆対抗役", get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
     { trigger: ONW.ROLE.SEAL_MADMAN, label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES; }, min: 3 },   // 封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE の封印の狂人シナジー: YAMINABE_SEAL_TARGET_ROLES を3枚。Web版にある役職の分）
     { trigger: "moses", label: "能力を使われる役職", get anyOf() { return ONW.SEAL_TARGET_ROLES.filter((r) => r !== "moses"); }, min: 4 },   // モーゼスが出る闇鍋には、能力を使われる（選ばれて票が増える）役職を最低4枚出す（マイクラ版 YAMINABE の優先度なしシナジー: YAMINABE_MOSES_TOUCH_ROLES = 封印の対象からモーゼス自身を除いたものを4枚。Web版にある役職の分。モーゼスは役職ファイルが後から読み込まれるので trigger は文字列で書く。対象は info.sealTarget から自動）
-    { trigger: "yomi", label: "状態が付く役職", get anyOf() { return ONW.YOMI_TARGET_ROLES.filter((r) => ONW.ROLE_INFO[r]); }, min: 3 },   // 黄泉が出る闇鍋には、断ち切れる状態（反転・恋人・シャッフラー・各役職の対象・思い込みなど）が付く役職を最低3枚出す（マイクラ版 YAMINABE の黄泉シナジー: YAMINABE_YOMI_TARGET_ROLES を3枚。Web版にある役職の分）。黄泉は役職ファイルが後から読み込まれるので trigger は文字列
+    { trigger: "yomi", label: "状態が付く役職", get anyOf() { return ONW.existingRoles(ONW.YOMI_TARGET_ROLES); }, min: 3 },   // 黄泉が出る闇鍋には、断ち切れる状態（反転・恋人・シャッフラー・各役職の対象・思い込みなど）が付く役職を最低3枚出す（マイクラ版 YAMINABE の黄泉シナジー: YAMINABE_YOMI_TARGET_ROLES を3枚。Web版にある役職の分）。黄泉は役職ファイルが後から読み込まれるので trigger は文字列
+    { trigger: "carmen", label: "囁く相手になる役職", get anyOf() { return ONW.existingRoles(ONW.CARMEN_TARGET_ROLES); }, min: 2 },   // カルメンが出る闇鍋には、囁かれて夜能力・昼能力をもう1回使える役職（マイクラ版 YAMINABE_CARMEN_TARGET_ROLES）を合わせて最低2枚出す。カルメンは役職ファイルが後から読み込まれるので trigger は文字列
+    { trigger: "steve", label: "スティーブを倒せる役職", get anyOf() { return ONW.existingRoles(ONW.STEVE_KILLER_ROLES); }, min: 2 },   // スティーブが出る闇鍋には、スティーブを倒せる側（模倣の人狼・番犬・独裁者・道化の爆弾魔、今後ヴァニティ）を最低2枚出す。保安官は単体では意味がないので入れず、模倣の人狼が模倣して初めて数える（模倣の人狼の模倣先は、mimic_wolf.js candidates が保安官・番犬・独裁者から選ぶ）。スティーブは役職ファイルが後から読み込まれるので trigger は文字列
+    { trigger: "mimic_wolf", requires: "steve", label: "スティーブを倒せる模倣先（模倣の人狼）", get anyOf() { return ONW.existingRoles(ONW.STEVE_KILL_TARGETS); }, min: 1 },   // 別枠: スティーブが出る闇鍋で模倣の人狼が出るときは、模倣先になる保安官・番犬・独裁者（今後ヴァニティ）のどれかを最低1人出す。すでに1枚以上出ていれば新しくは出さない（個数ルールなので足りないときだけ置く）。上の「スティーブを倒せる役職」のあとに処理される
     { trigger: ONW.ROLE.SPY, label: "人狼系（一匹狼以外）", get anyOf() { return ONW.sortByRoleOrder((ONW.VISIBLE_WOLF || []).slice()); }, min: 2 },   // スパイが出る闇鍋には、闇の化身から「一匹狼以外の人狼系」を合計2人以上出す（人狼が1人だけだと、狼マークに見えるスパイが確定してしまうため。一匹狼は誰からも見えないので数えない。マイクラ版 ensureDarkWolvesForLightSpy）。ONW.VISIBLE_WOLF から自動で作る（人狼系を足したら自動で入る）
     { always: true, label: "悪女・純愛者・キューピッド", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
     { always: true, label: "マーリン", anyOf: [ONW.ROLE.MERLIN], min: 0, max: 1, early: true },   // マーリンは1人まで（光の使徒などの変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）

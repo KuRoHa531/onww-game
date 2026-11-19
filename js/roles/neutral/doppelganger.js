@@ -42,7 +42,7 @@
     const { rn, nameOf, isNonVillage, nonVillageLie } = k;
     c.co = "doppelganger";
     if (i.keyFail && i.keyFail.kind === "shift") { c.result = { short: "コピーできず", text: "コピーできる相手がおらず、コピーできませんでした。", claim: null }; return; }
-    if (i.keyFail && i.keyFail.kind === "aa") { c.result = { short: "特殊な力で失敗", text: "選んだ人の特殊な力によりコピーに失敗しました。", claim: null }; return; }   // A.A.に弾かれた
+    if (i.keyFail && i.keyFail.kind === "aa") { c.result = { short: "ロックで失敗", text: "選んだプレイヤーの役職がロックされていたためコピーに失敗しました。", claim: null }; return; }   // A.A.に弾かれた（ロックと同じ文）
     if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたためコピーに失敗しました。", claim: null }; return; }   // ロックされてコピーに失敗した: 正直に言う
     if (!i.doppel) return;   // コピー情報なし: COだけする
     const dt = nameOf(g, i.doppel.target), dn = i.doppel.newRole;

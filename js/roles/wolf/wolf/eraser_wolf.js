@@ -94,11 +94,7 @@
       if (!t || !g.players.some((q) => q.id === t)) return;
       if ((g.eraserWolfResults || []).some((x) => x.actorId === actorId && x.targetId === t) || g.eraserWolfFailed[actorId]) return;
       if (dead(g, t)) { g.eraserWolfFailed[actorId] = "dead"; return; }
-      if (ONW.keymaster && ONW.keymaster.isAA(g, t) && ONW.keymaster.blocks(g, t)) {   // A.A.（ロックされていない）: 抹消できない。マイクラ版どおり本人への通知は無し（夜ログと観戦者の欄にだけ残る）
-        g.eraserWolfFailed[actorId] = "aa_blocked";
-        g.nightLogsAll.push(`抹消の人狼 ${nm(g, actorId)} は ${nm(g, t)} の特殊な力により、抹消に失敗しました。`);
-        return;
-      }
+      // A.A.（ロックされていない）もロックされた人と同じ扱い（下: target_locked。OJv26.11.19）
       if (ONW.keymaster && ONW.keymaster.blocks(g, t)) {
         g.eraserWolfFailed[actorId] = "target_locked";
         g.nightLogsAll.push(`抹消の人狼 ${nm(g, actorId)} は ${nm(g, t)} の役職がロックされていたため、抹消に失敗しました。`);

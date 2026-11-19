@@ -331,6 +331,7 @@ window.ONW = window.ONW || {};
     game.majorSacrificed = [];
     game.toughBounces = [];
     game.kingGuards = [];
+    if (ONW.knight) ONW.knight.reset(game, ["exec", "dictator", "coup", "sub"]);   // 騎士: 追放の守りは計算のたびにやり直す（守った騎士を未使用に戻す）。連鎖(chain)・保安官(shot)の守りは触らない
     if (maxVotes === 0) {
       game.eliminated = [];
       return game.eliminated;
@@ -350,9 +351,39 @@ window.ONW = window.ONW || {};
     // 独裁処刑(game.dictator): 議論を打ち切って投票は行わない（票は独裁者→対象の1票だけ）。
     //   2026-11-17 ユーザー指定: 独裁処刑の対象（ご主人）にも従者の身代わりが働く（結果発表は通常の追放と同じ「身代わり」演出: ご主人のカードがめくれそうになる → 従者のカードがめくれる）。少佐の身代わりは従来どおり独裁処刑では働かない。
     //   クーデター（反逆の狂人が独裁を跳ね返して独裁者本人が処刑される）は従来どおり身代わりなし（docs/rebel-madman.md）。
+    // 騎士（js/roles/village/knight.js・マイクラ版 applyKnightProtection）: 追放が決まった人（投票・独裁処刑・クーデター）を死から守る。従者・少佐の身代わりより【先】に働く（守られたご主人には身代わりが起きない）。
+    //   身代わりのあとにもう一度働き、身代わりで追放される従者・少佐（kind: "sub"）も守る。守られた人は game.eliminated から外れ、結果発表の 🛡️ 演出は game.knightGuards（net.js の res.knights）が持つ。
+    const kindOf = (id) => (game.dictator && game.dictator.target === id ? (game.dictator.coup ? "coup" : "dictator") : "exec");
+    ONW.vote.applyKnightGuard(game, null, kindOf);
+    const beforeSub = new Set(game.eliminated);
     if (game.dictator) { game.servantSubs = []; if (!game.dictator.coup) ONW.vote.applyServantSubstitution(game); }
     else { ONW.vote.applyServantSubstitution(game); ONW.vote.applyMajorSubstitution(game); }   // 本家の順序どおり: 豆腐の人狼のメンタル崩壊 → 従者の身代わり → 少佐の身代わり → 連鎖（resolveChain）
+    ONW.vote.applyKnightGuard(game, game.eliminated.filter((id) => !beforeSub.has(id)), () => "sub");   // 身代わりで新しく追放になった人だけ
     return game.eliminated;
+  };
+
+  /**
+   * 騎士の守り（追放）。game.eliminated のうち only（省略で全員）に入っている人を、守れるなら1人ずつ守る。
+   *   kindOf(id): その人の守りの種類（knight.js の kind: exec / dictator / coup / sub）
+   *   ・守れる判定・守る騎士の選び方は ONW.knight.protect（同時に追放される騎士・使用済みの騎士は守れない。追放される人の数は、守った人を外した最新の game.eliminated で見る）
+   *   ・守られた人は game.eliminated・mentalIds・shockIds から外れる（死なない）。game.knightGuards に { id, knight, kind } を積む（結果発表用）
+   * 戻り値: 守られた人のID（守った順）
+   */
+  vote.applyKnightGuard = function applyKnightGuard(game, only, kindOf) {
+    if (!ONW.knight) return [];
+    const out = [];
+    [...game.eliminated].forEach((id) => {
+      if (only && !only.includes(id)) return;
+      if (!game.eliminated.includes(id)) return;
+      const kind = kindOf(id), knight = ONW.knight.protect(game, id, kind, new Set(game.eliminated));
+      if (!knight) return;
+      game.eliminated = game.eliminated.filter((x) => x !== id);
+      game.mentalIds = (game.mentalIds || []).filter((x) => x !== id);
+      game.shockIds = (game.shockIds || []).filter((x) => x !== id);
+      ONW.knight.addGuard(game, id, knight, kind);
+      out.push(id);
+    });
+    return out;
   };
 
   /**
@@ -443,6 +474,7 @@ window.ONW = window.ONW || {};
     const done = new Set(game.eliminated), gone = new Set(game.deadIds || []);
     let queue = [...game.eliminated];
     game.chainIds = []; game.chainBy = {}; game.chainKind = {}; game.chainSub = {}; game.strawPending = null; game.toughBlocks = [];
+    if (ONW.knight) ONW.knight.reset(game, ["chain"]);   // 騎士: 道連れの守りも、連鎖を解くたびに作り直す（追放の守りは resolveElimination で決まったまま）
     game.kingGuards = (game.kingGuards || []).filter((b) => b.kind !== "tomo");   // 道連れのガードは、連鎖を解くたびに作り直す（追放のガードは resolveElimination で決まったまま）   // game.chainSub[身代わりになった従者] = 守られたご主人（道連れの身代わり）
     game.kingdomIds = []; game.queenFallen = [];   // 王国滅亡: 巻き込まれた村人陣営 / 倒れた女王
     game.catPicks = game.catPicks || {}; game.strawTargets = game.strawTargets || {};
@@ -469,6 +501,13 @@ window.ONW = window.ONW || {};
     const kill = (t, by, kind, chain = true) => {
       if (done.has(t) || gone.has(t) || !game.players.some((p) => p.id === t)) return false;
       if (kind === "tomo" && immune(t)) { if (!game.toughBlocks.some((b) => b.id === t && b.by === by)) game.toughBlocks.push({ id: t, by, kind }); return false; }   // 空振り
+      // 騎士（マイクラ版 tryKnightProtect(.., "chain")）: 道連れ(tomo)で死ぬ人を、1回だけ守る。従者の身代わりより先に働く（追放と同じ順）。守られた人は死なず、道連れした人がめくれたあとに 🛡️ が出る（game.knightGuards の kind "chain"・by = 道連れした人）。
+      //   同時に（同じ波で）道連れにされる人・すでにめくれた人の騎士は守れない。同じ道連れの再計算では同じ守りを使い回す（騎士を二重に使わない）
+      if (kind === "tomo" && ONW.knight) {
+        if ((game.knightGuards || []).some((b) => b.kind === "chain" && b.id === t && b.by === by)) return false;
+        const kn = ONW.knight.protect(game, t, "chain", new Set([...done, ...tomoSimul]), by);
+        if (kn) { ONW.knight.addGuard(game, t, kn, "chain", by); return false; }
+      }
       // 従者の身代わり（道連れ）: ご主人が道連れ(tomo)で死ぬときは、従者が身代わりになる（ご主人は生き残る）。追放の身代わり(applyServantSubstitution)と同じ条件:
       //   従者がまだ死んでいない / 従者が恋人でない / ご主人の最終役職が 従者・てるてる坊主・一目惚れしてるてる でない。従者が複数いれば先に見つかった1人
       if (kind === "tomo" || kind === "bomb") {   // 道連れ・爆殺（道化の爆弾魔）: 従者がご主人の身代わりになる
@@ -810,7 +849,7 @@ window.ONW = window.ONW || {};
     game.jesterMadmanWin = [];   // 道化の狂人: 追放・道連れで死亡して人狼陣営の勝利を作った人（分岐 1.9。結果の説明用）
     game.tenaciousCut = [];   // 執念の狂人: 死亡したため人狼陣営（または神の祝福）の勝利から外れた人（勝敗の説明用。下の 1 / 3.8 / 4 の分岐が決める）
     const gods = ids.filter((id) => role(id) === R.GOD);
-    game.priestMode = null; game.priestIds = [];   // 神官（docs/priest.md）: "block"（生存している神官が神降臨を無効にした）/ "help"（死亡している神官のおかげで村人陣営も追加勝利）/ null。結果の演出・説明用
+    game.priestMode = null; game.priestIds = []; game.priestBaseIds = null;   // 神官（docs/priest.md）: "block"（生存している神官が神降臨を無効にした）/ "help"（死亡している神官のおかげで村人陣営も追加勝利）/ null。結果の演出・説明用
     game.godMode = null; game.godIds = []; game.godBlown = [];   // 結果の演出用: "bless"（神の祝福）/ "descend"（神降臨）/ null
     // 無理心中で巻き込まれたてるてる系は、自分のてるてる勝利は発動しない（相手の一目惚れしてるてると「一緒に勝った」扱いになるだけ）
     const byLove = (id) => ["love", "lovers"].includes((game.chainKind || {})[id]);   // 無理心中・心中で死んだてるてる系も同じ扱い
@@ -873,7 +912,7 @@ window.ONW = window.ONW || {};
       if (game.shufflerTake) { title = "シャッフラー勝利"; teams = ["シャッフラー"]; winners = game.shufflerTake.ids.slice(); detail = ONW.shuffler.takeoverText(game, game.shufflerTake, game.shufflerBase); winnerTeams = [ONW.TEAM.THIRD]; }
       game.winTitle = title; game.winTitleStage = null; game.winTeams = teams; game.winDetail = detail; game.winners = winnerTeams;   // winTitleStage: 勝利演出の字幕用。追加勝利の「＆〇〇勝利」を付ける前のタイトル（追加勝利は役職の札で出すので、字幕には重ねない）
       const w = new Set(winners);
-      game.winBaseIds = [...w];   // 追加勝利の演出用（docs/extra-win-fx.md）: 陣営の勝者としてここまでに決まっていた人。最終の勝者（game.winnerIds）のうちここにいない人が「追加勝利」
+      game.winBaseIds = [...w].filter((id) => !(title === "神降臨" && game.priestBaseIds && !game.priestBaseIds.includes(id)));   // 神降臨+神官（priestBaseIds）のときは、神だけが陣営の勝者 / 追加勝利の演出用（docs/extra-win-fx.md）: 陣営の勝者としてここまでに決まっていた人。最終の勝者（game.winnerIds）のうちここにいない人が「追加勝利」
       const shotLoseIds = shotLostIds.filter((id) => role(id) !== R.MARTYR);   // 殉職者は撃たれても勝利条件を失わない（下の shotCut / 追加勝利の後ろの除外から外す）
       // 王国滅亡で死んだ人（結果発表で倒れた game.kingdomIds・昼中に倒れた deadKind "queen"）と、倒れた女王は勝者から外す。
       //   メモ（docs/victory-priority.md「王国滅亡の判定メモ」）: 本来は 無理心中した / 反転(+反転が奇数個) / 神の祝福が発動 / 羅刹の愛する人として勝利 / (+コピリスト)つき のときだけ勝てる。ここは今、例外なしで外している（例外は未実装）
@@ -1084,6 +1123,7 @@ window.ONW = window.ONW || {};
       if (priestHelps) {   // 死亡している神官: 村人陣営も追加で勝つ（マイクラ版 priestTeamWinners。恋人・(+反転)・シャッフラーの印がついた人は受けられない）
         const canRecv = (id) => !isLover(id) && !(ONW.reverse && ONW.reverse.is && ONW.reverse.is(game, id)) && !(ONW.shuffler && ONW.shuffler.tagged && ONW.shuffler.tagged(game, id));
         const vill = ids.filter((id) => !(game.cursedWolfIds || []).includes(id) && ONW.roles.getInfo(role(id)).team === ONW.TEAM.VILLAGE && canRecv(id));
+        game.priestBaseIds = godAlive.slice();   // 陣営の勝者は神だけ。村人陣営は神官の祈りによる「追加勝利」（set が winBaseIds から村人陣営を外す。結果発表の追加勝利の演出・勝者欄の色になる）
         return set("神降臨", ["神", "村人陣営"], [...new Set([...godAlive, ...vill])], `神が追放されませんでした。 死亡している神官 ${nm(priestHolders)} により村人陣営も追加勝利します。`, [ONW.TEAM.THIRD, ONW.TEAM.VILLAGE]);
       }
       return set("神降臨", ["神"], godAlive, "神が追放されませんでした。", [ONW.TEAM.THIRD]);

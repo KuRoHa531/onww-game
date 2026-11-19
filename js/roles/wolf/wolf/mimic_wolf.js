@@ -23,6 +23,10 @@
 (function (ONW) {
   const K = ONW.wolfKit;
   const R_ = () => ONW.ROLE;
+  // 【開拓者（js/roles/village/trailblazer.js）もこの仕組みに乗る】カードは開拓者のまま、持ち主が「運命の役職」の能力を使う。運命の役職は模倣先と同じ g.mimicRole に入る。
+  //   「模倣の人狼か開拓者か」= isBorrow。人狼判定・占い・保安官の誤爆の判定など「模倣の人狼だけ」の所は R_().MIMIC_WOLF のまま（開拓者は村人陣営のカード）
+  const isTrail = (role) => role === R_().TRAILBLAZER;
+  const isBorrow = (role) => role === R_().MIMIC_WOLF || isTrail(role);
 
   /** マイクラ版 NON_MIMICABLE_ROLES: 模倣の人狼が模倣できない役職（陣営が村人・人狼でも除外する） */
   const NON_MIMICABLE = new Set([
@@ -46,12 +50,18 @@
   function candidates(g, opts) {
     const draw = !!(opts && opts.draw);
     const pool = [...Object.values(g.initialRoles || {}), ...(draw ? (g.center || []) : ((g.center0 || g.center) || []))];
-    return pool.filter((r) => r && !NON_MIMICABLE.has(r) && teamOk(r) && isSupported(r) && !(draw && CHAIN_BLOCK.has(r)));
+    const list = pool.filter((r) => r && !NON_MIMICABLE.has(r) && teamOk(r) && isSupported(r) && !(draw && CHAIN_BLOCK.has(r)));
+    // 闇鍋シナジー（スティーブ）: スティーブが出ている闇鍋では、スティーブを倒せる模倣先（保安官・番犬・独裁者…）が盤面にあれば、その中から選ぶ（模倣保安官・模倣番犬・模倣独裁者。docs/steve.md）
+    if (!draw && Array.isArray(g.synergyLog) && Object.values(g.initialRoles || {}).includes("steve")) {
+      const kill = list.filter((r) => (ONW.STEVE_KILL_TARGETS || []).includes(r));
+      if (kill.length) return kill;
+    }
+    return list;
   }
   /** 持ち主が模倣している役職（なければ null） */
   const roleOf = (g, id) => (g && g.mimicRole && g.mimicRole[id]) || null;
   /** 「そのカードを持つ人が能力として使う役職」: 模倣の人狼なら模倣先、それ以外はカードの役職そのまま */
-  const actRole = (g, id, role) => (role === R_().MIMIC_WOLF && roleOf(g, id) ? roleOf(g, id) : role);
+  const actRole = (g, id, role) => (isBorrow(role) && roleOf(g, id) ? roleOf(g, id) : role);
   /** 受動効果（追放・道連れ・投票数・王国滅亡・公開・パンなど）で見る役職 = 最終盤面で id が持つカードを、模倣先に読み替えた役職（マイクラ版 roleForMimicEffect と同じ）。
    *  模倣の人狼でなければカードの役職そのまま。判定が「人狼陣営か」「村人陣営か」などカードそのものを見る所は、これを使わず g.currentRoles のまま */
   const eff = (g, id) => actRole(g, id, g && g.currentRoles ? g.currentRoles[id] : undefined);
@@ -113,12 +123,17 @@
     return out.filter((x, i) => out.indexOf(x) === i);
   }
   /** 模倣の人狼のカードを持っていて、模倣先が決まっているか */
-  const isMimic = (g, id, role) => role === R_().MIMIC_WOLF && !!roleOf(g, id);
+  const isMimic = (g, id, role) => isBorrow(role) && !!roleOf(g, id);
+  /** 能力を借りているカード（模倣の人狼 / 開拓者）の役職ID。借りていなければ null（夜ログの名乗り・新聞・封印の通知で、カード側の名前を出すのに使う） */
+  const cardRole = (g, id, role) => (isMimic(g, id, role) ? role : null);
+  /** 画面（カードの下の枠・2回目の面）に届ける値: 模倣の人狼なら模倣先の役職ID、開拓者なら "fate:<運命>"。借りていなければ null */
+  const view = (g, id, role) => { const mr = isBorrow(role) ? (roleOf(g, id) || choose(g, id)) : null; return mr ? (isTrail(role) ? ONW.trailblazer.viewOf(mr) : mr) : null; };
 
   /** 持ち主 holder の模倣先を決める（すでに決まっていればそのまま）。別の模倣の人狼が先に決めていれば同じ役職（マイクラ版と同じ）。デバッグの指定があればそれ（8of9）。戻り値: 模倣先 */
   function choose(g, holder, opts) {
     g.mimicRole = g.mimicRole || {};
     if (g.mimicRole[holder]) return g.mimicRole[holder];
+    if (ONW.trailblazer && ONW.trailblazer.isCard(g, holder)) return ONW.trailblazer.choose(g, holder);   // 開拓者のカード: 模倣先ではなく運命を決める
     // 同じ試合に別の模倣の人狼（いま模倣の人狼のカードを持つ人）が模倣先を決めていれば同じ役職（マイクラ版 existingMimicWolfChoiceExcept。墓地のカードに残った古い記録は見ない）
     const other = Object.keys(g.mimicRole).find((k) => k !== holder && g.mimicRole[k] && !String(k).startsWith("g:") && (g.currentRoles || g.initialRoles || {})[k] === R_().MIMIC_WOLF);
     let forced = ONW.debug && ONW.debug.mimicRole ? ONW.debug.mimicRole(g, holder) : null;
@@ -136,13 +151,14 @@
       const r = choose(g, p.id);
       g.mimicInfo.push({ by: p.name, role: r });   // 何を模倣したかは夜行動結果ではなく「役職情報」に出す（結果発表・PNG）
     });
+    if (ONW.trailblazer) ONW.trailblazer.assignAll(g);   // 開拓者: 配られたカードと墓地のカードの運命を決める（g.trailInfo）
     // 墓地にある模倣の人狼のカードは、ここでは決めない。マイクラ版は引いた時点（墓荒らしなどで手にしたとき）に決めるので、ONW.swapGrave が ONW.mimic.drawn を呼ぶ（引かれなかった墓地のカードには模倣先がない）
   }
   /** 9of9: いま模倣の人狼のカードを持っているのに模倣先が決まっていない人（シャッフラー・グレムリン・ドッペルなど、カードが動かずに役職だけ書き換わる経路で手にした／想定外の経路）に、模倣先を決める。決めた [{ id, role }] を返す。決まっていれば何もしない（安全網。夜から昼への切り替わりで呼ぶ） */
   function ensureAll(g) {
     const out = [];
     (g.players || []).forEach((p) => {
-      if (!g.currentRoles || g.currentRoles[p.id] !== R_().MIMIC_WOLF || roleOf(g, p.id)) return;
+      if (!g.currentRoles || !isBorrow(g.currentRoles[p.id]) || roleOf(g, p.id)) return;
       out.push({ id: p.id, role: choose(g, p.id) });
     });
     return out;
@@ -157,7 +173,7 @@
   }
   /** 模倣先が決まっていないカード（墓荒らし・シャッフラーなどで手にした）に、いま決める。決まっていれば何もしない。戻り値: 模倣先 / 持ち主が模倣の人狼でなければ null */
   function ensure(g, holder, role) {
-    if (role !== R_().MIMIC_WOLF) return null;
+    if (!isBorrow(role)) return null;
     return choose(g, holder);
   }
 
@@ -166,17 +182,18 @@
   function pubMap(g, final) {
     const out = {}, M = R_().MIMIC_WOLF, mr = (g && g.mimicRole) || {};
     const cur = final ? g.currentRoles : g.initialRoles;
-    (g.players || []).forEach((p) => { if (cur && cur[p.id] === M && mr[p.id]) out[`p:${p.id}`] = mr[p.id]; });
+    const val = (card, k) => (isTrail(card) ? ONW.trailblazer.viewOf(mr[k]) : mr[k]);   // 開拓者は "fate:<運命>"
+    (g.players || []).forEach((p) => { if (cur && (cur[p.id] === M || isTrail(cur[p.id])) && mr[p.id] && val(cur[p.id], p.id)) out[`p:${p.id}`] = val(cur[p.id], p.id); });
     const cen = final ? g.center : (g.center0 || g.center);
-    (cen || []).forEach((r, i) => { if (r === M && mr[`g:${i}`]) out[`g:${i}`] = mr[`g:${i}`]; });
+    (cen || []).forEach((r, i) => { if ((r === M || isTrail(r)) && mr[`g:${i}`] && val(r, `g:${i}`)) out[`g:${i}`] = val(r, `g:${i}`); });
     return out;
   }
   /** 模倣した能力の夜ログ（夜行動結果）の名乗りを、模倣先の役職名ではなく「模倣の人狼」にする。nl 以降に増えた行だけ。
    *  何を模倣したかは役職情報(g.mimicInfo)に出るので、夜行動結果には「模倣の人狼 A は B を占い、…」の形で残す */
-  function relabel(g, nl, who) {
+  function relabel(g, nl, who, card) {
     const logs = g.nightLogsAll; if (!logs || !who) return;
     const pl = (g.players || []).find((p) => p.id === who); if (!pl) return;
-    const mine = ONW.ROLE_INFO.mimic_wolf.name, names = new Set(Object.values(ONW.ROLE_INFO).map((i) => i.name));
+    const mine = ONW.ROLE_INFO[card || R_().MIMIC_WOLF].name, names = new Set(Object.values(ONW.ROLE_INFO).map((i) => i.name));
     for (let k = nl; k < logs.length; k++) {
       const t = logs[k], at = t.indexOf(` ${pl.name} `);
       if (at > 0 && !t.slice(0, at).includes(" ") && names.has(t.slice(0, at)) && t.slice(0, at) !== mine) logs[k] = mine + t.slice(at);
@@ -184,11 +201,11 @@
   }
   /** 模倣した能力を使う間（夜・朝・酔い覚め）に呼ぶ。模倣した能力の夜ログは「夜行動結果」に残す（名乗りは模倣の人狼。who=持ち主のID）。新聞には「模倣の人狼」が載る。
    *  fn の間に増えた新聞(g.newsRoles)は元に戻し、新聞には模倣の人狼を記録する */
-  function quiet(g, fn, who) {
+  function quiet(g, fn, who, card) {
     const nl = (g.nightLogsAll || []).length, nr = (g.newsRoles || []).slice();
     try { return fn(); } finally {
-      relabel(g, nl, who);
-      g.newsRoles = nr; ONW.newsNote(g, R_().MIMIC_WOLF);
+      relabel(g, nl, who, card);
+      g.newsRoles = nr; ONW.newsNote(g, card || R_().MIMIC_WOLF);   // 開拓者が使った能力は、新聞に「開拓者」が載る
     }
   }
   // ======================================================================
@@ -198,18 +215,18 @@
   //   ・墓荒らし・ドッペルで手にしたときは、模倣先の夜の能力を朝のうちに使える（actRole を朝の連鎖の役職にする）
   // ======================================================================
   /** role のカードを id が手にしたときの模倣先（模倣の人狼でなければ null）。決まっていなければここで決める */
-  const takenMimic = (g, id, role) => (role === R_().MIMIC_WOLF ? (roleOf(g, id) || choose(g, id)) : null);
+  const takenMimic = (g, id, role) => (isBorrow(role) ? (roleOf(g, id) || choose(g, id)) : null);
   /** 手にした role のカードで id が使う能力の役職（模倣の人狼なら模倣先、それ以外は role そのまま） */
   const gotAct = (g, id, role) => { takenMimic(g, id, role); return actRole(g, id, role); };
   /** 手にした演出データ rv に模倣先を足す（模倣の人狼でなければ何もしない）。rv を返す */
-  function tag(g, id, role, rv) { const mr = takenMimic(g, id, role); if (mr && rv) rv.mimic = mr; return rv; }
+  function tag(g, id, role, rv) { const v = view(g, id, role); if (v && rv) rv.mimic = v; return rv; }   // 開拓者は "fate:<運命>"（カードの下の枠・2回目の面）
   /** 手にした役職の下に出す文（模倣の人狼でなければ null） */
-  const takenLine = (g, id, role, rn) => { const mr = takenMimic(g, id, role); return mr ? ONW.mimic.text(rn, mr) : null; };
+  const takenLine = (g, id, role, rn) => { const mr = takenMimic(g, id, role); return mr ? (isTrail(role) ? ONW.trailblazer.text(ONW.trailblazer.fateOfRole(mr)) : ONW.mimic.text(rn, mr)) : null; };
   /** 模倣した能力を使う前後の道具（新聞の記録は呼び出し側で「模倣の人狼」にする）。夜ログは夜行動結果に残し、名乗りだけ「模倣の人狼」にする（who=持ち主のID）。fn() の戻り値を返す */
-  function quietLogs(g, fn, who) { const nl = (g.nightLogsAll || []).length; try { return fn(); } finally { relabel(g, nl, who); } }
+  function quietLogs(g, fn, who, card) { const nl = (g.nightLogsAll || []).length; try { return fn(); } finally { relabel(g, nl, who, card); } }
 
   ONW.mimic = {
-    takenMimic, gotAct, tag, takenLine, quietLogs,
+    takenMimic, gotAct, tag, takenLine, quietLogs, isBorrow, cardRole, view,
     quiet, ensureAll, drawn, pubMap, NON_MIMICABLE, SUPPORTED, candidates, roleOf, actRole, eff, isAs, snap, beforeEff, isMimic, choose, assignAll, ensure, isSupported,
     notWolfJudge, seerSeen, isMimicSheriff, flags, achievements, NOT_WOLF_JUDGE,
     /** 段階の最後に「全部つながった」として制限を外す（9of9） */

@@ -6,7 +6,7 @@
  * 【仕様（マイクラ版どおり）】
  *   ・夜の能力はない。使えるのは、最終盤面で イカロス を持っていて（酔っ払いは酔いが覚めてから）、生きていて、
  *     まだ票を分け与えていない相手が残っていて、昼のタイマーが動いているとき。封印の狂人に封印されていると使えない。
- *   ・1回の使用で選べるのは「生きている自分以外の1人」。同じ人には1回だけ（マイクラ版はカルメンに囁かれると2回だが、Web版にカルメンはまだ無い）。
+ *   ・1回の使用で選べるのは「生きている自分以外の1人」。同じ人には1回だけ（カルメンに囁かれた人は各プレイヤーに2回ずつ。ONW.carmen.dayUses）。
  *     全員（生きている自分以外）に分け与えたら、その日はもう使えない。途中でやめて、あとで続きを使ってもよい（昼のうちなら何人でも）。
  *   ・追加される票数（使った瞬間の相手で決まる。あとで相手の状態が変わっても増えた票数は変わらない）:
  *       村人陣営の役職で、(+恋人)・(+シャッフラー)・(+反転) が付いていない人 → +1票
@@ -35,10 +35,15 @@
 
   /** この人（by）が票を分け与えた記録（使った順） */
   const usesOf = (g, id) => grantsOf(g).filter((e) => e.by === id);
-  /** 票を分け与える相手として選べる人（生きている自分以外で、この人がまだ分け与えていない人） */
+  /** 同じ人に使える回数: ふつう1回。村人陣営としてカルメンに囁かれた人は各プレイヤーに2回ずつ（マイクラ版 maxPerTarget = carmenVillageWhisperedTargets ? 2 : 1。ONW.carmen.dayUses と同じ数え方） */
+  const maxPer = (g, id) => (ONW.carmen && ONW.carmen.dayUses ? ONW.carmen.dayUses(g, id) : 1);
+  /** この人（by）が、その相手（target）に票を分け与えた回数 */
+  const countOf = (g, id, target) => usesOf(g, id).filter((e) => e.target === target).length;
+  /** 票を分け与える相手として選べる人（生きている自分以外で、この人が使った回数が maxPer 未満の人） */
   function targets(g, id) {
-    const done = new Set(usesOf(g, id).map((e) => e.target));
-    return (g.players || []).map((p) => p.id).filter((x) => x !== id && !isDead(g, x) && !done.has(x));
+    const max = maxPer(g, id), cnt = {};
+    usesOf(g, id).forEach((e) => { cnt[e.target] = (cnt[e.target] || 0) + 1; });
+    return (g.players || []).map((p) => p.id).filter((x) => x !== id && !isDead(g, x) && (cnt[x] || 0) < max);
   }
   /** イカロスの昼能力を使える人か（最終盤面の役職がイカロス・酔いが覚めている・生きている・選べる相手が残っている・昼の議論中でタイマーが動いている） */
   function canUse(g, id) {
@@ -80,7 +85,7 @@
   }
 
   /** 使った本人に出す文（情報確認）。マイクラ版は本人に何も出さないが、Web版は「情報確認にイカロスの情報が載る」仕様（依頼）。増えた票数は書かない（相手の陣営が透けないように） */
-  function doneText(name) { return `${name} に票を分け与えました。`; }
+  function doneText(name, n) { return Number(n) > 1 ? `${name} に票を分け与えました。（${Number(n)}回目）` : `${name} に票を分け与えました。`; }   // n = 同じ相手への何回目か（カルメンに囁かれて2回目を使ったときだけ「（2回目）」を付けて、情報確認で同じ文が1行にまとまらないようにする）
   /** 結果発表の「昼行動結果」用。「イカロス A は 人狼 B に2票分け与えました。」（role = 分け与えた時点の相手の役職・bonus = 増えた票数 1 or 2。どちらも試合のあとに見る結果発表だけに出る）。role / bonus が無いときは従来の文 */
   function actText(rn, by, target, role, bonus) {
     if (!role && !bonus) return `${rn("icarus")} ${by} は ${target} に票を分け与えていました。`;
@@ -91,7 +96,7 @@
   /** 情報確認に載せる全員向けの通知（演出の字幕と同じ文）。n = その試合で何回目の使用か（2回目以降は「（2回目）」を付けて、同じ文でも別の行にする）。だれが・だれにかは出さない */
   function noticeText(n) { return Number(n) > 1 ? `${NOTICE}（${Number(n)}回目）` : NOTICE; }
 
-  ONW.icarus = { usesOf, targets, canUse, finished, bonusFor, apply, bonusOf, doneText, actText, NOTICE, noticeText };
+  ONW.icarus = { usesOf, maxPer, countOf, targets, canUse, finished, bonusFor, apply, bonusOf, doneText, actText, NOTICE, noticeText };
 
   // ======================================================================
   // 【CPU・COボタン・実績（4of4）】マイクラ版 cpu.js / main.js / stats.js のイカロスに合わせる。
@@ -132,7 +137,7 @@
 
   ONW.defineRole("icarus", {
     info: { sealTarget: true, deck: 110, name: "イカロス", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 16.7,
-      desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外のプレイヤーを1人ずつ選んで、票を分け与えます（同じ人には1回だけ。何人にでも使えます）。選ばれた人の投票数が増えます: 村人陣営の人には1票、人狼陣営・第三陣営・恋人・シャッフラー・反転状態の人には2票を追加します。対象や票数は誰にも公開されませんが、使うと全員の画面に太陽へ翼が飛び上がる演出が出ます（だれが・だれに使ったかは分かりません）。使えるのは最終的にイカロスを持っている人で、酔っ払いは酔いが覚めてからです。" },
+      desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外のプレイヤーを1人ずつ選んで、票を分け与えます（同じ人には1回だけ。何人にでも使えます。カルメンに囁かれた人は各プレイヤーに2回ずつ使えます）。選ばれた人の投票数が増えます: 村人陣営の人には1票、人狼陣営・第三陣営・恋人・シャッフラー・反転状態の人には2票を追加します。対象や票数は誰にも公開されませんが、使うと全員の画面に太陽へ翼が飛び上がる演出が出ます（だれが・だれに使ったかは分かりません）。使えるのは最終的にイカロスを持っている人で、酔っ払いは酔いが覚めてからです。" },
     // CPU（4of4）: 本物は必ず「イカロスCO」（結果なし）。騙りはしない。票を分け与えたCPUの発言は cpuSpeak
     cpuClaim(k, g, p, r, i, c) { c.co = "icarus"; },
     cpuSpeak,

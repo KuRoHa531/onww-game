@@ -47,8 +47,6 @@
         ? { short: `${t} → 変化なし`, text: `${t} を選びましたが、交換できる相手がおらず役職は変化しませんでした。`, claim: null }
         : i.keyFail.kind === "self"
         ? { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }
-        : i.keyFail.kind === "aa"
-        ? { short: `${t} → 特殊な力で失敗`, text: `${t} を選びましたが、特殊な力により交換できませんでした。`, claim: null }
         : { short: `${t} → ロックで失敗`, text: `${t} を選びましたが、役職がロックされていたため交換できませんでした。`, claim: null };
       return;
     }

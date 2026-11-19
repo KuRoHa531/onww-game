@@ -40,7 +40,7 @@
   const TOLD = ["seal", "drunk", "forget", "dream"];
 
   /** この人が（もう）使ったか */
-  const used = (g, id) => (g.yomiCuts || []).some((e) => e.by === id);
+  const used = (g, id) => (g.yomiCuts || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
   /** 黄泉の昼能力を使える人か（最終盤面の役職が黄泉・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
@@ -147,12 +147,12 @@
     return e;
   }
 
-  /** 使った本人に出す文（情報確認）。マイクラ版: 「〇〇に付与されていた状態を断ち切りました。」 */
-  function doneText(name) { return `${name} に付与されていた状態を断ち切りました。`; }
-  /** 結果発表の「昼行動結果」用（だれがだれの何を断ち切ったか）。マイクラ版 main.js は、断ち切った状態があるときだけ記録する */
+  /** 使った本人に出す文（情報確認）。「〇〇 を断ち切りました。」 */
+  function doneText(name) { return `${name} を断ち切りました。`; }
+  /** 結果発表の「昼行動結果」用（だれがだれの何を断ち切ったか）。何も断ち切れなかったときは「断ち切ろうとしましたが、何も起こりませんでした。」 */
   function actText(rn, by, target, cuts) {
     const detail = (cuts || []).map((c) => CUT_LABEL[c] || c).join("、");
-    return detail ? `${rn("yomi")} ${by} は ${target} の${detail}を断ち切っていました。` : null;
+    return detail ? `${rn("yomi")} ${by} は ${target} の${detail}を断ち切っていました。` : `${rn("yomi")} ${by} は ${target} を断ち切ろうとしましたが、何も起こりませんでした。`;
   }
   /** 結果発表用: 使った順の記録 [{ byId, by, targetId, target, cuts, told }]（nm = IDから名前を返す関数） */
   function view(g, nm) {

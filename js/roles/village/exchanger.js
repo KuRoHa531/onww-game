@@ -25,7 +25,7 @@
   const roleOf = (g, id) => { const r = g && g.currentRoles ? ONW.mimic.actRole(g, id, g.currentRoles[id]) : null; return isEx(r) ? r : null; };
 
   /** この人が（もう）使ったか */
-  const used = (g, id) => (g.exchanges || []).some((e) => e.by === id);
+  const used = (g, id) => (g.exchanges || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
   /** 交換者・狂った交換者の昼能力を使える人か（最終盤面の役職が交換者または狂った交換者・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている・選べる人が2人以上いる） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;

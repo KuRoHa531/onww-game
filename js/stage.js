@@ -43,11 +43,13 @@ window.ONW = window.ONW || {};
   let alm = {};                        // 従者の身代わり: ご主人のカードが「めくれそうになる」席（絶対に表にならない）
   let shin = {};                       // 無理心中で道連れになった席（死因の演出用）
   let gx = {};                         // 神の演出: 席 → "descend"（神降臨）/ "spark"（祝福: 神のキラキラ）/ "blow"（吹き飛ばされる）/ "win"（祝福で勝つ人）
-  let curv = {}, fqv = {};   // fqv: 先代女王の面（席 → true。女王のカードが「先代女王」の名前で見える。queen.js の stageResult）
+  let curv = {}, fqv = {}, tbv = {}, tbh = {};   // tbv: 開拓者の2回目の面（席 → true。めくれたあと、もう一度めくれて運命の名前の面）/ tbh: 結果発表で1回目にめくれたときは運命の枠を隠す席（js/roles/village/trailblazer.js の stageResult）
+   // fqv: 先代女王の面（席 → true。女王のカードが「先代女王」の名前で見える。queen.js の stageResult）
   let _fq0 = 0;                       // 呪われし者: 2回目に裏返ったあとの面（席 → true）。あれば、カードが人狼陣営の色（赤）の文字になる
   let catv = {};                       // シュレディンガーの猫: 2回目に裏返ったあとの面（席 → { team: village / wolf / third / none / loop, sfx: "(+役職名)" }）。あれば、猫のカードがその陣営の色の文字になる
   const CAT = "schrodinger_cat";   // シュレディンガーの猫
-  const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと、もう一度めくれて赤色の名前＝人狼陣営の面 "cursed_one@wolf"。js/roles/village/cursed_one.js の stageResult）
+  const TB = "trailblazer";   // 開拓者（めくれたあと、もう一度めくれて運命の面 "trailblazer@destruction" など）
+const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと、もう一度めくれて赤色の名前＝人狼陣営の面 "cursed_one@wolf"。js/roles/village/cursed_one.js の stageResult）
   const WOLF_MARK = "__wolf";
   const CUPID_MARK = "__cupid";   // キューピッドの演出に出る「💘」の印（役職名は出さない）
   const LOVE_MARK = "__love";   // 恋人の相方に見える「❤️」の印（役職名は出さない）
@@ -185,6 +187,8 @@ window.ONW = window.ONW || {};
     if (g.phase === ONW.PHASE.ONLINE_VOTE && !g.voted) return { type: "vote" };
     return null;
   }
+  /** イカロス: この人に分け与えた回数が上限（g.icarusMax。ふつう1・カルメンに囁かれたら2）に達しているか */
+  function icarusUsedUp(g, id) { return (g.icarusGiven || []).filter((x) => x === id).length >= (g.icarusMax || 1); }
   function pickable(k, m, g) {
     if (!m) return false;
     if (k.startsWith("c:")) return (m.type === "night" || m.type === "morning") && m.role === "cosplayer";   // コスプレイヤー: 山札から出た3枚だけ押せる
@@ -196,6 +200,7 @@ window.ONW = window.ONW || {};
     if (m.type === "exchange" || m.type === "libra") return isP;   // 交換者・天秤: 生きている人なら誰でも（自分も）
     if (m.type === "vote" && isP && g.dukeIds) return g.dukeIds.includes(k.slice(2));   // 魔界公爵追放会議: 生存者のカードだけ押せる（自分のカードも押せる）
     if (m.type === "vote" && isP && g.libraIds && !g.libraIds.includes(k.slice(2))) return false;   // 天秤で制限された投票: 選ばれた2人のカードしか押せない（ホストも検査する）
+    if (m.type === "icarus" && isP && icarusUsedUp(g, k.slice(2))) return false;   // イカロス: もう使い切った人（ふつう1回・カルメンに囁かれたら2回）のカードは光らせない・押せない（選べる相手だけが光る。ホストも targets で同じ検証をする）
     const pk = pickOf(m.role);
     if (isP) return (k.slice(2) !== me || !!(pk && pk.self)) && !(pk && pk.players === false);   // シャッフラーだけは自分のカードも選べる(stagePick.self)   // 墓荒らしが選べるのは墓地だけ(stagePick.players === false)
     if (m.type === "vote") return false;
@@ -242,14 +247,16 @@ window.ONW = window.ONW || {};
       return `${ONW.ui.roleIcon(CAT, "role-icon--face")}${nameB(ONW.roles.getInfo(CAT).name, "tb-cat")}${sfx ? `<span class="tb-catframe">${breakHtml(String(sfx).replace(/^\(\+/, "").replace(/\)$/, ""))}</span>` : ""}`;   // 第三陣営の猫: 参照先の役職を、模倣の人狼の模倣先と同じ枠で出す（猫の名前も枠の中も本体の役職名より小さめ）
     }
     if (String(role).startsWith("queen@")) return `${ONW.ui.roleIcon("queen", "role-icon--face")}${nameB(String(role).slice(6) || "先代女王")}`;   // 先代女王 / 初代女王 / 二代目女王…（村人陣営の色）
+    if (String(role).startsWith(TB + "@")) return `${ONW.ui.roleIcon(TB, "role-icon--face")}${nameB(ONW.trailblazer.fateName(String(role).slice(TB.length + 1)))}<span class="tb-mimic tb-fate">${breakHtml(ONW.roles.getInfo(TB).name)}</span>`;   // 2回目に裏返った開拓者: 運命の名前（壊滅など）＋「開拓者」の枠
     if (String(role).startsWith(CUR + "@")) return `${ONW.ui.roleIcon(CUR, "role-icon--face")}${nameB(ONW.roles.getInfo(CUR).name)}`;   // 2回目に裏返った呪われし者（赤色の名前。色は tb-team-wolf）
     const info = ONW.roles.getInfo(role);
-    const mt = role === "mimic_wolf" ? mimicTarget(k) : null;   // 模倣の人狼: 役職名の下に、模倣先の役職を枠で出す（見えるのは本人と、めくれたカードを見る全員）
-    return `${ONW.ui.roleIcon(role, "role-icon--face")}${nameB(info.name)}${mt ? `<span class="tb-mimic">${breakHtml(mt)}</span>` : ""}`;
+    const mt = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) : null;   // 模倣の人狼: 役職名の下に、模倣先の役職を枠で出す / 開拓者: 運命を枠で出す（見えるのは本人と、めくれたカードを見る全員）
+    return `${ONW.ui.roleIcon(role, "role-icon--face")}${nameB(info.name)}${mt ? `<span class="tb-mimic${role === "trailblazer" ? " tb-fate" : ""}">${breakHtml(mt)}</span>` : ""}`;
   }
   /** 席キー(p:ID / g:番号)のカードの模倣先の役職名（無ければ null）。模倣先は本人・結果発表・観戦者の画面にだけ届く(g.mimicView) */
   function mimicTarget(k) {
     const g = G(), r = k && g && g.mimicView ? g.mimicView[k] : null;
+    if (ONW.trailblazer && ONW.trailblazer.isView(r)) return tbh[k] && !tbv[k] ? null : ONW.trailblazer.viewName(r) || null;   // 結果発表で1回目にめくれたあと（tbh）は運命の枠を出さない（2回目のめくれで運命が出る）   // 開拓者の運命（"fate:destruction" → 壊滅）
     return r && ONW.ROLE_INFO[r] ? ONW.ROLE_INFO[r].name : null;
   }
   /** 酔いが覚めるまでの残り秒数（本家の「酔いが覚めるまで: N秒」）。出さない状況なら null。
@@ -502,17 +509,18 @@ window.ONW = window.ONW || {};
       let role = mine ? (g.strawKind === "bounty" ? ONW.ROLE.BOUNTY_HUNTER : ONW.ROLE.ASSASSIN) : hideAny && isP ? (flipped ? (hideAll && g.strawShow && g.strawShow[k.slice(2)]) || UNK_MARK : undefined) : (up[k] || (h && h.role));   // 選んでいない人の画面: めくれたカードは「？」。ただしアサシン・賞金稼ぎ以外の人には、めくれたアサシン・賞金稼ぎだけ本当の役職で見える
       if (!hideOthers && isP && role && veil[k]) role = veil[k] === "down" ? undefined : UNK_MARK;   // アサシン・賞金稼ぎ本人の画面: 同時にめくれた別のアサシン・賞金稼ぎは、その人の演出が始まる（または全部の演出が終わる）まで「？」のまま
       if (role === "queen" && fqv[k]) role = "queen@" + (fqv[k] === true ? "先代女王" : fqv[k]);   // 先代女王の面（queen.js）
+      if (role === TB && tbv[k] && ONW.trailblazer.fateOfView((G().mimicView || {})[k])) role = `${TB}@${ONW.trailblazer.fateOfView(G().mimicView[k])}`;   // 開拓者の2回目の面（運命の名前）
       if (role === CUR && curv[k]) role = `${CUR}@wolf`;   // 呪われし者の2回目の面（赤色の名前）
       if (role === CAT && catv[k]) role = `${CAT}@${catv[k].team}${catv[k].sfx ? "@" + catv[k].sfx : ""}`;   // 2回目の面（陣営の色）
       if (!hideOthers && role && bnt[k] && bnt[k] !== "by") { const br = String(role).startsWith(CAT + "@") ? CAT : String(role).startsWith(CUR + "@") ? CUR : role; if (ONW.roles.getInfo(br)) role = `${BNT}@${bnt[k]}@${br}`; }   // 賞金稼ぎに選ばれたカードは手配書の面
       if (!hideOthers && isP && curse[k]) role = curse[k] === true ? FOX_MARK : curse[k] === FOXX_MARK ? FOXX_MARK : deadMark(curse[k]);   // 呪殺された妖狐のカードは、待機時間から結果発表まで🦊の面のまま
       if (hideOthers && isP && role) rec[k] = { role, dead: !!flipped };
-      const mkey = role === "mimic_wolf" ? mimicTarget(k) || "" : "";   // 模倣先があとから届いたときも描き直す
+      const mkey = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) || "" : "";   // 模倣先があとから届いたときも描き直す
       if (role && (s.dataset.role !== role || (s.dataset.mimic || "") !== mkey)) {
         s.dataset.role = role; s.dataset.mimic = mkey;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role, k);
-        f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK || role === CUPID_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === FOX_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith(TB + "@") ? "village" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK || role === CUPID_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === FOX_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : ONW.roles.getInfo(role).team}`;
       }
       const sel = (k.startsWith("c:") && !!m && (m.type === "night" || m.type === "morning") && !!g.nightSel && g.nightSel.pick === +k.slice(2)) || (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning" || m.type === "dictate" || m.type === "shoot" || m.type === "steal" || m.type === "barrier" || m.type === "yomi" || m.type === "icarus" || m.type === "goranshin" || m.type === "rejob" || m.type === "mind" || m.type === "exchange" || m.type === "libra" || m.type === "predict") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
@@ -553,8 +561,8 @@ window.ONW = window.ONW || {};
         s.classList.toggle("mk2", nLov + (shuf[k] ? 1 : 0) + (kp[k] ? 1 : 0) + (wf[k] ? 1 : 0) + (bd[k] ? 1 : 0) >= 2);   // 丸が2つ以上同時に付くときは、全部を小さくして縦に並べる
         if (lv) { const t = nos.map((n) => `<span class="tb-lv">${typeof n === "number" ? `<span>❤</span><span>${n}</span>` : "<span>❤</span>"}</span>`).join(""); if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }
       s.classList.toggle("almost", !!alm[k]);
-      ["descend", "spark", "blow", "win", "chicken", "toughclang", "toughrecv", "kingguard", "exsel", "thsel", "bomb", "boom"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
-      const baseRole = role && String(role).startsWith(BNT + "@") ? String(role).split("@")[2] : role && String(role).startsWith(CAT + "@") ? CAT : role && String(role).startsWith(CUR + "@") ? CUR : role && String(role).startsWith("queen@") ? "queen" : role;   // 手配書の面("__bnt@状態@役職")のときは、中の役職名を使う
+      ["descend", "spark", "blow", "win", "extra", "chicken", "toughclang", "toughrecv", "kingguard", "exsel", "thsel", "bomb", "boom"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出
+      const baseRole = role && String(role).startsWith(BNT + "@") ? String(role).split("@")[2] : role && String(role).startsWith(CAT + "@") ? CAT : role && String(role).startsWith(CUR + "@") ? CUR : role && String(role).startsWith(TB + "@") ? TB : role && String(role).startsWith("queen@") ? "queen" : role;   // 手配書の面("__bnt@状態@役職")のときは、中の役職名を使う
       const ghostRole = baseRole && ONW.ROLE_INFO[baseRole] ? baseRole : (up[k] && ONW.ROLE_INFO[up[k]] ? up[k] : null);   // 呪殺・妖狐投票で追放された妖狐のカードは印(__fox / __foxx)の面なので、吹き飛んだあとの役職名は印ではなく本当の役職(up)から引く
       if (gx[k] === "blow" && ghostRole) { const gl = (NAME_BREAKS[ONW.roles.getInfo(ghostRole).name] || [ONW.roles.getInfo(ghostRole).name]); s.dataset.ghost = gl.join("\n"); s.dataset.gn = String(Math.max(...gl.map(clen))); } else { delete s.dataset.ghost; delete s.dataset.gn; }   // 吹き飛んだあとの点線のカードに書く役職名   // 従者の身代わり: ご主人のカードがめくれそうになって戻る
       ["by", "aim", "slash", "hit", "miss"].forEach((c) => s.classList.toggle("asn-" + c, asn[k] === c));   // アサシンの演出
@@ -628,12 +636,12 @@ window.ONW = window.ONW || {};
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
       smkN.group = null; smkN.perm = null; smkN.sig = "";
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; el.innerHTML = ""; }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; el.innerHTML = ""; }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; build(g, list); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; build(g, list); }
     el.classList.add("on");
     smkNamesSync(g);   // 煙幕の名前隠し: 名前が ？？？ になる・席の並びがシャッフルされる（詳細設定がONのときだけ）
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
@@ -783,7 +791,7 @@ window.ONW = window.ONW || {};
       ONW.ui.render(g); return;
     }
     if (m.type === "dictate" || m.type === "shoot" || m.type === "steal" || m.type === "barrier" || m.type === "yomi" || m.type === "icarus" || m.type === "goranshin" || m.type === "rejob" || m.type === "mind") {   // 独裁者: 押したカードを選ぶ（もう一度押すと解除）。確定は画面の「独裁を宣言する」ボタン（ui.dictConfirm）
-      if (m.type === "icarus" && (g.icarusGiven || []).includes(id)) return;   // イカロス: もう分け与えた人は選べない（ホストも同じ検証をする）
+      if (m.type === "icarus" && icarusUsedUp(g, id)) return;   // イカロス: もう分け与えた人は選べない（ホストも同じ検証をする）
       const sel = g.nightSel = g.nightSel || { players: [], graves: [] };
       sel.players = sel.players[0] === id ? [] : [id]; sel.graves = [];
       ONW.ui.render(g); return;
@@ -905,7 +913,7 @@ window.ONW = window.ONW || {};
     get loveMate() { return loveMate; }, get nightKeys() { return nightKeys; },
     // 結果発表・昼の公開演出(stageResult / stageSettle / stageFlash / stageSober)用
     get dead() { return dead; }, get curse() { return curse; }, get badge() { return badge; }, get dkb() { return dkb; }, get shin() { return shin; }, get gx() { return gx; },
-    get asn() { return asn; }, get bnt() { return bnt; }, get veil() { return veil; }, get alm() { return alm; }, get catv() { return catv; }, get curv() { return curv; }, get fqv() { return fqv; },
+    get asn() { return asn; }, get bnt() { return bnt; }, get veil() { return veil; }, get alm() { return alm; }, get catv() { return catv; }, get curv() { return curv; }, get tbv() { return tbv; }, get tbh() { return tbh; }, get fqv() { return fqv; },
     get mindKeys() { return mindKeys; }, get senseKeys() { return senseKeys; }, senseMark: (key) => SENSE_PRE + key, get starKeys() { return starKeys; }, get queenKeys() { return queenKeys; }, get flashKeys() { return flashKeys; }, get queenFlashKeys() { return queenFlashKeys; }, get kingKeys() { return kingKeys; }, get kingFlashKeys() { return kingFlashKeys; },
     WOLF_MARK, FOX_MARK, FOXX_MARK, FOXSEE_MARK, deadMark, DUO_MARK, MASTER_MARK, BONE_MARK, TARGET_MARK, AVENGER_MARK, MUTE_MARK, LOVE_MARK, CUPID_MARK, BREAK_MARK, KEEP_MARK, KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK, BLANK_MARK, BLANKX_MARK, SEAL_MARK,
     /** 席 k のカードを左右に揺らす（失敗の演出。鍵師の「🔒に弾かれる」と同じ揺れ） */
@@ -948,10 +956,12 @@ window.ONW = window.ONW || {};
     return `${ladderUnder(res)}<div class="rs-win t-${winTeamCls(res.title)}${fresh && !res.ladderOff && (res.ladder || []).length > 1 ? " rs-paste" : ""}">${esc(res.stageTitle || res.title)}</div>`;   // 勝利演出の字幕は stageTitle（追加勝利の「＆〇〇」なし）。ladderUnder の突き合わせ・結果シートは res.title のまま
   }
   /** 追加勝利の役職（res.extraWin。勝利陣営の字幕のあとに、1つずつ貼り足していく。docs/extra-win-fx.md）。n 個目までを字幕の下に並べる。g.resultCap にも足すので、再描画しても消えない */
+  let winNoteHtml = "";   // 勝利字幕のあとに出す一言（神官の祈り）。addExtraWin が再描画のとき字幕と札のあいだに入れる
   function addExtraWin(res, n) {
     const g = G(), list = res.extraWin || [];
     const chip = (x) => `<span class="rs-extra__chip">＋ <b>${esc(x.role ? ONW.roles.getInfo(x.role).name : "")}</b></span>`;   // 役職名だけ（プレイヤー名は出さない。OJv26.11.15-10）
-    g.resultCap = `${winHtml(res)}<div class="rs-extra"><div class="rs-extra__h">追加勝利</div>${list.slice(0, n).map(chip).join("")}</div>`;
+    g.resultCap = `${winHtml(res)}${winNoteHtml}<div class="rs-extra"><div class="rs-extra__h">追加勝利</div>${list.slice(0, n).map(chip).join("")}</div>`;   // winNoteHtml: 神官の「祈りにより〜」（勝利字幕と追加勝利の札のあいだ）
+    if (list[n - 1] && !gx[`p:${list[n - 1].id}`]) { gx[`p:${list[n - 1].id}`] = "extra"; paint(G()); }   // 追加勝利で勝った人のカードは、陣営の色（村人の緑など）から追加勝利の色（橙）になる
     const c = document.getElementById("res-cap"); if (!c || !list[n - 1]) return;
     let w = c.querySelector(".rs-extra");
     if (!w) { c.insertAdjacentHTML("beforeend", `<div class="rs-extra"><div class="rs-extra__h">追加勝利</div></div>`); w = c.querySelector(".rs-extra"); }
@@ -969,7 +979,7 @@ window.ONW = window.ONW || {};
   }
   /** 結果発表の骨組み。役職ごとの演出は各役職ファイルの stageResult(下の hk(...) で呼ぶ)。R.t = 演出の現在時刻(ms)で、フックが進める */
   function startResult(g) {
-    seq = true;
+    seq = true; winNoteHtml = "";
     libraTilt = "level";   // 天秤: 結果発表の最初は水平（票数バッジのあとに傾く）
     const res = g.result, P = (id) => `p:${id}`;
     g.revRes = {}; res.history.forEach((h) => { if (h.rev > 0) g.revRes[P(h.id)] = h.rev; });   // 反転者: 反転された人のカードは、めくれるとき180度回転した状態で公開
@@ -1147,6 +1157,12 @@ window.ONW = window.ONW || {};
     if (res.pranksterFx && res.pranksterFx.chickenFirst) { hk("reverse").forEach((h) => h.fn(R)); hk("prankster").forEach((h) => h.fn(R)); }
     else { hk("prankster").forEach((h) => h.fn(R)); hk("reverse").forEach((h) => h.fn(R)); }
     later(() => { if (ladderUnder(res)) { const html = winHtml(res, true), g = G(), c = document.getElementById("res-cap"); g.resultCap = html; if (c) { c.innerHTML = html; fitResCap(); } } else setCap(winHtml(res)); }, R.t);
+    const note = hk("winNote").map((h) => h.fn(R)).find(Boolean);   // 神官: 最終結果の字幕のあと・追加勝利の札の前に「神官〇〇の祈りにより村人陣営も追加勝利しました。」（神降臨の貼り重ねのあと）
+    if (note) {
+      later(() => { winNoteHtml = note.html; const c = document.getElementById("res-cap"); G().resultCap = `${winHtml(res)}${winNoteHtml}`; if (c) { c.insertAdjacentHTML("beforeend", winNoteHtml); fitResCap(); } (note.ids || []).forEach((id) => { gx[P(id)] = "spark"; }); paint(G()); }, R.t + 1300);
+      later(() => { (note.ids || []).forEach((id) => { if (gx[P(id)] === "spark") delete gx[P(id)]; }); paint(G()); }, R.t + 1300 + 2200);
+      R.t += 1300 + 1600;
+    }
     const exs = res.extraWin || [];   // 追加勝利: 勝利陣営の字幕のあと、追加で勝った人の役職を0.7秒おきに貼り足していく（そのあとで負けた人が吹き飛ぶ）
     exs.forEach((x, i) => later(() => addExtraWin(res, i + 1), R.t + 1200 + i * 700));
     if (exs.length) R.t += 1200 + exs.length * 700 + 400;
@@ -1172,7 +1188,8 @@ window.ONW = window.ONW || {};
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     const R = Object.create(stage.kit); R.res = res;
     libraTilt = libraTiltOf(res);   // 天秤: 演出なしの最終形（つられた皿が下がったまま）
-    hk("skip").forEach((h) => h.fn(R));   // 猫(2回目の面)・神の祝福・処刑人のターゲット(割れた状態)・アサシンに選ばれた人 を、演出なしの最終形で見せる
+    hk("skip").forEach((h) => h.fn(R));
+    (res.extraWin || []).forEach((x) => { if (!gx[`p:${x.id}`]) gx[`p:${x.id}`] = "extra"; });   // 追加勝利の人のカードは追加勝利の色   // 猫(2回目の面)・神の祝福・処刑人のターゲット(割れた状態)・アサシンに選ばれた人 を、演出なしの最終形で見せる
     if (!res.dictator) res.counts.forEach((c) => { if (!badge[`p:${c.id}`]) badge[`p:${c.id}`] = `${c.c}票`; });   // 独裁処刑のときは票が無い（対象の表示は独裁者の skip フックが付ける）
     toSheet();
   };

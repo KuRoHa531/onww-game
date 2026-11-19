@@ -77,8 +77,8 @@ window.ONW = window.ONW || {};
     nightSteps().forEach((s) => {
       if (!on(s.nd.stage)) return;
       const exec = (p) => {
-        if (s.nd.stage !== "seal" && ONW.seal.failIfSealed(g, p.id, act(p), { hold, mimic: ONW.mimic.isMimic(g, p.id, role(p)) })) return;   // 封印されているCPUの夜の能力は失敗（行動しない）
-        const go = () => { n.cur = act(p); s.nd.run(n, p, rn(role(p)), false, act(p)); }; if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id); else go(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
+        if (s.nd.stage !== "seal" && ONW.seal.failIfSealed(g, p.id, act(p), { hold, mimic: ONW.mimic.cardRole(g, p.id, role(p)) || false })) return;   // 封印されているCPUの夜の能力は失敗（行動しない）
+        const go = () => { n.cur = act(p); s.nd.run(n, p, rn(role(p)), false, act(p)); }; if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id, role(p)); else go(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
       const actors = cpus.filter((p) => s.roles.includes(act(p)) && !noTarget(p) && !deadSet.has(p.id));
       if (plan) plan.push({ roles: s.roles, order: s.order, idx: s.idx, actors, exec }); else actors.forEach(exec);
     });
@@ -90,14 +90,14 @@ window.ONW = window.ONW || {};
       const label = rn(got), keep = i.relic ? { ...i.relic } : null;
       const nd = (ONW.roleDef(got) || {}).cpuNight;
       const asMimic = ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id]) && ONW.mimic.roleOf(g, p.id) === got;
-      if (ONW.seal.failIfSealed(g, p.id, got, { hold, mimic: asMimic })) return;   // 封印されているCPUの朝の連鎖・昼の酔い覚めの能力は失敗   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
+      if (ONW.seal.failIfSealed(g, p.id, got, { hold, mimic: asMimic ? g.currentRoles[p.id] : false })) return;   // 封印されているCPUの朝の連鎖・昼の酔い覚めの能力は失敗   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
       const exec = () => {
         n.cur = got;
       if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
         if (nd) nd.run(n, p, label, true, got);
         i.relic = keep;
       };
-      if (asMimic) ONW.mimic.quiet(g, exec, p.id); else exec();
+      if (asMimic) ONW.mimic.quiet(g, exec, p.id, g.currentRoles[p.id]); else exec();
     });
   };
 
@@ -636,6 +636,7 @@ window.ONW = window.ONW || {};
     }
     if (co === "mason") s -= wolfSide ? 0.2 : 1.4;
     if (co === "tough_guy") s -= wolfSide ? 0.3 : 0.8;   // タフガイCO: 票を入れても、はじき返されて次点の人にとばっちりが行くだけなので、あまり狙わない
+    if (co === "knight") s -= wolfSide ? 0.1 : 0.4;   // 騎士CO: 村人陣営を名乗る（本物なら1回は死から守る）ので、軽く避けるだけ（マイクラ版にCPUの専用処理はない）
     if (co === "penguin") s -= wolfSide ? 0.1 : 0.4;   // ペンギンCO: 票を入れても、ペンギンの投票先へ滑るだけで、狙った人に当たらない（マイクラ版にCPUの専用処理はない。軽く避けるだけ）
     // 占い師COの結果（この人を占ったという報告）
     claims.filter((c) => c.kind === "seer" && c.target === q.id).forEach((c) => {

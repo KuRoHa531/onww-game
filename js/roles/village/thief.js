@@ -32,7 +32,7 @@
   const isDead = (g, id) => (g.deadIds || []).includes(id);
 
   /** この人が（もう）使ったか（失敗した分も使用済み） */
-  const used = (g, id) => (g.thiefSteals || []).some((e) => e.by === id);
+  const used = (g, id) => (g.thiefSteals || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
   /** 盗賊の昼能力を使える人か（最終盤面の役職が盗賊・酔いが覚めている・生きている・まだ使っていない・昼の議論中でタイマーが動いている・選べる人がいる） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;

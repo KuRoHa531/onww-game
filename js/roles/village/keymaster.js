@@ -73,7 +73,7 @@
   /** 失敗の文章（本人に朝に届く）。verb = 交換 / 入れ替え / コピー、two = 対象が2人（いたずらっ子） */
   function failLine(kind, verb, two) {
     if (kind === "self") return `自身の役職がロックされていたため${verb}に失敗しました。`;
-    if (kind === "aa") return verb === "コピー" ? "選んだプレイヤーの特殊な力によりコピーに失敗しました。" : two ? `選んだプレイヤーのどちらかの特殊な力により${verb}できませんでした。` : `選んだプレイヤーの特殊な力により${verb}できませんでした。`;   // A.A.に弾かれた（役職は動かない。ロックとは言わない）
+    // kind "aa"（A.A.に弾かれた）も、ロックに弾かれたときと同じ文（鍵師から見たロックと区別がつかない。OJv26.11.19）
     if (verb === "コピー") return "選んだプレイヤーの役職がロックされていたためコピーに失敗しました。";
     return two ? `選んだプレイヤーのどちらかの役職がロックされていたため${verb}できませんでした。` : `選んだプレイヤーの役職がロックされていたため${verb}できませんでした。`;
   }
@@ -81,9 +81,9 @@
    *  ログは g.nightLogsAll に積む（label = 「怪盗 ○○」のような名乗り） */
   function fail(g, actor, kind, verb, targets, label, two) {
     const line = failLine(kind, verb, two);
-    (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : kind === "aa" ? [] : (targets || []).filter((t) => lockBlocked(g, t)) };
+    (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : (targets || []).filter((t) => blocks(g, t)) };   // 弾かれた席（A.A.に弾かれた席も、ロックに弾かれた席と同じ見え方: 🔒に弾かれる）
     const tn = (targets || []).map((t) => nm(g, t)).join(" と ");
-    g.nightLogsAll.push(kind === "self" ? `${label} は 自身の役職がロックされていたため${verb}に失敗しました。` : kind === "aa" ? `${label} は ${tn} の特殊な力により${verb}に失敗しました。` : `${label} は ${tn} の役職がロックされていたため${verb}に失敗しました。`);
+    g.nightLogsAll.push(kind === "self" ? `${label} は 自身の役職がロックされていたため${verb}に失敗しました。` : `${label} は ${tn} の役職がロックされていたため${verb}に失敗しました。`);
     return line;
   }
   /** 失敗の演出（朝。本人の画面だけ）: g.keyFails から作る。actor = fail に渡した席、viewer = 演出を見る人の席。
@@ -93,7 +93,7 @@
     const f = (g.keyFails || {})[ONW.cardAt(g, actor)];
     if (!f) return null;
     if (f.kind === "self") return { kind: "key", mode: "fail", ids: [viewer], lock: true };
-    if (f.kind === "aa") return { kind: "key", mode: "fail", ids: (f.targets || []).slice(), lock: false };   // A.A.に弾かれた: 🔒は出さず、カードが揺れるだけ（ロックされているわけではない）
+    // A.A.に弾かれたときも、ロックに弾かれたときと同じ演出（🔒に弾かれて揺れる）。文章だけが「特殊な力により」で違う
     const lk = f.locked || [], tg = f.targets || [];
     if (tg.length > 1 && lk.length < tg.length) return { kind: "key", mode: "fail", ids: tg.slice(), lock: false };
     return { kind: "key", mode: "fail", ids: lk.slice(), lock: true };

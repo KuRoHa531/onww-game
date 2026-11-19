@@ -170,7 +170,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
    *     確認: node _wip/groupcheck.js .（登録もれがあれば FAIL。node _wip/viewall.js . の一覧にも出る）
    *  【必須・役職追加のたびに入れること】並びは js/roleorder.js の ONW.ROLE_ORDER(wikiの順)の末尾にIDを足す(groups の数字では並ばない)。確認: node _wip/orderAll.js .
    * ===================================================================================== */
-  ONW.ROLE_BOUND_KEYS = ["loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "mimicRole", "sealTargets", "avengerTargets", "pranksterPicks", "reverserTarget", "lawyerClient", "lawyerClientRole", "majorTargets", "mosesBonus"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
+  ONW.ROLE_BOUND_KEYS = ["carmenTarget", "loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "mimicRole", "sealTargets", "avengerTargets", "pranksterPicks", "reverserTarget", "lawyerClient", "lawyerClientRole", "majorTargets", "mosesBonus"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
   const holderKeyOfGrave = (i) => "g:" + i;
   ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; if ((key === "pureLoverTargets" || key === "akujoHonmei" || key === "cupidPair") && ONW.pureLover) { const c = ONW.cardAt(g, holderId); (g.pureLoverGen = g.pureLoverGen || {})[c] = ((g.pureLoverGen || {})[c] || 0) + 1; ONW.pureLover.note(g, []); } };   // 選び直したカードは、新しい恋人関係（次の番号）   // 純愛者が選んだ瞬間も、結果画面の「恋人の印」の履歴に残す
   ONW.getRoleBound = (g, key, holderId) => (g[key] || {})[holderId];
@@ -184,7 +184,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     let role = g.currentRoles[srcId];
     if (role === ONW.ROLE.DOPPELGANGER) role = ONW.ROLE.VILLAGER;
     const carry2 = role === ONW.ROLE.EVIL_WOMAN ? "akujoKeep" : null;   // 悪女は本命(carry)とキープ(carry2)の2つを持つ
-    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.REVERSER]: "reverserTarget", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.KEYMASTER]: "keyTargets", [ONW.ROLE.WATCHDOG]: "watchdogOwners", [ONW.ROLE.EXECUTIONER]: "execTargets", [ONW.ROLE.AVENGER]: "avengerTargets", [ONW.ROLE.PRANKSTER]: "pranksterPicks", [ONW.ROLE.MAJOR]: "majorTargets" }[role];
+    const carry = { [ONW.ROLE.FREETER]: "freeterTargets", [ONW.ROLE.REVERSER]: "reverserTarget", [ONW.ROLE.VISITOR]: "visitorTargets", [ONW.ROLE.SERVANT]: "servantMasters", [ONW.ROLE.LOVE_TANNER]: "loveTargets", [ONW.ROLE.PURE_LOVER]: "pureLoverTargets", [ONW.ROLE.EVIL_WOMAN]: "akujoHonmei", [ONW.ROLE.CUPID]: "cupidPair", [ONW.ROLE.HEARTBREAKER]: "breakerTargets", [ONW.ROLE.KEYMASTER]: "keyTargets", [ONW.ROLE.WATCHDOG]: "watchdogOwners", [ONW.ROLE.EXECUTIONER]: "execTargets", [ONW.ROLE.AVENGER]: "avengerTargets", [ONW.ROLE.PRANKSTER]: "pranksterPicks", [ONW.ROLE.MAJOR]: "majorTargets", [ONW.ROLE.CARMEN]: "carmenTarget" }[role];
     // コピーされた側(dst)は、酔っ払いでない限り（夜に配られた役職のまま眠っていないので）コピーされた役職の能力を自分では使えない。だから選択（フリーターの就職先・悪女の本命/キープ など）もまるごとコピーする。
     // 酔っ払いの dst は昼に酔いが覚めてから最終役職の能力を自分で使えるので、「能力を使った判定」(選択の記録)はコピーしない（従者のご主人・処刑人のターゲットは能力の使用ではなく自動で決まるのでこれまで通り）。
     const dstDrunk = !!ONW.hiddenDrunk(g, dstId), passive = carry === "servantMasters" || carry === "execTargets";
@@ -198,7 +198,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (g.breakerTargets) delete g.breakerTargets[dstId];   // 上書きされた破局師の記録は消す（破局師をコピーするときは下で新しく入れる）
     if (g.watchdogOwners) delete g.watchdogOwners[dstId];   // 上書きされた番犬の飼い主の記録は消す（番犬をコピーするときは下で新しく入れる）
     if (g.mimicRole) delete g.mimicRole[dstId];   // 上書きされた模倣の人狼の模倣先は消す（模倣の人狼をコピーするときは下で同じ模倣先を入れる）
-    if (role === ONW.ROLE.MIMIC_WOLF && ONW.mimic) { if (g.mimicRole && g.mimicRole[srcId]) g.mimicRole[dstId] = g.mimicRole[srcId]; else ONW.mimic.choose(g, dstId); }   // 9of9: 模倣の人狼をコピーしたら模倣先も同じ（なければ決める）
+    if (ONW.mimic && ONW.mimic.isBorrow(role)) { if (g.mimicRole && g.mimicRole[srcId]) g.mimicRole[dstId] = g.mimicRole[srcId]; else ONW.mimic.choose(g, dstId); }   // 9of9: 模倣の人狼をコピーしたら模倣先も同じ（なければ決める）   // 開拓者をコピーしたら運命も同じ（マイクラ版 copyTrailblazerFate）
     if (g.lawyerClient) { delete g.lawyerClient[dstId]; delete g.lawyerClientRole[dstId]; }
     if (g.majorTargets) delete g.majorTargets[dstId];   // 上書きされた少佐の救済先の記録は消す（少佐をコピーするときは下で救済先ごとコピーする）
     if (g.reverserTarget) delete g.reverserTarget[dstId];   // 上書きされた反転者の記録は消す（反転者をコピーするときは下で反転の付与先ごとコピーする。付与済みの反転は反転者のカードの記録なので、上書きされた席の分は無効になる）
@@ -301,7 +301,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (mosesSrc !== null) (g.mosesBonus = g.mosesBonus || {})[toId] = mosesSrc;
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[toId]];   // 上書きされたカードの上のシャッフラーの印は消える
     if (g.pureLoverTargets) delete g.pureLoverTargets[toId];   // 上書きされた役職の純愛者の記録は消す（あとで古い記録が復活しないように）
-    if (role === ONW.ROLE.MIMIC_WOLF && ONW.mimic) { if (g.mimicRole && g.mimicRole[fromId]) g.mimicRole[toId] = g.mimicRole[fromId]; else ONW.mimic.choose(g, toId); }   // 模倣の人狼をコピーしたら、模倣先も同じ（マイクラ版と同じ）。9of9: コピー元に模倣先がなければ決める
+    if (ONW.mimic && ONW.mimic.isBorrow(role)) { if (g.mimicRole && g.mimicRole[fromId]) g.mimicRole[toId] = g.mimicRole[fromId]; else ONW.mimic.choose(g, toId); }   // 模倣の人狼をコピーしたら、模倣先も同じ（マイクラ版と同じ）。9of9: コピー元に模倣先がなければ決める   // 開拓者をコピーしたら運命も同じ（マイクラ版 copyTrailblazerFate）
     const t = (g.roleTrail = g.roleTrail || {});
     (t[toId] = t[toId] || []).push(role);
     (cd.trail[toId] = cd.trail[toId] || []).push(cd.at[toId]);   // カードは同じ（役職だけが変わる）
@@ -327,7 +327,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   ONW.shufflerPlace = (g, toId, role, byCard) => {
     const cd = cards(g), card = cd.at[toId], from = g.currentRoles[toId];   // from = 置かれる前のそのカードの役職（選ばれた人への通知「A から B」の A）
     g.currentRoles[toId] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole", "mosesBonus"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
+    ["carmenTarget", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole", "mosesBonus"].forEach((k) => { if (g[k]) delete g[k][toId]; });   // 上書きされた役職の記録は消す（servantMasters・execTargets は下の fix が整える）
     (g.pureLoverGen = g.pureLoverGen || {})[card] = ((g.pureLoverGen || {})[card] || 0) + 1;   // 置かれたカードは別の恋人関係（次の番号）
     const marks = (g.shufflerMarks = g.shufflerMarks || {}), by = byCard || card;
     const list = (marks[card] = (Array.isArray(marks[card]) ? marks[card] : marks[card] ? [marks[card]] : []).filter((e) => e.by !== by));   // 同じシャッフラーが同じカードに置き直したときは、新しい印だけ残す
@@ -335,7 +335,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     const t = (g.roleTrail = g.roleTrail || {});
     (t[toId] = t[toId] || []).push(role);
     (cd.trail[toId] = cd.trail[toId] || []).push(card);   // カードは同じ（役職だけが変わる）
-    if (role === ONW.ROLE.MIMIC_WOLF && ONW.mimic) ONW.mimic.choose(g, toId);   // 9of9: シャッフラーで模倣の人狼が置かれたら、模倣先を決める（上で消した古い模倣先のあと）
+    if (ONW.mimic && ONW.mimic.isBorrow(role)) ONW.mimic.choose(g, toId);   // 9of9: シャッフラーで模倣の人狼が置かれたら、模倣先を決める（上で消した古い模倣先のあと）   // 開拓者が置かれたら、運命を新しく決める（マイクラ版 ensureTrailblazerFate）
     ONW.fixServants(g); if (ONW.avenger) ONW.avenger.fix(g); if (ONW.prankster) ONW.prankster.fix(g);
     if (ONW.fixExecutioners) ONW.fixExecutioners(g);
     ONW.shufflerStamp(g, toId);   // 結果画面: 置かれた段階に「(+シャッフラー)」
@@ -347,12 +347,12 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   ONW.cosplayPlace = (g, id, role) => {
     const cd = cards(g);
     g.currentRoles[id] = role;
-    ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole", "mosesBonus"].forEach((k) => { if (g[k]) delete g[k][id]; });
+    ["carmenTarget", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole", "mosesBonus"].forEach((k) => { if (g[k]) delete g[k][id]; });
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[id]];   // 上書きされたカードの上のシャッフラーの印は消える
     const t = (g.roleTrail = g.roleTrail || {});
     (t[id] = t[id] || []).push(role);
     (cd.trail[id] = cd.trail[id] || []).push(cd.at[id]);   // カードは同じ（役職だけが変わる）
-    if (role === ONW.ROLE.MIMIC_WOLF && ONW.mimic) ONW.mimic.choose(g, id);
+    if (ONW.mimic && ONW.mimic.isBorrow(role)) ONW.mimic.choose(g, id);   // コスプレで模倣の人狼・開拓者になったら、模倣先・運命を新しく決める
     ONW.fixServants(g); if (ONW.avenger) ONW.avenger.fix(g); if (ONW.prankster) ONW.prankster.fix(g);
     if (ONW.fixExecutioners) ONW.fixExecutioners(g);
     if (ONW.pureLover) ONW.pureLover.note(g, [id]);
@@ -500,6 +500,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       smokeHideAbility: false,          // 煙幕の狂人の詳細設定: 煙幕のあいだ、昼の能力対象（酔い覚め夜能力・昼能力）のプレイヤー名を ？？？ にして席をシャッフルする（初期値OFF。投票とは別の設定）
       smokeHideVote: false,             // 煙幕の狂人の詳細設定: 煙幕のあいだ、投票対象のプレイヤー名を ？？？ にして投票開始時に席をシャッフルする（初期値OFF。能力対象とは別の設定）
       winLadderFx: true,                // 勝利の乗っ取り演出（結果発表で、成立した勝利が低い順に貼り重ねられる）。OFFなら最終結果だけ
+      bubbleChat: false,                // 吹き出しチャット（アモアス風。ホストがルーム設定のシステム設定で切り替える。初期はOFF）
   revealManualRoles: false,       // 配役した役職(変化していないカード)も変化公開に出す（マイクラ版 revealManualRolesAsTransforms）。変化公開がONのときだけ有効
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）

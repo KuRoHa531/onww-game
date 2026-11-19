@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null, sub: null };   // sub: さらに上に重ねる選択（変化後。"t:" + 席のキー）
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.gw = d.rand.gw || {}; d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.trail = d.trail || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.gw = d.rand.gw || {}; d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -89,6 +89,14 @@ window.ONW = window.ONW || {};
   debug.mimicRole = function (game, id) {
     if (!game.debugOn || !game.dbg) return null;
     return (game.dbg.mimic || {})[id] || null;
+  };
+  /** 開拓者の運命の指定（持ち主のID → 運命 destruction / preservation / harmony / remembrance / elation。指定なしなら null。4of4-b。trailblazer.js の choose が見る）。
+   *  配られた開拓者（最初に自分に配られたカード）だけに効く。墓荒らし・怪盗で手にしたときは、そのカードの運命を引き継ぐ（指定は見ない） */
+  debug.trailFate = function (game, id) {
+    if (!game || !game.debugOn || !game.dbg) return null;
+    const f = (game.dbg.trail || {})[id];
+    if (!f || !ONW.trailblazer || !ONW.trailblazer.FATES.includes(f)) return null;
+    return game.initialRoles && game.initialRoles[id] === ONW.ROLE.TRAILBLAZER ? f : null;
   };
   /** CPUの夜の能力先指定 { player?, players?, graves?, cosRole? }（cosRole: コスプレイヤーがコスプレする役職ID / "none"=コスプレしない） */
   debug.cpuTarget = function (game, id) {
@@ -299,12 +307,13 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm" };   // era: 抹消の人狼（抹消する相手を1人）
+  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one" };   // era: 抹消の人狼（抹消する相手を1人）
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
     const grp = ONW.TRANSFORM_GROUPS[r];
     let out = grp ? (d.tf[key] ? [d.tf[key]] : grp.slice()) : [r];
+    if (out.includes("trailblazer") && ONW.trailblazer) { const T = ONW.trailblazer, f = (d.trail || {})[key]; out = [...out, ...(f ? [T.ROLE_OF[f]] : T.FATES.map((x) => T.ROLE_OF[x]))]; }   // 開拓者: 運命を固定したら、その運命の役職（調和=カルメン / 愉悦=いたずらっ子など）の能力先も指定できる。運命がランダムなら5つの役職すべて
     if (out.includes("mimic_wolf") && (d.mimic || {})[key]) out = [...out, d.mimic[key]];   // 模倣の人狼: 指定した模倣先の能力先（占う相手・墓地・口封じ先など）も同じパネルで指定できる
     return out;
   }
@@ -387,6 +396,18 @@ window.ONW = window.ONW || {};
     return rows ? `<div class="dbg-h">模倣先の固定</div>${rows}` : "";
   }
 
+  // ---- 開拓者の運命の固定（固定した役職が開拓者の人だけ。人間もCPUも。4of4-b）。指定なしはランダム（5つの運命が等確率） ----
+  function trailPart() {
+    const d = data(), { players } = slots(), T = ONW.trailblazer;
+    if (!T) return "";
+    const rows = players.filter((s) => d.roles[s.key] === "trailblazer" || (!!d.roles[s.key] && d.tf[s.key] === "trailblazer")).map((s) => {   // 開拓者を固定した人 / 変化役(光の使徒)の変化後を開拓者にした人
+      const cur = (d.trail || {})[s.key] || "";
+      const opts = `<option value="">指定なし（ランダム）</option>` + T.FATES.map((f) => `<option value="${f}"${f === cur ? " selected" : ""}>${esc(T.fateName(f))}（${esc(rn(T.ROLE_OF[f]))}の能力）</option>`).join("");
+      return row(esc(s.name) + (s.cpu ? cpuBadge : "") + ' <small class="dbg-dim">(開拓者固定)</small>', `<select onchange="ONW.debug.trailSet(${attr(s.key)}, this.value)">${opts}</select>`);
+    }).join("");
+    return rows ? `<div class="dbg-h">運命の固定</div>${rows}` : "";
+  }
+
   // ---- ランダムに決まる対象の指定（固定した役職が従者・黒猫などの人だけ。人間もCPUも） ----
   const RAND_KINDS = [   // 役職 → 指定できる対象の種類
     { kind: "master", roles: ["servant"], label: "ご主人" },
@@ -399,7 +420,7 @@ window.ONW = window.ONW || {};
   ];
   function tabCpu() {
     if (!inLobby()) return hint("能力先・ランダム対象はルーム（ロビー）で設定します。次の試合に反映されます。");
-    return `<div class="dbg-h">夜の能力先・ランダムに決まる対象</div>` + cpuPart() + mimicPart();
+    return `<div class="dbg-h">夜の能力先・ランダムに決まる対象</div>` + cpuPart() + mimicPart() + trailPart();
   }
 
   // ---- 昼能力（CPUをリアルタイムで発動する）----
@@ -532,9 +553,10 @@ window.ONW = window.ONW || {};
 
   debug.lockSet = (key, role) => {
     const d = data();
-    if (!role) { delete d.roles[key]; delete d.tf[key]; ui.pick = null; ui.sub = null; }
+    if (!role) { delete d.roles[key]; delete d.tf[key]; delete d.trail[key]; ui.pick = null; ui.sub = null; }
     else {
       d.roles[key] = role;
+      if (role !== "trailblazer" && !(ONW.TRANSFORM_GROUPS[role] || []).includes("trailblazer")) delete d.trail[key];   // 開拓者にならない役職に変えたら、運命の指定も消す（光の使徒などの変化先に開拓者がいるときは残す）
       if (d.tf[key] && !(ONW.TRANSFORM_GROUPS[role] || []).includes(d.tf[key])) delete d.tf[key];
       if (!ONW.TRANSFORM_GROUPS[role]) { ui.pick = null; ui.sub = null; }
       else ui.sub = "t:" + key;       // 変化役なら続けて「変化後」を、さらに上に重ねたメニューで選ぶ
@@ -564,6 +586,7 @@ window.ONW = window.ONW || {};
   };
   debug.dayCancel = () => { ui.pick = null; ui.dayFirst = null; ui.dayMulti = null; refresh(); };
   debug.mimicSet = (key, role) => { const d = data(); if (role) d.mimic[key] = role; else delete d.mimic[key]; refresh(); };   // 模倣の人狼の模倣先の指定
+  debug.trailSet = (key, fate) => { const d = data(); if (fate) d.trail[key] = fate; else delete d.trail[key]; refresh(); };   // 開拓者の運命の指定（空 = 指定なし）
   debug.masterSet = (key, t) => { const d = data(); if (t) d.master[key] = t; else delete d.master[key]; ui.pick = null; refresh(); };
   debug.randSet = (kind, key, t) => {   // kind: master / freeter / cat / straw / exec / muzzle（持ち主ごとに1人）
     const d = data(), store = kind === "master" ? d.master : d.rand[kind];
@@ -592,7 +615,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; ui.sub = null; ui.pick = null; refresh(); };   // 変化後を選んだら、重ねたメニューを全部閉じる
-  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.mimic = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, gw: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
+  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.mimic = {}; d.trail = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, gw: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
 
   // 指定を書き換える（空になったら項目ごと消す）
   const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };

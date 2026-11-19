@@ -47,7 +47,7 @@
   const isDead = (g, id) => (g.deadIds || []).includes(id);
 
   /** この人が（もう）撃ったか */
-  const used = (g, id) => (g.sheriffShots || []).some((e) => e.by === id);
+  const used = (g, id) => (g.sheriffShots || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
   /** 保安官の昼能力を使える人か（最終盤面の役職が保安官・酔いが覚めている・生きている・まだ撃っていない・昼の議論中でタイマーが動いている・撃てる人がいる） */
   function canUse(g, id) {
     if (!g || g.allDeadSkip || g.dictator) return false;
@@ -175,6 +175,12 @@
       else if (e.mode === "guarded") info = `${tg} は他に人狼判定の人がいる人狼王だったため、何も起きませんでした。`;
       else if (e.mode === "cat") info = `${tg} はシュレディンガーの猫でした。誰も死なず、${tg} は村人陣営に固定されました。`;
       else info = `${tg} はシュレディンガーの猫でしたが、すでに村人陣営に固定されていたため、何も起きませんでした。`;
+      if (e.knightGuard && e.knightGuard.length) {   // 騎士に守られた（knight.js guardShot）: 死んだ人はいない（勝利条件・投票権も失わない）
+        const pre = e.rev ? `${by} は模倣保安官です。` : "";
+        if (e.mode === "execute") info = `${pre}${tg} は${e.rev ? "人狼陣営ではありませんでした" : "村人陣営ではない人でした"}が、騎士に守られ、死にませんでした。`;
+        else if (e.mode === "misfire") info = `${pre}${tg} は${e.rev ? "人狼陣営" : "村人陣営"}でした。${by} は騎士に守られ、死にませんでした。`;
+        else info = `${tg} はネコカボチャでした。${tg} が撃たれ、道連れの ${e.knightGuard.map(nm).join("、")} は騎士に守られ、死にませんでした。`;
+      }
       return { by, target: tg, act: actText(by, tg), info: flags.showOutcome ? info : "" };
     });
   }
@@ -201,6 +207,8 @@
   // ======================================================================
   /** 「〇〇を撃ちました。」（CPUの発言・5of6b の COボタンの結果開示と同じ文言） */
   const shotText = (name) => `${name} を撃ちました。`;
+  /** 撃った本人の情報確認の文。騎士に守られたときだけ「🛡️ 騎士に守られました。」を足す（執行か誤爆かは分からない文のまま。撃った人にだけ届く） */
+  const doneText = (e, name) => shotText(name) + (e && e.knightGuard && e.knightGuard.length ? " 🛡️ 騎士に守られました。" : "");
   /** CO一覧に出す短い結果 */
   const shotShort = (name) => `${name} を撃った`;
   /** 撃てば執行される人外と、役職から言えるか（CPUが知っている役職で判断する）。白狼は村人陣営扱い・ネコカボチャ（保安官も死ぬ）・シュレディンガーの猫（何も起きない）・人狼王（ガードされることがある）は、撃っても効果がないか危ないので狙わない */
@@ -238,7 +246,7 @@
     const nm = k.nameOf(g, plan.target);
     return [{ p, text: shotText(nm), short: shotShort(nm), result: true, claim: { kind: "sheriff", target: plan.target }, gap: 3500 }];
   }
-  Object.assign(ONW.sheriff = ONW.sheriff || {}, { shotText, shotShort, cpuKnownHit, cpuPick, cpuSpeak });
+  Object.assign(ONW.sheriff = ONW.sheriff || {}, { shotText, doneText, shotShort, cpuKnownHit, cpuPick, cpuSpeak });
 
   // ======================================================================
   // 【COボタン・投票判断・5of6b】

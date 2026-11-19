@@ -32,9 +32,9 @@
   const has = (g, id) => !!id && g.players.some((q) => q.id === id);
   /** 夜ログの名乗り（模倣の人狼が封印の狂人を模倣しているときは「模倣の人狼」） */
   const cardOf = (g, h) => (g.currentRoles || g.initialRoles || {})[h];   // いまのカード（夜の最初の段階では配役直後と同じ。朝・昼は動いたあと）
-  const labelOf = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? ONW.ROLE_INFO.mimic_wolf.name : ONW.ROLE_INFO.seal_madman.name);
+  const labelOf = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? ONW.ROLE_INFO[cardOf(g, h)].name : ONW.ROLE_INFO.seal_madman.name);   // 開拓者が封印の狂人の能力を使うことは無い（運命の5役職のみ）が、カード側の名前を出す形に揃える
   /** 夜ログ・新聞・観測に残す役職（模倣の人狼が使ったときは「模倣の人狼」） */
-  const roleOfNews = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? ONW.ROLE.MIMIC_WOLF : R_());
+  const roleOfNews = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? cardOf(g, h) : R_());
 
   const FAIL_TEXT = "あなたは封印の狂人に能力を封印されていたため失敗しました。";
   const sealLine = (g, t) => `${nm(g, t)} を封印しました。`;
@@ -111,7 +111,7 @@
   function failIfSealed(g, id, actRole, io) {
     if (!is(g, id) || actRole === R_()) return false;
     const o = io || {}, info = ONW.ROLE_INFO[actRole] || {};
-    const label = o.mimic ? ONW.ROLE_INFO.mimic_wolf.name : (info.name || actRole);
+    const label = o.mimic ? ONW.ROLE_INFO[typeof o.mimic === "string" ? o.mimic : "mimic_wolf"].name : (info.name || actRole);   // o.mimic = 能力を借りているカードの役職ID（模倣の人狼 / 開拓者）。true のときは模倣の人狼
     (g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${nm(g, id)} は 封印されていたため能力に失敗しました。`);
     if (o.hold) o.hold(id, FAIL_TEXT);
     return true;

@@ -162,7 +162,7 @@
   W.keyFailShown = function keyFailShown(g, actor, shown, actual) {
     const f = ((g && g.keyFails) || {})[ONW.cardAt(g, actor)];
     if (!f || f.kind === "self" || !ONW.keymaster) return;
-    f.targets = shown.slice(); f.locked = f.kind === "aa" ? [] : shown.filter((s, k) => ONW.keymaster.lockBlocked(g, actual[k]));
+    f.targets = shown.slice(); f.locked = shown.filter((s, k) => ONW.keymaster.blocks(g, actual[k]));   // A.A.に弾かれた席も🔒（ロックと同じ演出）
   };
 
   // ---- 票を入れられた ----

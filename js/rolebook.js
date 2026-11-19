@@ -6,6 +6,7 @@
  *   ・能力結果: 占い・詩人・墓地の覗き見など、自分の能力で得た情報に「表示された」役職
  * 自認なので、あとからいたずらされて本当の役職が変わっていても載らない（忘却の占い師は「村人」と自認する）。
  * 役職の名前を押すまで説明は閉じている。画面はずれず、情報確認と同じ重ね画面で出す。
+ * 開拓者を自認しているときは、開いた説明の下に「歩んでいる運命」とその運命の能力（保安官・騎士・カルメン・妖精さん・いたずらっ子の配布時の説明）も出す（開拓者 4of4-b）。
  * 仕様の詳細は docs/role-book.md。
  * ------------------------------------------------------------
  */
@@ -32,8 +33,29 @@
     const last = g.rbSelf[g.rbSelf.length - 1];
     if (last && last.id === role) return;
     const e = { id: role };
+    if (role === "trailblazer") { const f = rb.myFate(g); if (f) e.fate = f; }   // 開拓者: 手にした時点で知らされた運命を覚えておく（あとで別の開拓者を手にしても、前のカードの運命は変わらない）
     if (ONW.ui && ONW.ui.logsHeld && ONW.ui.logsHeld(g)) e.late = true;
     g.rbSelf.push(e);
+  };
+
+  /** 自分が知らされている開拓者の運命（"fate:<運命>" の g.mimicView[自分の席] から。夜の「あなたは○○の運命を歩んでいます。」と同じもの）。知らなければ null。
+   *  いたずらっ子などで本当のカードが替わっても本人には知らされないので、自認のまま変わらない */
+  rb.myFate = function (g) {
+    const T = ONW.trailblazer;
+    if (!g || !T || !T.fateOfView) return null;
+    let id = null;
+    try { id = ONW.net && ONW.net.myId ? ONW.net.myId() : null; } catch (e) { id = null; }
+    const v = (g.mimicView || {})["p:" + id] || g.myMimic || null;
+    return T.fateOfView(v) || null;
+  };
+
+  /** 自認の流れの i 番目(開拓者)の運命: 流れのいちばん最後の開拓者は、いま知らされている運命（あとから届いても拾う）/ それより前の開拓者は、そのとき覚えた運命 */
+  rb.fateAt = function (g, list, i) {
+    const e = list[i];
+    if (!e || e.id !== "trailblazer") return null;
+    let lastTb = -1;
+    list.forEach((x, k) => { if (x.id === "trailblazer") lastTb = k; });
+    return (i === lastTb ? rb.myFate(g) : null) || e.fate || null;
   };
 
   /** 朝・昼の能力の演出(reveal)で、自分が新しく手にした役職: 怪盗の交換(swap)・墓荒らし(relic)・ドッペルゲンガー(doppel)・コスプレイヤー(cosplay)。
@@ -112,12 +134,20 @@
     return [P.ONLINE_NIGHT, P.ONLINE_MORNING, P.ONLINE_DAY].includes(g.phase);
   };
 
-  /** 役職1つぶん: 名前を押すと説明が開く(閉じた状態から。開閉は g.rbOpen に覚えて、再描画しても保つ) */
-  const roleRow = (g, id) => {
+  /** 開拓者の運命の欄（開いた説明の下）: 歩んでいる運命の文（夜の文と同じ）+ その運命で使う能力の役職の配布時の説明 */
+  const fateBlock = (g, fate) => {
+    const T = ONW.trailblazer;
+    if (!T || !fate || !T.ROLE_OF || !T.ROLE_OF[fate]) return "";
+    const ar = T.ROLE_OF[fate], ai = ONW.roles.getInfo(ar) || {};
+    return `<div class="gd-desc rb-fate"><div class="rb-fate__h">${esc(T.fateName(fate))}の運命</div>${esc(T.text(fate))}\n<span class="gd-name t-${ai.team}">${esc(ai.name || "")}</span> の能力\n${esc(ONW.roleDesc(ar, g) || ai.desc || "")}</div>`;
+  };
+
+  /** 役職1つぶん: 名前を押すと説明が開く(閉じた状態から。開閉は g.rbOpen に覚えて、再描画しても保つ)。fate: 開拓者の運命（自認の流れの開拓者だけ） */
+  const roleRow = (g, id, fate) => {
     const i = ONW.roles.getInfo(id);
     return `<details class="gd-role rb-role" ${g.rbOpen && g.rbOpen[id] ? "open" : ""} ontoggle="ONW.roleBook._tg('${id}',this.open)">
       <summary><span class="gd-name t-${i.team}">${esc(i.name)}</span></summary>
-      <div class="gd-desc">${esc(ONW.roleDesc(id, g) || i.desc || "説明はありません。")}</div></details>`;
+      <div class="gd-desc">${esc(ONW.roleDesc(id, g) || i.desc || "説明はありません。")}</div>${id === "trailblazer" ? fateBlock(g, fate) : ""}</details>`;
   };
 
   rb.bodyHtml = function () {
@@ -125,7 +155,7 @@
     rb.scan(g);
     const self = rb.visibleSelf(g), seen = rb.visibleSeen(g);
     const selfHtml = self.length
-      ? self.map((e, k) => `${k ? '<div class="rb-arrow" aria-hidden="true">↓</div>' : ""}${roleRow(g, e.id)}`).join("")
+      ? self.map((e, k) => `${k ? '<div class="rb-arrow" aria-hidden="true">↓</div>' : ""}${roleRow(g, e.id, rb.fateAt(g, self, k))}`).join("")
       : `<p class="night-step__hint">まだありません。</p>`;
     const seenHtml = seen.length ? seen.map((id) => roleRow(g, id)).join("") : `<p class="night-step__hint">まだありません。</p>`;
     return `<div class="rb-h">自身の役職（自認）</div>${selfHtml}<div class="rb-h">能力結果</div>${seenHtml}`;
@@ -167,7 +197,7 @@
   };
 
   /** ボタンの出し入れ(フェーズが変わっても拾えるよう、短い間隔で見る)。出せないフェーズになったら開いている画面も閉じる */
-  rb.key = function (g) { return rb.visibleSelf(g).map((e) => e.id).join(",") + "|" + rb.visibleSeen(g).join(","); };
+  rb.key = function (g) { const self = rb.visibleSelf(g); return self.map((e, k) => e.id + (rb.fateAt(g, self, k) || "")).join(",") + "|" + rb.visibleSeen(g).join(","); };   // 運命が（あとから）分かったときも描き直す
   rb.sync = function () {
     const btn = document.getElementById("rb-btn");
     const on = rb.canShow();
