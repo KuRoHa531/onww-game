@@ -130,7 +130,7 @@
   /** ボタンを出してよいフェーズか: 夜・朝・待機時間(朝のうち)・昼。観戦者・配布中・投票以降は出さない */
   rb.canShow = function () {
     const g = ONW.game, P = ONW.PHASE;
-    if (!g || !g.inGame || g.isSpectator || !g.rbSelf) return false;
+    if (!g || g.isSpectator || !g.rbSelf) return false;   // g.inGame はホストの端末にしか立たない（参加者では常に false）ので見ない。フェーズが夜・朝・昼なら試合中
     return [P.ONLINE_NIGHT, P.ONLINE_MORNING, P.ONLINE_DAY].includes(g.phase);
   };
 

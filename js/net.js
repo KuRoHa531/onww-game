@@ -1205,6 +1205,7 @@ window.ONW = window.ONW || {};
       const g = G(), saved = ONW.settings.load();
       if (saved) ONW.settings.apply(g, saved);            // 前回のルールを復元
       try { g.debugOn = localStorage.getItem("onw.debugOn.v1") === "1" && !!(ONW.debug && ONW.debug.allowed()); } catch (e) {}   // デバッグモードのON/OFFも前回のまま
+      try { g.bubbleChat = localStorage.getItem("onw.bubbleChat.v1") === "1"; } catch (e) {}   // 吹き出しチャットのON/OFFも前回のまま
       Object.assign(g, { players: [{ id: "host", name, isCpu: false, status: "host" }], inGame: false, spectators: [], specNames: {}, phase: PH().LOBBY });
       fitVillage();
       startHosting(peer);
@@ -1447,6 +1448,7 @@ window.ONW = window.ONW || {};
   net.toggleOpt = function (key) {
     if (!net.isHost || !["revealTransforms", "revealManualRoles", "winLadderFx", "bubbleChat", "smokeHideAbility", "smokeHideVote"].includes(key)) return;
     G()[key] = !G()[key];
+    if (key === "bubbleChat") { try { localStorage.setItem("onw.bubbleChat.v1", G()[key] ? "1" : "0"); } catch (e) {} }   // 吹き出しチャット: ホストの端末に覚えておき、次にルームを作ったときも前回のまま
     persist(); broadcastLobby();
   };
 
