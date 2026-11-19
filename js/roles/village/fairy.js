@@ -176,7 +176,7 @@
   //  ★ 🧚 の絵は fairyHtml() だけ。あとで画像に差し替えるときはここだけ直す（例: return `<img src="img/fairy.png" alt="">`）
   // ================================================================
   const fairyHtml = () => "🧚";
-  const reduced = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reduced = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   const PREP_MS = 350, FLY_MS = 1100, SHIELD_MS = 280, POP_MS = 700, END_MS = 1100;   // カードが持ち上がる / 🧚が飛んでくる / 膜が張られて票が減る(or 何も起きない)までの間 / 膜がはじける・消える / 次のバリアまで
   const HOLD_MS = PREP_MS + FLY_MS + SHIELD_MS;   // 字幕・持ち上がりから、票が減る（0票なら何も起きない）瞬間まで
   const R_HOLD = 900, R_END = 1000;   // 動きを減らす設定のとき: 飛ばさずに、持ち上げて票を減らすだけ（3of4-a と同じ）

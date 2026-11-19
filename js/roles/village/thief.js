@@ -138,7 +138,7 @@
   const SEARCH = 1100, SHRUG = 1000, RUN_BACK = 900;                                                  // 失敗: ポケットを探す / 肩をすくめる / 盗賊のカードへ戻る（出てくる・入るは成功と同じ）
   const OK_MS = EMERGE + RUN_IN + PULL + RUN2 + THROW + BACK, NG_MS = EMERGE + RUN_IN + SEARCH + SHRUG + RUN_BACK + BACK;
   const FIG_H = 60;                                                                                    // 棒人間の高さ(px)。足元が立つ位置
-  const reduceMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reduceMotion = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   function removeFx() { document.querySelectorAll(".th-fx").forEach((e) => e.remove()); }
   const $t = () => document.getElementById("table");
   /** 席 k のカードの位置（なければ null）。x = 中心 / r・t・b = 右・上・下の端 / w = 幅 */

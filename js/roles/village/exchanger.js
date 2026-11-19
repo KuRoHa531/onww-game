@@ -151,7 +151,7 @@
   function fly(R, ka, kb, ca, cb) {
     const A = anchorOf(R, ka), B = anchorOf(R, kb);
     const hide = () => { delete R.badge[ka]; delete R.badge[kb]; R.paint(R.G()); };
-    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduce = false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */;
     if (!A || !B || reduce) { hide(); return; }   // カードが画面にない / 動きを減らす設定: 動かさずに入れ替えるだけ
     hide();
     removeFx();

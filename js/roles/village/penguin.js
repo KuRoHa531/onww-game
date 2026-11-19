@@ -49,7 +49,7 @@
     </svg>`;
   }
   const PEEK_MS = 800, SLIDE_MS = 1500, TAIL_MS = 600, GAP = 34, N = 24;   // 出てくる時間 / 滑る時間 / 着地の余韻 / ペンギンがバッジの後ろに付く距離(px) / 軌道の分割数
-  const reduced = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reduced = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   const val = (st, id) => ((st || []).find((c) => c.id === id) || { c: 0 }).c;
   const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   function removeFx() { document.querySelectorAll(".pg-fx").forEach((e) => e.remove()); }

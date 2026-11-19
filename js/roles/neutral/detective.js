@@ -289,7 +289,7 @@
   //   めくれると、名探偵が推理した役職の面になり（正解ではなく推理の内容を見せる）、当たっていれば ⭕、外れていれば ✖。
   // ======================================================================
   const FX = { SHOW: 1500, GAP: 1300, FLIP: 650, MARK: 700, HOLD: 1900, FADE: 450, STILL: 3600 };
-  const reduceMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reduceMotion = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   function removeFx() { document.querySelectorAll(".dtr-fx").forEach((e) => e.remove()); }
   function runBoards(R, v) {
     const { later, setCap } = R, t0 = R.t, n = v.seats.length, reduce = reduceMotion();

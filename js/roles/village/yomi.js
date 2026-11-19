@@ -196,7 +196,7 @@
   //   ★ 刀の絵は swordHtml() だけ（画像に差し替えるときはここだけ直す。例: return `<img src="img/sword.png" alt="">`）
   // ================================================================
   const swordHtml = () => "🗡️";
-  const reducedMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reducedMotion = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   const SW_MS = 520, HIT_MS = 430, SLASH_MS = 520, TOTAL_MS = 1500;   // 刀が走り抜ける / 斬った瞬間（カードが揺れる）/ 斬り筋が残る / 全体
   const removeSlashFx = () => { if (document.querySelectorAll) document.querySelectorAll(".yo-fx").forEach((e) => e.remove()); };
   const slashCard = (k) => { const t = document.getElementById("table"); return t && t.querySelector(`.tb-seat[data-k="${k}"] .tb-card`); };

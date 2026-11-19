@@ -189,6 +189,7 @@
     if (!targetId || !g || g.phase !== ONW.PHASE.ONLINE_DAY) return;
     const k = `p:${targetId}`;
     K.gx[k] = "knightguard"; K.badge[k] = "🛡️"; K.paint(g);
+    burst(K, k);
     if (K.shake) K.shake(k);
     setTimeout(() => { const k2 = ONW.stage && ONW.stage.kit; if (!k2) return; if (k2.gx[k] === "knightguard") delete k2.gx[k]; if (k2.badge[k] === "🛡️") delete k2.badge[k]; k2.paint(k2.G()); }, 2800);
   }

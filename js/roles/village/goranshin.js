@@ -117,7 +117,7 @@
   }
 
   // ---- 結果発表の演出 ----
-  const reduced = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reduced = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   // 時間割（1回の御乱心）: カードが持ち上がる → 🍄が票数のところに出る → 数字が元の先から新しい先へ飛ぶ → 新しい先の票数が増える → 🍄が消える
   const PREP_MS = 450, SHROOM_MS = 600, FLY_MS = 800, LAND_MS = 500, END_MS = 500;
   const R_HOLD = 800, R_END = 900;   // 動きを減らす設定: 飛ばさず、🍄のあと票数だけ切り替える

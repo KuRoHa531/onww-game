@@ -149,7 +149,7 @@
   const bodyOff = () => document.body.classList.remove("dk-result");
   ONW.demonDuke.fx = function fx(R, v) {
     const { later, esc, res, P, setCap, paint, G } = R, hkF = (k) => ONW.roleHooksIn("stageResult", k);
-    const reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const reduce = !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
     const step = reduce ? 120 : 350, imm = v.kind === "immediate", cap = (t, b) => setCap(`<div class="res-cap__t t-wolf">${t}</div><div>${b}</div>`);
     const counts = (v.counts || []).filter((c) => c.c > 0).sort((a, b) => b.c - a.c), pickedId = v.pickedId, pk = pickedId ? P(pickedId) : null;
     const subs = (res.servantSubs || []).filter((x) => x.duke);

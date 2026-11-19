@@ -104,7 +104,7 @@
   //   データ: res.balancer = { success, ids, names, cards: [{ id, name, c, role }] }（net.js）。動きを減らす設定のときは、動かさずに結果の形だけ見せる
   // ======================================================================
   const BL = { PLACE0: 1100, GAP: 720, DROP: 520, HOLD_NG: 1100, CUT_GAP: 190, FALL: 1000, END_OK: 2300, END_NG: 2300, FADE: 450, STILL: 3200 };   // 時間割（ms）
-  const reduceMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const reduceMotion = () => !!(false /* OSのアニメ設定(prefers-reduced-motion)では演出を止めない */);
   function removeFx() { document.querySelectorAll(".bl-fx").forEach((e) => e.remove()); }
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
