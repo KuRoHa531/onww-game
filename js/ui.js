@@ -950,6 +950,23 @@ window.ONW = window.ONW || {};
       });
     } catch (e) { /* 音でゲームを止めない */ }
   };
+  /** 配役演出の「カードが席に着地する瞬間」にカードを配る・置く SE（se_deal）を合わせる。
+   *  dealFlipSe と同じ考え方の予約方式（配布画面は CSS アニメのみで stage.paint を通らない）。
+   *  times は dealStart 基準の着地時刻（秒）= 各カードの飛び始め（animation-delay）＋飛行時間（通常 0.55s / 自分の大きなカードは 0.75s）。
+   *  めくり SE（flip1 以降）とは時間帯が重ならない。過ぎた時刻（途中参加・再入室）は鳴らさず、同じ配布では1回だけ予約する */
+  ui.dealPlaceSe = function (game, times) {
+    try {
+      if (!ONW.sound || !game || !game.dealStart) return;
+      if (ui._dealPlaceSeFor === game.dealStart) return;
+      ui._dealPlaceSeFor = game.dealStart;
+      const ds = game.dealStart, elapsed = (Date.now() - ds) / 1000;
+      (times || []).forEach((t) => {
+        const d = t - elapsed;
+        if (d < -0.15) return;   // すでに着地したあとは鳴らさない
+        setTimeout(() => { if (ONW.sound && ONW.game && ONW.game.dealStart === ds) ONW.sound.se("deal"); }, Math.max(0, d * 1000));
+      });
+    } catch (e) { /* 音でゲームを止めない */ }
+  };
   ui.renderOnlineRole = function renderOnlineRole(game) {
     const info = ONW.roles.getInfo(game.myRole);
     const from = game.myFrom ? ONW.roles.getInfo(game.myFrom) : null;
@@ -989,6 +1006,11 @@ window.ONW = window.ONW || {};
     // SE: 自分のカードがめくれる瞬間（裏→役職 / 変化前→変化後 / →恋人）に合わせる
     const flipTimes = [flip1]; if (from) flipTimes.push(flip2); if (lover) flipTimes.push(flipL);
     ui.dealFlipSe(game, flipTimes);
+    // SE: カードが各席・墓地に配られて着地する瞬間（飛び始め＋飛行時間。自分の大きなカードだけ 0.75s）
+    const placeTimes = [];
+    for (let i = 0; i < G; i++) placeTimes.push(t0 + gStep * i + 0.55);
+    for (let i = 0; i < N; i++) placeTimes.push(pStart + pStep * i + (i === 0 ? 0.75 : 0.55));
+    ui.dealPlaceSe(game, placeTimes);
     return `
       <section class="panel night-step deal-stage" data-deal>
         <p class="lede">役職を配っています…</p>
@@ -1042,6 +1064,11 @@ window.ONW = window.ONW || {};
     const specFlipTimes = new Set([flip1]);
     [...list, ...graves].forEach((o) => { if (!o) return; if (o.from) specFlipTimes.add(flip2); if (o.lover) specFlipTimes.add(o.from ? flip2 + 1.6 : flip2); });
     ui.dealFlipSe(game, [...specFlipTimes]);
+    // SE: 観戦の配布でも、カードが各席・墓地に着地する瞬間に配る・置く音を合わせる（全カード通常サイズ＝飛行 0.55s）
+    const specPlaceTimes = [];
+    for (let i = 0; i < G; i++) specPlaceTimes.push(t0 + gStep * i + 0.55);
+    for (let i = 0; i < N; i++) specPlaceTimes.push(pStart + pStep * i + 0.55);
+    ui.dealPlaceSe(game, specPlaceTimes);
     return `
       <section class="panel night-step deal-stage dl-spec" data-deal>
         <p class="lede">役職を配っています…（観戦中は全員の役職が見えます）</p>

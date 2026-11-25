@@ -179,7 +179,7 @@
         if (Number.isInteger(r.pick)) {
           const dst = el.querySelector(`[data-k="${mine}"] .tb-card`);
           later(() => fly(r.pick, dst, 900, false), 1200);                         // ③ 選んだカードが自分の席へ飛ぶ
-          later(() => { SK.show(mine, r.role); }, 1200 + 900);                     // ④ 置かれて、自分のカードが新しい役職で表になる
+          later(() => { if (ONW.sound) ONW.sound.se("deal"); SK.show(mine, r.role); }, 1200 + 900);                     // ④ 置かれて、自分のカードが新しい役職で表になる。SE: 選んだカードが自分の席に置かれる（着地の瞬間）
         }
         later(() => { C.keep(false); C.clear(); g0.cosAnim = "done"; SK.paint(SK.G()); }, 2500);
       },

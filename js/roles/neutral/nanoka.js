@@ -240,7 +240,7 @@ later(() => fly(i, pile, 800, true), 1200); // 山札の一番下へ戻る
 if (Number.isInteger(r.pick) && r.role) {
 const dst = el.querySelector(`[data-k="${mine}"].tb-card`);
 later(() => fly(r.pick, dst, 900, false), 1200); // 選んだカードが自分の席へ飛ぶ
-later(() => { SK.show(mine, r.role);}, 2100); // 自分のカードが形態で表になる
+later(() => { if (ONW.sound) ONW.sound.se("deal"); SK.show(mine, r.role);}, 2100); // 選んだカードが自分の席に置かれる（着地の瞬間。SE: deal）＋自分のカードが形態で表になる
 }
 if (r.mark) later(() => { SK.show(`p:${r.mark.id}`, r.mark.face === "flat"? SK.FLAT_MARK: SK.COFFIN_MARK, true);}, 2500); // 対象のカードが ♭ / ⚰️ でめくれる
 later(() => { C.keep(false); C.clear(); g0.cosAnim = "done"; SK.paint(SK.G());}, r.mark? 3300: 2500);

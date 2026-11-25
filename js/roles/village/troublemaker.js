@@ -89,6 +89,7 @@
         a.style.zIndex = 6; b.style.zIndex = 5;
         const opt = { duration: 1200, easing: "ease-in-out", fill: "forwards" };
         const A = a.animate(path(dx, dy, -26, -8), opt), B = b.animate(path(-dx, -dy, 26, 8), opt);
+        later(() => { if (ONW.sound) ONW.sound.se("deal"); }, 1200);   // SE: 入れ替わった2枚が相手の席に着地する（2枚同時なので1回だけ）
         later(() => { A.cancel(); B.cancel(); a.style.zIndex = b.style.zIndex = ""; }, 1250);   // 裏面は同じなので、元の席に戻すと入れ替わったまま見える
       },
     },

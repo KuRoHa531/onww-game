@@ -9,6 +9,7 @@
  *   ONW.sound.bgm("night")        … BGM 切替（同じ曲なら継続）
  *   ONW.sound.se("gunshot")       … SE 再生
  *   ONW.sound.seKey("gunshot", k) … 同じ対象には一定時間に1回だけ鳴らす SE（二重配線の防止）
+ *   ONW.sound.se("deal")          … カードを配る・置く SE（配布演出は ui.dealPlaceSe が着地時刻に予約。stage の cosEnsure / swap と各役職 stageMorning の着地でも鳴らす）
  *   ONW.sound.syncBgm(game)       … ゲームの状態から BGM を決め直す（ui.render の末尾から呼ばれる）
  *   ONW.sound.hold("transform")   … 演出の間だけ BGM を固定する（syncBgm より優先）
  *   ONW.sound.release()           … hold を解除して状態どおりの曲に戻す

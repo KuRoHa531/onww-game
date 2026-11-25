@@ -91,7 +91,7 @@
             { transform: `translate(${dx / 2}px,${dy / 2 - 30}px) scale(1.25) rotate(-6deg)`, opacity: 0.95, offset: 0.5 },
             { transform: `translate(${dx}px,${dy}px) scale(1) rotate(0deg)`, opacity: 0.85 },
           ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
-          later(() => { A.cancel(); ghost.remove(); landed(); }, 950);
+          later(() => { A.cancel(); ghost.remove(); if (ONW.sound) ONW.sound.se("deal"); landed(); }, 950);   // SE: コピーがコピー先の席に置かれる（着地の瞬間）
         }, 900);
       },
     },

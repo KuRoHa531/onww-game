@@ -110,6 +110,7 @@
           ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
           later(() => {
             A.cancel(); ghost.remove();
+            if (ONW.sound) ONW.sound.se("deal");                    // SE: コピーが自分の席に置かれる（着地の瞬間）
             delete SK.up[theirs]; delete SK.glow[theirs];              // 選ばれた人のカードは伏せて元のまま（その人が相方・ご主人などなら、この後の peek で相方として改めてめくれる）
             SK.show(mine, r.role);                                  // 自分のカードが、コピーした役職で表になる
           }, 950);

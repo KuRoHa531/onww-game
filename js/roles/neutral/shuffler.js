@@ -308,7 +308,7 @@
             { transform: `translate(${dx}px,${dy}px) scale(1) rotate(0deg)` },
           ], { duration: FLY, easing: "ease-in-out", fill: "forwards" });
         }, LIFT + FLIP);
-        later(() => { SK.show(to, r.role); }, LIFT + FLIP + FLY);                 // ④ 重なったところで、選んだ人のカードが引いた役職で表になる
+        later(() => { if (ONW.sound) ONW.sound.se("deal"); SK.show(to, r.role); }, LIFT + FLIP + FLY);                 // ④ 重なったところで、選んだ人のカードが引いた役職で表になる。SE: 引いたカードが席に置かれる（着地の瞬間）
         later(() => ghost.remove(), LIFT + FLIP + FLY + LAND);
         later(hide, LIFT + FLIP + FLY + LAND + HOLD - 200);                       // ⑥ 少し見せたあと、置いたカードが裏面に戻る                    // ⑤ 重ねたカードを片づける（下のカードがすでに同じ役職で表になっている）
       },

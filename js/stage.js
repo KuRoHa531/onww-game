@@ -399,6 +399,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
       }
       later(() => { if (!row.isConnected) return; up[k] = r; paint(G()); }, 560 + i * 200);   // 出てきたあと、めくれて役職が見える
     });
+    if (!faceUp) later(() => { if (row.isConnected && ONW.sound) ONW.sound.se("deal"); }, 520);   // SE: 山札から3枚が配られる（最初の1枚が着地する瞬間に1回だけ。3枚で1回の配布として集約し、直後のめくり音とずらす）
     return row;
   }
   function cosRow(g) {
@@ -939,6 +940,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const A = a.animate(path(dx, dy, -22), opt), B = b.animate(path(-dx, -dy, 22), opt);
     later(() => {                                   // 裏面は同じなので、元の席に戻すと入れ替わったまま見える
       A.cancel(); B.cancel(); a.style.zIndex = b.style.zIndex = "";
+      if (ONW.sound) ONW.sound.se("deal");          // SE: 入れ替わった2枚が両方の席に着地する（2枚同時なので1回だけ）
       reveal();                                     // 新しい自分のカードが表に
     }, 1050);
   }
