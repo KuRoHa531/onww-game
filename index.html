@@ -41,6 +41,17 @@
 </head>
 <body>
 
+  <!-- スタートゲート: サイトを開いた直後はまずこれだけを出し、「ゲームを始める」でタイトル画面へ進む（js/ui.js の ONW.ui.enterGame が閉じる）。
+       この最初のタップが、サウンドの自動再生ロック解除（js/sound.js が window の pointerdown/click で解除）とタイトルBGMの開始も兼ねる。
+       #app の外にあるので再描画では消えず、読み込み直後の1回だけ表示される -->
+  <div id="start-gate" class="start-gate">
+    <div class="start-gate__inner">
+      <div class="start-gate__sub">ONE NIGHT WEREWOLF</div>
+      <div class="start-gate__title">混沌に潜みし狼達</div>
+      <button type="button" class="btn btn--primary start-gate__btn" onclick="ONW.ui.enterGame()">ゲームを始める</button>
+    </div>
+  </div>
+
   <div class="moon-glow" aria-hidden="true"></div>
   <button id="fs-btn" class="fs-btn" aria-label="全画面" title="全画面" onclick="ONW.ui.toggleFullscreen()">□</button>
   <!-- 左上: サウンドボタン（タップで音量パネル開閉。js/sound.js がアイコン表示・パネルの同期を行う） -->
@@ -82,6 +93,8 @@
   </main>
 
   <footer class="onw-footer">
+    <!-- クレジット: 「オンライン対応」の表記の上に出す。タイトル画面のときだけ表示（css の body.is-title で制御。js/ui.js の ONW.ui.openCredits が開く） -->
+    <button type="button" class="credits-link" onclick="ONW.ui.openCredits()">クレジット</button>
     <span id="footer-note">v0.2 オンライン対応(β)</span>
   </footer>
 

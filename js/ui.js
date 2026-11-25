@@ -163,6 +163,42 @@ window.ONW = window.ONW || {};
       </section>`;
   };
 
+  /** スタートゲートの「ゲームを始める」: ゲートを閉じてタイトル画面へ進む。
+   *  このタップ自体がサウンドの自動再生ロック解除も兼ねる（js/sound.js が window の pointerdown/click で unlock し、
+   *  保留していたタイトルBGMを流し始める）。ゲートは #app の外の静的要素なので、閉じたら二度と出ない */
+  ui.enterGame = function enterGame() {
+    const g = document.getElementById("start-gate");
+    if (!g || g.classList.contains("gate-done")) return;
+    g.classList.add("gate-done");
+    setTimeout(() => { if (g.parentNode) g.parentNode.removeChild(g); }, 450);
+  };
+
+  /** クレジット（タイトル画面のフッター、「オンライン対応」の上にある「クレジット」から開く。背景タップでも閉じる） */
+  ui.openCredits = function openCredits() {
+    if (document.getElementById("credits-overlay")) return;
+    const wrap = document.createElement("div");
+    wrap.id = "credits-overlay";
+    wrap.className = "credits-overlay";
+    wrap.innerHTML = `
+      <div class="credits-box">
+        <div class="credits-head"><span>クレジット</span><button type="button" class="btn" onclick="ONW.ui.closeCredits()">閉じる</button></div>
+        <h3>制作</h3>
+        <p>KuRoHa</p>
+        <p>AI:Codex(ChatGPT) ClaudeCode Muse</p>
+        <h3>役職提案</h3>
+        <p>KuRoHa グレ ダイ しらす 狐餅</p>
+        <h3>参考</h3>
+        <p>人狼ゲーム役職 など</p>
+        <p class="credits-music">音楽：魔王魂 <a href="https://maou.audio/" target="_blank" rel="noopener">https://maou.audio/</a></p>
+      </div>`;
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) ui.closeCredits(); });
+    document.body.appendChild(wrap);
+  };
+  ui.closeCredits = function closeCredits() {
+    const w = document.getElementById("credits-overlay");
+    if (w && w.parentNode) w.parentNode.removeChild(w);
+  };
+
   /** 画面左上の□: 全画面の切り替え（非対応ブラウザではヘッダー等を隠す擬似全画面） */
   ui.toggleFullscreen = function () {
     const de = document.documentElement;
