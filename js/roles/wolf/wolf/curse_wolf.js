@@ -3,7 +3,9 @@
  *
  * マイクラ版（scripts/vote.js の applyCurseWolfExecution / isPiercingVoteKillReason、state.js の ROLE_INFO、
  * stats.js の実績）と Wiki（order 89）を正とする。作者（くろはさん）の依頼メモ（2026-11-25）:
- * 「投票の結果で、呪術が投票しているところが死んだとき、毒で侵されるような演出」。
+ * 「投票の結果で、呪術が投票しているところが死んだとき」の演出は、当初メモの「毒で侵されるような演出」で
+ * 実装したが、作者が同日に訂正: 毒の侵食演出は将来移植する「蛇の狂人」用で、呪術の人狼は
+ * 「呪われていく演出」が正しい（下の stageResult / css の gx-curse 参照）。
  *
  * ・能力（投票連動・夜の行動なし）: 投票で、自分が投票した相手が最多得票になった場合、その相手は追放ではなく
  *   「呪殺」で死ぬ（死因は貫通扱い）。判定は vote.js の resolveElimination が、最多得票が決まったあと・
@@ -47,9 +49,10 @@
  * ・実績（マイクラ版 stats.js。Web版には保存が無いので判定関数だけ）:
  *   first_curse_wolf「禁断の呪術師」/ win_curse_wolf「狼の呪詛」/ lose_curse_wolf「呪いは変える」/
  *   curse_wolf_kill「その命、ここで終わりだ。」（呪殺を成功させた）。
- * ・結果発表の演出（作者指定）: 呪殺された人のカードは「呪殺」の札でめくれ、毒に侵される演出が出る
- *   （stageResult.flipped フック: カードが紫と緑の毒に下から侵されていき、毒色に染まったまま残る。
- *   CSS は css/style.css の gx-poison / gx-poisoned）。字幕は「呪殺」グループで 呪術の人狼 → 対象 を出す（stage.js）。
+ * ・結果発表の演出（作者指定・訂正済み）: 呪殺された人のカードは「呪殺」の札でめくれ、呪われていく演出が出る
+ *   （stageResult.flipped フック: 黒〜濃紫の呪いのオーラと大きな「呪」の字がカード全体に広がり、
+ *   カードが小刻みに震えながら呪いに染まったまま残る。CSS は css/style.css の gx-curse / gx-cursed）。
+ *   字幕は「呪殺」グループで 呪術の人狼 → 対象 を出す（stage.js）。
  */
 (function (ONW) {
   const ID = "curse_wolf";
@@ -102,19 +105,19 @@
       desc: "人狼陣営。自分が投票した相手が最多得票になった場合、その相手を追放ではなく呪殺します。呪殺は追放時に発動する能力や身代わり、護衛を貫通します。封印されている場合は発動しません。" },
     groups: { wolf: 8.98, "transform:dark_avatar": 9.48 },   // 人狼系（闇の化身の変化先。並びは ROLE_ORDER = wiki の order 89）
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,   // 人狼系共通の夜情報（仲間の人狼）
-    // 結果発表の演出: 呪殺されたカードが毒に侵される（めくれた直後、紫と緑の毒が下から這い上がり、カードが毒色に染まる）
+    // 結果発表の演出: 呪殺されたカードが呪われていく（めくれた直後、黒〜濃紫の呪いのオーラと大きな「呪」の字が広がり、カードが震えながら呪いに染まる）
     stageResult: {
       flipped: { order: 30, run(R, hs, at) {
         const hit = (hs || []).filter((h) => h.curseKill);
         if (!hit.length) return 0;
         const { later, paint, G, gx, P } = R;
         hit.forEach((h) => {
-          later(() => { gx[P(h.id)] = "poison"; if (ONW.sound) ONW.sound.se("curse_kill"); paint(G()); }, at + 450);   // SE: 呪殺（妖狐の呪殺と同じ音）
-          later(() => { if (gx[P(h.id)] === "poison") { gx[P(h.id)] = "poisoned"; paint(G()); } }, at + 2150);          // 毒に染まったまま残る
+          later(() => { gx[P(h.id)] = "curse"; if (ONW.sound) ONW.sound.se("curse_kill"); paint(G()); }, at + 450);   // SE: 呪殺（妖狐の呪殺と同じ音）
+          later(() => { if (gx[P(h.id)] === "curse") { gx[P(h.id)] = "cursed"; paint(G()); } }, at + 2150);          // 呪いに染まったまま残る
         });
         return 1750;
       } },
-      skip(R) { (R.res.history || []).forEach((h) => { if (h.curseKill) R.gx[`p:${h.id}`] = "poisoned"; }); },   // スキップ時: 最初から毒に染まった状態で見せる
+      skip(R) { (R.res.history || []).forEach((h) => { if (h.curseKill) R.gx[`p:${h.id}`] = "cursed"; }); },   // スキップ時: 最初から呪いに染まった状態で見せる
     },
   });
 })(window.ONW);

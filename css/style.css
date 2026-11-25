@@ -2397,17 +2397,20 @@ body.ovl-open .dbg-fab--float, body:has(.dbg-sheet) .dbg-fab--float { visibility
 @keyframes gx-bombblink { 0% { opacity: 1; } 100% { opacity: .25; } }
 @keyframes gx-boomcard { 0% { transform: scale(1.25); filter: brightness(3); } 40% { transform: scale(.9) rotate(-3deg); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
 @keyframes gx-boompop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 35% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
-/* 呪術の人狼の呪殺: 毒に侵される演出（紫と緑の毒がカードの下から這い上がり、毒色に染まったまま残る） */
-.tb-seat.gx-poison, .tb-seat.gx-poisoned { z-index: 8; }
-.tb-seat.gx-poison .tb-card { animation: gx-poison 1.7s ease-in both; }
-.tb-seat.gx-poison::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9; transform-origin: 50% 100%;
-  background: radial-gradient(circle at 18% 88%, rgba(124, 58, 237, .9), transparent 55%), radial-gradient(circle at 82% 92%, rgba(74, 222, 128, .55), transparent 50%), radial-gradient(circle at 50% 102%, rgba(88, 28, 135, .95), transparent 68%);
-  animation: gx-poison-creep 1.7s ease-in both; }
-@keyframes gx-poison { 0% { filter: none; } 40% { filter: saturate(1.5) hue-rotate(-38deg) brightness(.9); } 100% { filter: saturate(.55) hue-rotate(-55deg) brightness(.6) contrast(1.05); } }
-@keyframes gx-poison-creep { 0% { opacity: 0; transform: scaleY(.12); } 55% { opacity: .95; } 100% { opacity: .9; transform: scaleY(1); } }
-.tb-seat.gx-poisoned .tb-card { filter: saturate(.55) hue-rotate(-55deg) brightness(.6) contrast(1.05); }
-.tb-seat.gx-poisoned::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9;
-  background: radial-gradient(circle at 18% 88%, rgba(124, 58, 237, .5), transparent 55%), radial-gradient(circle at 50% 102%, rgba(88, 28, 135, .55), transparent 68%); }
+/* 呪術の人狼の呪殺: 呪われていく演出（黒〜濃紫の呪いのオーラと大きな「呪」の字がカード全体に広がり、呪いに染まったまま残る。カードは小刻みに震える）
+   ※毒の侵食演出は呪術用ではない（2026-11-25 作者訂正。当初の作者メモの指定ミス）。毒演出は将来移植する「蛇の狂人」用で、その移植時に作り直す */
+.tb-seat.gx-curse, .tb-seat.gx-cursed { z-index: 8; }
+.tb-seat.gx-curse .tb-card { animation: gx-curse-darken 1.7s ease-in both, gx-curse-shiver .15s linear 8; }
+.tb-seat.gx-curse::after, .tb-seat.gx-cursed::after { content: "呪"; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(var(--cw) * 1.05); line-height: 1;
+  color: rgba(216, 180, 254, .92); text-shadow: 0 0 6px rgba(147, 51, 234, .95), 0 0 20px rgba(59, 7, 100, .95), 0 2px 4px rgba(0, 0, 0, .85);
+  background: radial-gradient(circle at 50% 50%, rgba(59, 7, 100, .88), rgba(8, 3, 18, .94) 74%), radial-gradient(circle at 10% 6%, rgba(0, 0, 0, .85), transparent 55%), radial-gradient(circle at 90% 94%, rgba(30, 10, 60, .82), transparent 55%); }
+.tb-seat.gx-curse::after { transform-origin: 50% 50%; animation: gx-curse-in 1.7s ease-in both; }
+.tb-seat.gx-cursed::after { opacity: .97; }
+.tb-seat.gx-cursed .tb-card { filter: brightness(.52) saturate(.5) contrast(1.12); }
+@keyframes gx-curse-darken { 0% { filter: none; } 35% { filter: brightness(.82) saturate(.8) contrast(1.08); } 100% { filter: brightness(.52) saturate(.5) contrast(1.12); } }
+@keyframes gx-curse-shiver { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-1.5px, .5px) rotate(-.6deg); } 50% { transform: translate(1.5px, -.5px) rotate(.6deg); } 75% { transform: translate(-1px, -1px) rotate(-.4deg); } 100% { transform: translate(1px, 1px) rotate(.4deg); } }
+@keyframes gx-curse-in { 0% { opacity: 0; transform: scale(.3) rotate(-7deg); } 45% { opacity: .8; } 100% { opacity: .97; transform: scale(1) rotate(0deg); } }
 
 /* =========================================================
    上皿天秤（js/stage.js の libraSync）— 天秤で投票が制限されているとき、選ばれた2人のカードを皿に載せる。
