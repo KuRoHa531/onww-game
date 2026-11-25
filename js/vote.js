@@ -842,6 +842,7 @@ window.ONW = window.ONW || {};
     const nm = (list) => list.map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、");
     const executed = ONW.vote.resolveChain(game, true);
     game.executed = executed;
+    if (ONW.beggar) ONW.beggar.resolveVote(game);   // 乞食: 連鎖が確定したあと・猫の解決より前に、死者の役職を盗む（マイクラ版 resolveBeggarSwaps の位置。beggarUsedIds で何度呼ばれても1回だけ）
     ONW.vote.resolveCats(game);   // シュレディンガーの猫: 自分に投票した人からランダムに1人選び、その人の陣営になる
     game.cursedWolfIds = ONW.vote.cursedWolfIds(game);   // 呪われし者: 吊られて人狼陣営になった人（結果の演出・役職履歴・勝敗用。人狼判定には数えない）
     game.assassinResult = (game.assassinList || []).map((a) => ({ by: a.id, target: a.target, hit: E(game, a.target) === R.MERLIN }));   // 結果の演出用
@@ -948,6 +949,10 @@ window.ONW = window.ONW || {};
       const vanityWin = ONW.vanity ? ids.filter((id) => role(id) === R.VANITY && !lostLover(id) && !shotLoseIds.includes(id) && ONW.vanity.wins(game, id, teams, w)) : [];
       vanityWin.forEach((id) => w.add(id));
       if (vanityWin.length && !teams.includes("ヴァニティ")) teams.push("ヴァニティ");
+      // 乞食（js/roles/neutral/beggar.js・追加勝利）: 役職を盗めずに乞食のまま死亡した人は、どの結果でも追加で勝利する。ただし保安官・ヴァニティの執行（死因 "shot"）や道化の爆弾魔の爆殺で死んだ場合は勝てない（マイクラ版 beggarDeathBlocksWin）。盗んだ人は取った役職として通常どおり判定される
+      const beggarWin = ONW.beggar ? ids.filter((id) => role(id) === R.BEGGAR && dead.has(id) && !lostLover(id) && ONW.beggar.staysBeggarWin(game, id, dead)) : [];
+      beggarWin.forEach((id) => w.add(id));
+      if (beggarWin.length && !teams.includes("乞食")) teams.push("乞食");
       // 破局師（マイクラ版の追加勝利）: 破局に成功した（恋人関係を1つでも壊した）カードを最終盤面で持っている人は、どの結果でも追加で勝利（死亡・追放は関係なし）。勝てなかった恋人（本人が恋人）は追加勝利しない
       const breakers = ids.filter((id) => role(id) === R.HEARTBREAKER && ONW.heartbreaker && ONW.heartbreaker.succeeded(game, id) && !lostLover(id));
       breakers.forEach((id) => w.add(id));
