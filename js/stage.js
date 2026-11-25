@@ -81,6 +81,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   const deadMark = (label) => DEAD_PRE + label;
   const FOXX_MARK = "__foxx";   // 妖狐投票で追放された妖狐の「🦊 追放」の面
   const FOX_MARK = "__fox";   // 呪殺された妖狐の「🦊」の面（待機時間にカードが裏返る）
+  const TANUKI_MARK = "__tanuki";   // 呪殺された妖狸の「たぬきマーク」の面（作者指定で🦊ではなく🦝＋「呪殺」。待機時間にカードが裏返る）
   const KEYOPEN_MARK = "__keyopen";   // 鍵師: 鍵のかかっていない「🔓」の面（役職名は出さない）
   const BLANK_MARK = "__blank";   // 抹消の人狼: 真っ白のカード（役職名も印も何も書かれていない面。抹消された相手のカードがめくれたとき）
   const BLANKX_MARK = "__blankx";   // 抹消の人狼: 抹消に失敗したとき（鍵のかかった対象）の面。🔒だけ出す
@@ -88,6 +89,11 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   const KEYTURN_MARK = "__keyturn";   // 🔓に🔑が差し込まれてまわる面（鍵をかける途中）
   const KEYTURNU_MARK = "__keyturnu"; // 🔒に🔑が差し込まれてまわる面（鍵をはずす途中）
   const SEAL_MARK = "__seal";   // 封印の狂人: 封印のお札が貼られた面（封印された人の失敗・封印された通知・封印の狂人が封印した相手のカード）
+  const DARKFALL_MARK = "__darkfall";   // 魔法少女: 闇堕ちしたときに本人だけに見せる面（黒い背景に赤い「闇落ち」の文字。待機時間・酔い覚めの闇堕ちで使う）
+  const DAUGHTER_MARK = "__daughter";   // マティアス／娘ちゃん: 娘ちゃんになったカードに出る「👧」の印（朝のめくり・待機時間の本人のめくりで使う。役職名は出さない）
+  const FLAT_MARK = "__flat";   // なのか／長夜月: 長夜がついたカードに出る「♭」の印（作者指定。朝に長夜月本人の画面でだけめくれる。役職名は出さない）
+  const COFFIN_MARK = "__coffin";   // なのか／羅刹: 愛する人のカードに出る「⚰️」の印（作者指定。朝に羅刹本人の画面でだけめくれる。役職名は出さない）
+  const COFFEE_PRE = "__coffee@";   // ケセド: コーヒータイムの面（"__coffee@秒数"。☕ ＋ 酔っ払いの背景の茶色・白バージョン ＋ カウントダウン。待機時間にケセドと渡された人の目線だけで使う）
   const KEY_MARKS = [KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK];
   const HACK_MARK = "__hack";   // 銀狼に見える、ハッキング対象の「⚠️」の印（役職名は出さない）
   const MUTE_MARK = "__mute";   // 口封じの狂人に見える、口封じされた人の「🤐」の印（役職名は出さない）
@@ -139,7 +145,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   // ---------------------------------------------------------
   const seatHtml = (k, label, cls) => `
     <div class="tb-seat ${cls || ""}" data-k="${k}">
-      <div class="tb-card"><div class="tb-inner"><div class="tb-back"><div class="tb-shot"><svg viewBox="0 0 100 100" aria-hidden="true"><g class="tb-crack"><path d="M50 50 L44 41 L46 33 L38 24 L40 14 L33 4 L34 -8"/><path d="M50 50 L58 43 L57 34 L66 28 L65 17 L73 9"/><path d="M50 50 L61 52 L68 47 L79 51 L85 44 L98 46"/><path d="M50 50 L58 60 L56 69 L66 76 L64 88 L72 98 L71 108"/><path d="M50 50 L42 59 L44 68 L35 74 L36 86 L27 94"/><path d="M50 50 L39 52 L33 58 L22 56 L15 63 L3 61"/><path d="M50 50 L41 45 L31 46 L24 38 L12 40"/><path d="M38 24 L28 25 L21 18"/><path d="M66 28 L76 31 L83 26"/><path d="M66 76 L76 73 L82 80"/><path d="M35 74 L26 70 L19 74"/></g><polygon class="tb-burst" points="50,40 55,43 61,41 59,47 64,51 58,54 60,60 53,57 49,62 46,56 39,58 42,52 37,48 44,47 43,41"/><circle class="tb-ring" cx="50" cy="50" r="5.6"/><circle class="tb-hole" cx="50" cy="50" r="4"/></svg></div></div><div class="tb-front"></div></div><div class="tb-bullet"><i></i></div><div class="tb-drunk"><span class="tb-beer">🍺</span><span class="tb-drunk-n"></span></div><div class="tb-marks"><div class="tb-wf">🐺</div><div class="tb-lov">❤</div><div class="tb-kp">♡</div><div class="tb-shuf">🔀</div><div class="tb-bd">🍺</div></div></div>
+      <div class="tb-card"><div class="tb-inner"><div class="tb-back"><div class="tb-shot"><svg viewBox="0 0 100 100" aria-hidden="true"><g class="tb-crack"><path d="M50 50 L44 41 L46 33 L38 24 L40 14 L33 4 L34 -8"/><path d="M50 50 L58 43 L57 34 L66 28 L65 17 L73 9"/><path d="M50 50 L61 52 L68 47 L79 51 L85 44 L98 46"/><path d="M50 50 L58 60 L56 69 L66 76 L64 88 L72 98 L71 108"/><path d="M50 50 L42 59 L44 68 L35 74 L36 86 L27 94"/><path d="M50 50 L39 52 L33 58 L22 56 L15 63 L3 61"/><path d="M50 50 L41 45 L31 46 L24 38 L12 40"/><path d="M38 24 L28 25 L21 18"/><path d="M66 28 L76 31 L83 26"/><path d="M66 76 L76 73 L82 80"/><path d="M35 74 L26 70 L19 74"/></g><polygon class="tb-burst" points="50,40 55,43 61,41 59,47 64,51 58,54 60,60 53,57 49,62 46,56 39,58 42,52 37,48 44,47 43,41"/><circle class="tb-ring" cx="50" cy="50" r="5.6"/><circle class="tb-hole" cx="50" cy="50" r="4"/></svg></div></div><div class="tb-front"></div></div><div class="tb-bullet"><i></i></div><div class="tb-drunk"><span class="tb-beer">🍺</span><span class="tb-drunk-n"></span></div><div class="tb-coffee"><span class="tb-coffee-ico">☕</span><span class="tb-coffee-n"></span></div><div class="tb-marks"><div class="tb-wf">🐺</div><div class="tb-lov">❤</div><div class="tb-kp">♡</div><div class="tb-shuf">🔀</div><div class="tb-bd">🍺</div></div></div>
       <div class="tb-name">${label}</div><div class="tb-badge"></div>
     </div>`;
   function build(g, list) {
@@ -192,7 +198,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   function icarusUsedUp(g, id) { return (g.icarusGiven || []).filter((x) => x === id).length >= (g.icarusMax || 1); }
   function pickable(k, m, g) {
     if (!m) return false;
-    if (k.startsWith("c:")) return (m.type === "night" || m.type === "morning") && m.role === "cosplayer";   // コスプレイヤー: 山札から出た3枚だけ押せる
+    if (k.startsWith("c:")) return (m.type === "night" || m.type === "morning") && (m.role === "cosplayer" || m.role === "nanoka");   // コスプレイヤー・なのか: 山札から出た3枚だけ押せる
     const me = ONW.net.myId(), isP = k.startsWith("p:");
     if (m.type === "straw") return isP && g.strawPick.some((c) => c.id === k.slice(2));   // 選べるのは、まだめくれていない人だけ
     if (m.type === "predict") return isP;   // 予想屋: 死亡した人も含めて誰でも選べる（自分も。2of4-b）
@@ -220,6 +226,8 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     }
     if (String(role).startsWith(SENSE_PRE)) { const sk = String(role).slice(SENSE_PRE.length), sf = SENSE_FACE[sk] || SENSE_FACE.village; return `<div class="tb-wolfmark tb-sense tb-sense--${SENSE_FACE[sk] ? sk : "village"}"><span>${sf[0]}</span><small>${esc(sf[1])}</small></div>`; }
     if (role === SEAL_MARK) return `<div class="tb-wolfmark tb-seal"><span class="tb-ofuda"><i>封</i><i>印</i><s></s></span></div>`;
+    if (role === DARKFALL_MARK) return `<div class="tb-wolfmark tb-darkfall"><span>闇落ち</span></div>`;   // 魔法少女の闇堕ち（黒い面に赤い文字。色は tb-team-darkfall）
+    if (String(role).startsWith(COFFEE_PRE)) return `<div class="tb-wolfmark tb-coffee-face"><span class="tb-coffee-big">☕</span><span class="tb-coffee-sec">${esc(String(role).slice(COFFEE_PRE.length))}</span></div>`;   // ケセドのコーヒー（☕とカウントダウン。背景は tb-team-coffee の茶×白）
     if (role === BLANK_MARK) return `<div class="tb-wolfmark tb-blank"></div>`;
     if (role === BLANKX_MARK) return `<div class="tb-wolfmark tb-key tb-key--locked"><span>🔒</span></div>`;
     if (role === KEYOPEN_MARK) return `<div class="tb-wolfmark tb-key"><span>🔓</span></div>`;
@@ -230,6 +238,9 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     if (role === BREAK_MARK) return `<div class="tb-wolfmark tb-love tb-break">💔</div>`;
     if (role === LOVE_MARK) return `<div class="tb-wolfmark tb-love">❤️</div>`;
     if (role === CUPID_MARK) return `<div class="tb-wolfmark tb-love">💘</div>`;
+    if (role === DAUGHTER_MARK) return `<div class="tb-wolfmark tb-love">👧</div>`;
+    if (role === FLAT_MARK) return `<div class="tb-wolfmark tb-flat"><span>♭</span><small>長夜</small></div>`;
+    if (role === COFFIN_MARK) return `<div class="tb-wolfmark tb-coffin"><span>⚰️</span><small>愛する人</small></div>`;
     if (role === KEEP_MARK) return `<div class="tb-wolfmark tb-love tb-keep">♡</div>`;
     if (role === SELF_LOVE) return `<div class="tb-wolfmark tb-master tb-love"><span>❤️</span><small>恋人</small></div>`;
     if (role === AVENGER_MARK) return `<div class="tb-wolfmark tb-avenger"><span>🔪</span><small>復讐相手</small></div>`;
@@ -237,6 +248,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     if (role === FOXSEE_MARK) return `<div class="tb-wolfmark tb-foxsee">🦊</div>`;
     if (String(role).startsWith(DEAD_PRE)) { const lb = String(role).slice(DEAD_PRE.length); return `<div class="tb-wolfmark tb-follow${lb.length > 3 ? " tb-follow--long" : ""}"><span>${esc(lb)}</span></div>`; }
     if (role === FOX_MARK) return `<div class="tb-wolfmark tb-fox"><span>🦊</span><small>呪殺</small></div>`;
+    if (role === TANUKI_MARK) return `<div class="tb-wolfmark tb-fox tb-tanuki"><span>🦝</span><small>呪殺</small></div>`;   // 妖狸の呪殺はたぬきマーク（作者指定）
     if (role === FOXX_MARK) return `<div class="tb-wolfmark tb-fox"><span>🦊</span><small>追放</small></div>`;
     if (role === MUTE_MARK) return `<div class="tb-wolfmark tb-mute"><span>🤐</span><small>口封じ</small></div>`;
     if (role === HACK_MARK) return `<div class="tb-wolfmark tb-hack"><span>⚠️</span><small>ハッキング</small></div>`;
@@ -279,6 +291,26 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const n = drunkLeft(g);
     s.classList.toggle("drunk", n !== null);
     const t = s.querySelector(".tb-drunk-n");
+    if (t) t.textContent = n === null ? "" : String(n);
+  };
+  /** コーヒータイムが終わるまでの残り秒数（ケセド）。出さない状況なら null。
+   *  終わるのは g.remain が g.coffeeUntil（ホストが待機時間に届けた値）以下になった瞬間。本人の画面だけ・昼の間だけ */
+  function coffeeLeft(g) {
+    if (g.phase !== ONW.PHASE.ONLINE_DAY || g.coffeeUntil == null || g.isDead || g.isSpectator || hostWatching(g)) return null;
+    if (g.remain == null) return null;
+    const n = g.remain - g.coffeeUntil;
+    return n > 0 ? n : null;
+  }
+  stage.coffeeLeft = coffeeLeft;   // net.js の送信ガード（コーヒータイム中は発言・COを送らない）が使う
+  /** 毎秒のタイマー更新で、自分のカードのコーヒーの数字だけを書き換える（drunkTick と対） */
+  stage.coffeeTick = function () {
+    const g = G(), el = $t();
+    if (!el) return;
+    const s = el.querySelector(`.tb-seat[data-k="p:${ONW.net.myId()}"]`);
+    if (!s) return;
+    const n = coffeeLeft(g);
+    s.classList.toggle("coffee", n !== null);
+    const t = s.querySelector(".tb-coffee-n");
     if (t) t.textContent = n === null ? "" : String(n);
   };
   // ---------------------------------------------------------
@@ -334,8 +366,8 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   function cosWant(g) {
     if (g.isSpectator || g.isDead || hostWatching(g) || !Array.isArray(g.cosplayCards) || !g.cosplayCards.length) return null;
     const P = ONW.PHASE;
-    if (g.phase === P.ONLINE_NIGHT && !g.nightDone && g.actRole === "cosplayer") return g.cosplayCards;
-    if (((g.phase === P.ONLINE_MORNING && !g.settling) || (g.phase === P.ONLINE_DAY && g.abilityOpen)) && g.morningChain === "cosplayer" && g.morningChainReady && !g.morningChainDone) return g.cosplayCards;
+    if (g.phase === P.ONLINE_NIGHT && !g.nightDone && (g.actRole === "cosplayer" || g.actRole === "nanoka")) return g.cosplayCards;
+    if (((g.phase === P.ONLINE_MORNING && !g.settling) || (g.phase === P.ONLINE_DAY && g.abilityOpen)) && (g.morningChain === "cosplayer" || g.morningChain === "nanoka") && g.morningChainReady && !g.morningChainDone) return g.cosplayCards;
     return null;
   }
   function cosClear() {
@@ -516,14 +548,14 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
       if (role === CUR && curv[k]) role = `${CUR}@wolf`;   // 呪われし者の2回目の面（赤色の名前）
       if (role === CAT && catv[k]) role = `${CAT}@${catv[k].team}${catv[k].sfx ? "@" + catv[k].sfx : ""}`;   // 2回目の面（陣営の色）
       if (!hideOthers && role && bnt[k] && bnt[k] !== "by") { const br = String(role).startsWith(CAT + "@") ? CAT : String(role).startsWith(CUR + "@") ? CUR : role; if (ONW.roles.getInfo(br)) role = `${BNT}@${bnt[k]}@${br}`; }   // 賞金稼ぎに選ばれたカードは手配書の面
-      if (!hideOthers && isP && curse[k]) role = curse[k] === true ? FOX_MARK : curse[k] === FOXX_MARK ? FOXX_MARK : deadMark(curse[k]);   // 呪殺された妖狐のカードは、待機時間から結果発表まで🦊の面のまま
+      if (!hideOthers && isP && curse[k]) role = curse[k] === true ? FOX_MARK : curse[k] === FOXX_MARK ? FOXX_MARK : curse[k] === TANUKI_MARK ? TANUKI_MARK : deadMark(curse[k]);   // 呪殺された妖狐のカードは、待機時間から結果発表まで🦊の面のまま（妖狸はたぬきマークの面）
       if (hideOthers && isP && role) rec[k] = { role, dead: !!flipped };
       const mkey = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) || "" : "";   // 模倣先があとから届いたときも描き直す
       if (role && (s.dataset.role !== role || (s.dataset.mimic || "") !== mkey)) {
         s.dataset.role = role; s.dataset.mimic = mkey;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role, k);
-        f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith(TB + "@") ? "village" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === LOVE_MARK || role === CUPID_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === HACK_MARK ? "hack" : role === FOX_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith(TB + "@") ? "village" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === FLAT_MARK || role === COFFIN_MARK ? "third" : role === LOVE_MARK || role === CUPID_MARK || role === DAUGHTER_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : String(role).startsWith(COFFEE_PRE) ? "coffee" : role === DARKFALL_MARK ? "darkfall" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === HACK_MARK ? "hack" : role === FOX_MARK || role === TANUKI_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : ONW.roles.getInfo(role).team}`;
       }
       const sel = (k.startsWith("c:") && !!m && (m.type === "night" || m.type === "morning") && !!g.nightSel && g.nightSel.pick === +k.slice(2)) || (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning" || m.type === "dictate" || m.type === "shoot" || m.type === "steal" || m.type === "barrier" || m.type === "yomi" || m.type === "icarus" || m.type === "goranshin" || m.type === "rejob" || m.type === "mind" || m.type === "exchange" || m.type === "libra" || m.type === "predict") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
@@ -553,6 +585,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
       // 道連れ・暗殺を選んでいる人のカードは、選び終わるまで揺れ続ける（選んでいるアサシン本人の画面では、同時に選んでいる他の人の「？」は揺らさない）
       s.classList.toggle("choosing", !!(isP && (g.strawShake || []).includes(k.slice(2)) && (!hideOthers || k.slice(2) === me)));
       s.classList.toggle("drunk", isP && k.slice(2) === me && drunkLeft(g) !== null);   // 酔っ払い（未覚醒）本人の画面だけ: 自分のカードが黄×白のしまになり、🍺と「酔いが覚めるまで」の秒数が出る
+      s.classList.toggle("coffee", isP && k.slice(2) === me && coffeeLeft(g) !== null);   // ケセドのコーヒータイム本人の画面だけ: 自分のカードに☕と「コーヒータイム終了まで」の秒数が出る（酔っ払いと同時なら下段。CSS の .tb-coffee）
       s.classList.toggle("jobup", jobKeys.includes(k));   // 就職先の画面でめくれたフリーターの青い光と札
       s.classList.toggle("mindup", mindKeys.includes(k));
       s.classList.toggle("senseup", !!senseKeys[k]); Object.keys(SENSE_FACE).forEach((c) => s.classList.toggle("sense-" + c, senseKeys[k] === c));   // 感覚の占い師が感じ取った相手のカード: 気配の色の光と「👁 気配」の札   // 心眼の人狼が見抜いた相手のカードの紫の光と札
@@ -581,6 +614,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     libraSync(g);   // 天秤: 皿に載せる（paint の後始末。席を動かすだけで、カードの見た目は変えない）
     emKick(g);      // 選挙管理委員: 投票の矢印（見える人だけ。投票の画面以外では消す）
     stage.drunkTick();
+    stage.coffeeTick();
   }
 
   // ---------------------------------------------------------
@@ -672,8 +706,8 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
         if (!(p.step > 0) || !booted || dead[k] || released[k]) return true;
         if (!chainPend[k]) { chainPend[k] = true; later(() => { released[k] = true; stage.sync(G()); }, p.step * CHAIN_STEP_MS); }
         return false;
-      }).forEach((p) => { const k = `p:${p.id}`; if (!dead[k]) { dead[k] = true; if (!(p.shot && !p.fox && !p.fx)) badge[k] = p.fox ? "呪殺" : p.fx || p.mark || "死亡"; deathMarks.push(k); if (booted && ONW.sound && !p.shot) { const dk = (g.dealStart || 0) + ":death:" + p.id; if (p.fox) ONW.sound.seKey("curse_kill", (g.dealStart || 0) + ":curse:" + p.id, 60000); else if (p.mark === "道連れ") ONW.sound.seKey("chain", dk, 60000); else if (p.mark === "後追い" || p.mark === "心中" || p.mark === "王国滅亡") ONW.sound.seKey("follow_death", dk, 60000); } } if (p.fox && !curse[k]) { curse[k] = true; badge[k] = "呪殺"; } if (p.fx === "追放" && !curse[k]) { curse[k] = FOXX_MARK; badge[k] = "追放"; } if (p.mark && !curse[k]) { curse[k] = p.mark; badge[k] = p.mark; } });   // 呪殺された妖狐は、昼の議論中もずっと🦊の灰色（観戦・再入室でも同じ）
-      if (g.settleFoxQuiet) (g.settleFox || []).forEach((id) => { const k = `p:${id}`; curse[k] = true; badge[k] = "呪殺"; }); if (g.settleFoxQuiet) (g.settleFoxChain || []).forEach((e) => { const k = `p:${e.id}`; curse[k] = e.label; badge[k] = e.label; }); if (g.settleMadQuiet) (g.settleMad || []).forEach((e) => { const k = `p:${e.id}`; curse[k] = e.label; badge[k] = e.label; });   // 発狂も同じく（再入室は演出なしで灰色）   // 待機時間のうちに再入室: 演出なしで🦊の灰色
+      }).forEach((p) => { const k = `p:${p.id}`; if (!dead[k]) { dead[k] = true; if (!(p.shot && !p.fox && !p.fx)) badge[k] = p.fox || p.tanuki ? "呪殺" : p.fx || p.mark || "死亡"; deathMarks.push(k); if (booted && ONW.sound && !p.shot) { const dk = (g.dealStart || 0) + ":death:" + p.id; if (p.fox || p.tanuki) ONW.sound.seKey("curse_kill", (g.dealStart || 0) + ":curse:" + p.id, 60000); else if (p.mark === "道連れ") ONW.sound.seKey("chain", dk, 60000); else if (p.mark === "後追い" || p.mark === "心中" || p.mark === "王国滅亡") ONW.sound.seKey("follow_death", dk, 60000); } } if (p.fox && !curse[k]) { curse[k] = true; badge[k] = "呪殺"; } if (p.tanuki && !curse[k]) { curse[k] = TANUKI_MARK; badge[k] = "呪殺"; } if (p.fx === "追放" && !curse[k]) { curse[k] = FOXX_MARK; badge[k] = "追放"; } if (p.mark && !curse[k]) { curse[k] = p.mark; badge[k] = p.mark; } });   // 呪殺された妖狐は、昼の議論中もずっと🦊の灰色（観戦・再入室でも同じ）
+      if (g.settleFoxQuiet) (g.settleFox || []).forEach((id) => { const k = `p:${id}`; curse[k] = true; badge[k] = "呪殺"; }); if (g.settleFoxQuiet) (g.settleFoxChain || []).forEach((e) => { const k = `p:${e.id}`; curse[k] = e.label; badge[k] = e.label; }); if (g.settleTanukiQuiet) (g.settleTanuki || []).forEach((id) => { const k = `p:${id}`; curse[k] = TANUKI_MARK; badge[k] = "呪殺"; }); if (g.settleTanukiQuiet) (g.settleTanukiChain || []).forEach((e) => { const k = `p:${e.id}`; curse[k] = e.label; badge[k] = e.label; });   // 妖狸の呪殺も同じく、たぬきマークの灰色（再入室は演出なし） if (g.settleMadQuiet) (g.settleMad || []).forEach((e) => { const k = `p:${e.id}`; curse[k] = e.label; badge[k] = e.label; });   // 発狂も同じく（再入室は演出なしで灰色）   // 待機時間のうちに再入室: 演出なしで🦊の灰色
     }
     paint(g);
     // 朝になったら、夜の選択が実行される演出（占い=表に / 怪盗・墓荒らし=入れ替わって表に / いたずらっ子=入れ替わる）
@@ -919,7 +953,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     get dead() { return dead; }, get curse() { return curse; }, get badge() { return badge; }, get dkb() { return dkb; }, get shin() { return shin; }, get gx() { return gx; },
     get asn() { return asn; }, get bnt() { return bnt; }, get veil() { return veil; }, get alm() { return alm; }, get catv() { return catv; }, get curv() { return curv; }, get tbv() { return tbv; }, get tbh() { return tbh; }, get fqv() { return fqv; },
     get mindKeys() { return mindKeys; }, get senseKeys() { return senseKeys; }, senseMark: (key) => SENSE_PRE + key, get starKeys() { return starKeys; }, get queenKeys() { return queenKeys; }, get flashKeys() { return flashKeys; }, get queenFlashKeys() { return queenFlashKeys; }, get kingKeys() { return kingKeys; }, get kingFlashKeys() { return kingFlashKeys; },
-    WOLF_MARK, FOX_MARK, FOXX_MARK, FOXSEE_MARK, deadMark, DUO_MARK, MASTER_MARK, BONE_MARK, TARGET_MARK, AVENGER_MARK, MUTE_MARK, HACK_MARK, LOVE_MARK, CUPID_MARK, BREAK_MARK, KEEP_MARK, KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK, BLANK_MARK, BLANKX_MARK, SEAL_MARK,
+    WOLF_MARK, FOX_MARK, TANUKI_MARK, FOXX_MARK, FOXSEE_MARK, deadMark, DUO_MARK, MASTER_MARK, BONE_MARK, TARGET_MARK, AVENGER_MARK, MUTE_MARK, HACK_MARK, LOVE_MARK, CUPID_MARK, DAUGHTER_MARK, FLAT_MARK, COFFIN_MARK, BREAK_MARK, KEEP_MARK, KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK, BLANK_MARK, BLANKX_MARK, SEAL_MARK, DARKFALL_MARK, COFFEE_PRE,
     /** 席 k のカードを左右に揺らす（失敗の演出。鍵師の「🔒に弾かれる」と同じ揺れ） */
     cosplay: { ensure: (c, f) => cosEnsure(c, f), clear: () => cosClear(), keep: (v) => { cosKeep = !!v; } },
     shake(k) { const el = $t(), card = el && el.querySelector(`[data-k="${k}"] .tb-card`); if (card && card.animate) card.animate([{ transform: "translateX(0)" }, { transform: "translateX(-9px) rotate(-4deg)" }, { transform: "translateX(9px) rotate(4deg)" }, { transform: "translateX(-6px) rotate(-2deg)" }, { transform: "translateX(0)" }], { duration: 520, easing: "ease-in-out" }); },

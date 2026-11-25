@@ -255,7 +255,7 @@ window.ONW = window.ONW || {};
   function roleLists() {
     const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi", "carmen", "knight", "trailblazer"]);
     const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman", "mad_priest"]), dark = ["dark_avatar"];
-    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher", "vanity", "beggar"]);
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher", "vanity", "beggar", "magical_girl", "matthias", "chesed", "yokai_tanuki", "nanoka"]);   // 娘ちゃん(daughter)と なのかの形態3種は内部専用役職なので配役設定の一覧には出さない
     return { village, wolfLike, madLike, dark, third };
   }
 
@@ -810,13 +810,14 @@ window.ONW = window.ONW || {};
       const libra = info.libra ? `<div class="si-h">昼の行動（天秤）</div>${row(esc(info.libra.by), `→ <strong>${esc(info.libra.a)}</strong> と <strong>${esc(info.libra.b)}</strong> に投票対象を制限`)}` : "";   // 観戦者には、使った人と選ばれた2人を出す
       const predict = (info.predict || []).length ? `<div class="si-h">昼の行動（予想屋）</div>${info.predict.map((x) => row(esc(x.by), `→ <strong>${esc(x.text)}</strong> と予想`)).join("")}` : "";   // 観戦者には、予想屋が決めた予想を出す（投票が始まるまで選び直せるので、そのときの最新）
       const sense = (info.sense || []).length ? `<div class="si-h">昼の行動（感覚の占い師）</div>${info.sense.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.key ? `気配: <strong>${esc(ONW.senseSeer.feelLabel(x.key))}</strong>` : "")).join("")}` : "";   // 観戦者には、使った事実と感じた気配を出す（観戦者は全員の役職が見える）
+      const photo = (info.photo || []).length ? `<div class="si-h">昼の行動（三月なのか）</div>${info.photo.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.key ? `写真の気配: <strong>${esc(({ village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" })[x.key] || "")}</strong>` : "")).join("")}` : "";   // 観戦者には、撮影した事実と写った気配を出す
       const rnm = (r) => esc(ONW.roles.getInfo(r).name), FAIL = { target_locked: "ロックされて失敗", aa_blocked: "ロックされて失敗", dead: "対象が先に死亡" };
       const eraser = (info.eraser || []).length ? `<div class="si-h">抹消（抹消の人狼）</div>${info.eraser.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.before ? (x.before === x.after ? `<span class=\"rs-dim\">変化なし</span>` : `<strong>${rnm(x.before)}</strong> → <strong>${rnm(x.after)}</strong>`) : `<span class="rs-dim">${esc(FAIL[x.fail] || "まだ抹消されていません")}</span>`)).join("")}` : "";
       const sl = info.seal || { rows: [], sealed: [] };
       const seal = sl.rows.length || sl.sealed.length ? `<div class="si-h">封印（封印の狂人）</div>${sl.rows.map((x) => row(`${esc(x.by)}${x.target ? ` → ${esc(x.target)}` : ""}`, x.fail ? `<span class="rs-dim">封印されていたため失敗</span>` : "封印しました")).join("")}${sl.sealed.length ? row("封印されている人", `<strong>${sl.sealed.map(esc).join("、")}</strong>`) : ""}` : "";
       const major = (info.major || []).length ? `<div class="si-h">救済（少佐）</div>${info.major.map((x) => row(`${esc(x.by)} → ${esc(x.target)}`, x.before ? (x.before === x.after ? `<span class="rs-dim">変化なし</span>` : `<strong>${rnm(x.before)}</strong> → <strong>${rnm(x.after)}</strong>`) : `<span class="rs-dim">${esc(x.fail === "target_locked" ? "ロックされていて失敗" : x.fail === "aa_blocked" ? "特殊な力で失敗" : x.fail === "dead" ? "昼になる前に死亡" : x.fail === "sealed" ? "封印されていて失敗" : "まだ救済されていません")}</span>`)).join("")}` : "";
       const finger = (info.finger || []).length ? `<div class="si-h">初期役職の確認（指読み）</div>${info.finger.map((x) => row(esc(x.by), (x.targets || []).map((y) => `${esc(y.name)}: <strong>${rnm(y.role)}</strong>`).join("、") || `<span class="rs-dim">まだ確認していません</span>`)).join("")}` : "";   // 観戦者には、確認した人と見えた役職を出す（蜃気狼はランダムに見えた役職）
-      body = live + votes + mind + sense + libra + predict + eraser + major + finger + seal + log + mimicInfo + trailInfo || `<div class="si-log">まだ記録はありません。</div>`;
+      body = live + votes + mind + sense + photo + libra + predict + eraser + major + finger + seal + log + mimicInfo + trailInfo || `<div class="si-log">まだ記録はありません。</div>`;
     }
     const html = `<div class="night-info__head"><span>夜ログ</span><button class="cb-toggle" onclick="ONW.ui.toggleSpecInfo()">${open ? "▾ 閉じる" : "▸ 開く"}</button></div>` +
       (open && info ? `<div class="si-body">${body}</div>` : "");
@@ -1296,7 +1297,11 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     const sense = game.mindRole === "sense_seer";   // 感覚の占い師も同じ操作欄を使う（昼能力ボタン → カードを選ぶ → 確定）
-    const head = sense
+    const photo = game.mindRole === "mitsuki_nanoka";   // 三月なのかの写真撮影も同じ操作欄を使う
+    const head = photo
+      ? `<p class="night-step__hint"><strong>三月なのかの昼能力「写真撮影」</strong>: 上のテーブルから、<strong>写真を撮る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
+      <p class="night-step__hint">「撮影する」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人陣営・人狼陣営・第三陣営</strong>のどの気配かが写真に写ります。使えるのは1回だけで、取り消せません。写真は情報確認で見返せます。</p>`
+      : sense
       ? `<p class="night-step__hint"><strong>感覚の占い師の昼能力</strong>: 上のテーブルから、<strong>気配を感じ取る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「感じ取る」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人・人狼・狂っている・第三陣営・恋人陣営</strong>のどの気配かがわかります。使えるのは1回だけで、取り消せません。妖狐を感じ取っても呪殺しません。</p>`
       : `<p class="night-step__hint"><strong>心眼の人狼の昼能力</strong>: 上のテーブルから、<strong>最終役職を見抜く相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
@@ -1306,7 +1311,7 @@ window.ONW = window.ONW || {};
       ${head}
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
-      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.mindConfirm()">${sense ? "感じ取る" : "見抜く"}</button><button class="btn" onclick="ONW.ui.mindCancel()">キャンセル</button></div>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.mindConfirm()">${photo ? "撮影する" : sense ? "感じ取る" : "見抜く"}</button><button class="btn" onclick="ONW.ui.mindCancel()">キャンセル</button></div>
     </div>`;
   };
   /** 交換者: 選んだ2人の票数を入れ替える（確定）。確定すると取り消せない。議論は続く */
@@ -1712,6 +1717,7 @@ window.ONW = window.ONW || {};
   };
   ui.updateTimer = function () {
     if (ONW.stage && ONW.stage.drunkTick) ONW.stage.drunkTick();   // 酔っ払い: 自分のカードの「酔いが覚めるまで」を毎秒更新
+    if (ONW.stage && ONW.stage.coffeeTick) ONW.stage.coffeeTick();   // ケセド: 自分のカードの「コーヒータイム終了まで」を毎秒更新
     const g = ONW.game, el = document.getElementById("phase-label");
     if (!el) return;
     const base = g.phase === ONW.PHASE.ONLINE_SPECTATE ? `観戦中（${PHASE_LABEL[g.specPhase] ?? "―"}）` : phaseName(g);
@@ -2138,7 +2144,7 @@ window.ONW = window.ONW || {};
     const winTeam = res.abandoned ? "none" : res.title.startsWith("村人") ? "village" : res.title.startsWith("人狼") ? "wolf" : "third";
     const none = (t) => L(`<span class="rs-dim">${t}</span>`);
     const chainRows = ONW.chainRows(res);
-    const chainSec = chainRows.length ? `${sep}${H("道連れ・後追い")}${chainRows.map((r) => r.k === "sub" ? L(`<span class="rs-info">${r.major ? "少佐" : "従者"}:</span> ${esc(r.name)} が ${esc(r.master)} の身代わりになりました。`) : r.k === "chainSub" ? L(`<span class="rs-info">従者:</span> ${esc(r.name)} が ${esc(r.master)} の道連れの身代わりになりました。`) : L(`${r.by ? `${esc(r.by)} <span class="rs-dim">→</span> ` : ""}${esc(r.name)} <span class="rs-dead">${r.label}</span>`)).join("")}` : "";
+    const chainSec = chainRows.length ? `${sep}${H("道連れ・後追い")}${chainRows.map((r) => r.k === "sub" ? L(`<span class="rs-info">${r.major ? "少佐" : "従者"}:</span> ${esc(r.name)} が ${esc(r.master)} の身代わりになりました。`) : r.k === "msub" ? L(`<span class="rs-info">娘ちゃん:</span> ${esc(r.name)} が ${esc(r.master)} の身代わりになりました。`) : r.k === "chainSub" ? L(`<span class="rs-info">従者:</span> ${esc(r.name)} が ${esc(r.master)} の道連れの身代わりになりました。`) : L(`${r.by ? `${esc(r.by)} <span class="rs-dim">→</span> ` : ""}${esc(r.name)} <span class="rs-dead">${r.label}</span>`)).join("")}` : "";
     return `
       <section class="panel result-sheet">
         ${opts.preview ? "" : `${res.foxVote ? `${H("妖狐投票結果")}
@@ -2185,7 +2191,7 @@ window.ONW = window.ONW || {};
             [...(res.knightInfo || []).map((x) => L(`<span class="rs-info">${x.tb ? "存護" : "騎士"}:</span> ${esc(x.text)}`))],
             [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : []),
       ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${(x.loseNames || x.names).length ? `${(x.loseNames || x.names).map(esc).join("、")} が爆発して敗北しました。` : ""}${(x.keepNames || []).length ? `殉職者 ${x.keepNames.map(esc).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`))],
-            [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
+            [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`)), ...(res.matthiasPairs || []).map((p) => L(`<span class="rs-info">マティアス:</span> ${esc(p[0])} は ${esc(p[1])} を娘ちゃんにしていました。`)), ...(res.cheseds || []).map((p) => L(`<span class="rs-info">ケセド:</span> ${esc(p.by)} は ${esc(p.target)} を占い（${esc(p.result)}）、結果とコーヒーを ${esc(p.recipient)} に渡していました。`)), ...(res.nanokaLong || []).map((p) => L(`<span class="rs-info">長夜月:</span> ${esc(p.by)} は ${esc(p.target)} に長夜をつけていました。`)), ...(res.nanokaLove || []).map((p) => L(`<span class="rs-info">羅刹:</span> ${esc(p.by)} の愛する人は ${esc(p.target)} でした。`))],
             [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`)), ...(res.hacks || []).map((x) => L(`<span class="rs-info">銀狼:</span> ${esc(x.by)} は ${esc(x.target)} をハッキングしていました。${x.fake ? `（${esc(x.target)} は ${esc(x.fake)} と思い込んでいました${x.cut ? "が、黄泉に断ち切られました" : ""}）` : ""}`))],
             [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`)), ...(res.trails || []).map((x) => L(`<span class="rs-info">開拓者:</span> ${esc(x.by)} は ${esc(x.name)}の運命を歩んでいました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
             ...((res.detective && res.detective.boards) || []).map((b) => {   // 名探偵情報（マイクラ版 buildDetectiveResultLines と同じ。名探偵ごとに1組）

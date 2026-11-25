@@ -38,7 +38,7 @@
   const coText = (role, names) => `${ONW.roleDef(role) ? (ONW.ROLE_INFO[role] || {}).name : role}が${names.join("と")}に能力を使っていました。`;
   const NONE_TEXT = "対象を選ぶ夜能力は使われていませんでした。";
   /** 2人を対象にする夜能力（マイクラ版 twoTargetRoles） */
-  const TWO = ["troublemaker", "gremlin", "cupid", "evil_woman"];
+  const TWO = ["troublemaker", "gremlin", "cupid", "evil_woman", "chesed"];   // chesed: ケセド（マイクラ版 twoTargetRoles に入る。占い先とコーヒーを渡した相手の2人）
   /** CO・騙りで「使われていた」と言える役職: 配役にあり、夜に対象を選ぶ能力を持つ（墓荒らしは墓地だけなので除く） */
   const nightRoles = (k, g) => ONW.roleIds().filter((r) => r !== "poet" && r !== "relic_robber" && (ONW.roleDef(r) || {}).night && k.roleInSetup(g, r));
   const claimOf = (g, role, ids) => ({ short: `${(ONW.ROLE_INFO[role] || {}).name} → ${ids.map((x) => nameIn(g, x)).join("・")}`, text: coText(role, ids.map((x) => nameIn(g, x))), claim: { kind: "poet", role, targets: ids } });

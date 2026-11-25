@@ -4,6 +4,10 @@
  * ・誰かが死亡したとき、生存している乞食は（1回だけ）その死者の役職と自分の役職（乞食）を交換する。
  *   交換した相手（死者）は村人になる。乞食は取った役職の人として、そのままその役職の勝敗で判定される。
  * ・取れない役職（生存または死亡が勝利条件に含まれる役職・本物の人狼・妖狐など。EXCLUDED_ROLES と構造的な除外）はスルーする。
+ * ・魔法少女は、闇堕ちしている場合のみ取れない（マイクラ版 isBeggarSwapExcludedTarget が magicalGirlDarkFallenIds にいる人だけを
+ *   対象外にしているのと同じ。2026-11-25 の作者決定で乞食側をマイクラ版に合わせて修正）。闇堕ちの判定は昼開始時点
+ *   （Web版では待機時間の開始）なので、朝の即時交換の時点ではまだ誰も闇堕ちしておらず、夜に死んだ魔法少女は取れる。
+ *   昼開始後に闇堕ちした魔法少女が昼中・投票で死亡した場合は取れない。
  * ・交換の試行は1回だけ（失敗しても消費する。マイクラ版 beggarUsedIds）。
  * ・昼中に死んだ人からは、その場で交換する（即時交換）。投票で死んだ人からは、投票の解決中（連鎖が確定したあと・猫の解決より前）に交換する。
  * ・乞食のまま死亡した場合は追加勝利する。ただし保安官・ヴァニティの執行（死因 "shot"）や道化の爆弾魔の爆殺で死んだ場合は勝てない
@@ -37,18 +41,20 @@
   /**
    * 取れない役職（マイクラ版 isBeggarSwapExcludedTarget の明示リスト。即時版と投票版の和集合）。
    * 生存または死亡が勝利条件に含まれる役職が中心。Web版にまだ無い役職（detective_ghost 等）も、入ったときに自動で効くよう含めてある。
+   * 魔法少女はマイクラ版の明示リストには無く、「闇堕ちした人だけ」が別枠で対象外になる（excludedTarget で判定する）。
    */
   const EXCLUDED_ROLES = [
     "opportunist", "tanner", "love_tanner", "matthias", "daughter", "pure_lover", "evil_woman",
     "bounty_hunter", "detective_ghost", "yokai_tanuki", "beggar", "long_night_moon", "watcher",
     "lawyer", "jester_bomber", "jester_ghost", "god", "shuffler", "martyr", "demon_duke",
-    "fox", "tenacious_madman", "jester_madman", "magical_girl",
+    "fox", "tenacious_madman", "jester_madman",
   ];
   /** その人（死者）の役職が取れるか。マイクラ版 isBeggarSwapExcludedTarget: 実効役職で判定する */
   function excludedTarget(g, targetId) {
     const r = eff(g, targetId);
     if (!r) return true;
     if (EXCLUDED_ROLES.includes(r)) return true;
+    if (r === "magical_girl" && ONW.magicalGirl && ONW.magicalGirl.isDark(g, targetId)) return true;   // 魔法少女は闇堕ちしている場合のみ取れない（マイクラ版: magicalGirlDarkFallenIds にいる人だけ除外。闇堕ち判定は昼開始時点なので、朝の即時交換では未確定＝取れる）
     if ((ONW.WOLF_KIND || []).includes(r)) return true;                       // 本物の人狼の役職は取れない
     if ((g.promotedWolfIds || []).includes(targetId)) return true;           // 昇格して人狼になった人も取れない
     if (ONW.isLover && ONW.isLover(g, targetId)) return true;                // 恋人になっている人は取れない

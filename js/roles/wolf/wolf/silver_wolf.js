@@ -83,7 +83,7 @@
    *  ・思い込み役職が コスプレイヤー・模倣の人狼・開拓者 のときも、偽の操作画面・偽の演出が出る（コスプレ=山札から偽の3枚 / 模倣の人狼=偽の模倣先の役職 / 開拓者=偽の運命の役職。hackfix_11）。 */
   const UNSUP_UI = [];   // 以前は コスプレイヤー・模倣の人狼・開拓者 だけ操作画面を出さなかった。いまは3役職とも偽の画面・演出が出るので空（互換のために残す）
   const AUTO_SKIP = ["robber", "troublemaker"];
-  const WOLFVIEW = ["werewolf", "big_wolf", "white_wolf", "tofu_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "cultist", "merlin", "demon_duke"];
+  const WOLFVIEW = ["werewolf", "big_wolf", "white_wolf", "tofu_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "cultist", "merlin", "demon_duke", "yokai_tanuki"];
   const pool = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])].filter((r) => r && !NO_FAKE.includes(r));
   const rnd = (g) => { const p = pool(g); return p.length ? pick(p) : "villager"; };
   const shuf = (a) => a.slice().sort(() => Math.random() - 0.5);
@@ -140,8 +140,8 @@
       if (real && real.note) m.note = real.note;   // 説明文だけ借りる（仲間・墓地などの本当の情報は使わない）
       const V = H.view(g, p.id), nm = (id) => nameOf(g, id);
       if (WOLFVIEW.includes(fake)) {
-        const pre = fake === "cultist" || fake === "demon_duke" ? "人狼の気配" : fake === "merlin" ? "人狼" : "仲間の人狼";
-        const W = fake === "merlin" || fake === "demon_duke" ? V.wolvesAll : V.wolves;   // マーリン・魔界公爵には一匹狼も見える（本物と同じ）
+        const pre = fake === "cultist" || fake === "demon_duke" || fake === "yokai_tanuki" ? "人狼の気配" : fake === "merlin" ? "人狼" : "仲間の人狼";
+        const W = fake === "merlin" || fake === "demon_duke" || fake === "yokai_tanuki" ? V.wolvesAll : V.wolves;   // マーリン・魔界公爵・妖狸には一匹狼も見える（本物と同じ）
         m.text = W.length ? `${pre}: ${W.map(nm).join("、")}` : pre === "仲間の人狼" ? "仲間の人狼はいません。" : "見える人狼はいません。";
         if (W.length) m.cultWolves = W.slice();
         if (fake === "big_wolf") { m.bigGraves = V.graves.slice(); m.text2 = `墓地: ${V.graves.map((cr, i) => `${i + 1}枚目「${c.rn(cr)}」`).join(" ")}`; }
@@ -213,6 +213,11 @@
         if (!H.cosValid(g, id, pk, d)) return { text: null, rev: { kind: "cosplay", cards, pick: null, role: null } };
         const role = d.roles[pk], s = sh(role);
         return { text: `山札から3枚めくり、「${rn(s)}」にコスプレしました。あなたの新しい役職は「${rn(s)}」です。`, rev: { kind: "cosplay", cards, pick: pk, role: s }, newRole: role };
+      }
+      if (fake === "chesed") return t(`${A}を占い、${B}にコーヒーを渡しました。`);   // ケセドと思い込んだ人（マイクラ版の偽ケセド文と同じ。本物の記録・コーヒータイムには影響しない）
+      if (fake === "nanoka") {   // なのかと思い込んだ人: 選んだ形態に「なった」ことにする（マイクラ版の偽なのか文「○○になりました。」と同じ。朝の演出も本物と同じ rev.kind "nanoka"。本物の盤面・記録には影響しない）
+        const FORMS = ["long_night_moon", "mitsuki_nanoka", "rasetsu"], pk = Number.isInteger(sel.pick) && sel.pick >= 0 && sel.pick < 3 ? sel.pick : Math.floor(Math.random() * 3), form = FORMS[pk];
+        return { text: `${rn(form)}になりました。`, rev: { kind: "nanoka", cards: FORMS.slice(), pick: pk, role: form } };
       }
       return a ? t(`${A} を選びました。`) : t(null);
     },

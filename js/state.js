@@ -101,6 +101,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   ONW.chainRows = (res) => {
     const rows = [];
     (res.servantSubs || []).forEach((x) => rows.push({ k: "sub", name: x.servant, master: x.major ? (x.target || x.master) : x.master, major: !!x.major }));
+    (res.matthiasSubs || []).forEach((x) => rows.push({ k: "msub", name: x.daughter, master: x.matthias }));   // 娘ちゃんの犠牲（執行・投票・連鎖のどれでも）
     const hist = res.history || [];
     (res.chainOrder || []).forEach((id) => {
       const h = hist.find((q) => q.id === id && q.cause === "chain");
@@ -171,7 +172,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
    *     確認: node _wip/groupcheck.js .（登録もれがあれば FAIL。node _wip/viewall.js . の一覧にも出る）
    *  【必須・役職追加のたびに入れること】並びは js/roleorder.js の ONW.ROLE_ORDER(wikiの順)の末尾にIDを足す(groups の数字では並ばない)。確認: node _wip/orderAll.js .
    * ===================================================================================== */
-  ONW.ROLE_BOUND_KEYS = ["carmenTarget", "loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "mimicRole", "sealTargets", "avengerTargets", "pranksterPicks", "reverserTarget", "lawyerClient", "lawyerClientRole", "majorTargets", "mosesBonus"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。
+  ONW.ROLE_BOUND_KEYS = ["carmenTarget", "loveTargets", "freeterTargets", "freeterHist", "visitorTargets", "servantMasters", "servantNotified", "execTargets", "gremlinPicks", "muzzleTargets", "pureLoverTargets", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "mimicRole", "sealTargets", "avengerTargets", "pranksterPicks", "reverserTarget", "lawyerClient", "lawyerClientRole", "majorTargets", "mosesBonus", "matthiasDaughters", "nanokaMode", "nanokaLongNightTarget", "nanokaLoveTarget", "nanokaPhotoTarget"];   // 例: 一目惚れしてるてる(loveTargets[持ち主ID] = 選んだ相手のID)。役職に紐づく状態を足すときはここへ。matthiasDaughters[持ち主ID] = 娘ちゃんのカードIDの配列（娘側はカードで追うので、値の中身は移動では書き換えない）。なのかの4キーは nanoka.js: 形態・長夜の相手・愛する人・撮影した相手（すべて持ち主IDキー。値の中身は書き換えない）
   const holderKeyOfGrave = (i) => "g:" + i;
   ONW.setRoleBound = (g, key, holderId, value) => { (g[key] = g[key] || {})[holderId] = value; if ((key === "pureLoverTargets" || key === "akujoHonmei" || key === "cupidPair") && ONW.pureLover) { const c = ONW.cardAt(g, holderId); (g.pureLoverGen = g.pureLoverGen || {})[c] = ((g.pureLoverGen || {})[c] || 0) + 1; ONW.pureLover.note(g, []); } };   // 選び直したカードは、新しい恋人関係（次の番号）   // 純愛者が選んだ瞬間も、結果画面の「恋人の印」の履歴に残す
   ONW.getRoleBound = (g, key, holderId) => (g[key] || {})[holderId];
@@ -212,6 +213,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     (g.pureLoverGen = g.pureLoverGen || {})[cd.at[dstId]] = ((g.pureLoverGen || {})[cd.at[dstId]] || 0) + 1;   // コピー先のカードは別の恋人関係（次の番号）
     if (carry && val !== undefined) (g[carry] = g[carry] || {})[dstId] = ((carry === "pureLoverTargets" || carry === "watchdogOwners") && val === dstId) ? srcId : (Array.isArray(val) ? val.slice() : val);
     if (carry2 && val2 !== undefined) (g[carry2] = g[carry2] || {})[dstId] = val2;
+    if (ONW.matthias) ONW.matthias.copyLinks(g, srcId, dstId, role, true);   // マティアス／娘ちゃんのコピー: 娘をコピーした人は同じ親の娘に、マティアスをコピーした人は娘の関係もコピーする（マイクラ版 copyMatthiasDaughterMarker）
     if (role === ONW.ROLE.EVIL_WOMAN) ["akujoHonmei", "akujoKeep"].forEach((k) => { if (g[k] && g[k][dstId] === dstId) g[k][dstId] = srcId; });   // 悪女: 本命・キープがコピー先本人なら、コピー元に付け替える（自分自身は選べない）
     const t = (g.roleTrail = g.roleTrail || {});
     (t[dstId] = t[dstId] || []).push(role);
@@ -303,6 +305,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     if (g.shufflerMarks) delete g.shufflerMarks[cd.at[toId]];   // 上書きされたカードの上のシャッフラーの印は消える
     if (g.pureLoverTargets) delete g.pureLoverTargets[toId];   // 上書きされた役職の純愛者の記録は消す（あとで古い記録が復活しないように）
     if (ONW.mimic && ONW.mimic.isBorrow(role)) { if (g.mimicRole && g.mimicRole[fromId]) g.mimicRole[toId] = g.mimicRole[fromId]; else ONW.mimic.choose(g, toId); }   // 模倣の人狼をコピーしたら、模倣先も同じ（マイクラ版と同じ）。9of9: コピー元に模倣先がなければ決める   // 開拓者をコピーしたら運命も同じ（マイクラ版 copyTrailblazerFate）
+    if (ONW.matthias) ONW.matthias.copyLinks(g, fromId, toId, role, false);   // マティアス／娘ちゃんのコピー: 娘をコピーした人は同じ親の娘になる（マティアスは引き継がず、朝のうちに自分で選ぶ）
     const t = (g.roleTrail = g.roleTrail || {});
     (t[toId] = t[toId] || []).push(role);
     (cd.trail[toId] = cd.trail[toId] || []).push(cd.at[toId]);   // カードは同じ（役職だけが変わる）
@@ -340,6 +343,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     ONW.fixServants(g); if (ONW.avenger) ONW.avenger.fix(g); if (ONW.prankster) ONW.prankster.fix(g);
     if (ONW.fixExecutioners) ONW.fixExecutioners(g);
     ONW.shufflerStamp(g, toId);   // 結果画面: 置かれた段階に「(+シャッフラー)」
+    if (ONW.nanoka) ONW.nanoka.assignDerived(g, toId);   // なのかの形態が置かれたら、長夜・愛する人の対象をその場で割り当てる（マイクラ版 assignSilentNanokaDerivedTarget）
     if (ONW.pureLover) ONW.pureLover.note(g, [toId]);
     return role;
   };

@@ -68,16 +68,17 @@ if (ONW.kingActive && ONW.kingActive(g, target) && ONW.kingProtected(g, target, 
 if (ONW.mimic.isAs(g, target, r.CAT_PUMPKIN) &&!ONW.hiddenDrunk(g, target) &&!ONW.seal.is(g, target)) { out.mode = "pumpkin"; out.kind = "outsider"; out.victims = [target]; out.tomo = [by]; out.followIds = [target, by]; return out;}
 // シュレディンガーの猫: 誰も死なない。猫はヴァニティ陣営に固定される（マイクラ版 sheriffCatTeam。模倣ヴァニティなら模倣保安官と同じ人狼陣営）
 if (role === r.SCHRODINGER_CAT) { if (!ONW.sheriff.catFixed(g, target)) { out.mode = "cat"; out.kind = "outsider"; out.catFix = true; out.catTeam = out.mimic ? "wolf" : "vanity";} return out;}
-const sub = ONW.sheriff.substituteOf(g, target); // 従者の身代わり（執行と同じ条件）
+const msub = ONW.matthias ? ONW.matthias.daughterSubForShot(g, target) : null; // マティアス: 娘ちゃんの犠牲が従者の身代わりより先（マイクラ版）
+const sub = msub || ONW.sheriff.substituteOf(g, target); // 従者の身代わり（執行と同じ条件）
 if (ONW.sheriff.isHit(g, target)) {
 out.mode = "hit"; out.kind = "outsider";
-if (sub) { out.sub = sub; out.victims = [sub]; out.keepVictory = [sub];} // 従者が身代わりに撃たれる（勝利条件は失わない）
+if (sub) { out.sub = sub; if (msub) out.msub = msub; out.victims = [sub]; out.keepVictory = msub ? [] : [sub];} // 従者が身代わりに撃たれる（勝利条件は失わない）。娘ちゃんが犠牲のときは撃たれた人として勝利条件を失う
 else out.victims = [target];
 return out;
 }
 // 村人陣営を撃った: 対象が死に（執行と同じ）、ヴァニティは死なずに正体に気づく（作者確認済みの仕様）
 out.mode = "aware"; out.kind = "village";
-if (sub) { out.sub = sub; out.victims = [sub]; out.keepVictory = [sub];}
+if (sub) { out.sub = sub; if (msub) out.msub = msub; out.victims = [sub]; out.keepVictory = msub ? [] : [sub];}
 else out.victims = [target];
 return out;
 }
@@ -129,7 +130,8 @@ function lines(g, nm) {
 return (g.vanityShots || []).map((e) => {
 const by = nm(e.by), tg = nm(e.target), sub = e.sub? nm(e.sub): "";
 let info = "";
-if (e.mode === "hit" && e.sub) info = `${by} はヴァニティです。${tg} は村人陣営ではない人でしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
+if (e.mode === "hit" && e.msub) info = `${by} はヴァニティです。${tg} はマティアスでしたが、娘ちゃん ${sub} が犠牲になって執行を回避しました（${tg} は無傷）。`;
+else if (e.mode === "hit" && e.sub) info = `${by} はヴァニティです。${tg} は村人陣営ではない人でしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
 else if (e.mode === "hit") info = `${by} はヴァニティです。${tg} は村人陣営ではない人でした。${tg} が撃たれ、勝利条件と投票権を失いました。`;
 else if (e.mode === "aware" && e.sub) info = `${by} はヴァニティです。${tg} は村人陣営でしたが、従者 ${sub} が身代わりに撃たれました。${by} は自分の正体がヴァニティだと気づきました。`;
 else if (e.mode === "aware") info = `${by} はヴァニティです。${tg} は村人陣営でした。${tg} が撃たれ、${by} は自分の正体がヴァニティだと気づきました。`;
@@ -138,7 +140,8 @@ else if (e.mode === "guarded") info = `${tg} は他に人狼判定の人がい�
 else if (e.mode === "cat") info = `${tg} はシュレディンガーの猫でした。誰も死なず、${tg} は${e.catTeam === "wolf"? "人狼陣営": e.catTeam === "vanity"? "ヴァニティ陣営": "村人陣営"}に固定されました。`;
 else info = `${tg} はシュレディンガーの猫でしたが、すでに陣営が固定されていたため、何も起きませんでした。`;
 if (e.knightGuard && e.knightGuard.length) {
-if (e.mode === "hit") info = `${by} はヴァニティです。${tg} は村人陣営ではない人でしたが、騎士に守られ、死にませんでした。`;
+if (e.mode === "hit" && e.msub) info = `${by} はヴァニティです。${tg} はマティアスでした。娘ちゃん ${sub} が犠牲になろうとしましたが、騎士に守られ、死にませんでした。`;
+else if (e.mode === "hit") info = `${by} はヴァニティです。${tg} は村人陣営ではない人でしたが、騎士に守られ、死にませんでした。`;
 else if (e.mode === "aware") info = `${by} はヴァニティです。${tg} は村人陣営でしたが、騎士に守られ、死にませんでした。`;
 else info = `${tg} はネコカボチャでした。${tg} が撃たれ、道連れの ${e.knightGuard.map(nm).join("、")} は騎士に守られ、死にませんでした。`;
 }

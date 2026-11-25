@@ -44,7 +44,7 @@ window.ONW = window.ONW || {};
   /** CPUの夜行動（占い師系 → 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子の順）。占いは初期役職を見るので順序に影響されない。
    *  役職ごとの行動は各役職ファイルの cpuNight.run（order の小さい順）。ここは「誰が・いつ使うか」の枠組みだけ */
   cpu.runNight = function (g, stage, ids, plan) {   // plan（配列）を渡すと、段階の行動は実行せず計画 { roles, order, idx, actors, exec } だけを積む（net.js の runNightStage が人間と混ぜて順番を決める）
-    // stage: "init" | "seer" | "relic" | "doppel" | "shuffler" | "gremlin" | "robber" | "tm"（省略時は全部を起床順に実行）
+    // stage: "init" | "seer" | "chesed" | "relic" | "doppel" | "shuffler" | "gremlin" | "robber" | "tm"（省略時は全部を起床順に実行）
     const all = !stage;
     if (all || stage === "init") g.cpuInfo = {};
     g.cpuInfo = g.cpuInfo || {};

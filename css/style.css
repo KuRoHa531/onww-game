@@ -1662,6 +1662,19 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-beer { font-size: calc(var(--cw) * .42); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
 .tb-drunk-n { font-size: calc(var(--cw) * .5); line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: #e5232b; -webkit-text-stroke: calc(var(--cw) * .07) #000; paint-order: stroke fill; text-shadow: 0 0 1px #000, 0 1px 0 #000; }
 
+/* ---- ケセドのコーヒータイム: 本人の画面だけ。酔っ払いの茶色・白バージョン。自分のカードが茶×白のしまになり、☕と「コーヒータイム終了まで」の秒数が出る ---- */
+.tb-seat.coffee .tb-back { background: repeating-linear-gradient(45deg, #8a5a2b 0 4px, #ffffff 4px 8px); border-color: #6f4520; }
+.tb-seat.coffee .tb-back::after { content: ""; }
+.tb-coffee { display: none; position: absolute; inset: 0; z-index: 2; flex-direction: column; align-items: center; justify-content: space-evenly; pointer-events: none; }
+.tb-seat.coffee:not(.up) .tb-coffee { display: flex; }
+.tb-coffee-ico { font-size: calc(var(--cw) * .42); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.tb-coffee-n { font-size: calc(var(--cw) * .5); line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: #e5232b; -webkit-text-stroke: calc(var(--cw) * .07) #000; paint-order: stroke fill; text-shadow: 0 0 1px #000, 0 1px 0 #000; }
+/* 酔っ払いとコーヒーが同時: 上が黄×白の🍺、下が茶×白の☕の2段表示。片方が終われば片方だけに戻る */
+.tb-seat.drunk.coffee .tb-drunk { inset: 0 0 50% 0; }
+.tb-seat.drunk.coffee .tb-coffee { top: 50%; bottom: 0; background: repeating-linear-gradient(45deg, #8a5a2b 0 4px, #ffffff 4px 8px); }
+.tb-seat.drunk.coffee .tb-beer, .tb-seat.drunk.coffee .tb-coffee-ico { font-size: calc(var(--cw) * .34); }
+.tb-seat.drunk.coffee .tb-drunk-n, .tb-seat.drunk.coffee .tb-coffee-n { font-size: calc(var(--cw) * .4); }
+
 /* ---- 恋人（重複役職） ---- */
 .t-lover { color: #ff7eb6; }
 .tb-front.tb-team-love { border-color: #ff7eb6; }
@@ -1729,6 +1742,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .result-sheet .rs-tag-hackwolf { color: #ff5555; }
 .result-sheet .rs-tag-hackthird { color: #aaaaaa; }
 .result-sheet .rs-tag-cat { color: #aaaaaa; }   /* シュレディンガーの猫: 参照先が第三陣営の役職のときの「(+役職名)」 */
+.result-sheet .rs-tag-mgdark { color: #ff5555; }   /* 魔法少女: 闇堕ちした人の「(+人狼)」 */
+.result-sheet .rs-tag-mgvillage { color: #55ff55; }   /* 魔法少女: 闇堕ちしていない人の「(+村人)」 */
 .tb-front b .tb-catsfx { color: #aaaaaa; font-weight: 700; }   /* 「(+オポチュニスト)」は同じ行に灰色で続ける */
 
 /* ---- 処刑人: ターゲットの印（夜のはじめ・朝にターゲットのカードがめくれる） ---- */
@@ -2072,6 +2087,12 @@ body:has(.dbg-sheet) .snd-btn, body:has(.dbg-sheet) .snd-panel { visibility: hid
 .tb-seat.cursed .tb-front .tb-wolfmark.tb-fox small { color: #b9b9c4; }
 .tb-seat.cursed .tb-name { color: #a0a0ab; text-decoration: line-through; }
 
+/* ---- 妖狸: 呪殺された席（妖狐と同じ流れだが、面は🦊ではなくたぬきマーク。作者指定） ---- */
+.tb-front .tb-wolfmark.tb-tanuki { filter: drop-shadow(0 0 7px rgba(190,140,80,.95)); }
+.tb-front .tb-wolfmark.tb-tanuki small { color: #e8c491; }
+.tb-seat.cursed .tb-front .tb-wolfmark.tb-tanuki { filter: grayscale(1) drop-shadow(0 0 4px rgba(150,150,160,.8)); }
+.tb-seat.cursed .tb-front .tb-wolfmark.tb-tanuki small { color: #b9b9c4; }
+
 /* ---- 背徳者: 夜に見える妖狐の気配（🦊の印。役職名は出さない） ---- */
 .tb-front .tb-wolfmark.tb-foxsee { filter: drop-shadow(0 0 7px rgba(255,160,70,.9)); }
 
@@ -2173,6 +2194,12 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 
 /* ---- 封印の狂人: 封印のお札（失敗の演出 / 待機時間の封印マーク / 封印した相手のカード）---- */
 .tb-front.tb-team-seal { border-color: #c0392b; background: #2a1d1d; }
+.tb-front.tb-team-darkfall { background: #050505; border-color: #000; box-shadow: 0 0 18px rgba(255,30,30,.35), inset 0 0 22px rgba(0,0,0,1); }   /* 魔法少女の闇堕ち: 黒い背景に赤い「闇落ち」の文字 */
+.tb-front.tb-team-coffee { background: repeating-linear-gradient(45deg, #8a5a2b 0 6px, #ffffff 6px 12px); border-color: #6f4520; }   /* ケセドのコーヒー: 酔っ払い（黄×白）の茶色・白バージョン */
+.tb-front .tb-wolfmark.tb-coffee-face { flex-direction: column; gap: calc(var(--cw) * .04); }
+.tb-front .tb-coffee-big { font-size: calc(var(--cw) * .44); line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
+.tb-front .tb-coffee-sec { font-size: calc(var(--cw) * .5); line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: #e5232b; -webkit-text-stroke: calc(var(--cw) * .07) #000; paint-order: stroke fill; text-shadow: 0 0 1px #000, 0 1px 0 #000; }
+.tb-front .tb-wolfmark.tb-darkfall span { color: #ff2222; font-weight: 900; font-size: calc(var(--cw) * .30); letter-spacing: .08em; text-shadow: 0 0 10px rgba(255,0,0,.85); }
 .tb-front .tb-wolfmark.tb-seal { filter: drop-shadow(0 0 8px rgba(255,70,50,.9)); }
 /* お札: 白い縦長の紙・赤い太枠・黒の「封印」・下に赤い丸に×の判（縦書きの2文字を縦に積む） */
 .tb-front .tb-wolfmark.tb-seal .tb-ofuda { display: flex; flex-direction: column; align-items: center; justify-content: space-between; box-sizing: border-box; flex: 0 0 auto; width: calc(var(--cw) * .4); height: calc(var(--cw) * .86); padding: calc(var(--cw) * .05) 0; background: #fffdf8; border: max(1.5px, calc(var(--cw) * .045)) solid #d8321f; border-radius: 3px 2px 4px 2px; box-shadow: 0 0 0 1px #e9e4d8; transform: rotate(-6deg); animation: sealSlap .5s cubic-bezier(.3,1.6,.5,1); }

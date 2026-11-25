@@ -104,7 +104,7 @@ window.ONW = window.ONW || {};
     if (!f || !ONW.trailblazer || !ONW.trailblazer.FATES.includes(f)) return null;
     return game.initialRoles && game.initialRoles[id] === ONW.ROLE.TRAILBLAZER ? f : null;
   };
-  /** CPUの夜の能力先指定 { player?, players?, graves?, cosRole? }（cosRole: コスプレイヤーがコスプレする役職ID / "none"=コスプレしない） */
+  /** CPUの夜の能力先指定 { player?, players?, graves?, cosRole?, nanokaMode? }（cosRole: コスプレイヤーがコスプレする役職ID / "none"=コスプレしない。nanokaMode: なのかが変化する形態の役職ID） */
   debug.cpuTarget = function (game, id) {
     if (!game.debugOn || !game.dbg) return null;
     return (game.dbg.cpu || {})[id] || null;
@@ -313,7 +313,7 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one" };   // era: 抹消の人狼（抹消する相手を1人）
+  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one", matthias: "rob", chesed: "tm" };   // era: 抹消の人狼（抹消する相手を1人）/ matthias: 娘ちゃんにする相手を1人 / chesed: 占い先→コーヒーを渡す相手の2人（tm と同じ2人指定の形）
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
@@ -350,6 +350,7 @@ window.ONW = window.ONW || {};
       if ((t.players || []).length) parts.push(t.players.map((id) => esc(nameOfKey(id))).join(k.gr && !k.tm ? " → " : " と "));
       if ((t.graves || []).length) parts.push(t.graves.map((i) => `墓地${i + 1}`).join("・"));
       if (t.cosRole) parts.push(t.cosRole === "none" ? "コスプレしない" : `${esc(rn(t.cosRole))}にコスプレ`);
+      if (t.nanokaMode) parts.push(`${esc(rn(t.nanokaMode))}になる`);
       if (gwCur !== null) parts.push(`ギャンブラー票: ${gwCur}`);
       rk.forEach((x) => { const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null; if (cur) parts.push(`${esc(x.label)}: ${esc(nameOfKey(cur))}`); });
       if (rk.some((x) => x.kind === "hack") && (d.rand.hackFake || {})[s.key]) parts.push(`思い込ませる役職: ${esc(rn(d.rand.hackFake[s.key]))}`);
@@ -367,7 +368,7 @@ window.ONW = window.ONW || {};
         let body = "";
         if (!s.cpu) body = "";
         else if (mimicHint) body = hint("模倣先を指定すると、その役職の能力先（占う相手・墓地・ご主人など）を指定できます。下の「模倣先の固定」で選んでください。");
-        else if (rs && !Object.values(k).some(Boolean) && !rk.length) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
+        else if (rs && !Object.values(k).some(Boolean) && !rk.length && !rs.includes("nanoka")) body = hint(`この役職（${esc(rs.map(rn).join("・"))}）には、指定できる能力先がありません。`);
         else if (s.cpu) {
           if (k.seer || k.rob) body += sec(k.seer && k.rob ? "プレイヤー（占う相手 / 交換・一目惚れの相手）" : k.seer ? "プレイヤー（占う相手）" : "プレイヤー（交換・一目惚れの相手）", pb("cpuPlayer", (id) => t.player === id, selfOk ? players : others));   // 自分も選べる役職は、自分も指定できる
           if (k.one) body += sec("プレイヤー（反転を付ける相手 / 暴露する相手）", pb("cpuPlayer", (id) => t.player === id));   // 反転者・暴露狂人: 自分以外の1人
@@ -376,6 +377,7 @@ window.ONW = window.ONW || {};
           if (k.gr) body += sec("プレイヤー2人（コピー元 → コピー先の順に押す）", others.map((o) => { const ix = (t.players || []).indexOf(o.key); return b((ix >= 0 ? (ix === 0 ? "①元 " : "②先 ") : "") + esc(o.name), "cpuPlayers", [s.key, o.key], ix >= 0 ? "dbg-on" : ""); }).join(""));
           if (k.seer || k.rel) body += sec(k.seer ? `墓地（${seerMaxOf(s.key)}枚まで）` : "墓地（交換する1枚）", gb);
           if (k.cos) body += sec("コスプレする役職（山札の3枚に必ず入れて選ぶ）", ONW.sortByRoleOrder(ONW.cosplayer.pool()).map((r) => b(esc(rn(r)), "cpuCosRole", [s.key, r], t.cosRole === r ? "dbg-on" : "")).join("") + b("コスプレしない", "cpuCosRole", [s.key, "none"], t.cosRole === "none" ? "dbg-on" : ""));   // 山札(ELIGIBLE)の役職から。指定なしはランダム（夜に能力がある役職を好む）
+          if (rs.includes("nanoka")) body += sec("なのかの形態（変化する形態。指定なしはランダム）", ["long_night_moon", "mitsuki_nanoka", "rasetsu"].map((r) => b(esc(rn(r)), "cpuNanokaMode", [s.key, r], t.nanokaMode === r ? "dbg-on" : "")).join(""));
         }
         rk.forEach((x) => {   // 固定した役職（変化後も含む）が従者などなら、同じパネルで対象（ご主人など）を指定できる
           const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null;
@@ -452,6 +454,7 @@ window.ONW = window.ONW || {};
     { kind: "rejob", role: "freeter", label: "再就職", can: (g, id) => ONW.freeter.canRejob(g, id), targets: (g, id) => ONW.freeter.targets(g, id) },
     { kind: "mind", role: "mind_wolf", label: "見抜く", can: (g, id) => ONW.mindWolf.canUse(g, id), targets: (g, id) => ONW.mindWolf.targets(g, id) },
     { kind: "sense", role: "sense_seer", label: "感じ取る", can: (g, id) => ONW.senseSeer.canUse(g, id), targets: (g, id) => ONW.senseSeer.targets(g, id) },
+    { kind: "photo", role: "mitsuki_nanoka", label: "写真撮影", can: (g, id) => !!(ONW.nanoka && ONW.nanoka.photoCanUse(g, id)), targets: (g, id) => ONW.nanoka.photoTargets(g, id) },   // 三月なのか: 写真撮影（debugDayAbility の photo 分岐 → hostMind）
     { kind: "libra", role: "libra", label: "天秤", two: true, can: (g, id) => ONW.libra.canUse(g, id), targets: (g, id) => ONW.libra.targets(g) },
     { kind: "predict", role: "predictor", label: "予想", multi: true, can: (g, id) => ONW.predictor.canUse(g, id), targets: (g, id) => ONW.predictor.targets(g) },   // 予想屋: 死ぬと思う人を何人でも選んで「予想を決定」（multi）
   ];
@@ -657,6 +660,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.cpuCosRole = (id, role) => { setCpu(id, { cosRole: (data().cpu[id] || {}).cosRole === role ? null : role }); refresh(); };   // コスプレイヤー: コスプレする役職（押し直しで解除）
+  debug.cpuNanokaMode = (id, mode) => { setCpu(id, { nanokaMode: (data().cpu[id] || {}).nanokaMode === mode ? null : mode }); refresh(); };   // なのか: 変化する形態（押し直しで解除）
   debug.cpuClear = (id) => { delete data().cpu[id]; ui.pick = null; refresh(); };
 
   // 通常の再描画のあとに、デバッグ用の表示も追従させる

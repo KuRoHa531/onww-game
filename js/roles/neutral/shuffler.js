@@ -37,6 +37,9 @@
     "watcher",   // 静観者（マイクラ版 shufflerEligibleRoles の除外どおり。静観者のカードは交換・コピー・変化されない）
     "priest", "mad_priest",   // 神官・狂った神官（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補にも入っていない）
     "mimic_wolf", "mirage_wolf",   // 模倣の人狼・蜃気楼の人狼（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
+    "matthias", "daughter",   // マティアス・娘ちゃん（マイクラ版 shufflerEligibleRoles が両方とも除外。娘ちゃんは内部専用役職）
+    "chesed",   // ケセド（マイクラ版 shufflerEligibleRoles の除外どおり。夜に2人を選ぶ役職）
+    "nanoka",   // なのか（マイクラ版 shufflerEligibleRoles の除外どおり。形態3種は除外しない＝山札に入る。形態が置かれたら対象は state.js の assignDerived で割り当てる）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
   function pool() {

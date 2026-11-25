@@ -40,6 +40,7 @@
 
   /** 役職 role（持ち主 id）の気配の種類（蜃気狼・恋人は見ない。そこは judge）。昇格した狂人は人狼 */
   function classify(g, role, id) {
+    if (role === "magical_girl" && ONW.magicalGirl) return ONW.magicalGirl.isDark(g, id) ? "wolf" : "village";   // 魔法少女: 闇堕ちしていれば人狼の気配、いなければ村人の気配（マイクラ版 senseSeerMessage）
     if (id && (g.promotedWolfIds || []).includes(id) && MAD_ROLES.has(role)) return "wolf";
     if (WOLF_ROLES.has(role)) return "wolf";
     if (MAD_ROLES.has(role)) return "mad";

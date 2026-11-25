@@ -114,8 +114,9 @@
     if (role === r.SCHRODINGER_CAT) { if (!catFixed(g, target)) { out.mode = "cat"; out.catFix = true; if (rev) out.catTeam = "wolf"; } return out; }   // 模倣保安官が撃った猫は人狼陣営に固定（マイクラ版 sheriffCatTeam）
     if (rev ? isHitMimic(g, target) : isHit(g, target)) {
       out.mode = "execute";
-      const sub = substituteOf(g, target);
-      if (sub) { out.sub = sub; out.victims = [sub]; out.keepVictory = [sub]; }   // 従者が身代わりに撃たれる（勝利条件は失わない）。ご主人は無傷
+      const msub = ONW.matthias ? ONW.matthias.daughterSubForShot(g, target) : null;   // マティアス: 娘ちゃんの犠牲が従者の身代わりより先（マイクラ版 matthiasDaughterSubstituteForSheriffTarget）
+      const sub = msub || substituteOf(g, target);
+      if (sub) { out.sub = sub; if (msub) out.msub = msub; out.victims = [sub]; out.keepVictory = msub ? [] : [sub]; }   // 従者が身代わりに撃たれる（勝利条件は失わない）。娘ちゃんが犠牲のときは撃たれた人として勝利条件を失う（マイクラ版: 死因 "sacrifice" で preVoteDeadIds + noVoteIds。勝利条件の扱いは撃たれた人と同じ）
       else out.victims = [target];
       return out;
     }
@@ -168,6 +169,7 @@
       else if (e.rev && e.mode === "execute") info = `${by} は模倣保安官です。${tg} は人狼陣営ではありませんでした。${tg} が撃たれ、${lose}。`;
       else if (e.rev && e.mode === "misfire") info = `${by} は模倣保安官です。${tg} は人狼陣営でした。${by} が撃たれ、${lose}。`;
       else if (e.rev && e.mode === "cat") info = `${by} は模倣保安官です。${tg} はシュレディンガーの猫でした。誰も死なず、${tg} は人狼陣営に固定されました。`;
+      else if (e.mode === "execute" && e.msub) info = `${tg} はマティアスでしたが、娘ちゃん ${sub} が犠牲になって執行を回避しました（${tg} は無傷）。`;
       else if (e.mode === "execute" && e.sub) info = `${tg} は村人陣営ではない人でしたが、従者 ${sub} が身代わりに撃たれました（${tg} は無傷・${sub} は勝利条件を失いません）。`;
       else if (e.mode === "execute") info = `${tg} は村人陣営ではない人でした。${tg} が撃たれ、${lose}。`;
       else if (e.mode === "misfire") info = `${tg} は村人陣営でした。${by} が撃たれ、${lose}。`;
@@ -177,7 +179,8 @@
       else info = `${tg} はシュレディンガーの猫でしたが、すでに村人陣営に固定されていたため、何も起きませんでした。`;
       if (e.knightGuard && e.knightGuard.length) {   // 騎士に守られた（knight.js guardShot）: 死んだ人はいない（勝利条件・投票権も失わない）
         const pre = e.rev ? `${by} は模倣保安官です。` : "";
-        if (e.mode === "execute") info = `${pre}${tg} は${e.rev ? "人狼陣営ではありませんでした" : "村人陣営ではない人でした"}が、騎士に守られ、死にませんでした。`;
+        if (e.mode === "execute" && e.msub) info = `${pre}${tg} はマティアスでした。娘ちゃん ${sub} が犠牲になろうとしましたが、騎士に守られ、死にませんでした。`;
+        else if (e.mode === "execute") info = `${pre}${tg} は${e.rev ? "人狼陣営ではありませんでした" : "村人陣営ではない人でした"}が、騎士に守られ、死にませんでした。`;
         else if (e.mode === "misfire") info = `${pre}${tg} は${e.rev ? "人狼陣営" : "村人陣営"}でした。${by} は騎士に守られ、死にませんでした。`;
         else info = `${tg} はネコカボチャでした。${tg} が撃たれ、道連れの ${e.knightGuard.map(nm).join("、")} は騎士に守られ、死にませんでした。`;
       }

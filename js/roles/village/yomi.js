@@ -35,6 +35,7 @@
     shuffler: "シャッフラー", reversal: "反転", lover: "恋人", drunk: "酔っぱらい状態", exec: "処刑人の対象", avenger: "復讐者の対象", love_tanner: "愛する人",
     freeter: "フリーターの就職先", servant: "従者の主人", gremlin: "グレムリンの対象", fairy: "妖精さんの対象", seal: "封印", muzzle: "口封じ",
     exchanger: "交換者の対象", goranshin: "御乱心の対象", icarus: "イカロスの対象", forget: "忘却の人狼状態", dream: "狼夢人状態", hack: "ハッキング状態",
+    nanoka_love: "羅刹の愛する人", long_night: "長夜",
   };
   /** 使われた人に「断ち切られた」と分かる状態（マイクラ版 tellParticipantById の「黄泉通知」が出るもの）。Web版: 封印の解除・酔いが覚める */
   const TOLD = ["seal", "drunk", "forget", "dream", "hack"];
@@ -103,6 +104,8 @@
     if (dropPair(g.servantMasters, target)) cuts.push("servant");
     if (dropPair(g.gremlinPicks, target)) cuts.push("gremlin");
     if (dropPair(g.muzzleTargets, target)) cuts.push("muzzle");
+    if (dropPair(g.nanokaLoveTarget, target)) cuts.push("nanoka_love");   // 羅刹の愛する人（マイクラ版 yomiCutStates の nanoka_love）
+    if (dropPair(g.nanokaLongNightTarget, target)) cuts.push("long_night");   // 長夜月の長夜（マイクラ版 yomiCutStates の long_night）
     // 交換者・狂人の交換者: 使った人が target、または交換の2人のどちらかが target の交換を消す（マイクラ版 voteSwapPairs）
     if ((g.exchanges || []).some((e) => e.by === target || e.a === target || e.b === target)) { g.exchanges = g.exchanges.filter((e) => !(e.by === target || e.a === target || e.b === target)); cuts.push("exchanger"); }
     // 御乱心: 使った人が target、または選ばれた人が target の記録と、覚えていたランダムな先を消す

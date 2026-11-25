@@ -24,11 +24,11 @@
  */
 (function (ONW) {
   const R_ = () => ONW.ROLE.SMOKE_MADMAN;
-  /** 昼のはじめに死ぬことが決まっている席（すでに死亡・妖狐の呪殺とその連鎖・背徳者の発狂とその連鎖）。マイクラ版 preVoteDeadIds と同じ扱い: この席の煙幕の狂人は発動しない */
+  /** 昼のはじめに死ぬことが決まっている席（すでに死亡・妖狐と妖狸の呪殺とその連鎖・背徳者の発狂とその連鎖）。マイクラ版 preVoteDeadIds と同じ扱い: この席の煙幕の狂人は発動しない */
   function doomed(g) {
     const s = new Set(g.deadIds || []);
-    [...(g.foxSettleIds || []), ...(g.foxPending || []), ...(g.madSettleIds || []), ...(g.madPending || [])].forEach((id) => s.add(id));
-    [...(g.foxChainSettle || []), ...(g.madChainSettle || [])].forEach((e) => { if (e && e.id) s.add(e.id); });
+    [...(g.foxSettleIds || []), ...(g.foxPending || []), ...(g.tanukiSettleIds || []), ...(g.tanukiPending || []), ...(g.madSettleIds || []), ...(g.madPending || [])].forEach((id) => s.add(id));
+    [...(g.foxChainSettle || []), ...(g.tanukiChainSettle || []), ...(g.madChainSettle || [])].forEach((e) => { if (e && e.id) s.add(e.id); });
     return s;
   }
   /** いま煙幕を焚ける煙幕の狂人（最終盤面で持っている・模倣の人狼の模倣先でもよい・酔いが覚めている・封印されていない・昼のはじめに死なない） */
