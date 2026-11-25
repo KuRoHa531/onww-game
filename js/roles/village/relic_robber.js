@@ -19,6 +19,7 @@
       return;
     }
     ONW.swapGrave(g, p.id, idx);
+    const stolen = ONW.magician ? ONW.magician.trySteal(g, p.id, got, "relic_robber", "night") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら連鎖能力は使えない。見た役職は取った役職のまま。docs/magician.md）
     if (ONW.moses) ONW.moses.drewFromGrave(g, p.id);   // モーゼスを引いたら票数は1票（マイクラ版）
     i.mode = "relic"; i.graveIdx = idx; i.newRole = seen; i.known[p.id] = seen;
     g.nightLogsAll.push(ONW.watcher.graveText(`${n.rn("relic_robber")} ${p.name}`, idx0, idx, n.rn(got)) || `${n.rn("relic_robber")} ${p.name} は 墓地${idx + 1} と役職を交換し、${n.rn(got)} になりました。`);   // 静観者の札の墓地にずれたときは「墓地1と交換しようとしましたが、静観者だったため墓地3の…と交換しました。」
@@ -26,9 +27,9 @@
     i.relic = { graveIdx: idx, newRole: seen };
     if (got === ONW.ROLE.EXECUTIONER) { const tid = ONW.execTarget(g, p.id); if (tid) i.execTarget = tid; }   // 墓地から引いた処刑人: 新しいターゲットが決まっていて、引いた本人は朝に知る
     if (got === ONW.ROLE.SERVANT) { const mid = ONW.servantMaster(g, p.id); if (mid) i.master = mid; }   // 墓地から引いた従者: 新しいご主人が決まっていて、引いた本人は朝に知る（怪盗で奪った場合は役職名だけ）
-    // 交換後の役職に夜行動があれば、朝に使う（runNight の "morning" 段階）
+    // 交換後の役職に夜行動があれば、朝に使う（runNight の "morning" 段階）。魔法使いに奪われたときは使えない
     const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を使う
-    i.pendingChain = ONW.cpu.chainRoles("relic_robber").includes(ga) ? ga : null;
+    i.pendingChain = !stolen && ONW.cpu.chainRoles("relic_robber").includes(ga) ? ga : null;
     n.ob(p.id, [], [idx]);
     n.nn("relic_robber");
   }
@@ -105,11 +106,12 @@
         const got = g.center[i];
         if (ONW.hack && ONW.hack.blocks(got)) { c.hold(p.id, ONW.hack.fail(g, "relic", `${rn(c.eff(p))} ${p.name}`, `墓地${i + 1}`)); c.rev[p.id] = ONW.hack.failRev("g:" + i); return; }   // 銀狼のハッキングに阻まれて交換できない。墓地は動かず、新聞・観測にも載らない
         ONW.swapGrave(g, p.id, i);
+        const stolen = ONW.magician ? ONW.magician.trySteal(g, p.id, got, "relic_robber", "night") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら朝の連鎖能力は使えない。見た役職・演出は取った役職のまま。docs/magician.md）
         if (ONW.moses) ONW.moses.drewFromGrave(g, p.id);   // モーゼスを引いたら票数は1票
         g.nightLogsAll.push(ONW.watcher.graveText(`${rn(c.eff(p))} ${p.name}`, i0, i, rn(got)) || `${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
         hold(p.id, `墓地${i + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
         const ga = ONW.mimic.gotAct(g, p.id, got);   // 模倣の人狼を引いたら、模倣先の能力を朝のうちに使える（ga = 使う能力の役職。「〜を模倣しました」の文は下の gotInfo → mimic_wolf.got が出す）
-        if (ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; }
+        if (!stolen && ONW.roleCanChain(ga)) { g.morningAct[p.id] = ga; }
         rev[p.id] = ONW.mimic.tag(g, p.id, got, { kind: "relic", target: i, role: ONW.shownRole(got) });
         ONW.observeNote(g, p.id, [], [i], "relic_robber");
         ONW.newsNote(g, "relic_robber");
@@ -125,6 +127,7 @@
         ONW.swapGrave(g, id, idx);
         if (ONW.moses) ONW.moses.drewFromGrave(g, id);   // モーゼスを引いたら票数は1票
         const got = g.currentRoles[id];
+        if (ONW.magician) ONW.magician.trySteal(g, id, got, "relic_robber", "auto");   // 魔法使い: 変化後の役職を奪われる（奪われたら連鎖能力は使えない = after が最終役職を見て自動で止まる。docs/magician.md）
         const lines = [`墓地${idx + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`];
         g.nightLogsAll.push(ONW.watcher.graveText(`${c.label} ${c.me.name}`, idx0, idx, rn(got)) || `${c.label} ${c.me.name} は 墓地${idx + 1} と役職を交換し、${rn(got)} になりました。`);
         lines.push(...c.soberInfoLines(g, id, got));   // 模倣の人狼を引いたら「〜を模倣しています。」もここに入る（mimic_wolf.soberLines）

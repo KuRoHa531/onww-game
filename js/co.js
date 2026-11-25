@@ -82,7 +82,8 @@ window.ONW = window.ONW || {};
     if (kind === "hokma") return set({ step: "hokma", kind, chain });   // ホクマー: 対象を選ばず「昼時間を短縮していました。」の1択
     if (kind === "command") return set({ step: "command", kind, chain });   // 統率の人狼: 対象を選ばず「統率の人狼として人狼陣営の配置を確認していました。」の1択
     if (kind === "sam") return set({ step: "sam", kind, chain });   // サム: 対象を選ばず「サムに変身していました。」の1択
-    if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid" || kind === "chesed") return set({ step: "tm", kind, chain, sel: [] });   // chesed: 占い先 → コーヒーを渡した相手の2人
+    if (kind === "magician") return set({ step: "magicrole", kind, chain });   // 魔法使い: 奪った役職を選ぶ（マイクラ版の魔法使いCO。ロックで失敗の選択肢つき）
+    if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid" || kind === "chesed" || kind === "thread_spinner") return set({ step: "tm", kind, chain, sel: [] });   // chesed: 占い先 → コーヒーを渡した相手の2人 / thread_spinner: ペアにした2人
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
     if (kind === "love") return set({ step: "love", kind, chain });
@@ -128,6 +129,8 @@ co.poetPick = function (id) {
   co.pickHokma = function () { const h = hookOfKind("hokma"); if (h && h.fixedText) return done(h.fixedText, { kind: "hokma" }, null, "disclose", h.fixedShort); };   // ホクマーの結果開示: 固定文（マイクラ版のホクマーCO結果）をそのまま言う
   co.pickCommand = function () { const h = hookOfKind("command"); if (h && h.fixedText) return done(h.fixedText, { kind: "command" }, null, "disclose", h.fixedShort); };   // 統率の人狼の結果開示: 固定文（マイクラ版の統率の人狼CO結果）をそのまま言う
   co.pickSam = function () { const h = hookOfKind("sam"); if (h && h.fixedText) return done(h.fixedText, { kind: "sam" }, null, "disclose", h.fixedShort); };   // サムの結果開示: 固定文（マイクラ版のサムCO結果）をそのまま言う
+  co.magicRole = function (role) { const h = hookOfKind("magician"); if (h && h.pickRole) return done(...h.pickRole(role, K)); };   // 魔法使いの結果開示: 奪った役職を選ぶ（マイクラ版「○○を奪いました。」）
+  co.magicFail = function () { return done("ロックされていて失敗しました。", null, null, "disclose", "ロックで失敗"); };   // 魔法使いの結果開示: 封印・ロックで盗めなかった場合（マイクラ版の選択肢どおりの文面）
   // 代行者の結果開示（マイクラ版どおり: 指令を6種から選ぶ → 「対象を守れ」のときは対象を選ぶ。嘘もつける）
   co.pickAgentCmd = function (key) { if (key === "protect") return set({ step: "agenttgt", kind: "agent", chain: (G().co || {}).chain }); const h = hookOfKind("agent"); if (h && h.pickCommand) return done(...h.pickCommand(key, K)); };
   co.pickAgentTarget = function (id) { const h = hookOfKind("agent"); if (h && h.pickTarget) return done(...h.pickTarget(id, K)); };
@@ -136,7 +139,7 @@ co.poetPick = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
     if (s.kind === "gremlin") return set({ step: "gcopy", kind: "gremlin", chain: s.chain, sel });   // グレムリン: 2人(コピー元 → コピー先)を選んだら、コピーした役職を選ぶ
-    done(...(hookOfKind(s.kind === "gremlin" || s.kind === "evil_woman" || s.kind === "cupid" || s.kind === "chesed" ? s.kind : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先 / 悪女: 1人目が本命、2人目がキープ / キューピッド: 恋人にした2人 / ケセド: 1人目が占い先、2人目がコーヒーを渡した相手
+    done(...(hookOfKind(s.kind === "gremlin" || s.kind === "evil_woman" || s.kind === "cupid" || s.kind === "chesed" || s.kind === "thread_spinner" ? s.kind : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先 / 悪女: 1人目が本命、2人目がキープ / キューピッド: 恋人にした2人 / ケセド: 1人目が占い先、2人目がコーヒーを渡した相手 / 糸紡ぎ: ペアにした2人
   };
   co.gremlinRole = (role) => done(...hookOfKind("gremlin").pickRole(role, (G().co || {}).sel || [], K));   // コピーした役職（または「伏せる」）
   co.pickMason = function (id) {
@@ -184,6 +187,8 @@ co.poetPick = function (id) {
   co.infoBack = () => set({ step: "info" });
   co.visited = () => set({ step: "visited" });
   co.pickVisitor = (id) => done(...hookOfKind("visitor").infoVisited(id, K));
+  // カクテルを渡されたことを伝える（情報開示。マイクラ版 main.js のカクテル情報CO「カクテルが渡されてました。」。誰からかは言わない）
+  co.cocktailInfo = () => done("カクテルが渡されてました。", null, null, "disclose", "カクテルを渡された");
   // フリーターに就職されている（本家と同じ: 「誰がフリーターか」も伝えるかを選ぶ）
   co.freeterInfo = () => set({ step: "fjob" });
   co.freeterNoName = () => done(...hookOfKind("freeter").infoNoName());
@@ -325,6 +330,9 @@ co.poetPick = function (id) {
     } else if (s.step === "sam") {
       title = "結果開示";
       body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("サムに変身していました", "ONW.co.pickSam()") + back;
+    } else if (s.step === "magicrole") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">奪った役職を選んでください。</p>` + roleBtns("magicRole", btn("伏せる", "ONW.co.magicRole('hide')")) + btn("ロックされていて失敗しました", "ONW.co.magicFail()") + back;
     } else if (s.step === "command") {
       title = "結果開示";
       body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("統率の人狼として人狼陣営の配置を確認していました", "ONW.co.pickCommand()") + back;
@@ -373,7 +381,7 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedMenu()") + btn("反転されている", "ONW.co.reversedInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedMenu()") + btn("反転されている", "ONW.co.reversedInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()") + btn("カクテルを渡された", "ONW.co.cocktailInfo()");
     } else if (s.step === "sealedby") {
       title = "封印されていた";
       body = `<p class="night-step__hint">どちらに封印されていましたか？</p>` + btn("封印の狂人に封印されていた", "ONW.co.sealedInfo()") + btn("エルフリンデに封印されていた", "ONW.co.sealedInfoElf()") + back;

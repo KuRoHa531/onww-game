@@ -66,6 +66,7 @@
   function overwrite(g, t, role) {
     const card = ONW.cardAt(g, t), changed = g.currentRoles[t] !== role;
     g.currentRoles[t] = role;
+    if (ONW.threadSpinner) ONW.threadSpinner.losePair(g, t);   // 抹消された人が糸紡ぎなら、そのペアも消える（持ち主は敗北扱い。マイクラ版の役職変更時の owner_lost）
     ["akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "mindWolfTarget", "mindWolfSeen", "senseSeerTarget", "senseSeerSeen", "reverserTarget", "mosesBonus"].forEach((k) => { if (g[k]) delete g[k][t]; });
     if (g.reverserTarget) Object.keys(g.reverserTarget).forEach((h) => { if (g.reverserTarget[h] === t) delete g.reverserTarget[h]; });   // 対象についていた (+反転) も消える（反転者の持ち主の記録のうち、対象に付けたもの。docs/reverser.md）
     if (g.shufflerMarks) delete g.shufflerMarks[card];   // シャッフラーの印も消える
@@ -103,6 +104,7 @@
       const beforeRole = g.currentRoles[t], after = afterRole(beforeRole);
       const hadLover = breakLovers(g, t) > 0;
       overwrite(g, t, after);
+      if (ONW.threadSpinner) ONW.threadSpinner.removeByPlayer(g, t, "eraser");   // 抹消された人が糸紡ぎのペアのメンバーなら、そのペアは消える（糸紡ぎは敗北。マイクラ版 removeThreadPairsByPlayer "eraser"）
       const r = { actorId, targetId: t, beforeRole, afterRole: after, hadLover };
       g.eraserWolfResults.push(r); done.push(r);
     });

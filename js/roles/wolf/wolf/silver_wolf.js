@@ -60,6 +60,7 @@
       g.hackTarget[wolfId] = t;
       g.hackSource[t] = wolfId;
       g.hackRole[t] = fake;     // 同じ人を2人の銀狼がハッキングしたら、あとのほうが思い込みを上書きする（マイクラ版と同じ）
+      if (fake === "clone" && ONW.clone) ONW.clone.ensure(g, t);   // クローンと思い込んだ人: クローンの思い込み役職を決める（マイクラ版 ensureCloneThoughtRole。本人の表示とバーテンダーの認識に使う）
       if (ONW.observeNote) ONW.observeNote(g, wolfId, [t], null, ID);
       return t;
     },
@@ -83,7 +84,7 @@
    *  ・思い込み役職が コスプレイヤー・模倣の人狼・開拓者 のときも、偽の操作画面・偽の演出が出る（コスプレ=山札から偽の3枚 / 模倣の人狼=偽の模倣先の役職 / 開拓者=偽の運命の役職。hackfix_11）。 */
   const UNSUP_UI = [];   // 以前は コスプレイヤー・模倣の人狼・開拓者 だけ操作画面を出さなかった。いまは3役職とも偽の画面・演出が出るので空（互換のために残す）
   const AUTO_SKIP = ["robber", "troublemaker"];
-  const WOLFVIEW = ["werewolf", "big_wolf", "white_wolf", "tofu_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "command_wolf", "curse_wolf", "cultist", "merlin", "demon_duke", "yokai_tanuki"];
+  const WOLFVIEW = ["werewolf", "big_wolf", "white_wolf", "tofu_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "command_wolf", "curse_wolf", "negi_wolf", "cultist", "merlin", "demon_duke", "yokai_tanuki"];
   const pool = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])].filter((r) => r && !NO_FAKE.includes(r));
   const rnd = (g) => { const p = pool(g); return p.length ? pick(p) : "villager"; };
   const shuf = (a) => a.slice().sort(() => Math.random() - 0.5);
@@ -133,6 +134,7 @@
     },
     /** 1つの役職ぶんの偽の夜の表示（仲間の人狼・共有者の相方・大狼の墓地・銀狼のハッキング先・コスプレの3枚）。説明文（note）だけは本物の定義から借りる */
     baseView(c, p, fake) {
+      if (fake === "clone" && ONW.clone) return H.baseView(c, p, ONW.clone.ensure(c.g, p.id));   // クローンと思い込んだ人: 思い込み役職の偽の表示をそのまま使う（本物の情報は出さない）
       const g = c.g, d = ONW.roleDef(fake) || {};
       const m = { t: "night", text: "", text2: "", note: null, lines: null, godPeek: null, bigGraves: null, cultWolves: null, cmdReveal: null, masonMates: null, princessMates: null, lawyerClient: null, master: null };
       let real = null; const sv = g.initialRoles[p.id];
@@ -159,6 +161,7 @@
       else if (fake === "executioner") { m.text = V.target ? `あなたのターゲットは ${nm(V.target)} です。` : "ターゲットが見つかりませんでした。"; m.master = V.target ? { id: V.target, mark: "__target" } : null; }   // ターゲットのカードに🎯
       else if (fake === "cosplayer") { m.cosplay = { cards: shownList(H.cosDraw(g, p.id)) }; }   // 山札から偽の3枚がめくれる（選ぶと朝にコスプレの演出が出る）
       else if (fake === "hotaru") { m.cosplay = { cards: ["hotaru", "sam"] }; }   // 変身するかどうかの偽の2枚がめくれる（選ぶと朝にホタルの演出が出る。本物のホタルはハッキング対象外だが、思い込み先にはなる）
+      else if (fake === "bartender") { m.text = V.master ? `カクテルを${nm(V.master)}に渡しました。` : ""; }   // バーテンダーと思い込んだ人: 偽のカクテル通知（マイクラ版 showSilverWolfFakeNightInfo の BARTENDER。本物の対象・酔いには影響しない。相手は銀狼側の安定したランダムな相手）
       return m;
     },
     /** 偽の夜の表示（夜の始まり）。本当の情報は出さない。模倣の人狼・開拓者は、偽の模倣先 / 偽の運命の役職の表示を合流させる（本物の mimic_wolf.js / trailblazer.js と同じ形） */
@@ -214,6 +217,7 @@
       if (fake === "seal_madman") return t(`${A} を封印しました。`);
       if (fake === "elfrinde") return t(`${A} を封印しました。`);   // エルフリンデと思い込んだ人: 封印の狂人と同じ偽の結果文（本物の盤面・封印には影響しない）
       if (fake === "mercenary") return t(`${A}を護衛しました。`);   // 傭兵と思い込んだ人（マイクラ版の偽傭兵文と同じ。本物の記録・守りには影響しない）
+      if (fake === "thread_spinner") return t(`${A}と${B}をペア状態にしました。`);   // 糸紡ぎと思い込んだ人（マイクラ版の偽糸紡ぎ文と同じ。本物のペア・記録には影響しない）
       if (fake === "mimic_wolf") return t(`あなたは ${R()} の能力を模倣しました。`);
       if (fake === "cosplayer") {   // 山札から偽の3枚 → 選んだ1枚にコスプレ（選んでいなければ3枚とも山札へ戻る）。朝の演出は本物と同じ rev.kind "cosplay"
         const d = id ? H.cosDraw(g, id) : null;
@@ -258,8 +262,8 @@
       return (g.hackPub[key] = v);
     },
     /**
-     * 愉快犯の笑い声・麻婆豆腐の完成を、思い込んでいる役職の目線で出すか（1人1回）。ハッキングされた人にだけ使う。
-     *   kind "mapo": 麻婆の人狼と思い込んでいて、偽の夜の表示で仲間の人狼が見えている人 / kind "prankster": 愉快犯と思い込んで対象を選んだ人
+     * 愉快犯の笑い声・麻婆豆腐／冷奴の完成を、思い込んでいる役職の目線で出すか（1人1回）。ハッキングされた人にだけ使う。
+     *   kind "mapo": 麻婆の人狼と思い込んでいて、偽の夜の表示で仲間の人狼が見えている人 / kind "hiyayakko": 葱の人狼と思い込んでいて、偽の夜の表示で仲間の人狼が見えている人 / kind "prankster": 愉快犯と思い込んで対象を選んだ人
      * 出す時点で印を付ける（再入室でも出さない・戻すときは seen で調べる）。create が false なら印だけ調べる
      */
     fakeBanner(g, id, kind, create) {
@@ -267,9 +271,9 @@
       const key = kind + "Banner:" + id;
       if (g.hackPub[key]) return true;
       if (!create || !H.isFakeUi(g, id) || (ONW.seal && ONW.seal.is(g, id))) return false;
-      const want = kind === "mapo" ? "mapo_wolf" : "prankster";
+      const want = kind === "mapo" ? "mapo_wolf" : kind === "hiyayakko" ? "negi_wolf" : "prankster";
       if (g.hackRole[id] !== want && H.actOf(g, id) !== want) return false;
-      if (kind === "mapo" ? !H.view(g, id).wolves.length : !(((g.nightSels || {})[id] || {}).players || []).length) return false;
+      if (kind === "prankster" ? !(((g.nightSels || {})[id] || {}).players || []).length : !H.view(g, id).wolves.length) return false;
       return (g.hackPub[key] = true);
     },
     /** 偽の暴露狂人が対象を選んだら、昼の始まりにその人の画面にだけ出す偽の暴露（結果の役職は盤面と墓地からランダムに1回だけ決める）。resolveFake・偽の連鎖から呼ぶ */
@@ -339,7 +343,7 @@
       return g.hackSub[id] || (g.hackSub[id] = H.drawSub(g, f));
     },
     /** 夜の操作・朝の結果・昼能力に使う役職（模倣の人狼・開拓者は偽の模倣先 / 運命の役職。それ以外は思い込み役職そのもの） */
-    actOf(g, id) { const f = (g.hackRole || {})[id]; return H.isBorrowRole(f) ? H.subOf(g, id) : f || null; },
+    actOf(g, id) { const f = (g.hackRole || {})[id]; if (f === "clone" && ONW.clone) return ONW.clone.ensure(g, id); return H.isBorrowRole(f) ? H.subOf(g, id) : f || null; },   // クローンと思い込んだ人: 夜の操作・朝の結果・昼能力は、クローンの思い込み役職のものになる
     /** 本人に配るカードの下の枠: 模倣の人狼は偽の模倣先の役職ID / 開拓者は "fate:<運命>"。それ以外は null */
     cardMimic(g, id) {
       if (!H.isFakeUi(g, id)) return null;
@@ -400,6 +404,10 @@
         r.rev.mimic = nr === "trailblazer" ? T.viewOf(sub) : sub;   // カードの下の枠（模倣先 / 運命）
         if (nr === "mimic_wolf") { eat(H.gotParts(g, id, nr, r.rev, false)); lines.push(ONW.mimic.text(roleName, sub)); }
         else lines.push(T.text(T.fateOfRole(sub)));
+        eat(H.gotParts(g, id, sub, r.rev, true));
+      } else if (nr === "clone" && ONW.clone) {   // 偽の墓荒らし・ドッペルでクローンを手にしたと思い込んだ人: 思い込み役職を決めて、その役職の情報・連鎖にする（枠は付けない。本人はその役職だと思っている）
+        const sub = ONW.clone.ensure(g, id);
+        r.chainRole = sub;
         eat(H.gotParts(g, id, sub, r.rev, true));
       } else eat(H.gotParts(g, id, nr, r.rev, false));
       if (peek.length) { const seen = new Set(); r.rev.peek = peek.filter((x) => (seen.has(x.k) ? false : (seen.add(x.k), true))); r.rev.gap = 380; }
@@ -494,7 +502,7 @@
     },
     /** 酔いが覚めたハッキング中の人（人間）に出す、偽の酔い覚め。戻り値 { role（偽の役職）, lines, chain（偽の連鎖。なければ null） } */
     soberFake(c, p) {
-      const g = c.g, fake = g.hackRole[p.id], v = H.nightView(c, p), lines = [`酔いが覚めました。あなたの最終的な役職は「${roleName(fake)}」です。`];
+      const g = c.g, fake = g.hackRole[p.id], v = H.nightView(c, p), dispFake = fake === "clone" && ONW.clone ? ONW.clone.ensure(g, p.id) : fake, lines = [`酔いが覚めました。あなたの最終的な役職は「${roleName(dispFake)}」です。`];   // クローンと思い込んだ人: 最終役職の表示も思い込み役職
       const t2 = fake === "mimic_wolf" && v.text2 ? ONW.mimic.textNow(roleName, H.subOf(g, p.id)) : v.text2;   // 酔い覚めの文は「模倣しています」（本物と同じ）
       [v.text, t2, ...(v.lines || [])].filter(Boolean).forEach((x) => lines.push(x));
       let chain = null;
@@ -504,7 +512,7 @@
         g.morningAct[p.id] = chain; g.morningDone[p.id] = false; g.hackChain[p.id] = chain;
         lines.push("この能力を、議論中に1回だけ使えます。");
       }
-      return { role: ONW.shownRole(fake), lines, chain, v };
+      return { role: ONW.shownRole(dispFake), lines, chain, v };
     },
   });
 

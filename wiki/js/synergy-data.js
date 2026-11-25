@@ -65,6 +65,13 @@ window.ONW_WIKI_SYNERGY = {
    "priority": []
   },
   {
+   "trigger": "negi_wolf",
+   "required": [
+    "tofu_wolf"
+   ],
+   "priority": []
+  },
+  {
    "trigger": "fake_seer",
    "required": [
     "seer"
@@ -431,6 +438,7 @@ window.ONW_WIKI_SYNERGY = {
    "hokma",
    "command_wolf",
    "curse_wolf",
+   "negi_wolf",
    "vanity",
    "beggar",
    "magical_girl",
@@ -521,6 +529,7 @@ window.ONW_WIKI_SYNERGY = {
    "hokma",
    "command_wolf",
    "curse_wolf",
+   "negi_wolf",
    "vanity",
    "beggar",
    "magical_girl",
@@ -761,6 +770,24 @@ window.ONW_WIKI_SYNERGY = {
    "force": false,
    "early": true,
    "unlessLover": false
+  },
+  {
+   "trigger": "magician",
+   "always": false,
+   "label": "魔法使いが奪える役職",
+   "anyOf": [
+    "robber",
+    "doppelganger",
+    "shuffler",
+    "hotaru",
+    "nanoka",
+    "cosplayer"
+   ],
+   "min": 2,
+   "max": null,
+   "force": false,
+   "early": false,
+   "unlessLover": false
   }
  ],
  "notes": {
@@ -771,6 +798,7 @@ window.ONW_WIKI_SYNERGY = {
   "wolf_dreamer": "狼夢人が出る闇鍋には、人狼も最低1枚出す。",
   "wolf_marked": "狼憑きが出る闇鍋には、村人・人狼・占い師も最低1枚ずつ出す。",
   "mapo_wolf": "麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）。",
+  "negi_wolf": "葱の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても葱が必ず出るわけではない）。",
   "fake_seer": "偽占い師が出る闇鍋には、占い師も最低1枚出す（偽占い師の結果は、本物の占い師と見比べて初めて意味が出る）。",
   "aa": "A.A.が出る闇鍋には、鍵師も最低1枚出す（A.A.は鍵師にロックされて初めて役職変化が通る）。",
   "priest": "神官が出る闇鍋には、銀色の影から変化した神も最低1枚出す（神官は神がいてこそ働く）。",
@@ -802,6 +830,7 @@ window.ONW_WIKI_SYNERGY = {
   "能力を使われる役職": "モーゼスが出る闇鍋には、能力を使われる（選ばれて票が増える）役職を最低4枚出す（封印の対象と同じ一覧からモーゼス自身を除く）。",
   "人狼系（一匹狼以外）": "スパイが出る闇鍋には、闇の化身から一匹狼以外の人狼系を合計2人以上出す（人狼が1人だけだと、狼マークに見えるスパイが確定してしまうため。一匹狼は誰からも見えないので数えない）。",
   "悪女・純愛者・キューピッド": "常に適用: この3役職は合わせて1人まで（変化から出た分だけ減らす）。",
-  "マーリン": "常に適用: マーリンは1人まで（変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）。"
+  "マーリン": "常に適用: マーリンは1人まで（変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）。",
+  "魔法使いが奪える役職": "魔法使いが出る闇鍋には、自分の役職を変える役職（怪盗・ドッペルゲンガー・シャッフラー・ホタル・なのか・コスプレイヤー）を合わせて最低2枚出す。"
  }
 };

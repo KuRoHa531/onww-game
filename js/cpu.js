@@ -549,6 +549,9 @@ window.ONW = window.ONW || {};
         const vn = i.visitedBy.map((v) => nameOf(g, v)).join("、");
         c.result = { short: `${vn} が訪問`, text: `${vn} が訪問してきました。`, claim: { kind: "visited", from: i.visitedBy[0] } };
       }
+      else if (c.co && !c.result && !isWolfSide(r) && ONW.bartender && ONW.bartender.isCocktailDrunk(g, p.id) && Math.random() < 0.3) {   // バーテンダー: カクテルを渡されていた（本当。酔いが覚めたあとだけここに来る）: 渡されたことを開示する（マイクラ版 cpu.js の情報開示）
+        c.result = { short: "カクテルを渡された", text: "カクテルが渡されてました。", claim: { kind: "cocktail" } };
+      }
       const hf = c.co ? ONW.roleHook(c.co, "cpuCoFollow") : null;   // 名乗った役職ごとの後処理（後覚者: 結果を言わないと騙りだと透けるので、嘘の結果開示もする）
       if (hf) hf(cpu.kit, g, p, r, i, c);
       if (c.co && !coSurvives(g, p, r, c.co)) { c.co = bareCo(g); c.result = null; c.extra = null; }   // 最後の安全装置（2026-11-17）: この試合に無い（公開されている範囲に無い）役職は、どの経路で決まっても名乗らない。名乗ると、占い師でなくても即破綻する

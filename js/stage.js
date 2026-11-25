@@ -93,6 +93,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   const DARKFALL_MARK = "__darkfall";   // 魔法少女: 闇堕ちしたときに本人だけに見せる面（黒い背景に赤い「闇落ち」の文字。待機時間・酔い覚めの闇堕ちで使う）
   const DAUGHTER_MARK = "__daughter";   // マティアス／娘ちゃん: 娘ちゃんになったカードに出る「👧」の印（朝のめくり・待機時間の本人のめくりで使う。役職名は出さない）
   const SHIELD_MARK = "__shield";   // 傭兵: 護衛対象のカードに出る「🛡️」の印（朝に傭兵本人の画面でだけめくれる。役職名は出さない）
+  const THREAD_MARK = "__thread";   // 糸紡ぎ: ペアのカードに出る「🧵」の印（朝に糸紡ぎ本人の画面でだけめくれ、白い糸でつながる。役職名は出さない）
   const FLAT_MARK = "__flat";   // なのか／長夜月: 長夜がついたカードに出る「♭」の印（作者指定。朝に長夜月本人の画面でだけめくれる。役職名は出さない）
   const COFFIN_MARK = "__coffin";   // なのか／羅刹: 愛する人のカードに出る「⚰️」の印（作者指定。朝に羅刹本人の画面でだけめくれる。役職名は出さない）
   const COFFEE_PRE = "__coffee@";   // ケセド: コーヒータイムの面（"__coffee@秒数"。☕ ＋ 酔っ払いの背景の茶色・白バージョン ＋ カウントダウン。待機時間にケセドと渡された人の目線だけで使う）
@@ -101,7 +102,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   const MUTE_MARK = "__mute";   // 口封じの狂人に見える、口封じされた人の「🤐」の印（役職名は出さない）
   const BONE_MARK = "__bone";   // 番犬に見える飼い主の「🦴」の印（役職名は出さない）
   const MASTER_MARK = "__master";   // 従者に見えるご主人の「👑ご主人」の印（役職名は出さない）
-  let lov = {}, shuf = {}, kp = {}, wf = {}, bd = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）
+  let lov = {}, shuf = {}, kp = {}, wf = {}, bd = {}, bdCk = {};                       // 結果でめくれた恋人のカードに付ける、右上の丸いハート（夜は共有者・神のカードに付ける）。bdCk = カクテルで酔った人のバッジ（🍺ではなく🍸。バーテンダー）
   let loveMate = null;                // 夜: 自分の恋人の相方 { id, mode }
   const BNT = "__bnt";   // 賞金稼ぎに選ばれたカードの手配書（"__bnt@状態@役職" の形）
   const SENSE_PRE = "__sense@";   // 感覚の占い師: 感じ取った気配の面（"__sense@village" / wolf / mad / third / lover。役職名は出さない）
@@ -244,6 +245,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     if (role === CUPID_MARK) return `<div class="tb-wolfmark tb-love">💘</div>`;
     if (role === DAUGHTER_MARK) return `<div class="tb-wolfmark tb-love">👧</div>`;
     if (role === SHIELD_MARK) return `<div class="tb-wolfmark tb-shield"><span>🛡️</span><small>護衛対象</small></div>`;   // 傭兵の護衛対象（朝に傭兵本人の画面でだけ）
+    if (role === THREAD_MARK) return `<div class="tb-wolfmark tb-thread"><span>🧵</span><small>ペア</small></div>`;   // 糸紡ぎのペア（朝に糸紡ぎ本人の画面でだけ。白い糸も一緒に出る）
     if (role === FLAT_MARK) return `<div class="tb-wolfmark tb-flat"><span>♭</span><small>長夜</small></div>`;
     if (role === COFFIN_MARK) return `<div class="tb-wolfmark tb-coffin"><span>⚰️</span><small>愛する人</small></div>`;
     if (role === KEEP_MARK) return `<div class="tb-wolfmark tb-love tb-keep">♡</div>`;
@@ -269,8 +271,13 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     if (String(role).startsWith(TB + "@")) return `${ONW.ui.roleIcon(TB, "role-icon--face")}${nameB(ONW.trailblazer.fateName(String(role).slice(TB.length + 1)))}<span class="tb-mimic tb-fate">${breakHtml(ONW.roles.getInfo(TB).name)}</span>`;   // 2回目に裏返った開拓者: 運命の名前（壊滅など）＋「開拓者」の枠
     if (String(role).startsWith(CUR + "@")) return `${ONW.ui.roleIcon(CUR, "role-icon--face")}${nameB(ONW.roles.getInfo(CUR).name)}`;   // 2回目に裏返った呪われし者（赤色の名前。色は tb-team-wolf）
     const info = ONW.roles.getInfo(role);
-    const mt = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) : null;   // 模倣の人狼: 役職名の下に、模倣先の役職を枠で出す / 開拓者: 運命を枠で出す（見えるのは本人と、めくれたカードを見る全員）
-    return `${ONW.ui.roleIcon(role, "role-icon--face")}${nameB(info.name)}${mt ? `<span class="tb-mimic${role === "trailblazer" ? " tb-fate" : ""}">${breakHtml(mt)}</span>` : ""}`;
+    const mt = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) : role === "clone" ? cloneTarget(k) : null;   // 模倣の人狼: 役職名の下に、模倣先の役職を枠で出す / 開拓者: 運命を枠で出す / クローン: 思い込んでいる役職を枠で出す（作者メモ。枠の中の役職名は、その役職の通常の改行の仕方＝breakHtml で出す。余分な改行は足さない）
+    return `${ONW.ui.roleIcon(role, "role-icon--face")}${nameB(info.name)}${mt ? `<span class="tb-mimic${role === "trailblazer" ? " tb-fate" : role === "clone" ? " tb-clone" : ""}">${breakHtml(mt)}</span>` : ""}`;
+  }
+  /** 席キー(p:ID / g:番号)のカードの、クローンが思い込んでいる役職名（無ければ null）。思い込み先は結果発表・観戦者の画面にだけ届く(g.cloneView) */
+  function cloneTarget(k) {
+    const g = G(), r = k && g && g.cloneView ? g.cloneView[k] : null;
+    return r && ONW.ROLE_INFO[r] ? ONW.ROLE_INFO[r].name : null;
   }
   /** 席キー(p:ID / g:番号)のカードの模倣先の役職名（無ければ null）。模倣先は本人・結果発表・観戦者の画面にだけ届く(g.mimicView) */
   function mimicTarget(k) {
@@ -295,6 +302,9 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     if (!s) return;
     const n = drunkLeft(g);
     s.classList.toggle("drunk", n !== null);
+    s.classList.toggle("cocktail", n !== null && !!g.myCocktail);   // バーテンダー: カクテルの酔いは🍸＋ライム色
+    const beer = s.querySelector(".tb-beer");
+    if (beer) beer.textContent = g.myCocktail ? "🍸" : "🍺";
     const t = s.querySelector(".tb-drunk-n");
     if (t) t.textContent = n === null ? "" : String(n);
   };
@@ -533,6 +543,33 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   stage.emDraw = emKick;
   stage.emWant = emWant;
 
+  // ---------------------------------------------------------
+  // 糸紡ぎ（js/roles/neutral/thread_spinner.js）: ペアの2人を白い糸でつなぐ線（選挙管理委員の矢印と同じ、卓の上の SVG）。
+  //   朝: 糸紡ぎ本人の画面で、ペアのカードが 🧵 でめくれたあとに2人を糸でつなぐ（しばらくして消える）。
+  //   結果発表: 後追いが起きるときは全員の画面で、糸が見えて → 糸が切れて → 後追いする（startResult の flipChain / dayDead が呼ぶ。作者指定）。
+  // ---------------------------------------------------------
+  function threadClear() { document.querySelectorAll(".th-arrows").forEach((e) => e.remove()); }
+  function threadShow(a, b) {
+    const el = $t(); if (!el) return;
+    threadClear();
+    const box = el.getBoundingClientRect();
+    const pos = (id) => { const c = el.querySelector(`.tb-seat[data-k="p:${id}"] .tb-card`); if (!c) return null; const r = c.getBoundingClientRect(); if (!r.width || !r.height) return null; return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 }; };
+    const pa = pos(a), pb = pos(b); if (!pa || !pb) return;
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2 + Math.min(48, Math.hypot(pb.x - pa.x, pb.y - pa.y) * 0.16 + 14);   // 少し垂れる弧
+    const svg = document.createElementNS(EM_NS, "svg");
+    svg.setAttribute("class", "th-arrows"); svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", box.width); svg.setAttribute("height", box.height); svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+    svg.innerHTML = `<path class="th-line th-line--bg" pathLength="1" d="M ${pa.x} ${pa.y} Q ${mx} ${my} ${pb.x} ${pb.y}"/><path class="th-line th-in" pathLength="1" d="M ${pa.x} ${pa.y} Q ${mx} ${my} ${pb.x} ${pb.y}"/>`;
+    el.appendChild(svg);
+  }
+  /** 糸が切れる演出（ほどけて落ちて消える） */
+  function threadCutFx() {
+    const svg = document.querySelector(".th-arrows"); if (!svg) return;
+    svg.classList.add("th-cut");
+    setTimeout(() => svg.remove(), 1000);
+  }
+  stage.threadShow = threadShow; stage.threadCut = threadCutFx; stage.threadClear = threadClear;
+
   function paint(g) {
     cosRow(g);   // コスプレイヤーの3枚（あれば）を先に作る
     const el = $t(), m = mode(g), me = ONW.net.myId();
@@ -556,12 +593,12 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
       if (!hideOthers && role && bnt[k] && bnt[k] !== "by") { const br = String(role).startsWith(CAT + "@") ? CAT : String(role).startsWith(CUR + "@") ? CUR : role; if (ONW.roles.getInfo(br)) role = `${BNT}@${bnt[k]}@${br}`; }   // 賞金稼ぎに選ばれたカードは手配書の面
       if (!hideOthers && isP && curse[k]) role = curse[k] === true ? FOX_MARK : curse[k] === FOXX_MARK ? FOXX_MARK : curse[k] === TANUKI_MARK ? TANUKI_MARK : deadMark(curse[k]);   // 呪殺された妖狐のカードは、待機時間から結果発表まで🦊の面のまま（妖狸はたぬきマークの面）
       if (hideOthers && isP && role) rec[k] = { role, dead: !!flipped };
-      const mkey = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) || "" : "";   // 模倣先があとから届いたときも描き直す
+      const mkey = role === "mimic_wolf" || role === "trailblazer" ? mimicTarget(k) || "" : role === "clone" ? cloneTarget(k) || "" : "";   // 模倣先・思い込み先があとから届いたときも描き直す
       if (role && (s.dataset.role !== role || (s.dataset.mimic || "") !== mkey)) {
         s.dataset.role = role; s.dataset.mimic = mkey;
         const f = s.querySelector(".tb-front");
         f.innerHTML = faceHtml(role, k);
-        f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith(TB + "@") ? "village" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === FLAT_MARK || role === COFFIN_MARK || role === SHIELD_MARK ? "third" : role === LOVE_MARK || role === CUPID_MARK || role === DAUGHTER_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : role === ELFRINDE_MARK ? "elfseal" : String(role).startsWith(COFFEE_PRE) ? "coffee" : role === DARKFALL_MARK ? "darkfall" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === HACK_MARK ? "hack" : role === FOX_MARK || role === TANUKI_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : role === "hotaru" ? "village" : ONW.roles.getInfo(role).team}`;
+        f.className = `tb-front tb-team-${String(role).startsWith(BNT + "@") ? "bounty" : String(role).startsWith(SENSE_PRE) ? ({ village: "village", wolf: "wolf", third: "third", lover: "love", mad: "sensemad" }[String(role).slice(SENSE_PRE.length)] || "village") : String(role).startsWith(CUR + "@") ? "wolf" : String(role).startsWith(TB + "@") ? "village" : String(role).startsWith("queen@") ? "village" : String(role).startsWith(CAT + "@") ? (["village", "wolf"].includes(String(role).split("@")[1]) ? String(role).split("@")[1] : "third") : role === UNK_MARK || role === FOXSEE_MARK ? "third" : role === WOLF_MARK || role === DUO_MARK ? "wolf" : role === FLAT_MARK || role === COFFIN_MARK || role === SHIELD_MARK || role === THREAD_MARK ? "third" : role === LOVE_MARK || role === CUPID_MARK || role === DAUGHTER_MARK || role === KEEP_MARK || role === BREAK_MARK ? "love" : role === BLANK_MARK ? "blank" : role === BLANKX_MARK ? "key" : role === SEAL_MARK ? "seal" : role === ELFRINDE_MARK ? "elfseal" : String(role).startsWith(COFFEE_PRE) ? "coffee" : role === DARKFALL_MARK ? "darkfall" : KEY_MARKS.includes(role) ? "key" : role === TARGET_MARK ? "target" : role === AVENGER_MARK ? "avenger" : role === MUTE_MARK ? "mute" : role === HACK_MARK ? "hack" : role === FOX_MARK || role === TANUKI_MARK ? "fox" : String(role).startsWith(DEAD_PRE) ? "third" : role === MASTER_MARK || role === SELF_LOVE || role === BONE_MARK ? "master" : role === "hotaru" ? "village" : ONW.roles.getInfo(role).team}`;
       }
       const sel = (k.startsWith("c:") && !!m && (m.type === "night" || m.type === "morning") && !!g.nightSel && g.nightSel.pick === +k.slice(2)) || (m && m.type === "vote" && g.voteSel === k.slice(2) && isP) || (m && (m.type === "night" || m.type === "morning" || m.type === "dictate" || m.type === "shoot" || m.type === "steal" || m.type === "barrier" || m.type === "yomi" || m.type === "icarus" || m.type === "goranshin" || m.type === "agent" || m.type === "rejob" || m.type === "mind" || m.type === "exchange" || m.type === "libra" || m.type === "predict") && (isP ? (g.nightSel && g.nightSel.players || []).includes(k.slice(2)) : (g.nightSel && g.nightSel.graves || []).includes(+k.slice(2)))) || (g.voted && g.myVote && k === `p:${g.myVote}`);
       s.classList.toggle("up", !!role);
@@ -591,6 +628,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
       // 道連れ・暗殺を選んでいる人のカードは、選び終わるまで揺れ続ける（選んでいるアサシン本人の画面では、同時に選んでいる他の人の「？」は揺らさない）
       s.classList.toggle("choosing", !!(isP && (g.strawShake || []).includes(k.slice(2)) && (!hideOthers || k.slice(2) === me)));
       s.classList.toggle("drunk", isP && k.slice(2) === me && drunkLeft(g) !== null);   // 酔っ払い（未覚醒）本人の画面だけ: 自分のカードが黄×白のしまになり、🍺と「酔いが覚めるまで」の秒数が出る
+      s.classList.toggle("cocktail", isP && k.slice(2) === me && drunkLeft(g) !== null && !!g.myCocktail);   // バーテンダー: カクテルで酔った本人の画面だけ: ライム×白のしま＋🍸になる（CSS の .tb-seat.drunk.cocktail）
       s.classList.toggle("coffee", isP && k.slice(2) === me && coffeeLeft(g) !== null);   // ケセドのコーヒータイム本人の画面だけ: 自分のカードに☕と「コーヒータイム終了まで」の秒数が出る（酔っ払いと同時なら下段。CSS の .tb-coffee）
       s.classList.toggle("jobup", jobKeys.includes(k));   // 就職先の画面でめくれたフリーターの青い光と札
       s.classList.toggle("mindup", mindKeys.includes(k));
@@ -603,6 +641,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
       { const lv = s.querySelector(".tb-lov"); const nos = Array.isArray(lov[k]) ? lov[k] : [lov[k]]; const nLov = lov[k] ? nos.length : 0;   // 結果発表: 恋人の丸(❤と番号)。恋人が2組以上なら組ごとに1つずつ縦に並べる
         s.classList.toggle("mk2", nLov + (shuf[k] ? 1 : 0) + (kp[k] ? 1 : 0) + (wf[k] ? 1 : 0) + (bd[k] ? 1 : 0) >= 2);   // 丸が2つ以上同時に付くときは、全部を小さくして縦に並べる
         if (lv) { const t = nos.map((n) => `<span class="tb-lv">${typeof n === "number" ? `<span>❤</span><span>${n}</span>` : "<span>❤</span>"}</span>`).join(""); if (lv.dataset.t !== t) { lv.dataset.t = t; lv.innerHTML = t; } } }
+      { const bde = s.querySelector(".tb-bd"); if (bde) { const bt = bdCk[k] ? "🍸" : "🍺"; if (bde.textContent !== bt) bde.textContent = bt; } }   // バーテンダー: カクテルで酔った人の結果バッジは🍸
       s.classList.toggle("almost", !!alm[k]);
       ["descend", "spark", "blow", "win", "extra", "chicken", "toughclang", "toughrecv", "kingguard", "knightguard", "exsel", "thsel", "bomb", "boom", "curse", "cursed"].forEach((c) => s.classList.toggle("gx-" + c, gx[k] === c));   // 神降臨・神の祝福の演出（curse / cursed = 呪術の人狼の呪殺で呪われていく演出）
       const baseRole = role && String(role).startsWith(BNT + "@") ? String(role).split("@")[2] : role && String(role).startsWith(CAT + "@") ? CAT : role && String(role).startsWith(CUR + "@") ? CUR : role && String(role).startsWith(TB + "@") ? TB : role && String(role).startsWith("queen@") ? "queen" : role;   // 手配書の面("__bnt@状態@役職")のときは、中の役職名を使う
@@ -680,12 +719,12 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
       smkN.group = null; smkN.perm = null; smkN.sig = "";
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; el.innerHTML = ""; if (ONW.sound) ONW.sound.resetFlips(); }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; bdCk = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; el.innerHTML = ""; if (ONW.sound) ONW.sound.resetFlips(); }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; build(g, list); if (ONW.sound) ONW.sound.resetFlips(); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; bdCk = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; build(g, list); if (ONW.sound) ONW.sound.resetFlips(); }
     el.classList.add("on");
     smkNamesSync(g);   // 煙幕の名前隠し: 名前が ？？？ になる・席の並びがシャッフルされる（詳細設定がONのときだけ）
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
@@ -915,6 +954,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   }
   function playMorning(r) {
     if (r.kind === "peek") r.items.forEach((it, i) => later(() => show(it.k, it.role), i * 450));
+    if (r.thread) { later(() => threadShow(r.thread[0], r.thread[1]), r.items.length * 450 + 250); later(() => threadCutFx(), r.items.length * 450 + 250 + 3400); }   // 糸紡ぎ: ペアの2人が 🧵 でめくれたあと、白い糸でつなぐ（見えるのは選んだ人の画面だけ）
     else { const h = morningHook(r.kind); if (h) h.play(r, stage.kit); }
     // 墓荒らしで人狼系・狂信者・共有者を取ったとき: 交換の演出のあと、相方のカードが表になる（昼になるまで）
     // 墓荒らし・ドッペルゲンガーで口封じの狂人を手にしたとき: 交換・コピーの演出のあと（取ったと分かったあと）、ターゲットのカードが裏返ってミュートマークが出る（昼になるまで）
@@ -960,7 +1000,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     get dead() { return dead; }, get curse() { return curse; }, get badge() { return badge; }, get dkb() { return dkb; }, get shin() { return shin; }, get gx() { return gx; },
     get asn() { return asn; }, get bnt() { return bnt; }, get veil() { return veil; }, get alm() { return alm; }, get catv() { return catv; }, get curv() { return curv; }, get tbv() { return tbv; }, get tbh() { return tbh; }, get fqv() { return fqv; },
     get mindKeys() { return mindKeys; }, get senseKeys() { return senseKeys; }, senseMark: (key) => SENSE_PRE + key, get starKeys() { return starKeys; }, get queenKeys() { return queenKeys; }, get flashKeys() { return flashKeys; }, get queenFlashKeys() { return queenFlashKeys; }, get kingKeys() { return kingKeys; }, get kingFlashKeys() { return kingFlashKeys; },
-    WOLF_MARK, FOX_MARK, TANUKI_MARK, FOXX_MARK, FOXSEE_MARK, deadMark, DUO_MARK, MASTER_MARK, BONE_MARK, TARGET_MARK, AVENGER_MARK, MUTE_MARK, HACK_MARK, LOVE_MARK, CUPID_MARK, DAUGHTER_MARK, SHIELD_MARK, FLAT_MARK, COFFIN_MARK, BREAK_MARK, KEEP_MARK, KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK, BLANK_MARK, BLANKX_MARK, SEAL_MARK, ELFRINDE_MARK, DARKFALL_MARK, COFFEE_PRE,
+    WOLF_MARK, FOX_MARK, TANUKI_MARK, FOXX_MARK, FOXSEE_MARK, deadMark, DUO_MARK, MASTER_MARK, BONE_MARK, TARGET_MARK, AVENGER_MARK, MUTE_MARK, HACK_MARK, LOVE_MARK, CUPID_MARK, DAUGHTER_MARK, SHIELD_MARK, THREAD_MARK, FLAT_MARK, COFFIN_MARK, BREAK_MARK, KEEP_MARK, KEYOPEN_MARK, KEYLOCK_MARK, KEYTURN_MARK, KEYTURNU_MARK, BLANK_MARK, BLANKX_MARK, SEAL_MARK, ELFRINDE_MARK, DARKFALL_MARK, COFFEE_PRE,
     /** 席 k のカードを左右に揺らす（失敗の演出。鍵師の「🔒に弾かれる」と同じ揺れ） */
     cosplay: { ensure: (c, f) => cosEnsure(c, f), clear: () => cosClear(), keep: (v) => { cosKeep = !!v; } },
     shake(k) { const el = $t(), card = el && el.querySelector(`[data-k="${k}"] .tb-card`); if (card && card.animate) card.animate([{ transform: "translateX(0)" }, { transform: "translateX(-9px) rotate(-4deg)" }, { transform: "translateX(9px) rotate(4deg)" }, { transform: "translateX(-6px) rotate(-2deg)" }, { transform: "translateX(0)" }], { duration: 520, easing: "ease-in-out" }); },
@@ -1070,8 +1110,9 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const shufNo = {}; res.history.forEach((h) => { if (h.shuf) shufNo[h.id] = true; });
     const keepNo = {}; res.history.forEach((h) => { if (h.keep) keepNo[h.id] = true; });
     const drunkNo = {}; res.history.forEach((h) => { if (h.drunk) drunkNo[h.id] = true; });   // 酔っ払い: めくれたカードの丸い🍺
+    const cocktailNo = {}; res.history.forEach((h) => { if (h.cocktail) cocktailNo[h.id] = true; });   // バーテンダー: カクテルで酔った人は🍺ではなく🍸のバッジ
     const promNo = {}; res.history.forEach((h) => { if (h.prom) promNo[h.id] = true; });   // 昇格した狂人(最終段階に (+人狼) が付いた人): めくれたカードの右上に丸い🐺   // 悪女のキープ: めくれたカードの右上に丸い♡
-    const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; if (shufNo[id]) shuf[P(id)] = true; if (keepNo[id]) kp[P(id)] = true; if (promNo[id]) wf[P(id)] = true; if (drunkNo[id]) bd[P(id)] = true; };   // 結果でめくれる恋人のカードは、右上に丸いハート
+    const lovOn = (id) => { if (loverNo[id]) lov[P(id)] = loverNo[id]; if (shufNo[id]) shuf[P(id)] = true; if (keepNo[id]) kp[P(id)] = true; if (promNo[id]) wf[P(id)] = true; if (drunkNo[id]) bd[P(id)] = true; if (cocktailNo[id]) bdCk[P(id)] = true; };   // 結果でめくれる恋人のカードは、右上に丸いハート
     const dayDead = res.history.filter((h) => h.day && !h.dead).sort((a, b) => (a.dayN ?? 99) - (b.dayN ?? 99));   // 昼中に死んでいる人（呪殺・後追い・死亡）: 生存者が一斉にめくれる前に、1人ずつめくれる
     const rest = [...res.history.filter((h) => !h.dead && !h.day).map((h) => [P(h.id), h.role, h.id]), ...res.grave.map((c, i) => [`g:${i}`, c.role])];
     // 役職ファイルに渡す道具箱(stage.kit に、この結果の情報を足したもの)
@@ -1153,10 +1194,16 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     // わら人形・猫又・黒猫・ネコカボチャが追放された場合も同じ演出で、めくれた順(連鎖の順)に1人ずつ「道連れ」でめくれる
     const flipChain = (h) => {
       if (h.kind === "bite") R.t += hk("biteFx").reduce((n, x) => n + (x.fn(R, h) || 0), 0);   // 番犬の噛殺: 票のあと、カードの裏から番犬のカードが出て噛み付く（そのあとで字幕・めくれる）
-      const lab0 = h.sub ? "身代わり" : h.kind === "tomo" ? "道連れ" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : h.kind === "lovers" ? "心中" : h.kind === "follow" ? "後追い" : "無理心中", lab = lab0;   // 爆弾魔も、まず元の死因（道連れ・心中など）で普通にめくれる
+      if (h.kind === "thread" && h.thread) {   // 糸紡ぎの後追い（作者指定）: 全員の画面で、ペアをつなぐ白い糸が見えて → 糸が切れて → 後追いする
+        const th = h.thread, t0 = R.t;
+        later(() => { setCap(`<div class="res-cap__t t-third">糸紡ぎ</div><div>${esc(th.deadName)} と ${esc(h.name)} をつなぐ白い糸が…</div>`); threadShow(th.a, th.b); }, t0);
+        later(() => { threadCutFx(); }, t0 + 1800);
+        R.t += 2600;
+      }
+      const lab0 = h.sub ? "身代わり" : h.kind === "tomo" ? "道連れ" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : h.kind === "lovers" ? "心中" : h.kind === "follow" || h.kind === "thread" ? "後追い" : "無理心中", lab = lab0;   // 爆弾魔も、まず元の死因（道連れ・心中など）で普通にめくれる
       later(() => {
-        setCap(`<div class="res-cap__t t-wolf">${lab}</div><div>${h.sub ? `${esc(h.by)} → ${esc(h.sub)} の身代わり: ` : (h.kind === "tomo" || h.kind === "follow" || h.kind === "bite" || h.kind === "bomb") && h.by ? `${byOf(h)} → ` : h.kind === "lovers" && h.by ? `${esc(h.by)} ❤ ` : ""}${esc(h.name)}</div>`);
-        if (ONW.sound) { if (h.kind === "tomo") ONW.sound.se("chain"); else if (h.kind === "lovers" || h.kind === "follow") ONW.sound.se("follow_death"); }   // SE: 道連れ / 心中・後追い
+        setCap(`<div class="res-cap__t t-wolf">${lab}</div><div>${h.sub ? `${esc(h.by)} → ${esc(h.sub)} の身代わり: ` : (h.kind === "tomo" || h.kind === "follow" || h.kind === "thread" || h.kind === "bite" || h.kind === "bomb") && h.by ? `${byOf(h)} → ` : h.kind === "lovers" && h.by ? `${esc(h.by)} ❤ ` : ""}${esc(h.name)}</div>`);
+        if (ONW.sound) { if (h.kind === "tomo") ONW.sound.se("chain"); else if (h.kind === "lovers" || h.kind === "follow" || h.kind === "thread") ONW.sound.se("follow_death"); }   // SE: 道連れ / 心中・後追い
         shin[P(h.id)] = true; dead[P(h.id)] = true; badge[P(h.id)] = lab; paint(G());
       }, R.t);
       if (bmbSelf(h.id) || h.kind === "bomb") {   // 道化の爆弾魔: 爆殺されるカード。道連れ・心中で死んだ爆弾魔の自爆は、投票していた人と同時に爆発する（吊られた爆弾魔は上の自爆の演出）
@@ -1193,6 +1240,12 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     hk("bountyAfter").forEach((h) => h.fn(R));   // 賞金稼ぎが外れたあと: 賞金稼ぎがターゲットの処刑人のギロチン（処刑人勝利）
     dayDead.forEach((h) => {   // 昼中に死んでいる人が先にめくれる（呪殺された妖狐は🦊の灰色から本来の役職へ）
       const lab = h.dayLabel || "死亡";
+      if (h.thread) {   // 糸紡ぎの後追いで昼に死んだ人: めくれる前に、全員の画面で白い糸が見えて切れる（作者指定）
+        const th = h.thread, t0 = R.t;
+        later(() => { setCap(`<div class="res-cap__t t-third">糸紡ぎ</div><div>${esc(th.deadName)} と ${esc(h.name)} をつなぐ白い糸が…</div>`); threadShow(th.a, th.b); }, t0);
+        later(() => { threadCutFx(); }, t0 + 1700);
+        R.t += 2400;
+      }
       const wasGray = !!curse[P(h.id)];   // 呪殺・後追いなどで、待機時間から🦊や灰色の面のまま残っているカード
       later(() => { setCap(`<div class="res-cap__t t-wolf">${lab}</div><div>${h.dayKind === "fox" ? "" : h.dayBy ? `${esc(h.dayBy)} → ` : ""}${esc(h.name)}</div>`); delete curse[P(h.id)]; dead[P(h.id)] = true; badge[P(h.id)] = lab; if (wasGray) delete up[P(h.id)]; else up[P(h.id)] = h.role; lovOn(h.id); paint(G()); }, R.t);   // 灰色の面は、いったん裏返ってから…
       if (wasGray) later(() => { up[P(h.id)] = h.role; paint(G()); }, R.t + 800);   // …役職名の面でもう一度めくれる（表のまま中身が切り替わる「点滅」にしない）
@@ -1270,7 +1323,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     clearAll(); Object.keys(gx).forEach((k) => { if (gx[k] === "bomb" || gx[k] === "boom") delete gx[k]; }); alm = {}; veil = {}; hk("clear").forEach((h) => h.fn(stage.kit));   // 身代わりの「めくれそう」演出・処刑人の演出も止める
     const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));
     const skBmb = new Set(((res.bomber || {}).bombers || []).map((x) => x.id));   // 道化の爆弾魔: 演出なしの最終形でも、自爆した爆弾魔のバッジは「自爆」（結果シートの死因表示は変えていない）
-    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.keep) kp[`p:${h.id}`] = true; if (h.prom) wf[`p:${h.id}`] = true; if (h.drunk) bd[`p:${h.id}`] = true; if (h.day) { delete curse[`p:${h.id}`]; dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.dayLabel || "死亡"; } if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.duke ? "魔界断罪" : skipIds.has(h.id) || h.sub || h.dukeDead ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" ? "後追い" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.curseKill ? "呪殺" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : h.dict ? (h.coup ? "クーデター" : "独裁処刑") : "追放"; if (skBmb.has(h.id) && !h.sub) badge[`p:${h.id}`] = "自爆"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
+    res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.keep) kp[`p:${h.id}`] = true; if (h.prom) wf[`p:${h.id}`] = true; if (h.drunk) bd[`p:${h.id}`] = true; if (h.cocktail) bdCk[`p:${h.id}`] = true; if (h.day) { delete curse[`p:${h.id}`]; dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.dayLabel || "死亡"; } if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.duke ? "魔界断罪" : skipIds.has(h.id) || h.sub || h.dukeDead ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" || h.kind === "thread" ? "後追い" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.curseKill ? "呪殺" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : h.dict ? (h.coup ? "クーデター" : "独裁処刑") : "追放"; if (skBmb.has(h.id) && !h.sub) badge[`p:${h.id}`] = "自爆"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
     const R = Object.create(stage.kit); R.res = res;
     libraTilt = libraTiltOf(res);   // 天秤: 演出なしの最終形（つられた皿が下がったまま）
@@ -1328,9 +1381,11 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const g = G();
     g.newsSkip = true;   // ホストのスキップは、このあとに出る新聞の紙も飛ばす（新聞は情報確認から見られる）
     g.mapoSkip = true;   // 麻婆豆腐の演出も同じく飛ばす（完成は情報確認から見られる）
+    g.hiyayakkoSkip = true;   // 冷奴の演出も同じく飛ばす（完成は情報確認から見られる）
     g.exposeSkip = true;   // 暴露の紙も同じく飛ばす（暴露された役職は情報確認から見られる）
     const ex = document.querySelector(".exp-wrap"); if (ex) finishExpose(ex);
     const mp = document.querySelector(".mpo-wrap"); if (mp) finishMapo(mp);
+    const hy = document.querySelector(".hyk-wrap"); if (hy) finishHiyayakko(hy);
     const nw = document.querySelector(".nwp-wrap");
     if (nw) flyNews(nw);
     const w = document.querySelector(".tfp-wrap");
@@ -1626,8 +1681,8 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   }
   /** 変化公開の紙・新聞が出ている(出る)最中か。麻婆豆腐の演出はその後に出す */
   function mapoBusy(g) { return tfBusy(g) || g.newsPending || g.exposePending || g.prankPending || !!document.querySelector(".tfp-wrap, .nwp-wrap, .exp-wrap, .prk-banner"); }   // 愉快犯の笑い声（暴露のあと・麻婆豆腐の前）が出終わるのも待つ
-  /** パンのバナーは、変化公開・新聞・暴露・麻婆豆腐がすべて終わってから */
-  function breadBusy(g) { return mapoBusy(g) || g.mapoPending || !!document.querySelector(".mpo-wrap"); }
+  /** パンのバナーは、変化公開・新聞・暴露・麻婆豆腐・冷奴がすべて終わってから */
+  function breadBusy(g) { return mapoBusy(g) || g.mapoPending || !!document.querySelector(".mpo-wrap") || g.hiyayakkoPending || !!document.querySelector(".hyk-wrap"); }
   /** 待っている麻婆豆腐の演出を、出せるなら出す（変化公開の紙・新聞が終わったとき・ホストのスキップのときにも呼ばれる） */
   function runMapo() {
     const g = G();
@@ -1646,6 +1701,70 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     g.mapoPending = true; g.mapoForce = !!late; g.mapoLate = !!late; g.mapoWaitUntil = Date.now() + 15000;
     if (late) g.mapoSkip = false;
     runMapo();
+  };
+
+  // ---------------------------------------------------------
+  // 葱の人狼: 葱の人狼と豆腐の人狼が両方いるとき、昼の始まりに「冷奴 完成！」の演出が出る（麻婆豆腐の作りと対）
+  // 順番: 変化公開の紙 → 新聞 → 麻婆豆腐 → 冷奴の演出 → 昼のタイマー開始(パン屋)。完成は「情報確認」からいつでも確認できる
+  // 図形（作者指定）: 普通の長ネギと豆腐が合わさったあと、豆腐の上に刻んだ長ネギがのった図形になる
+  // ---------------------------------------------------------
+  const HIYAYAKKO_MS = 3800;   // 演出が出始めてから消えるまでの時間(ms)。麻婆豆腐と同じ
+  let hykTimers = [], hykPoll = null;
+  stage.hiyayakkoMs = function () { return HIYAYAKKO_MS; };
+  function finishHiyayakko(wrap) {
+    hykTimers.forEach(clearTimeout); hykTimers = [];
+    if (wrap && wrap.parentNode) wrap.remove();
+  }
+  // 長ネギの図形（SVG）: 白い茎に緑の葉が3枚
+  const HYK_NEGI_SVG = `<svg viewBox="0 0 80 112" xmlns="http://www.w3.org/2000/svg"><g stroke-linecap="round"><path d="M40 46 Q26 24 16 6 Q34 16 40 42 Z" fill="#57b25e" stroke="#3d8b44" stroke-width="1.6"/><path d="M40 46 Q40 18 41 2 Q48 20 43 44 Z" fill="#3f9e4d" stroke="#2f7d3a" stroke-width="1.6"/><path d="M40 46 Q54 24 64 6 Q46 16 40 42 Z" fill="#57b25e" stroke="#3d8b44" stroke-width="1.6"/><path d="M35 110 L37 44 Q40 38 43 44 L45 110 Z" fill="#f6faee" stroke="#b9d18f" stroke-width="1.6"/><path d="M36.4 62 H43.6 M36.9 80 H43.1 M37.2 96 H42.8" stroke="#cfe0ae" stroke-width="1.6"/><path d="M37 110 Q34 114 31 112 M40 110 Q40 115 37 114 M43 110 Q46 114 49 112" stroke="#d9c9a8" stroke-width="1.4" fill="none"/></g></svg>`;
+  // 冷奴の図形（SVG）: 皿の上の豆腐に、刻んだ長ネギがのっている
+  const HYK_DISH_SVG = `<svg viewBox="0 0 200 132" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="106" rx="88" ry="16" fill="#dfe9f2" stroke="#b9c9d6" stroke-width="2"/><ellipse cx="100" cy="103" rx="70" ry="11" fill="#eef4f9"/><rect x="52" y="36" width="96" height="64" rx="9" fill="#fdfdf8" stroke="#d8dcc8" stroke-width="2"/><path d="M52 84 H148 V91 a9 9 0 0 1 -9 9 H61 a9 9 0 0 1 -9 -9 Z" fill="#eef0e2"/><g fill="#57b25e" stroke="#3d8b44" stroke-width="1"><rect x="66" y="26" width="13" height="5" rx="2.5" transform="rotate(-14 72 28)"/><rect x="86" y="22" width="13" height="5" rx="2.5" transform="rotate(9 92 24)"/><rect x="106" y="26" width="13" height="5" rx="2.5" transform="rotate(-6 112 28)"/><rect x="122" y="22" width="12" height="5" rx="2.5" transform="rotate(16 128 24)"/><rect x="76" y="31" width="12" height="5" rx="2.5" transform="rotate(5 82 33)"/><rect x="97" y="32" width="12" height="5" rx="2.5" transform="rotate(-11 103 34)"/><rect x="116" y="33" width="11" height="5" rx="2.5" transform="rotate(7 121 35)"/><rect x="58" y="30" width="10" height="4.6" rx="2.3" transform="rotate(12 63 32)"/><rect x="134" y="31" width="10" height="4.6" rx="2.3" transform="rotate(-9 139 33)"/><rect x="30" y="98" width="11" height="4.6" rx="2.3" transform="rotate(-18 35 100)"/><rect x="160" y="97" width="11" height="4.6" rx="2.3" transform="rotate(13 165 99)"/></g></svg>`;
+  function drawHiyayakko(late) {
+    document.querySelectorAll(".hyk-wrap").forEach((w) => w.remove());
+    hykTimers.forEach(clearTimeout); hykTimers = [];
+    const wrap = document.createElement("div");
+    wrap.className = "hyk-wrap" + (late ? " hyk-wrap--late" : "");   // late = 昼の途中に完成した（操作は止めない）
+    const canSkip = !!(ONW.net && ONW.net.isHost) && !late;   // スキップできるのはホストだけ。麻婆豆腐と同じダブルタップで、全員ぶん飛ばす
+    wrap.innerHTML = `<div class="hyk-dim"></div>
+      <div class="hyk-stage">
+        <div class="hyk-item hyk-negi"><i class="hyk-negi__svg">${HYK_NEGI_SVG}</i><span>葱の人狼</span></div>
+        <div class="hyk-item hyk-tofu"><i class="hyk-cube"></i><span>豆腐の人狼</span></div>
+        <div class="hyk-flash"></div>
+        <div class="hyk-dish">${HYK_DISH_SVG}</div>
+        <div class="hyk-title">冷奴 完成！</div>
+        ${canSkip ? `<div class="hyk-hint">ダブルタップでスキップ</div>` : ""}
+      </div>`;
+    document.body.appendChild(wrap);
+    if (canSkip) {
+      let last = 0, lx = 0, ly = 0;
+      wrap.addEventListener("pointerup", (e) => {
+        const now = Date.now();
+        if (now - last < 400 && Math.abs(e.clientX - lx) < 40 && Math.abs(e.clientY - ly) < 40) { last = 0; ONW.net.skipPaper(); }
+        else { last = now; lx = e.clientX; ly = e.clientY; }
+      });
+    }
+    hykTimers.push(setTimeout(() => finishHiyayakko(wrap), HIYAYAKKO_MS - 150));
+  }
+  /** 変化公開の紙・新聞・麻婆豆腐が出ている(出る)最中か。冷奴の演出はその後に出す */
+  function hykBusy(g) { return mapoBusy(g) || g.mapoPending || !!document.querySelector(".mpo-wrap"); }
+  /** 待っている冷奴の演出を、出せるなら出す（紙・新聞・麻婆豆腐が終わったときにも、ポーリングで追いつく） */
+  function runHiyayakko() {
+    const g = G();
+    if (!g.hiyayakkoPending) return;
+    if (!g.hiyayakkoForce && !g.hiyayakkoSkip && hykBusy(g) && Date.now() < (g.hiyayakkoWaitUntil || 0)) {   // 紙と新聞と麻婆豆腐が終わるのを待つ（念のため最大15秒でやめる）
+      if (!hykPoll) hykPoll = setTimeout(() => { hykPoll = null; runHiyayakko(); }, 250);
+      return;
+    }
+    g.hiyayakkoPending = false;
+    if (g.hiyayakkoSkip || g.isSpectator) return;   // ホストがスキップした / 観戦中: 演出は出さない（情報確認には載る）
+    drawHiyayakko(!!g.hiyayakkoLate);
+  }
+  /** 冷奴の完成が届いた: 前の演出が終わっていれば今すぐ、終わっていなければその後に出す。late = 昼の途中に完成したとき（すぐ出す） */
+  stage.hiyayakko = function (late) {
+    const g = G();
+    g.hiyayakkoPending = true; g.hiyayakkoForce = !!late; g.hiyayakkoLate = !!late; g.hiyayakkoWaitUntil = Date.now() + 15000;
+    if (late) g.hiyayakkoSkip = false;
+    runHiyayakko();
   };
 
   // ---------------------------------------------------------

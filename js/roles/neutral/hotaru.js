@@ -60,7 +60,7 @@
   const choiceOf = (g, id) => (g.hotaruChoice || {})[id] || null;
   const setChoice = (g, id, ch) => { (g.hotaruChoice = g.hotaruChoice || {})[id] = ch; };
   /** サムへの変身を適用する: カードの上にサムを置く（ONW.cosplayPlace が記録の掃除・履歴・従者などの追随を見る） */
-  function applySam(g, id) { ONW.cosplayPlace(g, id, SAM); setChoice(g, id, "sam"); }
+  function applySam(g, id) { ONW.cosplayPlace(g, id, SAM); setChoice(g, id, "sam"); if (ONW.magician) ONW.magician.trySteal(g, id, SAM, "sam", "auto"); }   // 魔法使い: サムへの変身も「自分の役職を変えた」ので奪われる（奪われた人は村人になる。変身したという結果文・演出はそのまま。docs/magician.md）
   /** 勝敗の物差し: ホタルは村人陣営・サムは人狼陣営。それ以外は魔法少女の物差し（無ければ静的な陣営）へ委ねる
    *  （vote.js の各陣営勝者フィルタと、ヴァニティ／エルフリンデの「実際の村人陣営の勝者がいるか」が引く） */
   function teamOf(g, id) {

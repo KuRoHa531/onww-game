@@ -21,7 +21,9 @@
     }
     if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);   // モーゼス: 入れ替える「前」に使われた回数 +1（票数はカードについて動く）
     ONW.swapPlayers(g, p.id, ta);
-    i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(g.currentRoles[p.id]);
+    const gotRaw = g.currentRoles[p.id];   // 交換で手にした役職（魔法使いに奪われると自分の役職は村人になるが、怪盗が見た役職は取った役職のまま。マイクラ版 robberSeen）
+    if (ONW.magician) ONW.magician.trySteal(g, p.id, gotRaw, "robber", "night");   // 魔法使い: 自分の役職を変えたので、変化後の役職を奪われる（docs/magician.md）
+    i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(gotRaw);
     i.known[p.id] = i.newRole; i.known[t.id] = "robber";
     const nmOf = (id) => (g.players.find((q) => q.id === id) || {}).name || "?";
     g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${label} ${p.name}`, nmOf, n.rn(i.newRole), "交換") || `${label} ${p.name} は ${t.name} と役職を交換し、${n.rn(i.newRole)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
@@ -110,6 +112,7 @@
         if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, p.id, ta);
         const got = g.currentRoles[p.id];
+        if (ONW.magician) ONW.magician.trySteal(g, p.id, got, "robber", "night");   // 魔法使い: 変化後の役職を奪われる（怪盗が見た役職・演出は取った役職のまま。docs/magician.md）
         g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${rn(c.eff(p))} ${p.name}`, c.nameOf, rn(got), "交換") || `${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
         c.hold(p.id, `${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
         const ml = ONW.mimic.takenLine(g, p.id, got, rn); if (ml) c.hold(p.id, ml);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
@@ -129,6 +132,7 @@
         if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, id, ta);
         const got = g.currentRoles[id];
+        if (ONW.magician) ONW.magician.trySteal(g, id, got, "robber", "auto");   // 魔法使い: 変化後の役職を奪われる（見た役職・演出は取った役職のまま。docs/magician.md）
         g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${c.label} ${c.me.name}`, c.nameOf, rn(got), "交換") || `${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
         const ml = ONW.mimic.takenLine(g, id, got, rn);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）
         return {

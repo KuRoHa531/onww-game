@@ -37,6 +37,7 @@
     "watcher",   // 静観者（マイクラ版 shufflerEligibleRoles の除外どおり。静観者のカードは交換・コピー・変化されない）
     "priest", "mad_priest",   // 神官・狂った神官（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補にも入っていない）
     "mimic_wolf", "mirage_wolf",   // 模倣の人狼・蜃気楼の人狼（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
+    "clone",   // クローン（マイクラ版 shufflerEligibleRoles の除外どおり）
     "matthias", "daughter",   // マティアス・娘ちゃん（マイクラ版 shufflerEligibleRoles が両方とも除外。娘ちゃんは内部専用役職）
     "chesed",   // ケセド（マイクラ版 shufflerEligibleRoles の除外どおり。夜に2人を選ぶ役職）
     "nanoka",   // なのか（マイクラ版 shufflerEligibleRoles の除外どおり。形態3種は除外しない＝山札に入る。形態が置かれたら対象は state.js の assignDerived で割り当てる）
@@ -44,6 +45,7 @@
     "elfrinde",   // エルフリンデ（マイクラ版 shufflerEligibleRoles の除外どおり。夜に封印する役職）
     "sam",   // サム（マイクラ版 shufflerEligibleRoles の除外どおり。ホタルが変身した姿の内部専用役職。ホタル自体は山札に入る）
     "mercenary",   // 傭兵（マイクラ版 shufflerEligibleRoles の除外どおり。夜に護衛対象を選ぶ役職）
+    "magician",   // 魔法使い（マイクラ版 shufflerEligibleRoles の除外どおり）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
   function pool() {
@@ -98,6 +100,7 @@
   function shuffle(g, holder, t) {
     const by = ONW.cardAt(g, holder), from = g.currentRoles[t], role = draw(from, t === holder);
     ONW.shufflerPlace(g, t, role, by);
+    if (t === holder && ONW.magician) ONW.magician.trySteal(g, holder, role, "shuffler", "auto");   // 魔法使い: 自分を変化させたときだけ奪われる（他人を変化させたときは奪われない。マイクラ版 night.js の self 条件。docs/magician.md）
     return { target: t, role, from };
   }
   /** 結果画面の役職の流れ: shuf の付いた段階（net.js が g.shufflerStamp から付ける）に「(+シャッフラー)」を付ける。恋人の印のあとに並べる */

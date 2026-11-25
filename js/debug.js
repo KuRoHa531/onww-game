@@ -96,6 +96,11 @@ window.ONW = window.ONW || {};
     if (!game.debugOn || !game.dbg) return null;
     return (game.dbg.mimic || {})[id] || null;
   };
+  /** クローンの思い込み役職の指定（持ち主のID → 役職ID。指定なしなら null。clone.js の ensure が見る。村人陣営・クローン以外だけ有効。マイクラ版の game.nextCloneThoughtRoles に相当） */
+  debug.cloneRole = function (game, id) {
+    if (!game.debugOn || !game.dbg) return null;
+    return (game.dbg.clone || {})[id] || null;
+  };
   /** 開拓者の運命の指定（持ち主のID → 運命 destruction / preservation / harmony / remembrance / elation。指定なしなら null。4of4-b。trailblazer.js の choose が見る）。
    *  配られた開拓者（最初に自分に配られたカード）だけに効く。墓荒らし・怪盗で手にしたときは、そのカードの運命を引き継ぐ（指定は見ない） */
   debug.trailFate = function (game, id) {
@@ -313,7 +318,7 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one", matthias: "rob", chesed: "tm", elfrinde: "rob", mercenary: "rob" };   // mercenary: 護衛対象を1人   // era: 抹消の人狼（抹消する相手を1人）/ matthias: 娘ちゃんにする相手を1人 / chesed: 占い先→コーヒーを渡す相手の2人（tm と同じ2人指定の形）
+  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one", matthias: "rob", chesed: "tm", elfrinde: "rob", mercenary: "rob", thread_spinner: "tm" };   // mercenary: 護衛対象を1人   // era: 抹消の人狼（抹消する相手を1人）/ matthias: 娘ちゃんにする相手を1人 / chesed: 占い先→コーヒーを渡す相手の2人（tm と同じ2人指定の形）/ thread_spinner: ペアにする2人（tm と同じ2人指定の形）
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;

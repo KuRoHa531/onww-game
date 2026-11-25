@@ -450,6 +450,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WOLF_DREAMER,   required: [ONW.ROLE.WEREWOLF] },                        // 狼夢人が出る闇鍋には、人狼も最低1枚出す
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF, ONW.ROLE.SEER], priority: [ONW.ROLE.VILLAGER] },     // 狼憑きが出る闇鍋には、村人・人狼・占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面）
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
+    { trigger: ONW.ROLE.NEGI_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 葱の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても葱が必ず出るわけではない）
     { trigger: ONW.ROLE.FAKE_SEER,      required: [ONW.ROLE.SEER] },                             // 偽占い師が出る闇鍋には、占い師も最低1枚出す（偽占い師の結果は占い師と見比べて初めて意味が出る。マイクラ版 YAMINABE の偽占い師シナジー）
     { trigger: ONW.ROLE.VANITY,         required: [ONW.ROLE.SHERIFF] },                          // ヴァニティが出る闇鍋には、保安官も最低1枚出す（マイクラ版 YAMINABE_TRANSFORM_SYNERGY_RULES の { trigger: VANITY, required: [SHERIFF] }。変化枠のヴァニティに保安官を確保する ensureLightSheriffForTransformedVanity も、Web版では SYNERGY_RULES が変化枠経由で必須役職を置く仕組みなので、この1行が両方に相当する）
     { trigger: ONW.ROLE.MIRAGE_WOLF,    required: [ONW.ROLE.SEER] },                             // 蜃気狼が出る闇鍋には、占い師も最低1枚出す（占われてランダムな役職に見えるのが活きる盤面。マイクラ版 YAMINABE の蜃気狼シナジー: 占い師・偽占い師・感覚の占い師・指読みのどれか。Web版にあるのは占い師）
@@ -525,6 +526,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.SPY, label: "人狼系（一匹狼以外）", get anyOf() { return ONW.sortByRoleOrder((ONW.VISIBLE_WOLF || []).slice()); }, min: 2 },   // スパイが出る闇鍋には、闇の化身から「一匹狼以外の人狼系」を合計2人以上出す（人狼が1人だけだと、狼マークに見えるスパイが確定してしまうため。一匹狼は誰からも見えないので数えない。マイクラ版 ensureDarkWolvesForLightSpy）。ONW.VISIBLE_WOLF から自動で作る（人狼系を足したら自動で入る）
     { always: true, label: "悪女・純愛者・キューピッド", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 0, max: 1 },   // 悪女・純愛者・キューピッドは、合わせて1人まで（変化から出た分だけ減らせる）   // 破局師が出る闇鍋には、壊す相手の恋人を作る役職（悪女・純愛者・キューピッド）も最低1枚出す（マイクラ版 YAMINABE の破局師シナジー）
     { always: true, label: "マーリン", anyOf: [ONW.ROLE.MERLIN], min: 0, max: 1, early: true },   // マーリンは1人まで（光の使徒などの変化から2人目以降が出たときは、変化した枠を別の役職に変え直す。最初から配役に入れた分・デバッグ固定は動かさない）
+    { trigger: "magician", label: "魔法使いが奪える役職", anyOf: [ONW.ROLE.ROBBER, ONW.ROLE.DOPPELGANGER, ONW.ROLE.SHUFFLER, ONW.ROLE.HOTARU, "nanoka", "cosplayer"], min: 2 },   // 魔法使いが出る闇鍋には、自分の役職を変える役職（マイクラ版 YAMINABE_MAGICIAN_STEAL_ROLES のうちWeb版にあるもの。コピリストはWeb版に無い）を合わせて最低2枚出す。魔法使いは役職ファイルが後から読み込まれるので trigger は文字列
   ];
   /**
    * 本人に見せる「変化前」の役職。思い込み系（忘却の人狼・狼憑き・狼夢人）は、本当の変化前ではなく

@@ -81,6 +81,7 @@
     transferData(g, targetId, beggarId);
     g.currentRoles[targetId] = R().VILLAGER;
     g.currentRoles[beggarId] = role;
+    if (ONW.magician) ONW.magician.trySteal(g, beggarId, role, "beggar", when === "vote" ? "vote" : "auto");   // 魔法使い: 乞食の交換も「自分の役職を変えた」ので、取った役職を奪われる（乞食は村人になる。交換の記録・通知文は取った役職のまま=マイクラ版どおり。docs/magician.md）
     (g.beggarUsedTargets = g.beggarUsedTargets || []).push(targetId);
     const e = { by: beggarId, target: targetId, role, when, prevByRole };
     (g.beggarResults = g.beggarResults || []).push(e);
@@ -130,12 +131,12 @@
     const dk = (g.deadKind || {})[id];
     if (dk === "fox" || dk === "foxvote") return "curse";
     if (dk === "shot") return "sheriff";
-    if (dk === "follow" || dk === "cupid" || dk === "fanatic") return "follow";
+    if (dk === "follow" || dk === "cupid" || dk === "fanatic" || dk === "thread") return "follow";   // 糸紡ぎの後追いも「後追い」グループ（マイクラ版 markThreadPairFollowDeath の scheduleImmediateBeggarSwaps と同じ）
     if (dk === "dead") return "daytime";   // その他の昼中の死亡（即時交換の対象だった人。投票の時点で残っていれば最優先グループ）
     if (dk) return dk;   // tomo / bite / bomb / lovers / queen など（グループに無い死因は候補にならない）
     const ck = (g.chainKind || {})[id];
     if (ck === "bite") return "watchdog";
-    if (ck === "follow" || ck === "lovers" || ck === "love" || ck === "cupid" || ck === "fanatic") return "follow";
+    if (ck === "follow" || ck === "lovers" || ck === "love" || ck === "cupid" || ck === "fanatic" || ck === "thread") return "follow";
     if (ck) return ck;   // bomb / tomo / queen など
     if ((g.mentalIds || []).includes(id)) return "mental";
     if ((g.shockIds || []).includes(id)) return "shock";

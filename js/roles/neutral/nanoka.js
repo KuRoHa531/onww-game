@@ -90,6 +90,7 @@ ONW.setRoleBound(g, "nanokaMode", id, form);
 let target = null;
 if (form === LONGNIGHT) { target = randomOther(g, id); if (target) ONW.setRoleBound(g, "nanokaLongNightTarget", id, target);}
 if (form === RASETSU) { target = randomOther(g, id); if (target) ONW.setRoleBound(g, "nanokaLoveTarget", id, target);}
+if (ONW.magician) ONW.magician.trySteal(g, id, form, "nanoka", "auto"); // 魔法使い: 形態への変化も「自分の役職を変えた」ので奪われる（形態の記録は魔法使いへコピーされ、長夜・愛する人の対象も付いて動く。奪われた人は村人になる。docs/magician.md）
 return { form, target};
 }
 /**

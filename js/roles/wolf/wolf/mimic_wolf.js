@@ -61,7 +61,7 @@
   /** 持ち主が模倣している役職（なければ null） */
   const roleOf = (g, id) => (g && g.mimicRole && g.mimicRole[id]) || null;
   /** 「そのカードを持つ人が能力として使う役職」: 模倣の人狼なら模倣先、それ以外はカードの役職そのまま */
-  const actRole = (g, id, role) => (isBorrow(role) && roleOf(g, id) ? roleOf(g, id) : role);
+  const actRole = (g, id, role) => (isBorrow(role) && roleOf(g, id) ? roleOf(g, id) : role === "clone" && ONW.clone ? (ONW.clone.thoughtOf(g, id) || role) : role);   // クローン: 思い込んでいる役職として扱う（マイクラ版 effectiveRole の CLONE 解決。clone.js の thoughtOf）
   /** 受動効果（追放・道連れ・投票数・王国滅亡・公開・パンなど）で見る役職 = 最終盤面で id が持つカードを、模倣先に読み替えた役職（マイクラ版 roleForMimicEffect と同じ）。
    *  模倣の人狼でなければカードの役職そのまま。判定が「人狼陣営か」「村人陣営か」などカードそのものを見る所は、これを使わず g.currentRoles のまま */
   const eff = (g, id) => actRole(g, id, g && g.currentRoles ? g.currentRoles[id] : undefined);

@@ -1656,6 +1656,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 
 /* ---- 酔っ払い（未覚醒）: 本人の画面だけ。自分のカードが黄×白のしま（裏面の色違い）になり、🍺と「酔いが覚めるまで」の秒数が出る ---- */
 .tb-seat.drunk .tb-back { background: repeating-linear-gradient(45deg, #f5c518 0 4px, #ffffff 4px 8px); border-color: #e0a800; }
+.tb-seat.drunk.cocktail .tb-back { background: repeating-linear-gradient(45deg, #a8d61e 0 4px, #ffffff 4px 8px); border-color: #7fa80c; }   /* バーテンダー: カクテルの酔いはライム×白のしま（🍸は stage.js が .tb-beer に出す） */
 .tb-seat.drunk .tb-back::after { content: ""; }
 .tb-drunk { display: none; position: absolute; inset: 0; z-index: 2; flex-direction: column; align-items: center; justify-content: space-evenly; pointer-events: none; }
 .tb-seat.drunk:not(.up) .tb-drunk { display: flex; }
@@ -1731,6 +1732,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .dl-face--love b, .dl-face--love .dl-love-mark { color: #ff77dd !important; }   /* 最終結果の「(+恋人)」と同じピンク */
 .dl-face--drunk { border-color: #ffaa00 !important; }
 .dl-face--drunk b { color: #ffaa00 !important; }   /* 最終結果の「(+酔っ払い)」と同じ金色 */
+.dl-face--cocktail { border-color: #a8d61e !important; }
+.dl-face--cocktail b { color: #a8d61e !important; }   /* バーテンダーのカクテルで酔ったときはライム色（🍸面） */
 .dl-love-mark { font-size: 1.6em; line-height: 1; }
 
 /* 最終結果の役職履歴: 本家どおり (+恋人1) はピンク、(+酔っ払い) は金色 */
@@ -1738,6 +1741,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .result-sheet .rs-tag-drunk { color: #ffaa00; }
 .result-sheet .rs-tag-keep { color: #ff9ec9; }   /* 悪女のキープ: 「(+キープ)」（恋人ではないので恋人より淡いピンク） */
 .result-sheet .rs-tag-shuffler { color: #c4c9e0; }   /* シャッフラー: 山札から置かれたカードの「(+シャッフラー)」 */
+.result-sheet .rs-tag-thread { color: #f5f5ff; }   /* 糸紡ぎ: ペアのメンバーの「(+ペア)」（白い糸の色） */
 .result-sheet .rs-tag-hackvillage { color: #55ff55; }   /* 銀狼のハッキング: 思い込んでいた役職「(+メイヤー)」を、その役職の陣営の色で */
 .result-sheet .rs-tag-hackwolf { color: #ff5555; }
 .result-sheet .rs-tag-hackthird { color: #aaaaaa; }
@@ -1950,6 +1954,30 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 @keyframes mpo-steam { 0% { transform: translateY(0) scale(.6); opacity: 0; } 25% { opacity: .8; } 100% { transform: translateY(-46px) scale(1.7); opacity: 0; } }
 @keyframes mpo-title { 0%, 56% { opacity: 0; transform: scale(.4); } 66% { opacity: 1; transform: scale(1.18); } 74%, 100% { opacity: 1; transform: scale(1); } }
 @keyframes mpo-out { to { opacity: 0; } }
+/* 葱の人狼: 冷奴の完成演出（麻婆豆腐の .mpo-* と対。図形は stage.js の HYK_NEGI_SVG / HYK_DISH_SVG） */
+.hyk-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: default; animation: hyk-out .4s ease 3.4s forwards; }
+.hyk-wrap--late { pointer-events: none; }
+.hyk-dim { position: absolute; inset: 0; background: radial-gradient(circle at 50% 46%, rgba(24, 68, 54, .78), rgba(4, 16, 14, .9) 70%); animation: tfp-dim-in .2s ease both; }
+.hyk-wrap--late .hyk-dim { background: rgba(4, 16, 14, .55); }
+.hyk-stage { position: relative; width: min(86vw, 420px); height: 320px; text-align: center; color: #eaffea; }
+.hyk-item { position: absolute; top: 74px; left: 50%; width: 120px; margin-left: -60px; opacity: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hyk-item span { font-size: 13px; font-weight: 800; letter-spacing: .06em; white-space: nowrap; text-shadow: 0 2px 6px rgba(0, 0, 0, .7); }
+.hyk-negi__svg { display: block; width: 52px; height: 72px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .5)); }
+.hyk-negi__svg svg { width: 100%; height: 100%; display: block; }
+.hyk-cube { display: block; width: 58px; height: 58px; margin: 7px 0; border-radius: 9px; background: linear-gradient(145deg, #ffffff, #eef0e2); box-shadow: 0 5px 12px rgba(0, 0, 0, .5), inset -4px -4px 8px rgba(170, 180, 140, .45); }
+.hyk-negi { animation: hyk-negi 3.6s ease both; }
+.hyk-tofu { animation: hyk-tofu 3.6s ease both; }
+.hyk-flash { position: absolute; left: 50%; top: 104px; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; opacity: 0; background: radial-gradient(circle, #ffffff 0%, #b8f0a0 45%, rgba(88, 178, 94, 0) 72%); animation: hyk-flash 3.6s ease both; }
+.hyk-dish { position: absolute; left: 50%; top: 40px; width: 190px; margin-left: -95px; opacity: 0; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .55)); animation: hyk-dish 3.6s ease both; }
+.hyk-dish svg { width: 100%; height: auto; display: block; }
+.hyk-title { position: absolute; left: 0; right: 0; top: 190px; font-size: clamp(26px, 8vw, 40px); font-weight: 900; letter-spacing: .1em; color: #c8f7a8; opacity: 0; text-shadow: 0 0 14px rgba(88, 178, 94, .9), 0 3px 8px rgba(0, 0, 0, .8); animation: hyk-title 3.6s ease both; }
+.hyk-hint { position: absolute; left: 0; right: 0; bottom: 0; font-size: 12px; opacity: .6; }
+@keyframes hyk-negi { 0% { opacity: 0; transform: translateX(-190px) rotate(-24deg); } 14% { opacity: 1; } 40% { opacity: 1; transform: translateX(-34px) rotate(0); } 42% { opacity: 1; transform: translateX(-30px) rotate(0); } 46%, 100% { opacity: 0; transform: translateX(0) scale(.2); } }
+@keyframes hyk-tofu { 0% { opacity: 0; transform: translateX(190px) rotate(24deg); } 14% { opacity: 1; } 40% { opacity: 1; transform: translateX(34px) rotate(0); } 42% { opacity: 1; transform: translateX(30px) rotate(0); } 46%, 100% { opacity: 0; transform: translateX(0) scale(.2); } }
+@keyframes hyk-flash { 0%, 40% { opacity: 0; transform: scale(.2); } 46% { opacity: 1; transform: scale(2.4); } 62%, 100% { opacity: 0; transform: scale(7); } }
+@keyframes hyk-dish { 0%, 44% { opacity: 0; transform: scale(.2) rotate(6deg); } 54% { opacity: 1; transform: scale(1.18) rotate(-2deg); } 62%, 100% { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes hyk-title { 0%, 56% { opacity: 0; transform: scale(.4); } 66% { opacity: 1; transform: scale(1.18); } 74%, 100% { opacity: 1; transform: scale(1); } }
+@keyframes hyk-out { to { opacity: 0; } }
 
 
 /* ---- 観測の人狼: 観測結果が飛び出す（待機時間・本人の画面だけ） ---- */
@@ -2699,6 +2727,37 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 /* 矢印が出ている間だけ、卓の下に余白を足す（左向きの矢印は下へ弧を描くので、カードに重ならないように） */
 .tb-wrap.em-room .tb-table { padding-bottom: 54px; }
 
+/* =========================================================
+   糸紡ぎの白い糸（js/stage.js の threadShow / threadCutFx）: ペアの2人のカードをつなぐ白い糸。
+   朝は糸紡ぎ本人の画面だけ、後追いのときは全員の画面で、糸が見えて → 切れて → 後追いする
+   ========================================================= */
+/* =========================================================
+   魔法使いの魔法陣（js/roles/neutral/magician.js）: 盗みが起きたとき、魔法使いの席に出る魔法陣。
+   待機時間・昼の即時・結果発表（投票の乞食経由）で共用。ゆっくり回りながら現れ、消えるときは縮んで消える
+   ========================================================= */
+.mg-circle { position: fixed; pointer-events: none; z-index: 64; color: #b78bf0; opacity: 0; filter: drop-shadow(0 0 10px rgba(150,90,230,.65)); animation: mgCircleIn .55s ease-out both, mgCircleSpin 9s linear infinite; }
+.mg-circle svg { width: 100%; height: 100%; display: block; }
+.mg-circle--out { animation: mgCircleOut .5s ease-in both; }
+@keyframes mgCircleIn { from { opacity: 0; transform: scale(.55) rotate(-30deg); } to { opacity: .95; transform: scale(1) rotate(0deg); } }
+@keyframes mgCircleSpin { from { rotate: 0deg; } to { rotate: 360deg; } }
+@keyframes mgCircleOut { from { opacity: .95; transform: scale(1); } to { opacity: 0; transform: scale(.6); } }
+
+.th-arrows { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 6; }
+.th-line { fill: none; stroke: #ffffff; stroke-width: 2.6; stroke-linecap: round; opacity: .95; stroke-dasharray: 1 1; filter: drop-shadow(0 0 4px rgba(255,255,255,.75)); }
+.th-line--bg { stroke: rgba(8,10,24,.55); stroke-width: 5; opacity: .6; filter: none; }
+.th-in { animation: thLineIn .7s cubic-bezier(.3,.6,.3,1) both; }
+@keyframes thLineIn { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+/* 切れる: 真ん中に隙間が広がり（dash の位相ずらし）、糸が少し落ちて消える */
+.th-cut .th-line { animation: thLineCut .9s ease-in both; }
+@keyframes thLineCut {
+  0% { stroke-dashoffset: 0; opacity: .95; transform: translateY(0); }
+  35% { stroke-dasharray: .42 .16 .42; opacity: .95; }
+  100% { stroke-dasharray: .3 .4 .3; stroke-dashoffset: -.06; opacity: 0; transform: translateY(9px); }
+}
+/* 糸紡ぎのペアの面（🧵）: 傭兵の 🛡️ と同じ作り */
+.tb-thread span { font-size: 30px; line-height: 1; }
+.tb-thread small { display: block; font-size: 10px; font-weight: 700; color: #f2f2fa; letter-spacing: .12em; margin-top: 2px; }
+
 /* 黄泉: 刀で切りつける演出（3of4。js/roles/village/yomi.js の slash） */
 /* ホクマー: 昼時間を短縮したときの演出（js/roles/village/hokma.js ONW.hokma.playFx）。全員の画面に、時計が薄く浮き出て針が進む（約1.9秒）。だれが使ったかは出さない */
 .hk-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; display: flex; align-items: center; justify-content: center; opacity: 0; }
@@ -2770,6 +2829,7 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 
 /* 開拓者: 運命の枠（模倣の人狼の模倣先の枠と同じ形。村人陣営の色） */
 .tb-front .tb-mimic.tb-fate { border-color: #4fd18b; background: rgba(79,209,139,.12); color: #d4f7e3; }
+.tb-front .tb-mimic.tb-clone { border-color: #57b7ff; background: rgba(87,183,255,.12); color: #cfe9ff; }   /* クローン: 思い込んでいる役職の枠（村人陣営の青） */
 .dl-face .tb-mimic.dl-mimic.tb-fate { border-color: #4fd18b; background: rgba(79,209,139,.12); color: #d4f7e3; }
 
 /* 役職確認(📕): 開拓者の運命の欄（開いた説明の下）。運命の枠(tb-fate)と同じ緑 */

@@ -28,12 +28,14 @@
   const shownOf = (d) => (d ? d.roles.map((r) => ONW.shownRole(r)) : []);
   const validPick = (d, pick) => !!d && !d.used && Number.isInteger(pick) && pick >= 0 && pick < d.roles.length;
   const namesOf = (d) => shownOf(d).map(rn).join("・");
-  /** 実行（夜・朝の連鎖・昼能力で共通）: d の pick 番目をカードの上に置く。戻り値 { role, shown } */
+  /** 実行（夜・朝の連鎖・昼能力で共通）: d の pick 番目をカードの上に置く。戻り値 { role, shown, stolen }
+   *  stolen: 魔法使いに変化後の役職を奪われた（マイクラ版: 盗まれたコスプレイヤーは変化後の役職の夜行動をしない。呼び出し側は連鎖を止める） */
   function place(g, id, d, pick) {
     const role = d.roles[pick];
     d.used = true;
     ONW.cosplayPlace(g, id, role);
-    return { role, shown: ONW.shownRole(role) };
+    const stolen = ONW.magician ? ONW.magician.trySteal(g, id, role, "cosplayer", "auto") : false;   // 魔法使い: 自分の役職を変えたので奪われる（docs/magician.md）
+    return { role, shown: ONW.shownRole(role), stolen };
   }
   ONW.cosplayer = { ELIGIBLE, pool, ensureDraw, shownOf, validPick, namesOf, place, draw: (g, id) => store(g)[id] || null };
 
@@ -80,9 +82,9 @@
     i.cosplay.pick = pick; i.cosplay.role = r.shown; i.known[p.id] = r.shown;
     g.nightLogsAll.push(`${nm} は 山札から ${namesOf(d)} をめくり、${n.rn(r.role)} にコスプレしました。`);
     n.hold(p.id, `山札から3枚めくり、「${n.rn(r.shown)}」にコスプレしました。あなたの新しい役職は「${n.rn(r.shown)}」です。`);
-    ONW.cpu.learnInfo(g, p.id, r.role);   // コスプレ先の「夜の始まりに見える情報」（共有者の相方・人狼の仲間など）も知る
+    if (!r.stolen) ONW.cpu.learnInfo(g, p.id, r.role);   // コスプレ先の「夜の始まりに見える情報」（共有者の相方・人狼の仲間など）も知る。魔法使いに奪われたときは村人なので知らない
     const ga = ONW.mimic.gotAct(g, p.id, r.role);   // 模倣の人狼になったら模倣先の能力
-    i.pendingChain = ONW.cpu.chainRoles(SELF).includes(ga) ? ga : null;   // コスプレ先に夜の行動があれば、朝のうちに続けて使う（コスプレイヤー→墓荒らし→占い師）
+    i.pendingChain = !r.stolen && ONW.cpu.chainRoles(SELF).includes(ga) ? ga : null;   // コスプレ先に夜の行動があれば、朝のうちに続けて使う（コスプレイヤー→墓荒らし→占い師）。魔法使いに奪われたときは使えない
     if (!cur) n.nn(SELF);
   }
   const cpuFail = { short: "ロックで失敗", text: "自身の役職がロックされていたためコスプレに失敗しました。", claim: null };
@@ -225,9 +227,9 @@
         c.hold(p.id, `山札から3枚めくり、「${rn2(r.shown)}」にコスプレしました。あなたの新しい役職は「${rn2(r.shown)}」です。`);
         ONW.newsNote(g, SELF);
         const ga = ONW.mimic.gotAct(g, p.id, r.role);   // 模倣の人狼になったら模倣先の能力
-        if (ONW.roleIsActive(ga)) g.morningAct[p.id] = ga;   // 夜能力があれば朝のうちに使える（墓荒らし・占い師など。連鎖OK）
+        if (!r.stolen && ONW.roleIsActive(ga)) g.morningAct[p.id] = ga;   // 夜能力があれば朝のうちに使える（墓荒らし・占い師など。連鎖OK）。魔法使いに奪われたときは使えない（マイクラ版: 盗まれたら行動しない）
         c.rev[p.id] = ONW.mimic.tag(g, p.id, r.role, { kind: "cosplay", cards, pick, role: r.shown });
-        c.gotInfo(g, p, r.role, c.rev, { skipGrave: null, both: false, via: "コスプレした従者" });
+        if (!r.stolen) c.gotInfo(g, p, r.role, c.rev, { skipGrave: null, both: false, via: "コスプレした従者" });   // 奪われたときは村人なので、変化後の役職の知らせは出さない
       },
     },
     morning: {
