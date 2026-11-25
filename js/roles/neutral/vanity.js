@@ -109,12 +109,16 @@ return Object.keys(g.deadKind || {}).filter((id) => (g.deadIds || []).includes(i
 * teams は set() が決めた勝利陣営の表示名（「村人陣営」が含まれるかで村人陣営の勝ちを見る。神の祝福など陣営名に村人陣営が無い結果は「村人陣営の勝利ではない」として扱う）。
 * winners（set() の勝者集合）が渡されたときは、マイクラ版 resultHasActualVillageWinner と同じく、「村人陣営」が勝ちに含まれていても
 * 実際に村人陣営の役職の勝者が1人もいなければ村人陣営の勝利と数えない（例: 唯一の村人陣営の勝者が保安官に撃たれて勝利条件を失った場合）。
+* 「村人陣営の勝者」かどうかは、vote.js の基本勝敗が勝者を振り分けるときと同じ物差し（ONW.magicalGirl.teamOf）で見ること。
+* ROLE_INFO の静的な team だけで見ると、闇堕ちしていない魔法少女（ROLE_INFO は第三陣営だが、勝敗では村人陣営側）が
+* 唯一の村人側勝者のときに「村人陣営の勝者がいない」と誤判定し、村人を撃ったヴァニティが村人陣営勝利で追加勝利してしまう
+* （逆に人外を撃ったヴァニティが村人陣営勝利で勝てなくなる）。吊られた呪われし者（人狼陣営側に数える）も vote.js と同じく除く。
 */
 function wins(g, id, teams, winners) {
 const e = (g.vanityShots || []).find((x) => x.by === id);
 if (!e ||!e.kind) return false;
 let villageWon = (teams || []).includes("村人陣営");
-if (villageWon && winners) villageWon = [...winners].some((x) => x !== id && ((ONW.ROLE_INFO[(g.currentRoles || {})[x]] || {}).team === ONW.TEAM.VILLAGE));
+if (villageWon && winners) { const cw = g.cursedWolfIds || []; villageWon = [...winners].some((x) => x !== id && !cw.includes(x) && (ONW.magicalGirl ? ONW.magicalGirl.teamOf(g, x) : ((ONW.ROLE_INFO[(g.currentRoles || {})[x]] || {}).team)) === ONW.TEAM.VILLAGE); }
 return e.kind === "outsider"? villageWon:!villageWon;
 }
 /** 結果発表「昼行動結果」の1行（保安官と同じ言い回し。誰が誰を撃ったかだけ） */

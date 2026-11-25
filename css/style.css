@@ -1801,9 +1801,10 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .tb-seat.gx-blow[data-gn="6"]::before { font-size: max(6px, calc(var(--cw) * .135)); }   /* 点線カードの役職名も、通常のカードと同じ改行・文字サイズの決まり */
 @keyframes gx-blow { 0% { transform: none; opacity: 1; } 100% { transform: translate(90vw, -130vh) rotate(520deg) scale(.4); opacity: 1; } }   /* 透明にはならず、画面の外まで飛んでいく */
 @keyframes gx-blow2 { 0% { transform: none; opacity: 1; } 100% { transform: translate(-90vw, -130vh) rotate(-520deg) scale(.4); opacity: 1; } }
-/* 追加勝利で勝つ人（神官の祈りで勝つ村人陣営など）のカードは、陣営の色ではなく追加勝利の色（橙。結果シートの勝者欄 .rs-extra-name と同じ） */
-.tb-seat.gx-extra .tb-front { border-color: #ff9a3c; } .tb-seat.gx-extra .tb-front b { color: #ff9a3c; }
-.tb-seat.gx-extra .tb-card { filter: drop-shadow(0 0 6px rgba(255,154,60,.55)); }
+/* 追加勝利で勝つ人（神官の祈りで勝つ村人陣営など）のカードも、役職の色は通常どおり（その役職/陣営の本来の色）のままにする。
+   以前は追加勝利の色（橙 #ff9a3c）で枠・役職名・光彩を変えていたが、作者の指示（2026-11-25）で取りやめた。
+   追加勝利であることの表示は、勝利陣営の字幕の下に貼られる「追加勝利」の札（.rs-extra__chip）が担う。
+   .gx-extra のクラス自体は stage.js が結果発表の最終形で付け続けるが、色は変えない（将来の印用に残す）。 */
 /* 祝福で勝つ人のカードは金色に光る */
 .tb-seat.gx-win .tb-card { animation: gx-win 1.6s ease-in-out infinite; }
 @keyframes gx-win { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255,214,102,.7)); } 50% { filter: drop-shadow(0 0 13px rgba(255,236,160,1)); } }
@@ -2199,7 +2200,7 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .tb-front .tb-wolfmark.tb-coffee-face { flex-direction: column; gap: calc(var(--cw) * .04); }
 .tb-front .tb-coffee-big { font-size: calc(var(--cw) * .44); line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
 .tb-front .tb-coffee-sec { font-size: calc(var(--cw) * .5); line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: #e5232b; -webkit-text-stroke: calc(var(--cw) * .07) #000; paint-order: stroke fill; text-shadow: 0 0 1px #000, 0 1px 0 #000; }
-.tb-front .tb-wolfmark.tb-darkfall span { color: #ff2222; font-weight: 900; font-size: calc(var(--cw) * .30); letter-spacing: .08em; text-shadow: 0 0 10px rgba(255,0,0,.85); }
+.tb-front .tb-wolfmark.tb-darkfall span { color: #ff2222; font-weight: 900; font-size: calc(var(--cw) * .26); letter-spacing: .04em; white-space: nowrap; text-shadow: 0 0 10px rgba(255,0,0,.85); }   /* 「闇落ち」3文字が1行に収まる大きさ＋改行禁止（.30em では幅が足りず2行に折れていた。2026-11-25 作者報告で修正） */
 .tb-front .tb-wolfmark.tb-seal { filter: drop-shadow(0 0 8px rgba(255,70,50,.9)); }
 /* お札: 白い縦長の紙・赤い太枠・黒の「封印」・下に赤い丸に×の判（縦書きの2文字を縦に積む） */
 .tb-front .tb-wolfmark.tb-seal .tb-ofuda { display: flex; flex-direction: column; align-items: center; justify-content: space-between; box-sizing: border-box; flex: 0 0 auto; width: calc(var(--cw) * .4); height: calc(var(--cw) * .86); padding: calc(var(--cw) * .05) 0; background: #fffdf8; border: max(1.5px, calc(var(--cw) * .045)) solid #d8321f; border-radius: 3px 2px 4px 2px; box-shadow: 0 0 0 1px #e9e4d8; transform: rotate(-6deg); animation: sealSlap .5s cubic-bezier(.3,1.6,.5,1); }

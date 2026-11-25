@@ -3285,6 +3285,13 @@ window.ONW = window.ONW || {};
     const steveRev = (g.steveLog || []).map((e) => ({ id: e.id, name: nm(e.id), role: g.currentRoles[e.id] || null, reason: e.reason, when: e.when, label: STEVE_LABEL[e.reason] || "死亡", bys: (e.bys || []).map((x) => nm(x)) }));
     steveRev.forEach((e) => { const h = history.find((x) => x.id === e.id); if (!h) return; h.steve = e.when; h.steveLabel = e.label; h.steveReason = e.reason; h.steveBys = e.bys; h.statusParts = { death: `［${e.label}］`, revive: "［復活］", tail: h.status === "［生存］" ? "" : h.status }; h.status = `［${e.label}］［復活］${h.status === "［生存］" ? "" : h.status}`; });   // statusParts: 結果シート・画像用。死因（赤）→ 復活（生存の水色）で色分けして、間に矢印を出す（status の文字列は従来どおり）
     (g.steveLog || []).forEach((e) => { if (e.when === "result" && !e.logged) { e.logged = true; (g.dayLogsAll = g.dayLogsAll || []).push(`${ONW.roles.getInfo(ONW.ROLE.STEVE).name} ${nm(e.id)} は不死のトーテムにより復活しました。`); } });   // 結果発表の復活も昼行動結果に1回だけ（マイクラ版 addChainLog）
+    // 乞食（投票で交換した分）: 結果発表の汎用めくりでは、関係する2席は「交換前の姿」でめくる（乞食の席 = 交換前の役職、取られた人の席 = 元の役職）。
+    // 交換後の姿は乞食の専用演出（afterRest のカード移動）で初めて見せる（演出前に交換後が見えるネタバレの修正。2026-11-25 作者報告）。
+    // 役職履歴（segs）は最終役職までの流れのままなので、結果シート・共有画像は従来どおり。スキップ時は beggar.js の stageResult.skip が最終形を出す。
+    if (ONW.beggar) ONW.beggar.voteSwaps(g).forEach((s) => {
+      const ht = history.find((x) => x.id === s.targetId); if (ht) ht.role = s.role;
+      const hb = history.find((x) => x.id === s.byId); if (hb) hb.role = s.prevByRole || "beggar";
+    });
     const result = {
       title: g.winTitle,
       stageTitle: (!g.abandoned && !g.pranksterFx && g.winTitleStage && g.winTitle === g.winTitleStage.replace(/勝利$/, "＆道化の爆弾魔勝利") && winIds.some((id) => !(g.winBaseIds || []).includes(id))) ? g.winTitleStage : null,   // 勝利演出の字幕: 追加勝利の札（res.extraWin）が出るときは「村人陣営勝利」だけにして、「＆道化の爆弾魔勝利」は結果シート（title）だけに残す

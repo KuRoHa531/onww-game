@@ -76,11 +76,12 @@
   /** 交換を実行する（currentRoles の書き換えとデータ移転）。戻り値: 記録した結果 */
   function doSwap(g, beggarId, targetId, when) {
     const role = (g.currentRoles || {})[targetId];
+    const prevByRole = (g.currentRoles || {})[beggarId];   // 交換前に乞食の席にあった役職（通常は乞食。模倣の人狼が乞食を模倣していた場合は模倣の人狼）。結果発表で「演出前に交換前の姿でめくる」ために記録する
     transferData(g, targetId, beggarId);
     g.currentRoles[targetId] = R().VILLAGER;
     g.currentRoles[beggarId] = role;
     (g.beggarUsedTargets = g.beggarUsedTargets || []).push(targetId);
-    const e = { by: beggarId, target: targetId, role, when };
+    const e = { by: beggarId, target: targetId, role, when, prevByRole };
     (g.beggarResults = g.beggarResults || []).push(e);
     return e;
   }
@@ -203,8 +204,8 @@
       info: `${nm(e.by)} は乞食です。${nm(e.target)} の「${roleName(e.role)}」をいただきました（${nm(e.target)} は村人になりました）。`,
     }));
   }
-  /** 結果発表のカード移動演出用: 投票で交換した分 [{ byId, targetId, role }] */
-  const voteSwaps = (g) => (g.beggarResults || []).filter((e) => !e.failed && e.when === "vote").map((e) => ({ byId: e.by, targetId: e.target, role: e.role }));
+  /** 結果発表のカード移動演出用: 投票で交換した分 [{ byId, targetId, role, prevByRole }]（prevByRole = 交換前に乞食の席にあった役職。汎用めくりで交換前の姿を出すために net.js も使う） */
+  const voteSwaps = (g) => (g.beggarResults || []).filter((e) => !e.failed && e.when === "vote").map((e) => ({ byId: e.by, targetId: e.target, role: e.role, prevByRole: e.prevByRole || ID }));
 
   /**
    * 実績（wiki-data.js の「乞食」に定義済みの6つ）。Web版にはまだ実績を保存する仕組みが無いので、
@@ -252,28 +253,31 @@
     },
 
     // 結果発表の演出（stage.js の startResult が引く）: 投票で交換した分。全員がめくれ終わったあと（afterRest）に出す。
-    // 取られた人のカードは結果発表では最初から村人としてめくれているので、演出では一度だけ元の役職の面を見せてから
-    // カードが乞食の席へ飛び、元の席には村人のカードが残る形にする（作者メモの見た目）。res.beggarSwaps は net.js が作る（名前つき）。
+    // 汎用の結果めくりでは、関係する2席は交換前の姿でめくれている（乞食の席 = 乞食、取られた人の席 = 元の役職。
+    // net.js の buildResultObj が res.history の role を交換前に差し替える。演出前に交換後が見えるネタバレの修正。2026-11-25 作者報告）。
+    // この演出で初めて交換後を表示する: 字幕 → カードが乞食の席へ飛ぶ → 着地で元の席は村人・乞食の席は取った役職にめくれる。
+    // res.beggarSwaps は net.js が作る（名前つき）。
     stageResult: {
       afterRest(R) {
         const sw = (R.res && R.res.beggarSwaps) || [];
         if (!sw.length) return;
         sw.forEach((s) => {
           const kt = R.P(s.targetId), kb = R.P(s.byId), t0 = R.t;
-          R.later(() => {   // 取られた人のカードを、取られた役職の面で見せる
+          R.later(() => {   // 取られた人のカードは交換前の姿（元の役職）でめくれている。念のため同じ面を出し直して光らせる
             R.setCap(`<div class="res-cap__t t-third">${R.esc("乞食")}</div><div>${R.esc(s.target)} の「${R.esc(roleName(s.role))}」を ${R.esc(s.by)} がいただきました</div>`);
             R.up[kt] = s.role; R.glow[kt] = true; R.paint(R.G());
           }, t0);
           R.later(() => flyCard(R, kt, kb), t0 + 900);   // カードが乞食の席へ飛ぶ
-          R.later(() => {   // 着地: 元の席には村人のカードが残り、乞食の席のカード（取った役職）が光る
+          R.later(() => {   // 着地: 元の席には村人のカードが残り、乞食の席が取った役職にめくれて光る（ここで初めて交換後が見える）
             R.up[kt] = "villager"; delete R.glow[kt];
-            R.glow[kb] = true; R.paint(R.G());
+            R.up[kb] = s.role; R.glow[kb] = true; R.paint(R.G());
           }, t0 + 900 + 1100);
           R.later(() => { delete R.glow[kb]; R.paint(R.G()); }, t0 + 900 + 1100 + 700);
           R.t = t0 + 900 + 1100 + 900;
         });
       },
-      skip(R) {   // スキップ時: 最終形（取られた人は村人・乞食は取った役職）は res の表示そのものなので、飛ぶカードの残骸だけ片付ける
+      skip(R) {   // スキップ時: 汎用めくりは交換前の姿なので、最終形（取られた人は村人・乞食は取った役職）をここで出し、飛ぶカードの残骸も片付ける
+        ((R.res && R.res.beggarSwaps) || []).forEach((s) => { R.up[R.P(s.targetId)] = "villager"; R.up[R.P(s.byId)] = s.role; });
         removeFly();
       },
       clear(R) { removeFly(); },
