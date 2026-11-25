@@ -49,7 +49,7 @@ window.ONW = window.ONW || {};
     if (all || stage === "init") g.cpuInfo = {};
     g.cpuInfo = g.cpuInfo || {};
     // 酔っ払いが重なっているCPUは、酔いが覚める(late)までは夜の行動も情報もない
-    const cpus = stage === "late" ? g.players.filter((p) => (ids || []).includes(p.id)) : g.players.filter((p) => p.isCpu && !(g.drunkOverlay && g.drunkOverlay[p.id]));
+    const cpus = stage === "late" ? g.players.filter((p) => (ids || []).includes(p.id)) : g.players.filter((p) => (p.isCpu || (stage !== "morning" && ONW.hack && ONW.hack.autoReal(g, p))) && !(g.drunkOverlay && g.drunkOverlay[p.id]));   // 銀狼にハッキングされた人間の本当の夜の能力も、CPUと同じ動きで裏で自動的に使う（怪盗・いたずらっ子を除く。結果は本人に届けない）
     const role = (p) => g.initialRoles[p.id];
     const act = (p) => ONW.mimic.actRole(g, p.id, role(p));   // 夜に使う能力の役職（模倣の人狼は模倣先。仲間表示など「カードそのもの」は role(p) のまま）
     // 人狼系は互いを知っている（役職ごとの情報は cpuInit: 狂信者・マーリン・共有者・従者・処刑人・大狼・神）
@@ -70,7 +70,7 @@ window.ONW = window.ONW || {};
     // 役職ファイルの cpuNight.run に渡す道具
     const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves, n.cur); else if (ONW.watcher) ONW.watcher.touch(g, from, players); };   // 昼の酔い覚めは詩人・観測には載らないが、静観者の「能力を使われた」には数える   // n.cur = いま能力を使っている役職（詩人の通知に載る。模倣の人狼は模倣先）
       // 観測の人狼: 夜に誰が誰に能力を使ったかを記録（昼の酔い覚め後は記録しない）
-    const hold = (id, text) => { if (!text) return; g.nightResults = g.nightResults || {}; (g.nightResults[id] = g.nightResults[id] || []).push(text); };   // 人間なら net.js の hold() で預かる夜の結果を、CPUも同じ文で g.nightResults に積む（結果画面の「情報確認（全員）」に出る。CPUには届かないので画面には影響しない）
+    const hold = (id, text) => { if (!text || (ONW.hack && ONW.hack.isFakeUi(g, id))) return; g.nightResults = g.nightResults || {}; (g.nightResults[id] = g.nightResults[id] || []).push(text); };   // 人間なら net.js の hold() で預かる夜の結果を、CPUも同じ文で g.nightResults に積む（結果画面の「情報確認（全員）」に出る。CPUには届かないので画面には影響しない）
     const n = { g: gv, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf: (id) => infoOf(g, id), nameOf: (id) => nameOf(g, id) };
 
     const on = (s) => all || stage === s;
@@ -523,12 +523,14 @@ window.ONW = window.ONW || {};
       // 酔っ払い: 覚めるまでは「酔っ払いCO」だけ。覚めたあとは最終的な役職として振る舞う
       const i = infoOf(g, p.id);
       let r = hid ? "drunk" : ONW.shownRole(g.currentRoles[p.id] !== undefined && od ? g.currentRoles[p.id] : g.initialRoles[p.id]);   // 忘却の人狼のCPUは自分を村人だと思っている
-      if (!hid && i.shuffledTo) r = i.shuffledTo;   // 自分に置いたCPUシャッフラーだけは、自分で見た新しい役職として振る舞う（shuffler.js の cpuRun）。他人に役職を変えられたCPUは通知されないので、元の役職のつもりのまま（マイクラ版 selfPerceivedRole と同じ）
+      const hk = !hid && ONW.hack ? ONW.hack.roleOf(g, p.id) : null;   // 銀狼にハッキングされたCPU: 思い込んだ役職として振る舞う（本当の夜の能力は裏で使っているが、結果は思い込みの役職のものではないので、COだけ。docs/silver-wolf.md）
+      if (hk) r = hk;
+      if (!hid && i.shuffledTo && !hk) r = i.shuffledTo;   // 自分に置いたCPUシャッフラーだけは、自分で見た新しい役職として振る舞う（shuffler.js の cpuRun）。他人に役職を変えられたCPUは通知されないので、元の役職のつもりのまま（マイクラ版 selfPerceivedRole と同じ）
       const others = g.players.filter((q) => q.id !== p.id);
       const c = { co: null, result: null, extra: null };   // extra: 結果開示のあとに続けて言う2つ目の結果
       if (hid) { plan.push({ p, text: `${rn("drunk")}CO`, co: "drunk", claim: { kind: "villager" }, gap: 3500 }); return; }
       // スター・女王: 待機時間に知らされるので、本当のCOの扱いが特別（各役職ファイルの cpuFirst。配列を返したらその発言だけで終わり）
-      const first = ONW.roleHook(g.currentRoles[p.id], "cpuFirst");
+      const first = hk ? null : ONW.roleHook(g.currentRoles[p.id], "cpuFirst");
       let fr = first ? first(cpu.kit, g, p, r) : null;
       if (!fr && mimicStarRevealed(g, p)) fr = [{ p, text: `${rn("star")}CO`, co: "star", claim: { kind: "villager" }, gap: 3500 }];   // スターを模倣している模倣の人狼で、スター公開に実際に出たCPU: 全員にカードが見えているので、必ずスターCO（2026-11-07）
       if (fr) { fr.forEach((e) => plan.push(e)); return; }
@@ -538,7 +540,7 @@ window.ONW = window.ONW || {};
         c.co = lie.co; c.result = lie.result;
       } else {
         // 役職ごとの発言は各役職ファイルの cpuClaim（false を返したら通常の扱い）
-        const h = ONW.roleHook(r, "cpuClaim");
+        const h = hk ? null : ONW.roleHook(r, "cpuClaim");
         if (h && h(cpu.kit, g, p, r, i, c) !== false) { /* 役職ファイルで決まった */ }
         else if (ONW.roles.getInfo(r).team === "village") c.co = r;      // その他の村人陣営（わら人形・猫又など）: 必ず自分の役職をCO
         else { const pl = plainLie(g, p, r); c.co = pl.co; c.result = pl.result; }   // 神・天邪鬼・オポチュニストなど（人狼でもてるてる系でもない第三陣営）: 村人を騙る（村人がいなければ別の村役職）
@@ -597,7 +599,7 @@ window.ONW = window.ONW || {};
    * CPU本人が思っている今の役職（自認）。怪盗・墓荒らし・後覚者で知った役職があればそれ、なければ最初に配られた役職。
    * いたずらっ子や他人の怪盗に入れ替えられたことは本人には分からないので、実際の今の役職は見ない。
    */
-  const selfRole = (g, p) => (ONW.hiddenDrunk(g, p.id) ? "villager" : infoOf(g, p.id).known[p.id] || ONW.shownRole(g.initialRoles[p.id]));   // 酔いが覚める前のCPUは自分の役職を知らない
+  const selfRole = (g, p) => (ONW.hiddenDrunk(g, p.id) ? "villager" : (ONW.hack && ONW.hack.roleOf(g, p.id)) || infoOf(g, p.id).known[p.id] || ONW.shownRole(g.initialRoles[p.id]));   // 酔いが覚める前のCPUは自分の役職を知らない
   const alive = (g, id) => !(g.deadIds || []).includes(id);
   /** 投票先候補（本家 chooseBestVoteTarget: 自分以外・生存・共有者の相方は除く） */
   function voteCandidates(g, p) {
@@ -668,6 +670,7 @@ window.ONW = window.ONW || {};
     // 役職ごとの加点（てるてる系・処刑人・従者）。各役職ファイルの cpuVoteScore
     const hv = ONW.roleHook(me, "cpuVoteScore");
     if (hv) s += hv(cpu.kit, g, p, q, i, me);
+    if (ONW.cpuTalk && ONW.cpuTalk.suspectBonus) s += ONW.cpuTalk.suspectBonus(g, p, q);   // 会話で積まれた疑いスコア（js/cpu-talk.js。上限つき・控えめ。マイクラ版 addSuspectScore と同じ考え方）
     return s;
   }
 
@@ -684,6 +687,13 @@ window.ONW = window.ONW || {};
     for (let n = 0; n < pool.length; n++) { r -= w[n]; if (r <= 0) return pool[n].id; }
     return pool[pool.length - 1].id;
   }
+
+  /** そのCPUが「いま一番入れたい」相手（決まったら変わらない予告ではなく、点の一番高い人）。js/cpu-talk.js の議論発言が使う。何も記録しない */
+  cpu.leanTarget = function (g, p) {
+    let best = null;
+    voteCandidates(g, p).forEach((q) => { const sc = scoreVote(g, p, q); if (sc > -50 && (!best || sc > best.sc)) best = { id: q.id, sc }; });
+    return best ? best.id : null;
+  };
 
   /** 自認が人外のCPU（人狼・狂人・てるてる・第三陣営）が、投票先の予告で嘘をつく確率 */
   const VOTE_LIE_RATE = 0.5;

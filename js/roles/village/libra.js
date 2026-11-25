@@ -104,7 +104,7 @@
   /** 全員のチャットに出す天秤通知（マイクラ版の「天秤通知」と同じ文） */
   const noticeText = (a, b) => `天秤通知: ${a}と${b}に投票対象が制限されました。`;
   /** 本人の情報確認の文 */
-  const doneText = (a, b) => `${a} と ${b} に投票対象を制限しました。`;
+  const doneText = (a, b) => `${a} と ${b} に投票対象を制限していました。`;
   /** 観戦者の「昼の行動」欄（specInfo）用: 使われていれば { by, a, b }（名前）。なければ null */
   function specLine(g, nm) {
     const l = g && g.libra;

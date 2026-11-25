@@ -53,6 +53,20 @@
     });
     return out;
   }
+  /** viewer の目線で、本物の笑い声が聞こえるか: 銀狼にハッキングされた人は、自分の愉快犯のぶんを数えない（自分以外に本物の愉快犯がいれば聞こえる） */
+  const realFor = (g, vid) => !(ONW.hack && ONW.hack.isFakeUi(g, vid)) || picks(g).some((e) => e[0] !== vid);
+  /** 笑い声を全員へ。ハッキングされた人は、その人の目線（愉快犯と思い込んで対象を選んでいれば、偽の笑い声が本人にだけ1回出る）。docs/silver-wolf.md */
+  function sendLaugh(c, real, late) {
+    const g = c.g;
+    if (!real && !(ONW.hack && g.players.some((q) => ONW.hack.isFakeUi(g, q.id)))) return;   // 本物もなく、ハッキングされた人もいなければ何も送らない
+    const m = late ? { t: "prankster", late: true } : { t: "prankster" };
+    c.sendAll((p) => {
+      if (!ONW.hack || !ONW.hack.isFakeUi(g, p.id)) return real ? m : { t: "noop" };
+      if (real && realFor(g, p.id)) return m;
+      return ONW.hack.fakeBanner(g, p.id, "prankster", false) ? { t: "noop" } : ONW.hack.fakeBanner(g, p.id, "prankster", true) ? m : { t: "noop" };
+    });
+    if (real) c.sendSpec({ ...m, quiet: true });
+  }
   /** 笑い声を出すか（出すなら出した印をつけて true）。酔いが覚めていない人・封印された人の記録は数えない */
   function announce(c) {
     const g = c.g;
@@ -163,19 +177,19 @@
     },
     /** 昼の始まり(変化公開 → 新聞 → 暴露 のあと・麻婆豆腐の前): 「愉快な笑い声が聞こえました。」を出す。戻り値: バナーが消えるまでの待ち時間(ms)。出さないときは 0 */
     dayAnnounce: { order: 107, run(c) {
-      if (!announce(c)) return 0;
-      const m = { t: "prankster" }; c.sendAll(m); c.sendSpec({ ...m, quiet: true });
-      return ONW.stage && ONW.stage.pranksterMs ? ONW.stage.pranksterMs() : 0;
+      const real = announce(c);
+      sendLaugh(c, real, false);
+      return real && ONW.stage && ONW.stage.pranksterMs ? ONW.stage.pranksterMs() : 0;   // 待ち時間は本物の笑い声のときだけ
     } },
     /** 昼のうちに、酔いが覚めた / 昼に愉快犯を手にして選んだ人がいて、まだ出していなければ、その瞬間に出す（昼のタイマーは止めない） */
     dayNews: { order: 107, run(c) {
       if (c.g.phase !== c.PH.ONLINE_DAY) return;
-      if (!announce(c)) return;
-      const m = { t: "prankster", late: true }; c.sendAll(m); c.sendSpec({ ...m, quiet: true });
+      sendLaugh(c, announce(c), true);
     } },
     /** 再入室: バナーは出さず、情報確認にだけ反映 */
-    resyncDay: { order: 17, run(c) {
-      return c.g.pranksterAnnounced ? [{ t: "prankster", quiet: true }] : [];
+    resyncDay: { order: 17, run(c, seat) {
+      const g = c.g, ok = g.pranksterAnnounced && (!seat || realFor(g, seat)) || (seat && ONW.hack && ONW.hack.fakeBanner(g, seat, "prankster", false));
+      return ok ? [{ t: "prankster", quiet: true }] : [];
     } },
     /** 墓荒らし・ドッペルゲンガーで愉快犯を手にしたとき（朝のうち）/ 酔いが覚めた愉快犯が昼に使うとき: 自分以外の1人を選べる。
      *  酔っ払いは酔いが覚めるまで夜の能力を使えない（夜の resolve は酔い中の人には呼ばれない）ので、記録は覚めたあとのこの処理だけで入る。 */

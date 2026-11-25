@@ -191,6 +191,7 @@ co.poetPick = function (id) {
     ["trailblazer", "愉悦開拓者に交換されていそうです。", "愉悦開拓者に交換された"],   // 運命が愉悦の開拓者（いたずらっ子の能力）に交換された。いたずらっ子と区別して伝える（マイクラ版の並びどおり いたずらっ子の次）
     ["shuffler", "シャッフラーに変えられていそうです。", "シャッフラーに変えられた"],
     ["gremlin", "グレムリンに上書きされていそうです。", "グレムリンに上書きされた"],
+    ["silver_wolf", "銀狼にハッキングされていそうです。", "銀狼にハッキングされた"],   // マイクラ版の並びはグレムリン・魔法使いの次（魔法使いはWeb版にない）
   ];
   co.changedInfo = () => set({ step: "chg" });
   // 鍵師のロックで変化役の能力が弾かれた（怪盗・いたずらっ子・墓荒らし・ドッペル・シャッフラー・グレムリン・抹消の人狼）。
@@ -232,7 +233,7 @@ co.poetPick = function (id) {
   // deck は [{r, cand}]（古い形式の文字列も受け付ける）。変化先の候補には「(変化候補)」を付ける
   const TEAM_ORDER = { village: 0, wolf: 1, third: 2 };   // COボタンの並び: 村人陣営 → 人狼陣営 → 第三陣営（同じ陣営の中は、基準の並び ONW.ROLE_ORDER=wikiの順。同じ役職どうしはもとの並び）
   const teamRank = (r) => { const t = (ONW.roles.getInfo(r) || {}).team; return t in TEAM_ORDER ? TEAM_ORDER[t] : 3; };
-  const deckList = (noCo) => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin" && !(noCo && x.r === "finger_reader")).map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || ONW.roleRank(a.x.r) - ONW.roleRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）。指読みは役職COボタン(noCo)にだけ出さない（指読みCO禁止）が、占い師などの結果役職の一覧には出す（マイクラ版 availableCoRoles / availableSeerResultRoles）
+  const deckList = (noCo) => (G().deck || []).map((x) => (typeof x === "string" ? { r: x } : x)).filter((x) => x.r !== "merlin" && !(noCo && (x.r === "finger_reader" || x.r === "vanity"))).map((x, i) => ({ x, i })).sort((a, b) => teamRank(a.x.r) - teamRank(b.x.r) || ONW.roleRank(a.x.r) - ONW.roleRank(b.x.r) || a.i - b.i).map((o) => o.x);   // マーリンはCOボタンに出さない（マーリンCO・マーリンの騙りは禁止）。指読みは役職COボタン(noCo)にだけ出さない（指読みCO禁止）が、占い師などの結果役職の一覧には出す（マイクラ版 availableCoRoles / availableSeerResultRoles）。ヴァニティも役職COボタンにだけ出さない（本人は保安官だと思い込んでいるので、COは保安官でする。マイクラ版 availableCoRoles でヴァニティは保安官に置き換わる。結果役職の一覧には出す）
   const roleBtns = (fn, extra = "", skip = []) => deckList(fn === "roleCo").filter((x) => !skip.includes(x.r)).map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.${fn}('${x.r}')`)).join("") + extra;
 
   /** COパネルの高さを、ボタンの上の「見える範囲」に収める（2026-11-07）。

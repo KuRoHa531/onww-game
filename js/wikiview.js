@@ -54,7 +54,7 @@ window.ONW = window.ONW || {};
   const sec = (title, inner) => `<section class="gd-sec"><h3 class="gd-h">${title}</h3>${inner}</section>`;
 
   /** 重複役職の設定表示: 「2人（確率100%）」/ 0なら「なし」 */
-  const dupText = (n, unit, chance) => (n > 0 ? `${n}${unit}（${unit === "組" ? "恋人になる" : "酔っ払いになる"}確率 ${chance ?? 100}%）` : "なし");
+  const dupText = (n, unit, kind) => (n > 0 ? `${n}${unit}（${unit === "組" ? "恋人になる" : "酔っ払いになる"}${ONW.assign.dupText(ONW.game, kind, n)}）` : "なし");
   /** ルーム設定タブ: アサイン設定の表示（ONなら、陣営の人数の範囲と、100%でない役職の確率） */
   function asgLines(g) {
     const A = ONW.assign, R = A.ranges(g), on = !!g.assignOn;
@@ -93,10 +93,10 @@ window.ONW = window.ONW || {};
       <p class="gd-note">${g.phase === P.LOBBY ? "設定の変更はホストが、ロビーの「ルーム設定」から行います。" : "試合中は設定を変更できません(確認のみ)。"}</p>
       ${sec("人数設定", line("参加人数", `${total}人${cpu ? `（CPU ${cpu}人を含む）` : ""}`) + line("墓地の枚数", `${g.graveCount ?? 0}枚`) + line("CPU人数", `${cpu}人`))}
       ${sec("タイマー設定", line("役職配布(演出のあとの待ち)", `${t.deal ?? 5}秒`) + line("夜時間", `${t.night ?? "―"}秒`) + line("朝時間", `${t.morning ?? "―"}秒`) + line("待機時間", `${t.settle ?? 5}秒`) + line("昼・議論", `${t.day ?? "―"}秒`) + line("夕方・投票", `${t.vote ?? "―"}秒`))}
-      ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", g.drunkChance)) + line("恋人", dupText(g.loverCount, "組", g.loverChance)))}
+      ${sec("重複役職設定", line("酔っ払い", dupText(g.drunkCount, "人", "drunk")) + line("恋人", dupText(g.loverCount, "組", "lover")))}
       ${sec("役職設定（アサイン設定）", asgLines(g))}
       ${sec("役職設定（詳細設定）", line("占い師が占える墓地の枚数", `${seerMax}枚`) + line("偽占い師が占える墓地の枚数", `${fakeSeerMax}枚`) + line("狂った占い師が占える墓地の枚数", `${madSeerMax}枚`) + line("メイヤーの投票数", `${g.mayorVoteCount ?? 2}票`) + line("狂ったメイヤーの投票数", `${g.madMayorVoteCount ?? 2}票`) + line("煙幕: 能力対象のプレイヤー名を隠す", onoff(g.smokeHideAbility === true)) + line("煙幕: 投票対象のプレイヤー名を隠す", onoff(g.smokeHideVote === true)))}
-      ${sec("システム設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("変化公開", onoff(g.revealTransforms)) + line("手動配役を変化公開に表示", onoff(g.revealManualRoles)) + line("勝利の乗っ取り演出", onoff(g.winLadderFx !== false)) + line("吹き出しチャット", onoff(g.bubbleChat === true)) + line("デバッグモード", onoff(g.debugOn)))}
+      ${sec("システム設定", line("狂人昇格", onoff(g.fakeWolfWhenNoWolf)) + line("変化公開", onoff(g.revealTransforms)) + line("手動配役を変化公開に表示", onoff(g.revealManualRoles)) + line("勝利の乗っ取り演出", onoff(g.winLadderFx !== false)) + line("吹き出しチャット", onoff(g.bubbleChat === true)) + line("CPU AI議論(β版)", onoff(g.cpuAi === true)) + line("デバッグモード", onoff(g.debugOn)))}
       ${sec("変化先の有無", tf)}`;
   }
 
@@ -108,8 +108,8 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   const ORDER = {
     village: ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi", "carmen", "knight", "trailblazer"]),
-    wolf: ONW.sortByRoleOrder(["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]),
-    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher"]),
+    wolf: ONW.sortByRoleOrder(["dark_avatar", "werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "cat_pumpkin", "madman", "mad_seer", "cultist", "black_cat", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman", "mad_priest"]),
+    third: ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher", "vanity"]),
   };
   const TEAM_TITLE = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
@@ -207,7 +207,7 @@ window.ONW = window.ONW || {};
     };
     // 重複役職（第三陣営の外に、独立したグループとして出す）
     const dupBlock = () => (counts.drunk > 0 || counts.lover > 0) ? `<section class="gd-team t-dup"><h3 class="gd-h">重複役職</h3>
-        ${counts.drunk > 0 ? rowOf("drunk", `<span class="gd-n">×${counts.drunk}人</span><span class="gd-n gd-n--cand">確率${g.drunkChance ?? 100}%</span>`) : ""}${counts.lover > 0 ? rowOf("lover", `<span class="gd-n">×${counts.lover}組</span><span class="gd-n gd-n--cand">確率${g.loverChance ?? 100}%</span>`) : ""}</section>` : "";
+        ${counts.drunk > 0 ? rowOf("drunk", `<span class="gd-n">×${counts.drunk}人</span><span class="gd-n gd-n--cand">${ONW.assign.dupText(g, "drunk", counts.drunk)}</span>`) : ""}${counts.lover > 0 ? rowOf("lover", `<span class="gd-n">×${counts.lover}組</span><span class="gd-n gd-n--cand">${ONW.assign.dupText(g, "lover", counts.lover)}</span>`) : ""}</section>` : "";
     return `
       <p class="gd-summary">${g.assignOn && g.phase === ONW.PHASE.LOBBY ? `アサイン設定ON <b>候補${totalRoles}枚 → ${Math.max(0, (g.villageSize || 0))}人村 / 墓地${grave}枚の${Math.max(0, (g.villageSize || 0)) + grave}枚を抽選</b>` : `現在の配役設定 <b>${Math.max(0, totalRoles - grave)}人村 / 墓地${grave}枚 / 役職${totalRoles}枚</b>`}</p>
       <p class="gd-note">${g.assignOn && g.phase === ONW.PHASE.LOBBY ? "アサイン設定がONなので、ここに出ているのは配役の「候補」です（ゲーム開始のときに抽選され、選ばれなかった役職は結果で「欠け」になります）。" : "現在の配役に含まれる役職です。"}役職名を押すと説明が開きます。${!g.revealTransforms && cands.length ? "「変化候補」は、変化役の変化先として出る可能性がある役職です。" : ""}${g.revealTransforms && !afterDayStart() ? (g.revealManualRoles ? "手動配役を変化公開に表示する設定がONなので、各役職は変化役にまとめて表示しています。本当の役職は昼の開始時に反映されます。" : "変化公開がONなので、変化後の役職は昼の開始時に反映されます。") : ""}</p>

@@ -604,7 +604,7 @@ body {
   from { opacity: 1; width: var(--dw, 44px); height: var(--dh, 62px); font-size: var(--df, 18px); transform: translate(var(--dx), var(--dy)) rotate(0deg); }
   0.01% { z-index: 2000; }
   35%  { opacity: 1; transform: translate(calc(var(--dx) * .62), calc(var(--dy) * .62)) rotate(-7deg); }
-  to   { opacity: 1; width: 96px; height: 134px; font-size: 34px; transform: none; z-index: 2000; }
+  to   { opacity: 1; width: var(--dlmw, 96px); height: var(--dlmh, 134px); font-size: var(--dlmfs, 34px); transform: none; z-index: 2000; }   /* 実際のスロットの大きさに合わせる（画面に収めて縮めた時も、PCの大きい時も） */
 }
 /* 自分のカード: 裏面 → 表(変化前) → 表(変化後) */
 .dl-flipper { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 2; pointer-events: none; will-change: transform; }
@@ -693,6 +693,16 @@ body {
   .wikiv__box { height: 100%; border: 0; border-radius: 0; }
 }
 .fs-btn { position: fixed; top: 6px; left: 6px; z-index: 500; width: 28px; height: 28px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: rgba(27,29,43,.85); color: var(--gold-dim); font-size: 16px; line-height: 1; cursor: pointer; }
+/* 左上: サウンドボタン（全画面ボタンの隣）と音量パネル（js/sound.js が開閉・同期） */
+.snd-btn { position: fixed; top: 6px; left: 40px; z-index: 500; }
+.snd-panel { position: fixed; top: 44px; left: 6px; z-index: 510; width: 248px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(27,29,43,.97); box-shadow: 0 8px 24px rgba(0,0,0,.5); color: var(--ink); }
+.snd-panel[hidden] { display: none; }
+.snd-panel__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; font-weight: 700; }
+.snd-panel__row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.snd-panel__row label { flex: 0 0 34px; font-size: 13px; color: var(--ink-dim); }
+.snd-panel__row input[type="range"] { flex: 1 1 auto; min-width: 0; }
+.snd-panel__val { flex: 0 0 38px; text-align: right; font-size: 12px; color: var(--ink-dim); }
+@media (min-width: 900px) { .snd-panel { top: 60px; } }   /* PC版は 🔊 ボタンが大きくなる分、パネルを下げる */
 body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glow, body.pseudo-fs .onw-app + * { }
 body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glow, body.pseudo-fs body > p { display: none; }
 /* トップ画面 */
@@ -704,10 +714,10 @@ body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glo
 body.chat-mode { height: 100vh; height: var(--app-h, 100dvh); min-height: 0; overflow: hidden; }
 html:has(body.chat-mode) { overflow: hidden; overscroll-behavior: none; }
 /* res-compact: 結果発表のあいだもヘッダーを小さいまま保つ（投票→結果でヘッダーの高さが1コマで変わり、カードが下にジャンプするのを防ぐ） */
-body.chat-mode .onw-header, body.res-compact .onw-header { padding: 6px 10px 6px 40px; gap: 8px; }
-body.chat-mode .onw-header__title, body.res-compact .onw-header__title { font-size: 15px; }
-body.chat-mode .onw-header__title-sub, body.res-compact .onw-header__title-sub { display: none; }
-body.chat-mode .onw-header__phase, body.chat-mode .onw-header__day, body.res-compact .onw-header__phase, body.res-compact .onw-header__day { min-width: 0; padding: 3px 10px; font-size: 12px; }
+body.chat-mode .onw-header, body.res-compact .onw-header, body.deal-fit .onw-header { padding: 6px 10px 6px 40px; gap: 8px; }
+body.chat-mode .onw-header__title, body.res-compact .onw-header__title, body.deal-fit .onw-header__title { font-size: 15px; }
+body.chat-mode .onw-header__title-sub, body.res-compact .onw-header__title-sub, body.deal-fit .onw-header__title-sub { display: none; }
+body.chat-mode .onw-header__phase, body.chat-mode .onw-header__day, body.res-compact .onw-header__phase, body.res-compact .onw-header__day, body.deal-fit .onw-header__phase, body.deal-fit .onw-header__day { min-width: 0; padding: 3px 10px; font-size: 12px; }
 body.chat-mode .onw-footer, body.chat-mode .moon-glow { display: none; }
 body.chat-mode .onw-app { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 6px 6px 0; overflow: hidden; }
 body.chat-mode .onw-app > * { flex: 0 0 auto; }
@@ -1106,6 +1116,195 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
   .dl-players { margin-top: 28px; }
 }
 
+/* PC幅でも高さが低い窓（1000x600 など）で、人数が多いときカードのテーブルが中でスクロールしないよう、カードと間隔を小さくする（3of4） */
+@media (min-width: 1000px) and (max-height: 700px) {
+  body:has(#table.on) .tb-wrap { --cw: clamp(36px, min(7.4vw, 9vh), 160px); }
+  body:has(#table.on) .tb-table { gap: clamp(8px, 2vh, 48px); padding: 10px 16px 8px; }
+  body:has(#table.on) .tb-row, body:has(#table.on) .tb-players { gap: clamp(10px, 1.8vh, 28px) clamp(12px, 1.8vw, 30px); }
+  body:has(#table.on) .tb-seat { gap: 4px; }
+  body:has(#table.on) .tb-name { font-size: 12px; }
+}
+
+/* =========================================================
+   横向きの小さい画面（スマホを横にした・高さの低い窓）で、夜・朝・待機時間・昼・投票・結果発表をスクロールなしで収める（3of4）
+   PC幅(1000px以上)と同じ「左: カードのテーブル / 右: 操作パネル」の2カラムにする（大きさだけ小さい画面向け）。
+   縦向きのスマホ・タブレットは今までどおり（上: テーブル / 下: 操作パネル）で、ここでは触らない
+   ========================================================= */
+@media (max-width: 999px) and (orientation: landscape) and (max-height: 640px) {
+  body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .onw-header { grid-column: 1 / -1; grid-row: 1; }
+  .onw-app { grid-column: 1; grid-row: 3; }
+  .onw-footer { grid-column: 1 / -1; grid-row: 4; }
+  .dbg-badge { grid-column: 1 / -1; grid-row: 2; }
+  body:has(#table.on) {
+    grid-template-columns: minmax(0, 1fr) clamp(250px, 46vw, 440px);
+    height: 100vh; height: var(--app-h, 100dvh); min-height: 0; overflow: hidden;
+  }
+  html:has(#table.on) { overflow: hidden; overscroll-behavior: none; }
+  body:has(#table.on) .onw-header { padding: 4px 10px 4px 40px; gap: 8px; }
+  body:has(#table.on) .onw-header__title { font-size: 14px; }
+  body:has(#table.on) .onw-header__title-sub { display: none; }
+  body:has(#table.on) .onw-header__phase, body:has(#table.on) .onw-header__day { min-width: 0; padding: 2px 10px; font-size: 12px; }
+  body:has(#table.on) .onw-footer, body:has(#table.on) .moon-glow { display: none; }
+
+  /* 左: カードのテーブル */
+  body:has(#table.on) .stage-col { display: flex; flex-direction: column; grid-column: 1; grid-row: 3; min-height: 0; position: relative; z-index: 1; padding: 4px 6px 6px; }
+  body:has(#table.on) .big-timer { display: none; }
+  body:has(#table.on) .tb-wrap {
+    --cw: clamp(26px, min(5.6vw, 9vh), 56px); --ch: calc(var(--cw) * 1.42);
+    display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-width: none; width: 100%; margin: 0; padding: 0;
+  }
+  body:has(#table.on) .tb-table {
+    flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: safe center; align-items: center; overflow: hidden;
+    gap: clamp(6px, 2vh, 14px); padding: 8px 8px 6px; border-radius: 10px;
+  }
+  body:has(#table.on) .tb-row, body:has(#table.on) .tb-players { gap: clamp(8px, 1.8vh, 14px) clamp(6px, 1.2vw, 14px); max-width: 100%; }
+  body:has(#table.on) .tb-center { margin-bottom: 0; gap: 4px 8px; }
+  body:has(#table.on) .tb-seat { gap: 3px; }
+  body:has(#table.on) .tb-name { font-size: 10px; max-width: calc(var(--cw) + 20px); }
+  body:has(#table.on) .tb-name .av { display: none; }
+  body:has(#table.on) .tb-badge { font-size: 10px; top: -8px; right: -9px; padding: 1px 6px; }
+  body:has(#table.on) .tb-seat.sel .tb-card { transform: translateY(-6px); }
+
+  /* 右: 操作パネル */
+  body:has(#table.on) .onw-app {
+    grid-column: 2; grid-row: 3; max-width: none; margin: 0; padding: 6px 8px; min-height: 0;
+    overflow: hidden; border-left: 1px solid var(--line); background: rgba(18, 19, 28, .55);
+  }
+  body:has(#table.on):not(.chat-mode) .onw-app:not(:has(.result-sheet)) { display: flex; flex-direction: column; justify-content: safe center; }
+  body:has(#table.on):not(.chat-mode) .onw-app:not(:has(.result-sheet)) > * { flex: 0 0 auto; }
+  body:has(#table.on) .panel.night-step { padding: 8px 10px; }
+  body:has(#table.on) .night-step__role { font-size: 20px; margin: 4px 0; }
+  body:has(#table.on) .night-step__hint { font-size: 12.5px; margin-bottom: 6px; }
+  body:has(#table.on) .panel p.lede { font-size: 12.5px; margin: 0 0 6px; line-height: 1.5; }
+  body:has(#table.on) .panel h2 { font-size: 15px; margin: 0 0 2px; }
+  body:has(#table.on) .btn-row { margin-top: 6px; gap: 8px; }
+  body:has(#table.on) .btn { padding: 7px 14px; font-size: 13px; }
+  body:has(#table.on).chat-mode .onw-app { padding: 6px 8px 0; }
+  body:has(#table.on) .chat-log { font-size: 13px; }
+  body:has(#table.on).chat-mode .co-board { max-height: 28vh; }
+  body:has(#table.on) .vote-grid { max-height: none; }
+  /* 議論・投票: チャット欄と入力欄を残すため、COボタン・CO一覧を小さく詰める */
+  body:has(#table.on).chat-mode .co-bar { display: flex; flex-wrap: nowrap; justify-content: center; gap: 4px; margin: 0 0 4px; }
+  body:has(#table.on).chat-mode .co-bar .btn { padding: 5px 6px; font-size: 12px; letter-spacing: 0; }
+  body:has(#table.on).chat-mode .co-board { max-height: 17vh; }
+  body:has(#table.on).chat-mode .panel h2 { font-size: 14px; margin: 0; }
+  body:has(#table.on).chat-mode .panel p.lede { font-size: 11.5px; line-height: 1.35; margin: 0 0 2px; }
+  body:has(#table.on).chat-mode .panel { padding: 6px 8px; }
+  body:has(#table.on).chat-mode .chat-log:not(.result-chat) { margin: 2px 0; padding: 4px 8px; min-height: 36px; }
+  body:has(#table.on).chat-mode .co-bar { padding: 3px 4px; }
+  body:has(#table.on).chat-mode .chat-input { margin-bottom: 0; }
+  body:has(#table.on).chat-mode .chat-input .onw-input { padding: 5px 8px; }
+}
+
+/* 縦向きの小さい画面: 夜・朝・待機時間・結果発表の演出は、高さを画面に固定し（フッターは隠す）、カードの大きさだけ js/ui.js の ui.fitTable が縮める（3of4）。最終結果の一覧(.result-sheet)・議論/投票(chat-mode)は今までどおり */
+@media (max-width: 999px) and (orientation: portrait) {
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) { height: 100vh; height: var(--app-h, 100dvh); min-height: 0; overflow: hidden; }
+  html:has(#table.on):not(:has(.result-sheet)) { overflow: hidden; overscroll-behavior: none; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-footer, body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .moon-glow { display: none; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-header { padding: 6px 10px 6px 40px; gap: 8px; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-header__title { font-size: 15px; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-header__title-sub { display: none; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-app { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: safe center; padding-top: 8px; padding-bottom: 8px; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-app > * { flex: 0 0 auto; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-header { flex-wrap: nowrap; }
+  body:has(#table.on):not(.chat-mode):not(:has(.result-sheet)) .onw-header__title { order: 0; flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
+  body.tbl-tight .panel.night-step { padding: 8px 10px; }
+  body.tbl-tight .night-step__role { font-size: 20px; margin: 4px 0; }
+  body.tbl-tight .night-step__hint { font-size: 12px; margin-bottom: 6px; }
+  body.tbl-tight .panel p.lede { font-size: 12px; margin: 0 0 6px; line-height: 1.5; }
+  body.tbl-tight .btn-row { margin-top: 6px; }
+  body.tbl-tight .btn { padding: 7px 14px; font-size: 13px; }
+  body.tbl-tight .onw-app { padding-top: 4px; padding-bottom: 4px; }
+}
+
+/* =========================================================
+   配役（役職配布）の演出を、画面にぴったり収める（全画面でもスクロールしない）
+   ・ページ全体: 配布のあいだは body.deal-fit（js/ui.js が付ける）。高さを画面に固定し、フッターを隠し、ヘッダーを小さくする
+   ・カード・余白・文字: 全部 --dk（0.3〜1）を掛けた大きさ。js/ui.js の fitDeal が、はみ出さない最大の --dk を測って入れる
+     （--dk = 1 のときは、これまでと同じ大きさ。小さい画面・人数が多いときだけ縮む）
+   ========================================================= */
+.deal-stage {
+  --dk: 1;
+  --dl-w: 44px; --dl-h: 62px; --dl-mw: 96px; --dl-mh: 134px; --dl-fs: 18px; --dl-mfs: 34px;
+  --dl-ic: 38px; --dl-nfs: 11px; --dl-nmw: 80px; --dl-gx: 14px; --dl-gy: 12px; --dl-sep: 22px; --dl-ff: 14px;
+  --dl-px: 20px; --dl-py: 40px; --dl-lfs: 14px;
+  --dlw: calc(var(--dl-w) * var(--dk)); --dlh: calc(var(--dl-h) * var(--dk));
+  --dlmw: calc(var(--dl-mw) * var(--dk)); --dlmh: calc(var(--dl-mh) * var(--dk));
+  --dlfs: calc(var(--dl-fs) * var(--dk)); --dlmfs: calc(var(--dl-mfs) * var(--dk));
+}
+@media (min-width: 1000px) {
+  .deal-stage {
+    --dl-w: 72px; --dl-h: 102px; --dl-mw: 150px; --dl-mh: 210px; --dl-fs: 26px; --dl-mfs: 48px;
+    --dl-ic: 48px; --dl-nfs: 13px; --dl-nmw: 110px; --dl-gx: 22px; --dl-gy: 20px; --dl-sep: 28px; --dl-ff: 18px;
+    --dl-px: 36px; --dl-py: 32px; --dl-lfs: 15px;
+  }
+}
+.panel.deal-stage { padding: calc(var(--dl-py) * var(--dk)) calc(var(--dl-px) * var(--dk)); }
+.deal-stage p.lede { font-size: max(10px, calc(var(--dl-lfs) * var(--dk))); margin: 0 0 calc(22px * var(--dk)); }
+.deal-stage .dl-deck { width: var(--dlw); height: var(--dlh); margin: calc(6px * var(--dk)) auto calc(14px * var(--dk)); }
+.deal-stage .dl-card, .deal-stage .dl-slot { width: var(--dlw); height: var(--dlh); }
+.deal-stage .dl-card { font-size: var(--dlfs); }
+.deal-stage .dl-me .dl-slot, .deal-stage .dl-me .dl-card { width: var(--dlmw); height: var(--dlmh); }
+.deal-stage .dl-me .dl-card { font-size: var(--dlmfs); }
+.deal-stage .dl-row { gap: calc(var(--dl-gy) * var(--dk)) calc(var(--dl-gx) * var(--dk)); margin: calc(10px * var(--dk)) 0; }
+.deal-stage.dl-spec .dl-players { gap: calc(14px * var(--dk)) calc(10px * var(--dk)); }
+.deal-stage .dl-graves { margin-bottom: calc(var(--dl-sep) * var(--dk)); }
+.deal-stage .dl-players { margin-top: calc(var(--dl-sep) * var(--dk)); }
+.deal-stage .dl-player { gap: calc(6px * var(--dk)); }
+.deal-stage .dl-icon { width: calc(var(--dl-ic) * var(--dk)); height: calc(var(--dl-ic) * var(--dk)); font-size: calc(16px * var(--dk)); }
+.deal-stage .dl-name { font-size: max(8px, calc(var(--dl-nfs) * var(--dk))); max-width: calc(var(--dl-nmw) * var(--dk)); margin-top: calc(4px * var(--dk)); }
+.deal-stage .dl-player .dl-name { margin: 0; }
+.deal-stage .dl-me .dl-name { max-width: calc(200px * var(--dk)); }
+.deal-stage .dl-face { font-size: max(7px, calc(var(--dl-ff) * var(--dk))); }
+.deal-stage.dl-spec .dl-face { font-size: max(6px, calc(10px * var(--dk))); }
+.deal-stage .dl-result { margin-top: calc(10px * var(--dk)); }
+.deal-stage .dl-result .role-icon--big { width: calc(64px * var(--dk)); height: calc(64px * var(--dk)); margin: calc(4px * var(--dk)) auto calc(6px * var(--dk)); }
+.deal-stage .dl-result .night-step__role { font-size: max(14px, calc(26px * var(--dk))); margin: calc(10px * var(--dk)) 0; }
+.deal-stage .dl-result .night-step__hint { font-size: max(10px, calc(13px * var(--dk))); margin-bottom: calc(14px * var(--dk)); }
+.deal-stage .btn-row { margin-top: calc(12px * var(--dk)); }
+
+/* ---- タイトル・ロビー(2of4): 画面にぴったり収める。js/ui.js の ui.fitMenu が body.menu-fit のあいだ、収まらないときだけ menu-tight（小さくする）→ --mk（縮める）を付ける ---- */
+body.menu-fit { height: 100vh; height: var(--app-h, 100dvh); min-height: 0; overflow: hidden; }
+html:has(body.menu-fit) { overflow: hidden; overscroll-behavior: none; }
+body.menu-fit .onw-app { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+body.menu-fit .onw-app > * { flex: 0 0 auto; zoom: var(--mk, 1); }
+body.menu-tight .onw-footer { display: none; }
+body.menu-tight .onw-header { padding: 6px 10px 6px 40px; gap: 8px; }
+body.menu-tight .onw-header__title { font-size: 15px; }
+body.menu-tight .onw-header__title-sub { display: none; }
+body.menu-tight .onw-header__phase, body.menu-tight .onw-header__day { min-width: 0; padding: 3px 10px; font-size: 12px; }
+body.menu-tight .onw-app { padding: 8px 8px; }
+body.menu-tight .title-menu { margin-top: 0; }
+body.menu-tight .panel { padding: 12px 14px; }
+body.menu-tight .panel.night-step { padding: 8px 12px; }
+body.menu-tight .panel h2 { font-size: 15px; margin: 0 0 2px; }
+body.menu-tight .panel p.lede { font-size: 12px; margin: 0 0 6px; line-height: 1.5; }
+body.menu-tight .room-code-row { margin: 0 0 4px; gap: 8px; }
+body.menu-tight .room-code-row .night-step__role { font-size: 18px; margin: 0; }
+body.menu-tight .result-role { padding: 3px 0; font-size: 13px; }
+body.menu-tight .night-step__hint { font-size: 12px; margin-bottom: 4px; }
+body.menu-tight .lobby-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); column-gap: 18px; }
+body.menu-tight .lobby-list .result-role:last-child { border-bottom: 1px dashed var(--line); }
+body.menu-tight .btn-row { margin-top: 6px; gap: 8px; }
+body.menu-tight .btn { padding: 7px 14px; font-size: 13px; }
+body.menu-tight .btn--wide { padding: 10px 16px; }
+body.menu-tight .title-btns { gap: 8px; margin-top: 4px; }
+body.menu-tight .field-row { padding: 4px 0; }
+body.menu-tight .acct-bar { margin: 0 0 4px; }
+body.menu-tight .rejoin-box { margin-bottom: 8px; padding: 6px 10px; }
+@media (min-width: 1000px) { body.menu-tight .onw-header { padding: 8px 44px 8px 48px; } body.menu-tight .onw-header__title { font-size: 19px; } body.menu-tight .onw-app { padding: 12px 20px; } }
+body.deal-fit { height: 100vh; height: var(--app-h, 100dvh); min-height: 0; overflow: hidden; }
+html:has(body.deal-fit) { overflow: hidden; overscroll-behavior: none; }
+body.deal-fit .onw-footer, body.deal-fit .moon-glow { display: none; }
+body.deal-fit .onw-app { flex: 1 1 auto; min-height: 0; padding: 8px 6px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+body.deal-fit .onw-app > .deal-stage { flex: 0 0 auto; margin: 0; }
+@media (min-width: 1000px) {
+  body.deal-fit .onw-header { padding: 8px 44px 8px 48px; }
+  body.deal-fit .onw-header__title { font-size: 19px; }
+  body.deal-fit .onw-app { padding: 12px 20px; }
+}
+
 
 /* =========================================================
    プロフィール画面（アイコンを押すと開く）
@@ -1465,6 +1664,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .result-sheet .rs-tag-drunk { color: #ffaa00; }
 .result-sheet .rs-tag-keep { color: #ff9ec9; }   /* 悪女のキープ: 「(+キープ)」（恋人ではないので恋人より淡いピンク） */
 .result-sheet .rs-tag-shuffler { color: #c4c9e0; }   /* シャッフラー: 山札から置かれたカードの「(+シャッフラー)」 */
+.result-sheet .rs-tag-hackvillage { color: #55ff55; }   /* 銀狼のハッキング: 思い込んでいた役職「(+メイヤー)」を、その役職の陣営の色で */
+.result-sheet .rs-tag-hackwolf { color: #ff5555; }
+.result-sheet .rs-tag-hackthird { color: #aaaaaa; }
 .result-sheet .rs-tag-cat { color: #aaaaaa; }   /* シュレディンガーの猫: 参照先が第三陣営の役職のときの「(+役職名)」 */
 .tb-front b .tb-catsfx { color: #aaaaaa; font-weight: 700; }   /* 「(+オポチュニスト)」は同じ行に灰色で続ける */
 
@@ -1712,6 +1914,26 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .tb-front.tb-team-mute { border-color: #8a93a6; }
 .tb-front .tb-wolfmark.tb-mute { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(150,160,185,.95)); }
 .tb-front .tb-wolfmark.tb-mute small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #cdd3e2; line-height: 1.1; letter-spacing: -.02em; }
+/* 銀狼のハッキング演出: USBメモリがカードに刺さり、ウイルスをインストールする（stage.kit.hackUsb） */
+.tb-usb { position: absolute; inset: 0; z-index: 6; pointer-events: none; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+.tb-usb__slot { position: absolute; left: -3px; top: 12%; width: 5px; height: 17%; border-radius: 2px; background: #0b0d16; box-shadow: 0 0 8px 2px rgba(224,179,65,.95); }
+.tb-usb__stick { position: absolute; left: -2px; top: 12%; width: calc(100% + 2px); height: 17%; display: flex; align-items: stretch; filter: drop-shadow(0 2px 5px rgba(0,0,0,.7)); }
+.tb-usb__plug { flex: 0 0 24%; position: relative; background: linear-gradient(#e3e6ee, #9aa0ae); border-radius: 2px 0 0 2px; }
+.tb-usb__plug::before, .tb-usb__plug::after { content: ""; position: absolute; top: 50%; width: 22%; height: 16%; margin-top: -8%; background: #2a2d3a; border-radius: 1px; }
+.tb-usb__plug::before { left: 24%; } .tb-usb__plug::after { left: 56%; }
+.tb-usb__body { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 3px; background: linear-gradient(#2f4a86, #1a2a52); border: 1px solid #e0b341; border-left: 0; border-radius: 0 6px 6px 0; }
+.tb-usb__body u { display: block; width: 34%; height: 28%; border-radius: 2px; background: rgba(241,236,214,.85); }   /* 空のラベル */
+.tb-usb__term { position: absolute; left: 6%; right: 6%; bottom: 10%; display: flex; flex-direction: column; gap: 2px; padding: 3px 4px; background: rgba(4,10,6,.88); border: 1px solid #3cff7a; border-radius: 3px; box-shadow: 0 0 8px rgba(60,255,122,.5); opacity: 0; }
+.tb-usb__term small { display: block; font-size: max(6px, calc(var(--cw) * .115)); line-height: 1.15; font-weight: 700; color: #3cff7a; letter-spacing: -.02em; white-space: nowrap; }
+.tb-usb__pct { text-align: right; }
+.tb-usb__bar { height: max(4px, calc(var(--cw) * .07)); border: 1px solid #3cff7a; border-radius: 1px; overflow: hidden; }
+.tb-usb__bar i { display: block; height: 100%; width: 0; background: #3cff7a; }
+.tb-usb.is-done .tb-usb__term { border-color: #e0b341; box-shadow: 0 0 8px rgba(224,179,65,.6); }
+.tb-usb.is-done .tb-usb__term small { color: #ffd76a; }
+.tb-usb.is-done .tb-usb__bar { border-color: #e0b341; } .tb-usb.is-done .tb-usb__bar i { background: #e0b341; }
+.tb-front.tb-team-hack { border-color: #e0b341; }
+.tb-front .tb-wolfmark.tb-hack { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 8px rgba(255,200,60,.95)); }
+.tb-front .tb-wolfmark.tb-hack small { font-size: max(8px, calc(var(--cw) * .17)); font-weight: 700; color: #ffe9a8; line-height: 1.1; letter-spacing: -.02em; }
 .mute-wrap { position: fixed; inset: 0; z-index: 1010; display: flex; align-items: center; justify-content: center; padding: 20px; cursor: pointer; transition: opacity .45s ease; }
 .mute-wrap.mute-out { opacity: 0; pointer-events: none; }
 .mute-dim { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(40, 44, 60, .8), rgba(4, 5, 10, .93) 75%); animation: tfp-dim-in .25s ease both; }
@@ -1749,6 +1971,10 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 body.ovl-open .top-right { visibility: hidden; pointer-events: none; }   /* JS(debug.js)が付ける。:has非対応の古いスマホ用 */
 body:has(.settings-modal) .top-right { visibility: hidden; pointer-events: none; }   /* 最新ブラウザ用（セレクタを分けているのは、:hasが分からない端末でも上の行を有効にするため） */
 body:has(.dbg-sheet) .top-right { visibility: hidden; pointer-events: none; }
+/* 左上のサウンドボタン・音量パネルも、設定・デバッグを開いている間は同じように隠す */
+body.ovl-open .snd-btn, body.ovl-open .snd-panel { visibility: hidden; pointer-events: none; }
+body:has(.settings-modal) .snd-btn, body:has(.settings-modal) .snd-panel { visibility: hidden; pointer-events: none; }
+body:has(.dbg-sheet) .snd-btn, body:has(.dbg-sheet) .snd-panel { visibility: hidden; pointer-events: none; }
 .dbg-sheet { z-index: 10000; }   /* 結果発表の演出(9998)・投票の画面より上。投票中・結果発表中でも結果確認が見られるように */
 .x-bar .x-close, .x-bar .x-back, .dbg-head .btn { position: relative; z-index: 6; touch-action: manipulation; }
 
@@ -2394,6 +2620,30 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .rb-role + .rb-role { border-top: 0; }
 .rb-role .gd-desc { margin: 4px 0 6px; padding: 6px 10px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); white-space: pre-wrap; }
 .rb-btn { border-color: var(--gold); }
+/* 役職確認のレイアウト: 見出し・矢印・「まだありません。」は中央寄せ。役職名は古紙の帯（金色の線の上下つき）に、陣営色の太字を中央に置く（名前を押すと説明が開くのは今までどおり） */
+#rb-body { text-align: center; }
+#rb-body .rb-h { margin: 14px 0 10px; font-size: 17px; letter-spacing: .08em; }
+#rb-body .rb-h:first-child { margin-top: 4px; }
+#rb-body .night-step__hint { margin: 8px 0 12px; text-align: center; }
+.rb-role__btn { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.rb-role .gd-name {
+  display: block; margin: 0 auto; width: 84%; padding: 10px 20px; font-size: 20px; font-weight: 900; letter-spacing: .06em; text-align: center; color: var(--ink); font-family: var(--font-display);
+  background: linear-gradient(160deg, #dcc48f, #c8a869);
+  box-shadow: inset 0 0 18px rgba(105, 62, 18, .55);
+  clip-path: polygon(2% 0%, 98% 4%, 100% 30%, 98.5% 60%, 100% 92%, 96% 100%, 4% 96%, 0% 70%, 1.5% 40%, 0% 8%);
+  text-shadow: 0 0 1px #000, 1px 1px 0 rgba(0, 0, 0, .55), -1px -1px 0 rgba(0, 0, 0, .35);
+}
+.rb-role .gd-name.t-village { color: #55ff55; }
+.rb-role .gd-name.t-wolf { color: #ff5555; }
+.rb-role .gd-name.t-third { color: #bdbdc6; }
+/* 役職の説明メニュー: 背景は半透明（後ろの役職確認が透けて見える）・画面はずらさない・スクロールなし */
+#rbd-overlay { position: fixed; inset: 0; z-index: 975; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .55); overscroll-behavior: contain; touch-action: none; }
+.rbd-card { width: min(360px, 100%); padding: 14px 14px 12px; border: 1px solid var(--gold-dim, #8a7a4d); border-radius: 12px; background: rgba(27, 29, 43, .94); box-shadow: 0 8px 28px rgba(0, 0, 0, .6); font-size: 14px; overflow: hidden; }
+.rbd-name { text-align: center; margin-bottom: 6px; }
+.rbd-name .gd-name { font-size: 1.5em; font-weight: 900; letter-spacing: .06em; }
+.rbd-name .gd-name.t-village { color: #55ff55; } .rbd-name .gd-name.t-wolf { color: #ff5555; } .rbd-name .gd-name.t-third { color: #bdbdc6; }
+.rbd-card .gd-desc { margin: 4px 0 8px; padding: 6px 8px; font-size: .93em; line-height: 1.7; color: var(--ink); text-align: left; white-space: pre-wrap; }
+.rbd-card .btn-row { display: flex; justify-content: center; }
 /* ロビーの部屋コード: 伏せ字（＊＊＊＊）の右に「コピー」だけのボタンを横並びで置く */
 .room-code-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 4px 0 10px; }
 .room-code-row .room-code-mask { letter-spacing: .3em; margin: 0; }
@@ -2427,3 +2677,12 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 
 /* 御乱心: 票数の数字が、元の先から新しい先へ飛ぶ（js/roles/village/goranshin.js の flyNumber） */
 .gr-fly { position: fixed; z-index: 9999; pointer-events: none; font-weight: 900; font-size: 22px; color: #fff; text-shadow: 0 0 8px rgba(190,120,255,.95), 0 0 3px #000; }
+
+/* ---- 役職確認の一覧: スクロールなし。多いときは js/rolebook.js の rb.fit が --rbs(1〜0.3)を下げて、文字と余白を縮めて枠に収める ---- */
+.rb-overlay .info-body { overflow-y: hidden; }
+#rb-body { --rbs: 1; }
+#rb-body .rb-h { margin: calc(14px * var(--rbs)) 0 calc(10px * var(--rbs)); font-size: calc(17px * var(--rbs)); }
+#rb-body .rb-h:first-child { margin-top: calc(4px * var(--rbs)); }
+#rb-body .rb-arrow { margin: calc(6px * var(--rbs)) 0; font-size: calc(24px * var(--rbs)); }
+#rb-body .rb-role .gd-name { padding: calc(10px * var(--rbs)) calc(20px * var(--rbs)); font-size: calc(20px * var(--rbs)); }
+#rb-body .night-step__hint { margin: calc(6px * var(--rbs)) 0; font-size: calc(13px * var(--rbs)); }

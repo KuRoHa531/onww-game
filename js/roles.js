@@ -32,6 +32,7 @@ window.ONW = window.ONW || {};
    */
   roles.dealRoles = function dealRoles(game) {
     const deck = ONW.utils.shuffle([...game.selectedRoles]);
+    ONW.roles.dropCoexistingPriest(deck);   // 神官と狂った神官が一緒に配役に入ったら、片方だけにする（マイクラ版 buildRolePool）
     if (ONW.debug) ONW.debug.applyLocks(game, deck);   // デバッグ: 固定役を反映
 
     game.initialRoles = {};
@@ -45,9 +46,32 @@ window.ONW = window.ONW || {};
 
     game.center = deck.slice(game.players.length);
     ONW.roles.applyTransforms(game);
+    ONW.roles.ensurePriestTypesDoNotCoexist(game);   // 光の使徒・闇の化身の変化で、神官と狂った神官が両方出たときも、片方だけにする（マイクラ版 ensurePriestTypesDoNotCoexist）
     ONW.roles.avoidCpuDictator(game);   // 独裁者(昼能力)を CPU が引いたら、人間と入れ替える（マイクラ版 avoidUnfixedCpuDayRoles）
     ONW.roles.assignServants(game);   // 変化のあとに、従者のご主人を決める
     ONW.roles.assignExecutioners(game);   // 処刑人のターゲットを決める
+  };
+
+  /**
+   * 神官と狂った神官は、同じ試合に一緒に出ない（マイクラ版 buildRolePool / ensurePriestTypesDoNotCoexist）。
+   * 両方あるときは、どちらか1種類（50%ずつ）をまるごと、神官なら村人・狂った神官なら狂人に置き換える。
+   *   dropCoexistingPriest: 配る前の山札（deck）で。 ensurePriestTypesDoNotCoexist: 変化のあとの盤面（プレイヤー＋墓地）で。
+   *   デバッグで固定した席は動かさない（役職を指定してデバッグしているときに勝手に変わらないように）。変化前の記録 transformFrom はそのまま残る。
+   */
+  roles.dropCoexistingPriest = function dropCoexistingPriest(deck) {
+    if (!deck.includes("priest") || !deck.includes("mad_priest")) return null;
+    const removed = Math.random() < 0.5 ? "priest" : "mad_priest", rep = removed === "priest" ? "villager" : "madman";
+    for (let i = 0; i < deck.length; i++) if (deck[i] === removed) deck[i] = rep;
+    return removed;
+  };
+  roles.ensurePriestTypesDoNotCoexist = function ensurePriestTypesDoNotCoexist(game) {
+    const all = [...Object.values(game.initialRoles || {}), ...(game.center || [])];
+    if (!all.includes("priest") || !all.includes("mad_priest")) return null;
+    const dbg = game.debugOn && game.dbg ? game.dbg : null, fixed = (id) => !!(dbg && (dbg.roles || {})[id]);
+    const removed = Math.random() < 0.5 ? "priest" : "mad_priest", rep = removed === "priest" ? "villager" : "madman";
+    game.players.forEach((p) => { if (game.initialRoles[p.id] === removed && !fixed(p.id)) { game.initialRoles[p.id] = rep; game.currentRoles[p.id] = rep; } });
+    game.center = (game.center || []).map((r) => (r === removed ? rep : r));
+    return removed;
   };
 
   /**
@@ -427,6 +451,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.WOLF_MARKED,    required: [ONW.ROLE.VILLAGER, ONW.ROLE.WEREWOLF, ONW.ROLE.SEER], priority: [ONW.ROLE.VILLAGER] },     // 狼憑きが出る闇鍋には、村人・人狼・占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面）
     { trigger: ONW.ROLE.MAPO_WOLF,      required: [ONW.ROLE.TOFU_WOLF] },                        // 麻婆の人狼が出る闇鍋には、豆腐の人狼も必ず出す（豆腐の人狼がいても麻婆が必ず出るわけではない）
     { trigger: ONW.ROLE.FAKE_SEER,      required: [ONW.ROLE.SEER] },                             // 偽占い師が出る闇鍋には、占い師も最低1枚出す（偽占い師の結果は占い師と見比べて初めて意味が出る。マイクラ版 YAMINABE の偽占い師シナジー）
+    { trigger: ONW.ROLE.VANITY,         required: [ONW.ROLE.SHERIFF] },                          // ヴァニティが出る闇鍋には、保安官も最低1枚出す（マイクラ版 YAMINABE_TRANSFORM_SYNERGY_RULES の { trigger: VANITY, required: [SHERIFF] }。変化枠のヴァニティに保安官を確保する ensureLightSheriffForTransformedVanity も、Web版では SYNERGY_RULES が変化枠経由で必須役職を置く仕組みなので、この1行が両方に相当する）
     { trigger: ONW.ROLE.MIRAGE_WOLF,    required: [ONW.ROLE.SEER] },                             // 蜃気狼が出る闇鍋には、占い師も最低1枚出す（占われてランダムな役職に見えるのが活きる盤面。マイクラ版 YAMINABE の蜃気狼シナジー: 占い師・偽占い師・感覚の占い師・指読みのどれか。Web版にあるのは占い師）
     { trigger: ONW.ROLE.REBEL_MADMAN,   required: [ONW.ROLE.DICTATOR] },                       // 反逆の狂人が出る闇鍋には、独裁者も最低1枚出す（反転させるクーデターの相手がいないと活きない。マイクラ版 YAMINABE の反逆の狂人シナジー）
     { trigger: ONW.ROLE.BLACK_WOLF_MADMAN, required: [ONW.ROLE.WEREWOLF, ONW.ROLE.SEER] },   // 黒子の狂人が出る闇鍋には、人狼と占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面。マイクラ版 YAMINABE の黒子の狂人シナジー）
@@ -435,6 +460,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.FOX_MARKED,     required: [ONW.ROLE.SEER, ONW.ROLE.FOX, ONW.ROLE.VILLAGER], priority: [ONW.ROLE.VILLAGER] },   // 狐憑きが出る闇鍋には、占い師・妖狐・村人も最低1枚ずつ出す（占われて「妖狐」と出る相手と、本物の妖狐。自分を村人だと思い込む狐憑きに、本物の村人が1人は並ぶように）
     { trigger: ONW.ROLE.FANATIC,        required: [ONW.ROLE.FOX, ONW.ROLE.SEER] },               // 背徳者が出る闇鍋には、ご主人の妖狐と占い師も最低1枚ずつ出す（妖狐を呪殺できる占い師がいる盤面にする）
     { trigger: ONW.ROLE.PRINCESS,       required: [ONW.ROLE.VILLAGER, ONW.ROLE.QUEEN], priority: [ONW.ROLE.VILLAGER] },   // 姫君が出る闇鍋には、村人（自認村人の相方）と女王も最低1枚ずつ出す（マイクラ版 YAMINABE の姫君シナジー。昇格する相手・夜に姫君を知る女王がいる盤面）
+    { trigger: ONW.ROLE.MAD_PRIEST,     required: [ONW.ROLE.GOD] },                              // 狂った神官が出る闇鍋にも、銀色の影から変化した神を最低1枚出す（マイクラ版 ensureSilverGodForPriest は PRIEST・MAD_PRIEST の両方が対象）
     { trigger: ONW.ROLE.PRIEST,         required: [ONW.ROLE.GOD] },                              // 神官が出る闇鍋には、銀色の影から変化した神も最低1枚出す（神官は神がいてこそ働く。マイクラ版 YAMINABE の ensureSilverGodForPriest）
     { trigger: ONW.ROLE.AA,             required: [ONW.ROLE.KEYMASTER] },                        // A.A.が出る闇鍋には、鍵師も最低1枚出す（A.A.は鍵師にロックされて初めて役職変化が通る。マイクラ版 YAMINABE_TRANSFORM_SYNERGY_RULES）
     { trigger: ONW.ROLE.MASON,          required: [ONW.ROLE.MASON, ONW.ROLE.MASON] },           // 共有者が出る闇鍋には、光の使徒から変化した共有者を合わせて最低2枚出す（共有者が1人だけにならない）
@@ -503,10 +529,12 @@ window.ONW = window.ONW || {};
    * 「本人に見せている役職の陣営」の変化役から出たように見せて、変化前から正体が透けないようにする。
    *   ・村人だと思い込む（忘却の人狼・狼憑き）→ 光の使徒から  （忘却の人狼は本当は闇の化身から）
    *   ・人狼だと思い込む（狼夢人）          → 闇の化身から  （狼夢人は本当は光の使徒から）
+   *   ・保安官だと思い込む（ヴァニティ）    → 光の使徒から  （ヴァニティは本当は銀色の影から。変化元が銀色の影のままだと、本人に見せる役職（保安官）と組んで「銀色の影 → 保安官」という矛盾した配布テキストになるので、銀色の影の素通しより先にこの分岐で光の使徒に偽装する。作者指定）
    * 変化していない人は変化前なし（null）。
    */
   roles.shownFrom = function shownFrom(game, base, after) {
     if (!base) return null;
+    if ((ONW.SELF_AS_SHERIFF || []).includes(after)) return ONW.ROLE.LIGHT_APOSTLE;   // 保安官だと思い込む（ヴァニティ）は、本当の変化元（銀色の影）ではなく光の使徒から出たように見せる
     if (base !== ONW.ROLE.LIGHT_APOSTLE && base !== ONW.ROLE.DARK_AVATAR) return base;
     if (ONW.SELF_AS_WOLF.includes(after)) return ONW.ROLE.DARK_AVATAR;
     if (ONW.SELF_AS_VILLAGER.includes(after)) return ONW.ROLE.LIGHT_APOSTLE;

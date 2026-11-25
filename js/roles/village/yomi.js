@@ -34,10 +34,10 @@
   const CUT_LABEL = {
     shuffler: "シャッフラー", reversal: "反転", lover: "恋人", drunk: "酔っぱらい状態", exec: "処刑人の対象", avenger: "復讐者の対象", love_tanner: "愛する人",
     freeter: "フリーターの就職先", servant: "従者の主人", gremlin: "グレムリンの対象", fairy: "妖精さんの対象", seal: "封印", muzzle: "口封じ",
-    exchanger: "交換者の対象", goranshin: "御乱心の対象", icarus: "イカロスの対象", forget: "忘却の人狼状態", dream: "狼夢人状態",
+    exchanger: "交換者の対象", goranshin: "御乱心の対象", icarus: "イカロスの対象", forget: "忘却の人狼状態", dream: "狼夢人状態", hack: "ハッキング状態",
   };
   /** 使われた人に「断ち切られた」と分かる状態（マイクラ版 tellParticipantById の「黄泉通知」が出るもの）。Web版: 封印の解除・酔いが覚める */
-  const TOLD = ["seal", "drunk", "forget", "dream"];
+  const TOLD = ["seal", "drunk", "forget", "dream", "hack"];
 
   /** この人が（もう）使ったか */
   const used = (g, id) => (g.yomiCuts || []).filter((e) => e.by === id).length >= (ONW.carmen ? ONW.carmen.dayUses(g, id) : 1);   // カルメンに囁かれた人は昼能力を2回使える（docs/carmen.md）
@@ -123,6 +123,13 @@
         cuts.push("seal");
       }
     }
+    // 銀狼のハッキング: 偽の役職の思い込みを解いて本来の役職を思い出す（マイクラ版 yomiCutStates）。銀狼側の記録（hackTarget）は結果画面のために残す
+    if (g.hackRole && g.hackRole[target]) {
+      (g.hackCutRole = g.hackCutRole || {})[target] = g.hackRole[target]; (g.hackCut = g.hackCut || {})[target] = true;
+      { const fc = g.hackChain && g.hackChain[target]; if (fc && g.morningAct && g.morningAct[target] === fc && !(g.morningDone || {})[target]) delete g.morningAct[target]; }   // 使っていない偽の連鎖は消す
+      ["hackRole", "hackSource", "hackView", "hackChain", "hackDayUsed", "hackPred", "hackIcarus"].forEach((k) => { if (g[k]) delete g[k][target]; });
+      note(target, "あなたは本来の役職を思い出しました。"); cuts.push("hack");
+    }
     // 思い込み: 忘却の人狼は人狼に、狼夢人は村人に戻る（マイクラ版 yomiCutStates: finalRoles を書き換える）
     if (g.currentRoles && g.currentRoles[target] === R().FORGETFUL_WOLF) { g.currentRoles[target] = R().WEREWOLF; note(target, "あなたは人狼であることを思い出しました。"); cuts.push("forget"); }
     else if (g.currentRoles && g.currentRoles[target] === R().WOLF_DREAMER) { g.currentRoles[target] = R().VILLAGER; note(target, "あなたは目が覚めました。村人だったようです。"); cuts.push("dream"); }
@@ -142,7 +149,7 @@
     const info = (ONW.ROLE_INFO || {})[g.currentRoles && g.currentRoles[target]], village = !!info && info.team === ONW.TEAM.VILLAGE;   // 断ち切る前の最終役職で「村人役」か（実績用）
     const notes = [], cuts = cut(g, target, notes);
     const e = { by: id, target, cuts, told: cuts.includes("drunk") || notes.some((n) => n.id === target), wake: cuts.includes("drunk") ? target : null, notes,
-      badge: village && cuts.some((c) => c === "shuffler" || c === "reversal" || c === "lover"), memory: cuts.some((c) => c === "drunk" || c === "forget" || c === "dream") };
+      badge: village && cuts.some((c) => c === "shuffler" || c === "reversal" || c === "lover"), memory: cuts.some((c) => c === "drunk" || c === "forget" || c === "dream" || c === "hack") };
     (g.yomiCuts = g.yomiCuts || []).push(e);
     return e;
   }

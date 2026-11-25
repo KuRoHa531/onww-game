@@ -5,7 +5,7 @@
  *   ・自身の役職(自認): 配られた役職(変化前→変化後)→ 墓荒らし/怪盗/ドッペル等で手にした役職 → 酔い覚め・後覚者の最終役職 …の流れ
  *   ・能力結果: 占い・詩人・墓地の覗き見など、自分の能力で得た情報に「表示された」役職
  * 自認なので、あとからいたずらされて本当の役職が変わっていても載らない（忘却の占い師は「村人」と自認する）。
- * 役職の名前を押すまで説明は閉じている。画面はずれず、情報確認と同じ重ね画面で出す。
+ * 役職の名前を押すまで説明は閉じている。画面はずれず、情報確認と同じ重ね画面で出す。一覧はスクロールさせず、多いときは文字と余白を縮めて枠に収める(rb.fit)。
  * 開拓者を自認しているときは、開いた説明の下に「歩んでいる運命」とその運命の能力（保安官・騎士・カルメン・妖精さん・いたずらっ子の配布時の説明）も出す（開拓者 4of4-b）。
  * 仕様の詳細は docs/role-book.md。
  * ------------------------------------------------------------
@@ -91,6 +91,10 @@
   };
   rb.rolesIn = function (g, text, names, players) {
     let t = String(text == null ? "" : text).replace(/(?:村人|人狼|第三)陣営/g, " ");
+    // 夜の文の見出しに出る「人狼」は役職ではない（人狼系・マーリン・狂信者などの「仲間の人狼: 〇〇」「人狼: 〇〇」「人狼の気配」「見える人狼はいません」「人狼はいません」）。これを役職の人狼として拾わない
+    t = t.replace(/仲間の人狼|見える人狼|人狼の気配|妖狐の気配|村人の気配|人狼(?=[:：])/g, (m) => " ".repeat(m.length));   // 「〇〇の気配」は感覚の占い師・銀狼・魔界公爵・狂信者・背徳者の見出し（陣営の気配であって役職ではない）
+    t = t.replace(/待機時間に妖狐（狐憑きを含む）がいなければ狂人になります。/g, (m) => " ".repeat(m.length));   // 背徳者の「妖狐の気配はありません。…」の説明文
+    t = t.replace(/[^\s。:：、「」]*はいません/g, (m) => " ".repeat(m.length));   // 「人狼はいません」「姫君はいません」など、いないという知らせは役職の結果ではない
     // 役職名と参加者の名前を、長いものから順に見つけて消す（同じ長さなら名前が先）。
     // 名前が「占い師」の人がいても「感覚の占い師」は役職として拾え、「占い師 を占って…」の占い師は名前として消える
     const cand = [...(players || []).map((n) => [n, null]), ...(names || [])].sort((a, b) => b[0].length - a[0].length || (a[1] === null ? -1 : 1) - (b[1] === null ? -1 : 1));
@@ -134,7 +138,7 @@
     return [P.ONLINE_NIGHT, P.ONLINE_MORNING, P.ONLINE_DAY].includes(g.phase);
   };
 
-  /** 開拓者の運命の欄（開いた説明の下）: 歩んでいる運命の文（夜の文と同じ）+ その運命で使う能力の役職の配布時の説明 */
+  /** 開拓者の運命の欄（説明の下）: 歩んでいる運命の文（夜の文と同じ）+ その運命で使う能力の役職の配布時の説明 */
   const fateBlock = (g, fate) => {
     const T = ONW.trailblazer;
     if (!T || !fate || !T.ROLE_OF || !T.ROLE_OF[fate]) return "";
@@ -142,13 +146,29 @@
     return `<div class="gd-desc rb-fate"><div class="rb-fate__h">${esc(T.fateName(fate))}の運命</div>${esc(T.text(fate))}\n<span class="gd-name t-${ai.team}">${esc(ai.name || "")}</span> の能力\n${esc(ONW.roleDesc(ar, g) || ai.desc || "")}</div>`;
   };
 
-  /** 役職1つぶん: 名前を押すと説明が開く(閉じた状態から。開閉は g.rbOpen に覚えて、再描画しても保つ)。fate: 開拓者の運命（自認の流れの開拓者だけ） */
+  /** 役職1つぶん: 名前（古紙の帯）を押すと、画面をずらさず、背景が半透明の重なりメニューで説明が出る。fate: 開拓者の運命（自認の流れの開拓者だけ） */
   const roleRow = (g, id, fate) => {
     const i = ONW.roles.getInfo(id);
-    return `<details class="gd-role rb-role" ${g.rbOpen && g.rbOpen[id] ? "open" : ""} ontoggle="ONW.roleBook._tg('${id}',this.open)">
-      <summary><span class="gd-name t-${i.team}">${esc(i.name)}</span></summary>
-      <div class="gd-desc">${esc(ONW.roleDesc(id, g) || i.desc || "説明はありません。")}</div>${id === "trailblazer" ? fateBlock(g, fate) : ""}</details>`;
+    return `<div class="rb-role"><button type="button" class="rb-role__btn" onclick="ONW.roleBook.showRole('${id}','${esc(fate || "")}')"><span class="gd-name t-${i.team}">${esc(i.name)}</span></button></div>`;
   };
+
+  /** 役職の説明メニュー（#rbd-overlay）: 背景は半透明・スクロールなし（長いときは文字を縮めて画面に収める）。背景か「閉じる」で閉じる */
+  rb.showRole = function (id, fate) {
+    const g = ONW.game, i = ONW.roles.getInfo(id);
+    if (!g || !i) return;
+    rb.closeRole();
+    const wrap = document.createElement("div");
+    wrap.id = "rbd-overlay";
+    wrap.onclick = (e) => { if (e.target === wrap) rb.closeRole(); };
+    wrap.innerHTML = `<div class="rbd-card"><div class="rbd-name"><span class="gd-name t-${i.team}">${esc(i.name)}</span></div>
+      <div class="gd-desc rbd-desc">${esc(ONW.roleDesc(id, g) || i.desc || "説明はありません。")}</div>${id === "trailblazer" ? fateBlock(g, fate) : ""}
+      <div class="btn-row"><button class="btn" onclick="ONW.roleBook.closeRole()">閉じる</button></div></div>`;
+    document.body.appendChild(wrap);
+    const card = wrap.querySelector(".rbd-card");
+    let fs = 14;
+    for (let k = 0; k < 20 && card.offsetHeight > window.innerHeight - 28 && fs > 8; k++) { fs -= 0.5; card.style.fontSize = fs + "px"; }   // スクロールさせない: 収まるまで文字を縮める
+  };
+  rb.closeRole = function () { const w = document.getElementById("rbd-overlay"); if (w) w.remove(); };
 
   rb.bodyHtml = function () {
     const g = ONW.game;
@@ -161,14 +181,22 @@
     return `<div class="rb-h">自身の役職（自認）</div>${selfHtml}<div class="rb-h">能力結果</div>${seenHtml}`;
   };
 
-  rb._tg = function (id, open) { const g = ONW.game; if (!g) return; g.rbOpen = g.rbOpen || {}; if (open) g.rbOpen[id] = true; else delete g.rbOpen[id]; };
+
+  /** スクロールさせない: 一覧が枠に収まるまで、文字・余白・役職名の帯を少しずつ縮める（CSS 変数 --rbs: 1 → 0.3） */
+  rb.fit = function () {
+    const b = document.getElementById("rb-body");
+    if (!b) return;
+    let sc = 1;
+    b.style.setProperty("--rbs", "1");
+    for (let k = 0; k < 40 && b.scrollHeight > b.clientHeight + 1 && sc > 0.3; k++) { sc -= 0.025; b.style.setProperty("--rbs", sc.toFixed(3)); }
+    b.scrollTop = 0;
+  };
 
   rb.refresh = function () {
     const b = document.getElementById("rb-body");
     if (!b) return;
-    const st = b.scrollTop;
     b.innerHTML = rb.bodyHtml();
-    b.scrollTop = st;
+    rb.fit();
   };
 
   rb.open = function () {
@@ -183,12 +211,14 @@
       <div class="info-head"><span>📕 役職確認</span><button class="btn" onclick="ONW.roleBook.close()">閉じる</button></div>
       <div class="info-body" id="rb-body">${rb.bodyHtml()}</div></div>`;
     document.body.appendChild(wrap);
+    rb.fit();
     rb._key = rb.key(ONW.game);
     rb._locked = ui.isPc() && !document.getElementById("chat-overlay") && !document.getElementById("info-overlay");
     if (rb._locked) ui.lockPage(true);   // 開いている間、ページ本体は動かさない
   };
 
   rb.close = function () {
+    rb.closeRole();
     const w = document.getElementById("rb-overlay");
     if (!w) return;
     w.remove();
@@ -212,6 +242,7 @@
     }
   };
   setInterval(rb.sync, 400);
+  window.addEventListener("resize", () => { if (document.getElementById("rb-overlay")) rb.fit(); });   // 画面の大きさが変わったら収め直す
 
   ONW.roleBook = rb;
 })(window.ONW);

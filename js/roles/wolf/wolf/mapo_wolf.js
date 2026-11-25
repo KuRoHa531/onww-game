@@ -18,6 +18,24 @@
     g.mapoAnnounced = true;
     return true;
   }
+  /** viewer の目線で、本物の麻婆豆腐の完成が見えるか: 銀狼にハッキングされた人は、自分を麻婆・豆腐として数えない（本当は麻婆の人狼でも、思い込んでいる別の役職の目線ではなかったことになる） */
+  const realFor = (g, vid) => {
+    if (!ONW.hack || !ONW.hack.isFakeUi(g, vid)) return true;
+    const has = (role, sealOk) => g.players.some((p) => p.id !== vid && ONW.mimic.eff(g, p.id) === role && !ONW.hiddenDrunk(g, p.id) && (sealOk || !ONW.seal.is(g, p.id)));
+    return has(ONW.ROLE.MAPO_WOLF, false) && has(ONW.ROLE.TOFU_WOLF, true);
+  };
+  /** 完成の演出を全員へ。ハッキングされた人は、その人の目線（麻婆の人狼と思い込んでいて偽の仲間が見えていれば、偽の完成が本人にだけ1回出る）。docs/silver-wolf.md */
+  function sendMapo(c, real, late) {
+    const g = c.g;
+    if (!real && !(ONW.hack && g.players.some((q) => ONW.hack.isFakeUi(g, q.id)))) return;   // 本物もなく、ハッキングされた人もいなければ何も送らない
+    const m = late ? { t: "mapo", late: true } : { t: "mapo" };
+    c.sendAll((p) => {
+      if (!ONW.hack || !ONW.hack.isFakeUi(g, p.id)) return real ? m : { t: "noop" };
+      if (real && realFor(g, p.id)) return m;
+      return ONW.hack.fakeBanner(g, p.id, "mapo", false) ? { t: "noop" } : ONW.hack.fakeBanner(g, p.id, "mapo", true) ? m : { t: "noop" };
+    });
+    if (real) c.sendSpec({ ...m, quiet: true });
+  }
   ONW.defineRole("mapo_wolf", {
     info: { sealTarget: true, deck: 50, name: "麻婆の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.45,
       desc: "人狼陣営。他の人狼を確認できます。麻婆の人狼と豆腐の人狼が同時にいるとき、昼の始まりに麻婆豆腐が完成し、豆腐の人狼は1票ではメンタル崩壊せず（最多得票のときだけ追放）2票持ちになります。占い・判定・勝利条件は常に人狼として扱われます。" },
@@ -25,19 +43,19 @@
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,
     /** 昼の始まり(変化公開 → 新聞 のあと): 麻婆豆腐の完成演出を出す。戻り値: 演出が出終わるまでの待ち時間(ms)。出さないときは 0 */
     dayAnnounce: { order: 110, run(c) {
-      if (!announce(c)) return 0;
-      const m = { t: "mapo" }; c.sendAll(m); c.sendSpec({ ...m, quiet: true });
-      return ONW.stage && ONW.stage.mapoMs ? ONW.stage.mapoMs() : 0;
+      const real = announce(c);
+      sendMapo(c, real, false);
+      return real && ONW.stage && ONW.stage.mapoMs ? ONW.stage.mapoMs() : 0;   // 待ち時間は本物の完成のときだけ（偽の完成だけなら、他の人の昼を止めない）
     } },
     /** 昼のうちに、酔いが覚めた麻婆の人狼がいるのに豆腐の人狼もいて、まだ完成していなければ、その瞬間に完成の演出を出す（昼のタイマーは止めない） */
     dayNews: { order: 110, run(c) {
       if (c.g.phase !== c.PH.ONLINE_DAY) return;
-      if (!announce(c)) return;
-      const m = { t: "mapo", late: true }; c.sendAll(m); c.sendSpec({ ...m, quiet: true });
+      sendMapo(c, announce(c), true);
     } },
     /** 再入室: 演出は出さず、情報確認にだけ反映 */
-    resyncDay: { order: 15, run(c) {
-      return c.g.mapoAnnounced ? [{ t: "mapo", quiet: true }] : [];
+    resyncDay: { order: 15, run(c, seat) {
+      const g = c.g, ok = g.mapoAnnounced && (!seat || realFor(g, seat)) || (seat && ONW.hack && ONW.hack.fakeBanner(g, seat, "mapo", false));
+      return ok ? [{ t: "mapo", quiet: true }] : [];
     } },
   });
 })(window.ONW);

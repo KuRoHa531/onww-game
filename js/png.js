@@ -51,7 +51,7 @@ window.ONW = window.ONW || {};
     sep(); head("役職履歴");
     res.history.forEach((h) => {
       const segs = [T(h.name + " ", C.ink)];
-      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : t.k === "keep" ? "#ff9ec9" : t.k === "cat" ? C.third : t.k === "reverse" ? "#6fc3ff" : "#ffaa00"))); });
+      h.segs.forEach((s, i) => { if (i) segs.push(T(" → ", C.dim)); segs.push(T(s.name, team(s.team))); if (s.sfx) segs.push(T(s.sfx, C.wolf)); (s.tags || []).forEach((t) => segs.push(T(t.t, t.k === "love" ? "#ff77dd" : t.k === "keep" ? "#ff9ec9" : t.k === "cat" ? C.third : t.k === "hackvillage" ? C.village : t.k === "hackwolf" ? C.wolf : t.k === "hackthird" ? C.third : t.k === "reverse" ? "#6fc3ff" : "#ffaa00"))); });
       if (h.statusParts) { segs.push(T(" " + h.statusParts.death, C.dead), T(" → ", C.dim), T(h.statusParts.revive, C.alive)); if (h.statusParts.tail) segs.push(T(h.statusParts.tail, C.dead)); }   // スティーブ: ［死因］（赤）→ ［復活］（生存の水色）
       else segs.push(T(" " + h.status, h.dead || h.day ? C.dead : C.alive));
       L.push({ segs, fit: true });   // 1人ぶんの役職履歴は、長くても1行に収める（画像の横幅を広げる）

@@ -104,7 +104,7 @@
       const g = c.g;
       g.players.forEach((p) => {
         if (ONW.mimic.beforeEff(before, p.id) === ONW.mimic.eff(g, p.id) || ONW.mimic.eff(g, p.id) !== ONW.ROLE.POET) return;
-        if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id)) return;
+        if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id) || (ONW.hack && ONW.hack.isFakeUi(g, p.id))) return;   // ハッキングされた人には本当の通知は出さない
         if (g.poetSeen) delete g.poetSeen[p.id];
         const lines = deliver(g, p.id), tx = textOf(lines);
         if (p.isCpu) { cpuLearn(g, p.id, lines); tx.forEach((t) => c.hold(p.id, t)); return; }
@@ -120,6 +120,10 @@
     /** 待機時間: 最終盤面で酔いが覚めている詩人に通知を伝える（再入室では、すでに伝えた分だけ同じ内容を返す） */
     settleMsg: { order: 26, run(c, p, mode) {
       const g = c.g;
+      if (!p.isCpu && ONW.hack && ONW.hack.isFakeUi(g, p.id)) {   // 銀狼にハッキングされた人: 本当の通知は出ず、詩人と思い込んでいれば偽の通知（その人にだけ）
+        const fl = g.hackRole[p.id] === "poet" && !sealed(g, p.id) ? ONW.hack.pub(g, p.id, "poet", mode === "settle") : null;
+        return fl ? { logs: textOf(fl), poet: { lines: fl } } : {};
+      }
       if (p.isCpu || ONW.mimic.eff(g, p.id) !== ONW.ROLE.POET || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id)) return {};
       if (mode === "resync" && !(g.poetSeen || {})[p.id]) return {};
       const lines = deliver(g, p.id);

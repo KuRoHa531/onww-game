@@ -74,17 +74,20 @@ ONW.fox = { isFoxLike, curseTargets, curseNow, lateCurse, takeover, takeoverText
   /** 呪殺のあとで連鎖して死ぬ人のカードが、同じ深さごとに同時に「心中」「後追い」の面にめくれて灰色になる（妖狐のカードが🦊でめくれたあと）。base: 妖狐のカードがめくれ終わる時刻(ms)
    *  すでに表の❤のカードは、いったん裏返してから「心中」「後追い」でめくれる（その分、深さの間隔を少し広げてある） */
   function playChain(chain, base, SK) {
+    const g0 = SK.G(), ds0 = (g0 && g0.dealStart) || 0;   // SE: 連鎖死（stage 側の盤面検出とキーをそろえて二重に鳴らさない）
     const depths = [...new Set(chain.map((e) => e.depth))].sort((a, b) => a - b);
     depths.forEach((d, n) => {
       const t = base + n * 2200;
       chain.filter((e) => e.depth === d).forEach((e, i) => {
         const k = `p:${e.id}`;
+        if (ONW.sound) SK.later(() => ONW.sound.seKey("follow_death", ds0 + ":death:" + e.id, 60000), t + i * 120);   // SE: 心中・後追い
         SK.later(() => flipUp(SK, k, SK.deadMark(e.label), () => SK.later(() => { SK.curse[k] = e.label; SK.badge[k] = e.label; delete SK.glow[k]; SK.paint(SK.G()); }, 1300)), t + i * 120);
       });
     });
   }
   /** 呪殺の演出: 妖狐のカードが🦊に裏返って光り、1.4秒後に灰色(札「呪殺」)。全員が灰色になった380ms後に、連鎖で死ぬ人(心中・後追い)の演出が始まる。d: 始まるまでの待ち(ms) */
   function playCurse(ids, chain, d, SK) {
+    if (ONW.sound && ids && ids.length) { const g0 = SK.G(), ds0 = (g0 && g0.dealStart) || 0; ids.forEach((id) => SK.later(() => ONW.sound.seKey("curse_kill", ds0 + ":curse:" + id, 60000), d + 700)); }   // SE: 呪殺（🦊にめくれる瞬間。キーは stage 側の盤面検出と共通で二重に鳴らさない）
     let left = ids.length;
     const next = () => { if (--left <= 0) playChain(chain || [], 380, SK); };
     ids.forEach((id, i) => {

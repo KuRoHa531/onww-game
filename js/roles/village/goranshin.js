@@ -185,10 +185,10 @@
   //   ・本物の御乱心CPUは、昼に必ず「御乱心CO」（cpuClaim）。結果は言わない（ランダムに決まった先は結果発表まで誰にも分からない）。
   //   ・騙りはしない（cpuLie なし）: マイクラ版は昼能力の役職を騙りの候補から外している（dayRoles に GORANSHIN が入っている）。
   //   ・CPUは昼能力を勝手に使わない（ONW.CPU_AUTO_DAY / roles.js の avoidCpuDictator）。デバッグの「昼能力」タブで使わせたときだけ、
-  //     net.js hostGoranshin が cpuSpeak を呼び、「〇〇 の投票先をランダムにしていました。」と言う（マイクラ版 cpu.js の御乱心の発言と同じ文）。
+  //     net.js hostGoranshin が cpuSpeak を呼び、「〇〇 の投票先をランダムにしました。」と言う（マイクラ版 cpu.js の御乱心の発言と同じ文）。
   //   ・CPUの投票判断（cpuVoteSee）は足さない: 申告は結果発表まで真偽が分からないため、加点の根拠がない（妖精さんと同じ）。
   // ======================================================================
-  const randText = (name) => `${name} の投票先をランダムにしていました。`;
+  const randText = (name) => `${name} の投票先をランダムにしました。`;
   const randShort = (name) => `${name} の投票先をランダムにした`;
   /** 投票先を変えたあとのCPUの発言（net.js hostGoranshin が、使ったのがCPUで生きているときに呼ぶ）。[{ p, text, short, result, claim, gap }] */
   function cpuSpeak(k, g, p, e) {
@@ -196,7 +196,7 @@
     const nm = k.nameOf(g, e.target);
     return [{ p, text: randText(nm), short: randShort(nm), result: true, claim: { kind: "goranshin", target: e.target }, gap: 3500 }];
   }
-  /** COボタンの結果開示の文。マイクラ版 main.js: 「〇〇の投票先をランダムにしていました。」（Web版は名前のあとに空白を入れる） */
+  /** COボタンの結果開示の文。マイクラ版 main.js: 「〇〇の投票先をランダムにしました。」（Web版は名前のあとに空白を入れる） */
   const coText = randText;
   /**
    * 実績（マイクラ版 stats.js と同じ条件。wiki の「御乱心」に定義済みの3つのうち、この試合の結果だけで決まる2つ）:
@@ -217,7 +217,7 @@
     // CPU: 本物は必ず「御乱心CO」（結果なし）。騙りはしない。使ったCPUの発言は cpuSpeak
     cpuClaim(k, g, p, r, i, c) { c.co = "goranshin"; },
     cpuSpeak,
-    // 結果開示(COボタン・co.js が kind で引く): 「御乱心CO」だけで終わらせられる(noChain)。結果開示で投票先を変えた相手を選ぶ → 「〇〇 の投票先をランダムにしていました。」（妖精さんと同じ形）
+    // 結果開示(COボタン・co.js が kind で引く): 「御乱心CO」だけで終わらせられる(noChain)。結果開示で投票先を変えた相手を選ぶ → 「〇〇 の投票先をランダムにしました。」（妖精さんと同じ形）
     coResult: {
       kind: "goranshin", targetLabel: "投票先をランダムにした相手", noChain: true,
       pickPlayer: (id, K) => [coText(K.nameOf(id)), { kind: "goranshin", target: id }, null, "disclose", randShort(K.nameOf(id))],

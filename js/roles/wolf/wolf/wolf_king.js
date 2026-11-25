@@ -9,6 +9,13 @@
   const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id)).map((p) => p.id);   // 模倣の人狼が人狼王を模倣していても人狼王として公開・ガードされる
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
   ONW.kingHolders = holders;
+  /** 銀狼にハッキングされた人の画面に出す人狼王（思い込んでいる役職の目線: 本当の人狼王でも自分のぶんは出ない / 人狼王と思い込んでいれば自分のぶんが出る）。docs/silver-wolf.md */
+  const viewOf = (g, vid, ids, addSelf) => (ONW.hack ? ONW.hack.pubView(g, vid, ONW.ROLE.WOLF_KING, ids, addSelf) : ids);
+  const sendUp = (c, ids, addSelfFn) => {
+    const g = c.g, all = holders(g);
+    c.sendAll((p) => ({ t: "kingup", ids: viewOf(g, p.id, ids, addSelfFn(p.id)), names: nameList(g, viewOf(g, p.id, all, true)) }));
+    c.sendSpec({ t: "kingup", ids, names: nameList(g, all) });
+  };
   /** 効果が働いている人狼王か（酔いが覚めていない酔っ払いは、まだ人狼王の能力を使えない） */
   const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.WOLF_KING && !ONW.hiddenDrunk(g, id) && !(ONW.seal && ONW.seal.is(g, id));   // 封印されている人狼王はガードできない（追放・道連れ・保安官のどれも。2of4b）
   ONW.kingActive = active;
@@ -153,8 +160,8 @@
       desc: "人狼陣営。他の人狼を確認できます。最終盤面で人狼王を持っている人のカードは、朝のあとの待機時間に全員の画面で表になり、誰が人狼王か公開されます。占い・判定・勝利条件は常に人狼として扱われます。他に人狼系がいないときは、設定に関係なく狂人系の1人が昇格して人狼判定になります。追放・とばっちり・道連れでは、他に人狼判定の人が生き残るときだけ追放されず（死なず）、カードがめくれそうになってガードされます（他に人狼判定がいない・先に全員死亡している・他の人狼判定が全員同時に死ぬときは死にます。人狼王どうしだけが同時に追放・道連れにされるときは互いを守り合って死にませんが、人狼王以外の人狼判定も同時に死ぬときは全員死にます）。心中・無理心中では無条件で死にます。" },
     groups: { wolf: 8, "transform:dark_avatar": 8 },
     nightMsg: K.nightMsg, got: K.got, soberLines: K.soberLines, soberPeek: K.soberPeek,
-    settleMsg: { order: 55, run(c) {
-      const kings = holders(c.g);
+    settleMsg: { order: 55, run(c, p) {
+      const kings = viewOf(c.g, p.id, holders(c.g), true);
       return { kings, kingNames: nameList(c.g, kings) };
     } },
     /** 昼のうちに役職が動いて、新しく人狼王を持った人（酔いが覚めている人）がいたら、その瞬間に全員の画面でカードが表になって裏に戻る。before: 動く前の g.currentRoles */
@@ -163,16 +170,16 @@
       if (g.phase !== c.PH.ONLINE_DAY) return;
       const ids = holders(g).filter((id) => ONW.mimic.beforeEff(before, id) !== ONW.ROLE.WOLF_KING);
       if (!ids.length) return;
-      const m = { t: "kingup", ids, names: nameList(g, holders(g)) };
       cpuLearn(g, ids);
-      c.sendAll(m); c.sendSpec(m);
+      sendUp(c, ids, () => false);
     },
     /** 酔いが覚めた瞬間に全員へ公開（全員の画面でカードがめくれて裏に戻る） */
     soberReveal: { order: 15, run(c, ids) {
       const g = c.g;
       const nk = ids.filter((id) => ONW.mimic.eff(g, id) === ONW.ROLE.WOLF_KING);
       if (nk.length) cpuLearn(g, nk);
-      if (nk.length) { const m = { t: "kingup", ids: nk, names: nameList(g, holders(g)) }; c.sendAll(m); c.sendSpec(m); }
+      const fakeNew = ONW.hack ? ids.filter((id) => ONW.hack.isFakeUi(g, id) && g.hackRole[id] === ONW.ROLE.WOLF_KING) : [];
+      if (nk.length || fakeNew.length) sendUp(c, nk, (vid) => ids.includes(vid));
     } },
   });
 })(window.ONW);

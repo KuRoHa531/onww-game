@@ -30,7 +30,7 @@
   function collect(c) {
     const g = c.g;
     g.exposeTargets = g.exposeTargets || {}; g.exposeAnnounced = g.exposeAnnounced || {}; g.exposeLines = g.exposeLines || [];
-    const rows = [];
+    const rows = [], by = [];   // by: 各行を出した暴露狂人（ハッキングされた本人の画面から、自分の本当の暴露を外すため。クライアントには送らない）
     g.players.forEach((p) => {
       const t = g.exposeTargets[p.id];
       if (!t || g.exposeAnnounced[p.id] || ONW.mimic.eff(g, p.id) !== ONW.ROLE.EXPOSED_MADMAN || ONW.hiddenDrunk(g, p.id) || ONW.seal.is(g, p.id) || c.isDead(p.id)) return;
@@ -39,16 +39,35 @@
       const extras = [];
       if (g.drunkOverlay && g.drunkOverlay[t]) extras.push("酔っ払い");   // 本家: 酔っぱらい・恋人なら付加情報も公開
       if (ONW.isLover(g, t)) extras.push("恋人");
-      rows.push({ role: c.rn(g.currentRoles[t]), extras });
+      rows.push({ role: c.rn(g.currentRoles[t]), extras }); by.push(p.id);
     });
-    ONW.utils.shuffle(rows);
-    g.exposeLines.push(...rows);
+    const ord = ONW.utils.shuffle(rows.map((r, i) => i));   // 並びはランダム（行と出した人の組を同じ並びにする）
+    const rs = ord.map((i) => rows[i]); rows.length = 0; rows.push(...rs); rows.by = ord.map((i) => by[i]);
+    g.exposeLines.push(...rows); g.exposeBy = g.exposeBy || []; g.exposeBy.push(...rows.by);
     return rows;
   }
   /** 公開した1回分を全員(と観戦者)へ送る */
-  function sendRows(c, rows, late) {
-    const m = { t: "expose", rows }; if (late) m.late = true;
-    c.sendAll(m); c.sendSpec({ ...m, quiet: true });
+  /** 銀狼にハッキングされた人の偽の暴露（暴露狂人と思い込んで対象を選んでいた人。出す時点で1回だけ、その人の画面にだけ出る） */
+  function fakeRows(g, pending) {
+    const out = {};
+    g.players.forEach((p) => {
+      const f = (g.hackExpose || {})[p.id];
+      if (!f || (g.hackExposeShown || {})[p.id] || !ONW.hack || !ONW.hack.isFakeUi(g, p.id) || ONW.seal.is(g, p.id)) return;
+      if (pending) g.hackExposeShown = Object.assign(g.hackExposeShown || {}, { [p.id]: true });
+      out[p.id] = { role: f.role, extras: f.extras || [] };
+    });
+    return out;
+  }
+  /** 公開した1回分を全員(と観戦者)へ送る。ハッキングされた人には、思い込んでいる役職の目線（自分の本当の暴露は出ず、偽の暴露は自分にだけ出る） */
+  function sendRows(c, rows, late, fakes) {
+    const g = c.g, by = rows.by || [];
+    c.sendAll((p) => {
+      let rs = rows;
+      if (ONW.hack && ONW.hack.isFakeUi(g, p.id)) { rs = rows.filter((r, i) => by[i] !== p.id); if (fakes[p.id]) rs = ONW.utils.shuffle([...rs, fakes[p.id]]); }
+      const m = { t: "expose", rows: rs }; if (late) m.late = true;
+      return rs.length ? m : { t: "noop" };
+    });
+    if (rows.length) c.sendSpec({ t: "expose", rows, ...(late ? { late: true } : {}), quiet: true });
   }
 
   const uiPick = {
@@ -77,20 +96,23 @@
     stagePick: {},   // 夜(と朝の連鎖)にカードを押して行動する: プレイヤー1人
     /** 昼の始まり(変化公開 → 新聞 のあと、麻婆豆腐の前): 暴露の紙を出す。戻り値: 紙が出終わるまでの待ち時間(ms)。出さないときは 0 */
     dayAnnounce: { order: 105, run(c) {
-      const rows = collect(c);
-      if (!rows.length) return 0;
-      sendRows(c, rows, false);
-      return ONW.stage && ONW.stage.exposeMs ? ONW.stage.exposeMs(rows) : 0;
+      const rows = collect(c), fakes = fakeRows(c.g, true);
+      if (!rows.length && !Object.keys(fakes).length) return 0;
+      sendRows(c, rows, false, fakes);
+      return rows.length && ONW.stage && ONW.stage.exposeMs ? ONW.stage.exposeMs(rows) : 0;   // 待ち時間は本物の暴露があるときだけ（偽の暴露だけなら、他の人の昼を止めない）
     } },
     /** 昼のうちに、酔いが覚めた / 昼に暴露狂人を手にして選んだ人がいれば、その瞬間に出す（昼のタイマーは止めない） */
     dayNews: { order: 105, run(c) {
       if (c.g.phase !== c.PH.ONLINE_DAY) return;
-      const rows = collect(c);
-      if (rows.length) sendRows(c, rows, true);
+      const rows = collect(c), fakes = fakeRows(c.g, true);
+      if (rows.length || Object.keys(fakes).length) sendRows(c, rows, true, fakes);
     } },
     /** 再入室: 紙は出さず、情報確認にだけ反映 */
-    resyncDay: { order: 16, run(c) {
-      return c.g.exposeLines && c.g.exposeLines.length ? [{ t: "expose", rows: c.g.exposeLines, quiet: true }] : [];
+    resyncDay: { order: 16, run(c, seat) {
+      const g = c.g, fake = seat && ONW.hack && ONW.hack.isFakeUi(g, seat);
+      let rows = g.exposeLines || [];
+      if (fake) { const by = g.exposeBy || []; rows = rows.filter((r, i) => by[i] !== seat); const f = (g.hackExpose || {})[seat]; if (f && (g.hackExposeShown || {})[seat]) rows = [...rows, { role: f.role, extras: f.extras || [] }]; }
+      return rows.length ? [{ t: "expose", rows, quiet: true }] : [];
     } },
     night: {
       kind: "seer", order: 60,   // 暴露の対象を記録するだけ（カードは動かさない）。公開は昼の始まりの最終盤面で

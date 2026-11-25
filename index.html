@@ -43,6 +43,13 @@
 
   <div class="moon-glow" aria-hidden="true"></div>
   <button id="fs-btn" class="fs-btn" aria-label="全画面" title="全画面" onclick="ONW.ui.toggleFullscreen()">□</button>
+  <!-- 左上: サウンドボタン（タップで音量パネル開閉。js/sound.js がアイコン表示・パネルの同期を行う） -->
+  <button type="button" id="snd-btn" class="wiki-btn snd-btn" onclick="ONW.sound.togglePanel()" aria-label="サウンド設定を開く" title="サウンド設定（タップで開く）">🔊</button>
+  <div id="snd-panel" class="snd-panel" hidden>
+    <div class="snd-panel__head"><span>サウンド</span><button type="button" id="snd-mute-btn" class="btn">ミュート</button></div>
+    <div class="snd-panel__row"><label for="snd-bgm-range">BGM</label><input id="snd-bgm-range" type="range" min="0" max="100" step="1"><span id="snd-bgm-val" class="snd-panel__val"></span></div>
+    <div class="snd-panel__row"><label for="snd-se-range">SE</label><input id="snd-se-range" type="range" min="0" max="100" step="1"><span id="snd-se-val" class="snd-panel__val"></span></div>
+  </div>
 
   <header class="onw-header">
     <div class="onw-header__phase" id="phase-label"></div>
@@ -83,6 +90,8 @@
   <!-- アカウント機能（Supabase）。js/config.js が空ならゲストプレイだけが動く -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/state.js"></script>
+  <script src="js/sound.js"></script>   <!-- BGM/SE（js/sound.js。他に依存しない。ONW.sound を各所から呼ぶ） -->
+  <script src="js/role-desc-mc.js"></script>   <!-- 配布時・役職確認の説明文（マイクラ版から転記。ONW.roleDesc が使う。Web版だけ違う役職は役職ファイルの info.descShort で上書き） -->
   <script src="js/roleorder.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/assign.js"></script>
@@ -161,6 +170,7 @@
   <script src="js/roles/wolf/wolf/mimic_wolf.js"></script>
   <script src="js/roles/wolf/wolf/eraser_wolf.js"></script>
   <script src="js/roles/wolf/wolf/mirage_wolf.js"></script>
+  <script src="js/roles/wolf/wolf/silver_wolf.js"></script>
   <script src="js/roles/wolf/wolf/tofu_wolf.js"></script>
   <script src="js/roles/wolf/wolf/werewolf.js"></script>
   <script src="js/roles/wolf/wolf/wolf_king.js"></script>
@@ -180,6 +190,7 @@
   <script src="js/roles/wolf/mad/tenacious_madman.js"></script>
   <script src="js/roles/wolf/mad/jester_madman.js"></script>
   <script src="js/roles/wolf/mad/smoke_madman.js"></script>
+  <script src="js/roles/wolf/mad/mad_priest.js"></script>
   <script src="js/roles/wolf/mad/mad_seer.js"></script>
   <script src="js/roles/wolf/mad/madman.js"></script>
   <!-- 第三陣営 -->
@@ -213,6 +224,7 @@
   <script src="js/roles/neutral/heartbreaker.js"></script>
 <script src="js/roles/neutral/shuffler.js"></script>
   <script src="js/roles/neutral/schrodinger_cat.js"></script>
+  <script src="js/roles/neutral/vanity.js"></script>
   <script src="js/roles/neutral/servant.js"></script>
   <script src="js/roles/neutral/silver_shadow.js"></script>
   <script src="js/roles/neutral/tanner.js"></script>
@@ -220,6 +232,8 @@
   <script src="js/net.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/cpu.js"></script>
+  <script src="js/cpu-talk.js"></script>   <!-- CPUの会話（人間・他CPUのチャット/COへの返事。マイクラ版 cpuDiscussionTalk の移植。docs/cpu-talk.md） -->
+  <script src="js/cpu-ai.js"></script>   <!-- CPU AI議論(β版): ホストの端末の小型AI（WebLLM）の対応判定・インストール確認。docs/cpu-ai.md -->
   <script src="js/night.js"></script>
   <script src="js/vote.js"></script>
   <script src="js/ui.js"></script>

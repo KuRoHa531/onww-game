@@ -33,6 +33,7 @@
           later(() => { setCap(`<div class="res-cap__t t-third">賞金稼ぎ</div><div>${esc(a.by)} が人狼だと思う相手を選びました…</div>`); bnt[bk] = "by"; delete veil[bk]; paint(G()); }, R.t);   // この人の演出が始まったので、「？」で隠していた賞金稼ぎ(別のアサシン・賞金稼ぎ視点)のカードも本当の役職で見える
           later(() => { setCap(head); up[tk] = a.role; delete veil[tk]; bnt[tk] = "pick"; paint(G()); }, R.t + 1300);   // 選ばれたカードが手配書に（顔写真の位置は「？」。恋人❤などの丸いマークはまだ付けない）
           later(() => {                                                                                                      // 判定 → 狼マーク / バツマーク
+            if (a.hit && ONW.sound) ONW.sound.se("bounty_success");   // SE: 賞金稼ぎ成功（的中の瞬間）
             bnt[tk] = a.hit ? "hit" : "miss"; delete bnt[bk];
             R.lovOn(a.targetId);   // 恋人❤・🔀・♡・🍺・昇格🐺の丸いマークは、役職名が出るこのタイミングで付く
             badge[tk] = a.hit ? "的中" : "外れ";

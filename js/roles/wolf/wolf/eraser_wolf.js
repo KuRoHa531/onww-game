@@ -11,8 +11,8 @@
  *   3of5: 朝の「真っ白のカード」めくり演出【済】= 待機時間に、抹消の人狼本人の画面だけ相手のカードが白紙でめくれる（失敗は🔒）。stage.js BLANK_MARK / css .tb-team-blank
  *   4of5: CPU・COボタン・情報確認・デバッグ固定・観戦【済】
  *         ・CPU: 夜に自分以外の1人を選んで抹消対象にする（cpuNight order 95 / stage "tm"。仲間の人狼と分かっている人は避ける。デバッグの能力先指定=forced(p).player が最優先）。記録・夜ログ・情報確認(hold)は人間と同じ文。
- *               人狼陣営のCPUは昼は必ず騙る（Web版の共通ルール。心眼の人狼と同じ）ので、「〇〇を抹消対象にしていました」を本当に自白することはしない。人間のCOボタンだけが同じ文を出す。
- *         ・COボタン: 役職CO「抹消の人狼」→ 結果開示で対象を選ぶと「〇〇を抹消対象にしていました。」（マイクラ版 main.js と同じ文）。失敗したときは「ロックされて失敗」。
+ *               人狼陣営のCPUは昼は必ず騙る（Web版の共通ルール。心眼の人狼と同じ）ので、「〇〇を抹消対象にしました」を本当に自白することはしない。人間のCOボタンだけが同じ文を出す。
+ *         ・COボタン: 役職CO「抹消の人狼」→ 結果開示で対象を選ぶと「〇〇を抹消対象にしました。」（マイクラ版 main.js と同じ文）。失敗したときは「ロックされて失敗」。
  *                    情報開示の「役職が変わっていること」に「抹消に消されていそうです。」（マイクラ版の並びどおり先頭 / js/co.js の CHANGED_LINES）
  *         ・情報確認: 夜は night.resolve の hold（「〇〇 を抹消対象にしました。」）、待機時間は 3of5 の settleMsg（【抹消通知】）。CPUも夜の分は g.nightResults に同じ文で残る
  *         ・デバッグ固定: 抹消の人狼を固定したCPUの「能力先」で、抹消する相手を指定できる（js/debug.js の ABILITY.eraser_wolf = "era"）
@@ -118,8 +118,8 @@
     const ft = failText(g, id);
     return ft ? { ok: false, logs: ["【抹消通知】", ft] } : null;
   }
-  /** COボタンの結果開示の文（マイクラ版 main.js の「〇〇を抹消対象にしていました。」と同じ） */
-  const coText = (name) => `${name} を抹消対象にしていました。`;
+  /** COボタンの結果開示の文（マイクラ版 main.js の「〇〇を抹消対象にしました。」と同じ） */
+  const coText = (name) => `${name} を抹消対象にしました。`;
   /** 観戦者の「抹消」欄（specInfo）: 選んだ順に { by, target, before, after, fail }（名前と役職のID。成功なら before/after、失敗は fail に理由）。観戦者は全員の役職が見えるので事実をそのまま出す */
   function specLines(g, nm) {
     return Object.entries(g.eraserWolfTarget || {}).map(([by, t]) => {
@@ -182,7 +182,7 @@
     // 夜にカードを押して行動する: プレイヤー1人（自分は選べない）
     stagePick: { players: 1 },
     noDayChain: true,   // 昼に入ってからは使えない（抹消は昼になる前に実行する能力）: 酔い覚めの議論中の連鎖には出さない（net.js soberUp）
-    // 結果開示(COボタン)の流れ(co.js が kind で引く): 抹消対象にした相手を選ぶ →「〇〇を抹消対象にしていました。」（マイクラ版 main.js と同じ文。CPUは人狼陣営なので騙るため、この文を自白には使わない）
+    // 結果開示(COボタン)の流れ(co.js が kind で引く): 抹消対象にした相手を選ぶ →「〇〇を抹消対象にしました。」（マイクラ版 main.js と同じ文。CPUは人狼陣営なので騙るため、この文を自白には使わない）
     coResult: {
       kind: "eraser", targetLabel: "抹消対象にした相手",
       pickPlayer: (id, K) => [coText(K.nameOf(id)), null, null, "disclose", `→ ${K.nameOf(id)}`],

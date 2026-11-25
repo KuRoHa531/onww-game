@@ -35,7 +35,7 @@
     "avenger",   // 復讐者（夜に復讐対象を選ぶ役職。マイクラ版 shufflerEligibleRoles の除外どおり）
     "prankster",   // 愉快犯（夜に対象を選ぶ役職。復讐者と同じ扱いで山札から外す。※マイクラ版 shufflerEligibleRoles の確認は 4of4）
     "watcher",   // 静観者（マイクラ版 shufflerEligibleRoles の除外どおり。静観者のカードは交換・コピー・変化されない）
-    "priest",   // 神官（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補にも入っていない）
+    "priest", "mad_priest",   // 神官・狂った神官（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補にも入っていない）
     "mimic_wolf", "mirage_wolf",   // 模倣の人狼・蜃気楼の人狼（マイクラ版 shufflerEligibleRoles の除外どおり。wiki の山札候補 SHUFFLE_CANDIDATE_KEYS にも入っていない）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
@@ -297,7 +297,7 @@
         document.body.appendChild(ghost);
         const dx = rd.left - rp.left, dy = rd.top - rp.top;
         ghost.animate([{ transform: "translate(0,0) scale(1)" }, { transform: "translate(0,-14px) scale(1.12)" }], { duration: LIFT, easing: "ease-out", fill: "forwards" });   // ① 山札の一番上が浮く
-        later(() => ghost.classList.add("up"), LIFT);                                                                                                    // ② その場でめくれる（引いた役職が見える）
+        later(() => { ghost.classList.add("up"); if (ONW.sound) ONW.sound.se("card_flip"); }, LIFT);   // ② その場でめくれる（引いた役職が見える）。ゴーストカードは stage の席ではないので paint のめくれ検出が効かず、ここで直接めくりSEを鳴らす
         later(() => {                                                                                                                                  // ③ 選んだ人のカードの上へ飛んで重なる
           ghost.animate([
             { transform: "translate(0,-14px) scale(1.12) rotate(0deg)" },

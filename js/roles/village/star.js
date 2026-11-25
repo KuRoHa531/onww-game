@@ -4,6 +4,14 @@
   const holders = (g) => g.players.filter((p) => ONW.mimic.eff(g, p.id) === ONW.ROLE.STAR && !ONW.hiddenDrunk(g, p.id) && !ONW.seal.is(g, p.id)).map((p) => p.id);   // 酔いが覚めていない人は、覚めた瞬間に公開される
   ONW.starHolders = holders;   // CPUの発言が使う（模倣の人狼がスターを模倣していて、スター公開に実際に出たか: js/cpu.js）
   const nameList = (g, ids) => ids.map((id) => (g.players.find((q) => q.id === id) || {}).name);
+  /** 銀狼にハッキングされた人の画面に出すスター（思い込んでいる役職の目線: 本当のスターでも自分のぶんは出ない / スターと思い込んでいれば自分のぶんが出る）。docs/silver-wolf.md */
+  const viewOf = (g, vid, ids, addSelf) => (ONW.hack ? ONW.hack.pubView(g, vid, ONW.ROLE.STAR, ids, addSelf) : ids);
+  /** 全員へ starup を送る（ハッキングされた人にはその人の目線の ids / names。観戦者は本当の内容） */
+  const sendUp = (c, ids, addSelfFn) => {
+    const g = c.g, all = holders(g);
+    c.sendAll((p) => ({ t: "starup", ids: viewOf(g, p.id, ids, addSelfFn(p.id)), names: nameList(g, viewOf(g, p.id, all, true)) }));
+    c.sendSpec({ t: "starup", ids, names: nameList(g, all) });
+  };
 
   ONW.defineRole("star", {
     // 朝の待機時間(stage.js が g.settleStars を受け取って呼ぶ): 最終盤面でスターを持っている人のカードが全員の画面で同時に表になる（後覚者の確認とは別に「スター」の札が付く。昼になったら札を外して伏せる）
@@ -26,7 +34,7 @@
       desc: "村人陣営。夜の能力はありません。最終盤面でスターを持っている人のカードは、朝のあとの待機時間に全員の画面で表になり、誰がスターか公開されます。" },
     groups: { "transform:light_apostle": 14 },
     settleMsg: { order: 60, run(c, p, mode) {
-      const g = c.g, stars = holders(g);
+      const g = c.g, stars = viewOf(g, p.id, holders(g), true);   // ハッキングされた人は、思い込んでいる役職の目線のスター
       // ※既存の挙動を保持: 待機時間の通常送信と再入室で、名前の取り出し方が同じ(見つからなければ例外)
       return { stars, starNames: stars.map((id) => g.players.find((q) => q.id === id).name) };
     } },
@@ -36,14 +44,14 @@
       if (g.phase !== c.PH.ONLINE_DAY) return;
       const ids = holders(g).filter((id) => ONW.mimic.beforeEff(before, id) !== ONW.ROLE.STAR);
       if (!ids.length) return;
-      const m = { t: "starup", ids, names: nameList(g, holders(g)) };
-      c.sendAll(m); c.sendSpec(m);
+      sendUp(c, ids, () => false);   // 昼に新しく動いた分（偽のスターは動かないので、ハッキングされた人の自分のぶんは足さない）
     },
     /** 酔いが覚めた瞬間に全員へ公開（全員の画面でカードがめくれて裏に戻る） */
     soberReveal: { order: 10, run(c, ids) {
       const g = c.g;
       const newStars = ids.filter((id) => ONW.mimic.eff(g, id) === ONW.ROLE.STAR);
-      if (newStars.length) { const m = { t: "starup", ids: newStars, names: nameList(g, holders(g)) }; c.sendAll(m); c.sendSpec(m); }
+      const fakeNew = ONW.hack ? ids.filter((id) => ONW.hack.isFakeUi(g, id) && g.hackRole[id] === ONW.ROLE.STAR) : [];
+      if (newStars.length || fakeNew.length) sendUp(c, newStars, (vid) => ids.includes(vid));   // 酔いが覚めたハッキングされた人が偽のスターなら、自分のカードも表になる
     } },
   });
 })(window.ONW);

@@ -119,8 +119,8 @@
     const nm = k.nameOf(g, e.target);
     return [{ p, text: guardText(nm), short: guardShort(nm), result: true, claim: { kind: "fairy", target: e.target }, gap: 3500 }];
   }
-  /** COボタン（4of4-b）の結果開示の文。マイクラ版 main.js: 「〇〇にバリアを付与していました。」（Web版は名前のあとに空白を入れる） */
-  const coText = (name) => `${name} にバリアを付与していました。`;
+  /** COボタン（4of4-b）の結果開示の文。マイクラ版 main.js: 「〇〇にバリアを付与しました。」（Web版は名前のあとに空白を入れる） */
+  const coText = (name) => `${name} にバリアを付与しました。`;
   /**
    * 実績（4of4-b。マイクラ版 stats.js と同じ条件。wiki の「妖精さん」に定義済みの3つ）:
    *   fairy_win「真我の力」 = 最終役職が妖精さんで勝利 / fairy_loss「可愛い妖精さん」 = 最終役職が妖精さんで敗北 /
@@ -142,7 +142,7 @@
     // CPU（4of4-a）: 本物は必ず「妖精さんCO」（結果なし）。騙りはしない。バリアを付与したCPUの発言は cpuSpeak
     cpuClaim(k, g, p, r, i, c) { c.co = "fairy"; },
     cpuSpeak,
-    // 結果開示(COボタン・co.js が kind で引く): 「妖精さんCO」だけで終わらせられる(noChain)。結果開示でバリアを付与した相手を選ぶ → 「〇〇 にバリアを付与していました。」（盗賊と同じ形）
+    // 結果開示(COボタン・co.js が kind で引く): 「妖精さんCO」だけで終わらせられる(noChain)。結果開示でバリアを付与した相手を選ぶ → 「〇〇 にバリアを付与しました。」（盗賊と同じ形）
     coResult: {
       kind: "fairy", targetLabel: "バリアを付与した相手", noChain: true,
       pickPlayer: (id, K) => [coText(K.nameOf(id)), { kind: "fairy", target: id }, null, "disclose", guardShort(K.nameOf(id))],

@@ -34,7 +34,7 @@
   function noticeFor(g, id) {
     const seen = ((g.madQueenSeen = g.madQueenSeen || {})[id] = g.madQueenSeen[id] || []);
     if (!ONW.isMadQueenViewer(g, id)) return [];
-    const fresh = ONW.madQueenHolders(g).filter((q) => !seen.includes(q));
+    const fresh = ONW.madQueenHolders(g).filter((q) => !seen.includes(q) && !(q === id && ONW.hack && ONW.hack.isFakeUi(g, id)));   // 銀狼にハッキングされた人は、自分のぶんの通知は出ない
     if (!fresh.length) return [];
     seen.push(...fresh);
     const me = g.players.find((q) => q.id === id);

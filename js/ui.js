@@ -85,6 +85,10 @@ window.ONW = window.ONW || {};
     }
     // 議論・投票・観戦中は画面を縦に固定し、チャット本文だけをスクロールさせる
     document.body.classList.toggle("chat-mode", !specDeal && !!(hostWatching || [P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_SPECTATE].includes(game.phase)));
+    // 役職配布の演出のあいだは、画面にぴったり収める（高さを固定・フッターを隠す。大きさは ui.fitDeal が測って縮める）
+    document.body.classList.toggle("deal-fit", game.phase === ONW.PHASE.ONLINE_ROLE || specDeal);
+    // タイトル・ロビーも画面にぴったり収める（高さを固定。収まらないときは ui.fitMenu が、小さくする → それでも足りなければ縮める）
+    document.body.classList.toggle("menu-fit", !specDeal && (game.phase === ONW.PHASE.TITLE || (game.phase === ONW.PHASE.LOBBY && !reviewing)));
     // 設定の＋／−などで再描画しても、画面のスクロール位置がずれないようにする（同じ画面の再描画のときだけ）
     const keepY = ui._lastPhase === game.phase ? (window.scrollY || 0) : 0;
     const mp = document.querySelector(".settings-panel--modal"), keepM = mp ? mp.scrollTop : 0;   // 設定ウィンドウの中のスクロール位置も保つ
@@ -97,6 +101,7 @@ window.ONW = window.ONW || {};
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
     if (game.phase === ONW.PHASE.ONLINE_ROLE || ui.isSpecDeal(game)) ui.setupDeal();
+    ui.fitMenu();
     if (ONW.accountUi && ONW.accountUi.updateFixed) ONW.accountUi.updateFixed();
     ui.updateBoard();
     ui.updateSpecInfo();
@@ -105,6 +110,8 @@ window.ONW = window.ONW || {};
     ui.updateChat();
     if (ONW.co) ONW.co.render();
     if (ONW.stage) ONW.stage.sync(game);   // 山札・墓地・各自のカード（再描画しても作り直さない）
+    ui.fitTable();   // 縦向きの小さい画面: カードのテーブルを、操作パネルがスクロールなしで収まる大きさに縮める
+    if (ONW.sound) ONW.sound.syncBgm(game);   // BGM: フェーズ・状態に合わせて切り替える（音が出なくても進行には影響しない）
   };
 
   // ---------------------------------------------------------
@@ -211,8 +218,8 @@ window.ONW = window.ONW || {};
   /** 役職の一覧（配役設定・役職設定の詳細設定で共通）。並びは wiki 順（ONW.sortByRoleOrder = ONW.ROLE_ORDER） */
   function roleLists() {
     const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi", "carmen", "knight", "trailblazer"]);
-    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]), dark = ["dark_avatar"];
-    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher"]);
+    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman", "mad_priest"]), dark = ["dark_avatar"];
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher", "vanity"]);
     return { village, wolfLike, madLike, dark, third };
   }
 
@@ -374,12 +381,17 @@ window.ONW = window.ONW || {};
       <div class="rg-sub"><div class="rg-label">人狼系</div>${L0.wolfLike.map(roleRow).join("")}</div>
       <div class="rg-sub"><div class="rg-label">狂人系</div>${L0.madLike.map(roleRow).join("")}</div>`;
     if (key === "dup") return `${row("酔っ払い(人)", game.drunkCount || 0, "ONW.net.changeSetting('drunkCount',-1)", "ONW.net.changeSetting('drunkCount',1)")}
-        ${row("酔う確率(1人ごと)", `${game.drunkChance ?? 100}%`, "ONW.net.changeSetting('drunkChance',-5)", "ONW.net.changeSetting('drunkChance',5)")}
-        <p class="night-step__hint" style="margin:4px 8px 8px;">配役の枚数には数えません。ランダムな参加者（CPU含む）に重なり、議論時間の半分が過ぎるまで自分の役職が分かりません。人数ぶんの枠が、それぞれ「酔う確率」で当たります。</p>
+        ${dupChanceRows("drunk", game.drunkCount || 0, "酔う確率", row)}
+        <p class="night-step__hint" style="margin:4px 8px 8px;">配役の枚数には数えません。ランダムな参加者（CPU含む）に重なり、議論時間の半分が過ぎるまで自分の役職が分かりません。人数ぶんの枠（①②…）が、それぞれの「酔う確率」で当たります（アサイン設定のON/OFFに関係なく、1枠ごとに決められます。初期値100%）。</p>
         ${row("恋人(組)", game.loverCount || 0, "ONW.net.changeSetting('loverCount',-1)", "ONW.net.changeSetting('loverCount',1)")}
-        ${row("恋人になる確率(1組ごと)", `${game.loverChance ?? 100}%`, "ONW.net.changeSetting('loverChance',-5)", "ONW.net.changeSetting('loverChance',5)")}
-        <p class="night-step__hint" style="margin:4px 8px 8px;">恋人は2人1組で、ランダムな参加者（CPU含む）に重なります（酔っ払いと同じ人に重なることもあります）。夜に相方のカードが❤️でめくれ、相方が死亡すると、死因を問わず同時に心中します。二人とも死ななければ恋人陣営の勝利で、恋人以外は敗北です。組数は村の人数の半分までです。</p>`;
+        ${dupChanceRows("lover", game.loverCount || 0, "恋人になる確率", row)}
+        <p class="night-step__hint" style="margin:4px 8px 8px;">恋人は2人1組で、ランダムな参加者（CPU含む）に重なります（酔っ払いと同じ人に重なることもあります）。組（①②…）ごとの「恋人になる確率」を、アサイン設定のON/OFFに関係なく決められます（初期値100%）。夜に相方のカードが❤️でめくれ、相方が死亡すると、死因を問わず同時に心中します。二人とも死ななければ恋人陣営の勝利で、恋人以外は敗北です。組数は村の人数の半分までです。</p>`;
     return "";
+  }
+  /** 重複役職（酔っ払い・恋人）の、枠(①②…)ごとの確率の行。枠の数（人数・組数）が0なら出さない。値は g.drunkChances / g.loverChances（js/assign.js A.dupChance） */
+  function dupChanceRows(kind, n, label, row) {
+    const A = ONW.assign, g = ONW.game;
+    return Array.from({ length: n }, (_, k) => row(`${CIRC[k] || k + 1} ${label}`, `${A.dupChance(g, kind, k)}%`, `ONW.net.changeDupChance('${kind}',${k},-5)`, `ONW.net.changeDupChance('${kind}',${k},5)`)).join("");
   }
   /** 詳細設定の陣営のメニューの中身（設定のある役職の行。押すとその役職の設定がさらに上に重なる）。wolf は 闇の化身 → 人狼系 → 狂人系 */
   function detailGroupRows(key) {
@@ -499,9 +511,12 @@ window.ONW = window.ONW || {};
         <input class="onw-input" maxlength="20" placeholder="ルール名" value="${esc(game.presetName)}" oninput="ONW.game.presetName=this.value">
         <button class="btn" onclick="ONW.net.savePreset()">今のルールを保存</button>
       </div>
-      ${presets.length ? presets.map((p, i) => `
+      ${presets.length ? presets.map((p, i) => game.renameIdx === i ? `
+        <div class="result-role"><span style="flex:1;"><input class="onw-input" maxlength="20" placeholder="新しいルール名" value="${esc(game.renameText)}" oninput="ONW.game.renameText=this.value" onkeydown="if(event.key==='Enter')ONW.net.commitRename()"></span>
+          <span><button class="btn" onclick="ONW.net.commitRename()">決定</button> <button class="btn" onclick="ONW.net.cancelRename()">やめる</button></span>
+        </div>` : `
         <div class="result-role"><span>${esc(p.name)}</span>
-          <span><button class="btn" onclick="ONW.net.loadPreset(${i})">読み込む</button> <button class="btn" onclick="ONW.net.showCode(${i})">コード</button> <button class="btn" onclick="ONW.net.deletePreset(${i})">削除</button></span>
+          <span><button class="btn" onclick="ONW.net.loadPreset(${i})">読み込む</button> <button class="btn" onclick="ONW.net.updatePreset(${i})">更新</button> <button class="btn" onclick="ONW.net.startRename(${i})">名前変更</button> <button class="btn" onclick="ONW.net.copyPresetCode(${i})">コードコピー</button> <button class="btn" onclick="ONW.net.showCode(${i})">コード表示</button> <button class="btn" onclick="ONW.net.deletePreset(${i})">削除</button></span>
         </div>`).join("") : `<p class="night-step__hint">保存したルールはまだありません。</p>`}
       <h3 class="set-sub">ルールコード</h3>
       <p class="night-step__hint">コードを友達に送ると、同じルールを読み込めます。</p>
@@ -556,6 +571,22 @@ window.ONW = window.ONW || {};
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('bubbleChat')">${game.bubbleChat === true ? "ON" : "OFF"}</button>` : `<span>${game.bubbleChat === true ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: チャットの発言を、アイコンと名前つきの吹き出しで表示します（自分の発言は右側）。OFF: 今までの「名前: 発言」の表示です。</p>
+          <div class="field-row"><label>CPU AI議論(β版)</label>
+            ${isHost ? (ONW.cpuAi && ONW.cpuAi.state === "loading" ? `<button class="btn" onclick="ONW.net.cancelCpuAi()">中断</button>` : `<button class="btn" ${ONW.cpuAi && !game.cpuAi && !ONW.cpuAi.supported().ok ? "disabled" : ""} onclick="ONW.net.toggleCpuAi()">${game.cpuAi === true ? "ON" : "OFF"}</button>`) : `<span>${game.cpuAi === true ? "ON" : "OFF"}</span>`}
+          </div>
+          ${isHost && ONW.cpuAi ? `<p class="night-step__hint" id="cpuai-prog" style="overflow-wrap:anywhere">${ONW.utils.esc(ONW.cpuAi.statusText())}</p>` : ""}
+          <p class="night-step__hint">ON: CPUの発言・返事の言い方を、ホストの端末の中で動くAIが自然な言葉にします。何をCOするか・誰に投票するか・どこで嘘をつくかは、これまでどおりCPUが決め、AIは言い方だけを変えます。AIが失敗したり遅いときは、自動で今までの発言に戻ります。ONにできるのは、ホストの端末にAIをインストールして動作確認ができたときだけです（初回はダウンロードあり・WebGPU対応の端末が必要）。AIが動くのはホストの端末だけで、参加者の端末には何も入りません。OFFでも、CPUは今までどおり会話します。（β版）</p>
+          ${ONW.sound ? `<div class="field-row"><label>サウンド</label>
+            <button class="btn" onclick="ONW.sound.toggleMute()">${ONW.sound.muted() ? "ミュート中" : "ON"}</button>
+          </div>
+          <div class="field-row"><label>BGM音量</label>
+            <input type="range" min="0" max="100" step="1" value="${ONW.sound.bgmVol()}" oninput="ONW.sound.setBgmVol(this.value)" style="flex:1">
+          </div>
+          <div class="field-row"><label>SE音量</label>
+            <input type="range" min="0" max="100" step="1" value="${ONW.sound.seVol()}" oninput="ONW.sound.setSeVol(this.value)" style="flex:1">
+            <button class="btn" onclick="ONW.sound.se('card_flip')">試聴</button>
+          </div>
+          <p class="night-step__hint">BGM・効果音の設定は、この端末だけのものです（ブラウザに保存されます。ルーム設定とは別）。左上の🔊ボタンから開く音量パネルでも、同じ設定を変えられます（連動します）。</p>` : ""}
           ${isHost && (game.debugOn || (ONW.debug && ONW.debug.allowed())) ? `<div class="field-row"><label>デバッグモード</label>
             <button class="btn" onclick="ONW.debug.toggle()">${game.debugOn ? "ON" : "OFF"}</button>
           </div>
@@ -598,9 +629,9 @@ window.ONW = window.ONW || {};
         <p class="lede">部屋コード（友達に教えてください）</p>
         <div class="room-code-row"><span class="night-step__role room-code-mask">＊＊＊＊</span><button class="btn tf-chip room-code-copy" onclick="ONW.ui.copyRoomCode(this)">コピー</button></div>
         <h2>参加者 ${total}/${size}</h2>
-        ${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
-        ${Array.from({ length: game.cpuCount || 0 }, (_, i) => `<div class="result-role"><span>${esc((game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`).join("")}
-        ${specs.length ? `<h2>観戦者 ${specs.length}</h2>${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}` : ""}
+        <div class="lobby-list">${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
+        ${Array.from({ length: game.cpuCount || 0 }, (_, i) => `<div class="result-role"><span>${esc((game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`).join("")}</div>
+        ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint">${hint}</p>
         ${canInvite && game.invOpen ? `<div class="invite-panel"><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
@@ -865,6 +896,23 @@ window.ONW = window.ONW || {};
   ui.dealDuration = function (graveCount, playerCount, hasLover) {
     return 0.4 + 0.3 * graveCount + 0.2 + 0.28 * playerCount + 0.5 + 0.4 + 1.6 + (hasLover ? 1.6 : 0) + 0.9;
   };
+  /** 配役演出の「めくれる瞬間」にカードめくり SE を合わせる。
+   *  配布画面は CSS アニメーションだけで描かれ、stage.paint のめくれ検出（sound.noteFlip）が効かないため、ここで予約して鳴らす。
+   *  times は dealStart 基準のめくり時刻（秒）。まだ来ていないものだけ予約し、過ぎたもの（途中参加・再入室で途中から見た場合）は鳴らさない
+   *  （stage 側の「初回同期では鳴らさない」方針に合わせる）。再描画で何度呼ばれても、同じ配布（dealStart）では1回だけ予約する */
+  ui.dealFlipSe = function (game, times) {
+    try {
+      if (!ONW.sound || !game || !game.dealStart) return;
+      if (ui._dealSeFor === game.dealStart) return;
+      ui._dealSeFor = game.dealStart;
+      const ds = game.dealStart, elapsed = (Date.now() - ds) / 1000;
+      (times || []).forEach((t) => {
+        const d = t - elapsed;
+        if (d < -0.15) return;   // すでにめくれたあとは鳴らさない
+        setTimeout(() => { if (ONW.sound && ONW.game && ONW.game.dealStart === ds) ONW.sound.se("card_flip"); }, Math.max(0, d * 1000));
+      });
+    } catch (e) { /* 音でゲームを止めない */ }
+  };
   ui.renderOnlineRole = function renderOnlineRole(game) {
     const info = ONW.roles.getInfo(game.myRole);
     const from = game.myFrom ? ONW.roles.getInfo(game.myFrom) : null;
@@ -901,6 +949,9 @@ window.ONW = window.ONW || {};
         <span class="dl-name">${esc(name || "あなた")}${me ? "（あなた）" : ""}</span>
       </div>`;
     const players = [mkPlayer(game.myName, 0, true), ...others.map((p, i) => mkPlayer(p.name, i + 1, false))].join("");
+    // SE: 自分のカードがめくれる瞬間（裏→役職 / 変化前→変化後 / →恋人）に合わせる
+    const flipTimes = [flip1]; if (from) flipTimes.push(flip2); if (lover) flipTimes.push(flipL);
+    ui.dealFlipSe(game, flipTimes);
     return `
       <section class="panel night-step deal-stage" data-deal>
         <p class="lede">役職を配っています…</p>
@@ -912,7 +963,7 @@ window.ONW = window.ONW || {};
           <div class="night-step__role t-${info.team}">${info.name}</div>
           ${from ? `<p class="night-step__hint">${esc(from.name)} → ${esc(info.name)} に変化しました。</p>` : ""}
           ${lover ? `<p class="night-step__hint"><strong>${esc(info.name)}</strong> に加えて <strong>恋人</strong> になっています。相方は夜に分かります。</p>` : ""}
-          <p class="night-step__hint">${ONW.roleDesc(game.myRole, game)}</p>
+          <p class="night-step__hint" style="white-space:pre-line;">${esc(ONW.roleDesc(game.myRole, game))}</p>
         </div>
       </section>`;
   };
@@ -950,6 +1001,10 @@ window.ONW = window.ONW || {};
         <div class="dl-slot">${card(p, pStart + pStep * i)}</div>
         <span class="dl-name">${esc(p.name)}</span>
       </div>`).join("");
+    // SE: 観戦の配布でも、全員のカードがめくれる瞬間（flip1 / 変化は flip2 / 恋人は flipL）に合わせる。同時にめくれるので時刻ごとに1回だけ
+    const specFlipTimes = new Set([flip1]);
+    [...list, ...graves].forEach((o) => { if (!o) return; if (o.from) specFlipTimes.add(flip2); if (o.lover) specFlipTimes.add(o.from ? flip2 + 1.6 : flip2); });
+    ui.dealFlipSe(game, [...specFlipTimes]);
     return `
       <section class="panel night-step deal-stage dl-spec" data-deal>
         <p class="lede">役職を配っています…（観戦中は全員の役職が見えます）</p>
@@ -960,11 +1015,37 @@ window.ONW = window.ONW || {};
       </section>`;
   };
 
-  /** 山札から各スロットへ飛ぶ軌道（--dx/--dy）を実測して入れる。
-   *  ・出発点は山札の「いちばん上のカード」（手前に見えている1枚）
-   *  ・配る順が早いカードほど手前（z-index が大きい）にして、山札の上から順に1枚ずつ取って配っているように見せる */
+  /** 配役の演出を始める: 画面に収まる大きさに縮め（fitDeal）→ 山札から各スロットへの軌道を測り（placeDeal）→ 演出を開始（go） */
   ui.setupDeal = function () {
     const root = document.querySelector("[data-deal]");
+    if (!root) return;
+    ui.fitDeal(root);
+    ui.placeDeal(root);
+    root.classList.add("go");
+  };
+
+  /** 配役の演出を、画面からはみ出さない最大の大きさにする（スクロールさせない）。
+   *  css の --dk（0.3〜1）を下げて、カード・余白・文字をまとめて縮める。1 のままで収まるなら何もしない（今までと同じ大きさ） */
+  ui.fitDeal = function (root) {
+    root = root || document.querySelector("[data-deal]");
+    const app = document.getElementById("app");
+    if (!root || !app) return;
+    const cs = getComputedStyle(app);
+    const avail = app.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    if (!(avail > 0)) return;
+    const fits = (k) => { root.style.setProperty("--dk", k.toFixed(3)); return root.offsetHeight <= avail && root.scrollWidth <= root.clientWidth + 1; };
+    if (fits(1)) return;   // そのままで収まる（今までと同じ大きさ）
+    // 収まる最大の大きさを二分探索する（人数が多いと、小さくした途端に折り返しが減って高さがガクンと変わるので、比例計算ではなく実測で探す）
+    let lo = 0.3, hi = 1;
+    for (let i = 0; i < 9; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+    root.style.setProperty("--dk", lo.toFixed(3));
+  };
+
+  /** 山札から各スロットへ飛ぶ軌道（--dx/--dy）を実測して入れる。（画面の大きさが変わったときも、これだけやり直す）
+   *  ・出発点は山札の「いちばん上のカード」（手前に見えている1枚）
+   *  ・配る順が早いカードほど手前（z-index が大きい）にして、山札の上から順に1枚ずつ取って配っているように見せる */
+  ui.placeDeal = function (root) {
+    root = root || document.querySelector("[data-deal]");
     if (!root) return;
     const stack = root.querySelectorAll(".dl-deck-card");
     const top = stack[stack.length - 1];
@@ -981,8 +1062,79 @@ window.ONW = window.ONW || {};
     fly.map((el, i) => ({ el, i, t: parseFloat(el.style.animationDelay) || 0 }))
       .sort((a, b) => (a.t - b.t) || (a.i - b.i))
       .forEach((x, rank) => { x.el.style.zIndex = String(500 - rank); });
-    root.classList.add("go");
   };
+  // 画面の大きさが変わったとき（全画面にした・戻した・端末を回した）も、配役の演出を収め直す
+  if (!ui._dealResizeBound) {
+    ui._dealResizeBound = true;
+    const refit = () => { const root = document.querySelector("[data-deal]"); if (root) { ui.fitDeal(root); ui.placeDeal(root); } };
+    window.addEventListener("resize", refit);
+    window.addEventListener("orientationchange", () => setTimeout(refit, 250));
+    document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
+  }
+
+  /** タイトル・ロビーを、スクロールなしで画面に収める（body.menu-fit のあいだだけ）。
+   *  1) そのまま（今までと同じ大きさ）で収まるならそのまま
+   *  2) 収まらなければ body.menu-tight: ヘッダー・余白・文字を小さくし、フッターを隠す
+   *  3) それでも収まらなければ、#app の中身を --mk(0.45〜1) で縮める（zoom。収まる最大値を二分探索）
+   *  ルーム設定のウィンドウ(.settings-modal)は画面に固定で重なるので、縮めない（ウィンドウの中だけがスクロールする） */
+  ui.fitMenu = function () {
+    const b = document.body, app = document.getElementById("app");
+    if (!app) return;
+    const kids = Array.from(app.children);
+    const setK = (k) => kids.forEach((el) => { if (k < 1) el.style.setProperty("--mk", k.toFixed(3)); else el.style.removeProperty("--mk"); });
+    if (!b.classList.contains("menu-fit")) { b.classList.remove("menu-tight"); setK(1); return; }
+    const over = () => app.scrollHeight > app.clientHeight + 1 || app.scrollWidth > app.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1;
+    b.classList.remove("menu-tight"); setK(1);
+    if (!over()) return;                       // 1) そのままで収まる
+    b.classList.add("menu-tight");
+    if (!over() || app.querySelector(".settings-modal")) return;   // 2) 小さくすれば収まる（設定ウィンドウが出ているときは縮めない）
+    let lo = 0.45, hi = 1;                     // 3) 収まる最大の縮め方を測る
+    setK(lo); if (over()) return;              // 最小でも収まらないときは最小のまま
+    for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; setK(mid); if (over()) hi = mid; else lo = mid; }
+    setK(lo);
+  };
+  if (!ui._menuResizeBound) {
+    ui._menuResizeBound = true;
+    const refit = () => { if (ONW.game && document.body.classList.contains("menu-fit")) ui.fitMenu(); };
+    window.addEventListener("resize", refit);
+    window.addEventListener("orientationchange", () => setTimeout(refit, 250));
+    document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
+  }
+
+  /** 縦向きの小さい画面（スマホ）の夜・朝・待機時間・結果発表の演出: 上のテーブル + 下の操作パネルが、スクロールなしで収まるように、カードの大きさ(--cw/--ch)だけを縮める。
+   *  収まるなら何もしない（今までと同じ大きさ）。横向き・PC幅は CSS の2カラムなのでここでは触らない。議論・投票(chat-mode)はチャット欄が伸び縮みするので対象外 */
+  ui.fitTable = function () {
+    const b = document.body, tb = document.getElementById("table"), app = document.getElementById("app");
+    if (!tb || !app) return;
+    if (!ui._tableMo && window.MutationObserver) {   // 画面の文字があとから増えたとき（演出の途中で説明が出るなど）も収め直す
+      let raf = 0;
+      ui._tableMo = new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; ui.fitTable(); }); });
+      ui._tableMo.observe(app, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
+      app.addEventListener("animationend", () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ui.fitTable(); }); });
+    }
+    b.classList.remove("tbl-tight");
+    tb.style.transition = "none"; tb.style.removeProperty("--cw"); tb.style.removeProperty("--ch");   // 大きさのなめらかな変化(transition)は測るあいだだけ止める
+    const done = () => { void tb.offsetHeight; tb.style.transition = ""; };
+    const portrait = window.matchMedia("(max-width: 999px) and (orientation: portrait)").matches;
+    if (!portrait || !tb.classList.contains("on") || b.classList.contains("chat-mode") || app.querySelector(".result-sheet")) return done();
+    const over = () => app.scrollHeight > app.clientHeight + 1 || b.scrollHeight > b.clientHeight + 1;
+    if (!over()) return done();
+    const def = parseFloat(getComputedStyle(tb).getPropertyValue("--cw")) || 52;
+    const set = (w) => { tb.style.setProperty("--cw", w.toFixed(1) + "px"); tb.style.setProperty("--ch", (w * 1.42).toFixed(1) + "px"); };
+    const search = () => { let lo = 20, hi = def; set(lo); if (over()) return false; for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; set(mid); if (over()) hi = mid; else lo = mid; } set(lo); return true; };
+    if (!search()) {   // カードを最小にしても収まらない（320x568 で10人など）: 操作パネルの余白・文字も小さくして、もう一度
+      b.classList.add("tbl-tight");
+      if (!search()) set(20);
+    }
+    done();
+  };
+  if (!ui._tableResizeBound) {
+    ui._tableResizeBound = true;
+    const refit = () => { if (ONW.game && ui.fitTable) ui.fitTable(); };
+    window.addEventListener("resize", refit);
+    window.addEventListener("orientationchange", () => setTimeout(refit, 250));
+    document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
+  }
 
   ui.renderOnlineNight = function renderOnlineNight(game) {
     const info = ONW.roles.getInfo(game.myRole);
@@ -1992,11 +2144,12 @@ window.ONW = window.ONW || {};
             ...(res.slides || []).map((x) => L(`<span class="rs-info">ペンギン:</span> ${esc(x.by)} に投票した ${(x.voters || []).map(esc).join("・")} の${x.w}票は、${esc(x.to)} へ滑りました。`))],   // ペンギンは昼能力ではないので、昼行動結果ではなく役職情報に出す（滑らせた順。処理の順番はペンギン → 交換者 → 番犬）
             [...(res.watchdogs || []).map((x) => L(`<span class="rs-info">番犬:</span> ${esc(x.by)} の飼い主は ${esc(x.owner)} です。${x.bite ? `${esc(x.by)} が ${esc(x.owner)} を${x.simul ? "同時に" : ""}噛み殺しました。` : x.votes ? `${esc(x.owner)} への ${x.votes}票は無効でした。` : ""}${x.back ? `ネコカボチャに噛み返されました。` : ""}`))],
             [...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
+            [...(res.vanities || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">ヴァニティ:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
             [...(res.knightInfo || []).map((x) => L(`<span class="rs-info">${x.tb ? "存護" : "騎士"}:</span> ${esc(x.text)}`))],
             [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : []),
       ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${(x.loseNames || x.names).length ? `${(x.loseNames || x.names).map(esc).join("、")} が爆発して敗北しました。` : ""}${(x.keepNames || []).length ? `殉職者 ${x.keepNames.map(esc).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`))],
             [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`))],
-            [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`))],
+            [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`)), ...(res.hacks || []).map((x) => L(`<span class="rs-info">銀狼:</span> ${esc(x.by)} は ${esc(x.target)} をハッキングしていました。${x.fake ? `（${esc(x.target)} は ${esc(x.fake)} と思い込んでいました${x.cut ? "が、黄泉に断ち切られました" : ""}）` : ""}`))],
             [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`)), ...(res.trails || []).map((x) => L(`<span class="rs-info">開拓者:</span> ${esc(x.by)} は ${esc(x.name)}の運命を歩んでいました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
             ...((res.detective && res.detective.boards) || []).map((b) => {   // 名探偵情報（マイクラ版 buildDetectiveResultLines と同じ。名探偵ごとに1組）
               const nmOf = (id) => ((res.detective.seats || []).find((q) => q.id === id) || {}).name || "?", rn = (r) => (ONW.roles.getInfo(r) || {}).name || r;

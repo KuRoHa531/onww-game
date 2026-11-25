@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null, sub: null };   // sub: さらに上に重ねる選択（変化後。"t:" + 席のキー）
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.trail = d.trail || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.gw = d.rand.gw || {}; d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.trail = d.trail || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle", "hack"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.gw = d.rand.gw || {}; d.rand.hackFake = d.rand.hackFake || {}; d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -56,6 +56,12 @@ window.ONW = window.ONW || {};
   };
   /** ランダムに決まる対象の指定（全プレイヤー対象）。kind: "cat"=猫又・黒猫の道連れ先 / "freeter"=就職先を選べなかったフリーターの就職先 / "straw"=わら人形の自動選択。
    *  持ち主のID → 対象のID（指定なしなら null。対象が使えない状況なら、呼び出し側でランダムに戻す） */
+  /** 銀狼のハッキングで「何と思い込ませるか」の指定（銀狼のID → 役職ID）。指定なし・デバッグ中でないときは null（墓地からランダム） */
+  debug.randHackFake = function (game, id) {
+    if (!game.debugOn || !game.dbg || !game.dbg.rand) return null;
+    const r = (game.dbg.rand.hackFake || {})[id];
+    return r && ONW.ROLE_INFO[r] ? r : null;
+  };
   debug.randTarget = function (game, kind, id) {
     if (!game.debugOn || !game.dbg || !game.dbg.rand) return null;
     return ((game.dbg.rand[kind] || {})[id]) || null;
@@ -231,7 +237,7 @@ window.ONW = window.ONW || {};
     const dukeNow = !!(g.dukeMeeting && g.dukeMeeting.active);
     const hasDuke = dukeNow || !!(ONW.demonDuke && g.players.some((p) => g.currentRoles && g.currentRoles[p.id] === ONW.ROLE.DEMON_DUKE));
     const foxNow = !!(g.foxVote && g.foxVote.active);
-    const targets = (self) => g.players.filter((p) => p.id !== self);
+    const targets = () => g.players;   // 自分自身も選べる（自投票）
     // kind: "f" = 妖狐投票 / "d" = 魔界公爵追放会議 / "v" = 通常投票
     const section = (kind) => {
       const forced = (kind === "f" ? g.dbgFoxVotes : kind === "d" ? g.dbgDukeVotes : g.dbgVotes) || {};
@@ -239,11 +245,11 @@ window.ONW = window.ONW || {};
       const rows = g.players.map((p) => {
         const cur = forced[p.id] ? `指定: ${esc(nm(forced[p.id]))}` : (live && g.votes[p.id]) ? `投票済: ${esc(nm(g.votes[p.id]))}` : "未指定";
         let h = row(esc(p.name) + (p.isCpu ? cpuBadge : ""), `<span class="dbg-val">${cur}</span> ${b("変更", "pick", [kind + ":" + p.id])}`);
-        if (ui.pick === kind + ":" + p.id) h += ovl(`${esc(p.name)}${p.isCpu ? cpuBadge : ""} <small class="dbg-dim">の投票先</small>`, "pick", [kind + ":" + p.id], `${targets(p.id).map((t) => b(esc(t.name), "voteSet", [p.id, t.id, kind])).join("")}${b("指定を解除", "voteSet", [p.id, "", kind], "dbg-clear")}`);
+        if (ui.pick === kind + ":" + p.id) h += ovl(`${esc(p.name)}${p.isCpu ? cpuBadge : ""} <small class="dbg-dim">の投票先</small>`, "pick", [kind + ":" + p.id], `${targets().map((t) => b(esc(t.name) + (t.id === p.id ? "（自投票）" : ""), "voteSet", [p.id, t.id, kind])).join("")}${b("指定を解除", "voteSet", [p.id, "", kind], "dbg-clear")}`);
         return h;
       }).join("");
       const all = ui.pick === kind + "all" ? ovl("全員の投票先を一括指定", "pick", [kind + "all"], g.players.map((t) => b(esc(t.name), "voteAll", [t.id, kind])).join("")) : "";
-      return rows + `<div class="dbg-actions">${b("全員の投票先を一括指定", "pick", [kind + "all"])}${b("全員の指定を解除", "voteClear", [kind])}</div>${all}`;
+      return rows + `<div class="dbg-actions">${b("自投票", "voteSelf", [kind])}${b("2/2", "voteTwo", [kind])}${b("全員の投票先を一括指定", "pick", [kind + "all"])}${b("全員の指定を解除", "voteClear", [kind])}</div>${all}`;
     };
     if (!hasFox && !hasDuke) return section("v");
     const now = (on) => (on ? "（いま行われています）" : "");
@@ -346,6 +352,7 @@ window.ONW = window.ONW || {};
       if (t.cosRole) parts.push(t.cosRole === "none" ? "コスプレしない" : `${esc(rn(t.cosRole))}にコスプレ`);
       if (gwCur !== null) parts.push(`ギャンブラー票: ${gwCur}`);
       rk.forEach((x) => { const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null; if (cur) parts.push(`${esc(x.label)}: ${esc(nameOfKey(cur))}`); });
+      if (rk.some((x) => x.kind === "hack") && (d.rand.hackFake || {})[s.key]) parts.push(`思い込ませる役職: ${esc(rn(d.rand.hackFake[s.key]))}`);
       const lab = parts.length ? parts.join(" / ") : "指定なし";
       const mimT = isMimicFixed(s.key) ? (d.mimic || {})[s.key] : null;
       const fixed = role ? ` <small class="dbg-dim">(${esc(rn(role))}${d.tf[s.key] ? " → " + esc(rn(d.tf[s.key])) : ""}固定${mimT ? " / 模倣先: " + esc(rn(mimT)) : ""})</small>` : "";
@@ -374,6 +381,11 @@ window.ONW = window.ONW || {};
           const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null;
           body += sec(esc(x.label), players.filter((o) => x.self || o.key !== s.key).map((o) => b(esc(o.name) + (o.cpu ? cpuBadge : ""), "randSet", [x.kind, s.key, o.key], cur === o.key ? "dbg-on" : "")).join("") + b("指定なし", "randSet", [x.kind, s.key, ""], "dbg-clear"));
         });
+        if (rk.some((x) => x.kind === "hack")) {   // 銀狼: ハッキングする相手に「何と思い込ませるか」も指定できる（指定なしは墓地からランダム）
+          const fk = (d.rand.hackFake || {})[s.key] || "", noFake = (ONW.hack && ONW.hack.NO_FAKE) || [];
+          const fl = ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO).filter((r) => !noFake.includes(r)));
+          body += sec("思い込ませる役職（指定なし＝墓地からランダム）", `<select onchange="ONW.debug.hackFakeSet(${attr(s.key)}, this.value)"><option value="">指定なし（墓地からランダム）</option>${fl.map((r) => `<option value="${r}"${r === fk ? " selected" : ""}>${esc(rn(r))}</option>`).join("")}</select>`);
+        }
         // ギャンブラーの票数: その人がギャンブラー固定、または光の使徒固定で変化先がギャンブラーのときだけ出す（gwOk）
         if (gwOk) body += sec("ギャンブラーの票数（抽選＝ふつうの確率で0〜3票）", b("抽選", "gwSet", [s.key, ""], gwCur === null ? "dbg-on" : "") + [0, 1, 2, 3].map((n) => b(`${n}票`, "gwSet", [s.key, String(n)], gwCur === n ? "dbg-on" : "")).join(""));
         h += ovl(`${esc(s.name)}${s.cpu ? cpuBadge : ""} <small class="dbg-dim">の能力先</small>`, "pick", ["c:" + s.key], `${body}${s.cpu ? b("能力先を全て解除", "cpuClear", [s.key], "dbg-clear") : ""}`);
@@ -416,7 +428,8 @@ window.ONW = window.ONW || {};
     { kind: "cat", roles: ["cat_sidhe", "black_cat", "cat_pumpkin"], label: "道連れ先" },
     { kind: "straw", roles: ["straw_doll"], label: "道連れ先（自動で選ぶとき）" },
     { kind: "exec", roles: ["executioner"], label: "ターゲット" },
-    { kind: "muzzle", roles: ["muzzle_madman"], label: "口封じ先", self: true },   // 自分自身も口封じ先になれる
+    { kind: "muzzle", roles: ["muzzle_madman"], label: "口封じ先", self: true },
+    { kind: "hack", roles: ["silver_wolf"], label: "ハッキングする相手", self: false },   // 自分は対象外（ALLOW_SELF）。思い込ませる役職は墓地からランダム   // 自分自身も口封じ先になれる
   ];
   function tabCpu() {
     if (!inLobby()) return hint("能力先・ランダム対象はルーム（ロビー）で設定します。次の試合に反映されます。");
@@ -430,6 +443,7 @@ window.ONW = window.ONW || {};
     { kind: "exchange", role: "exchanger", label: "交換", two: true, can: (g, id) => ONW.exchanger.canUse(g, id), targets: (g, id) => ONW.exchanger.targets(g, id) },
     { kind: "exchange", role: "mad_exchanger", label: "交換", two: true, can: (g, id) => ONW.exchanger.canUse(g, id), targets: (g, id) => ONW.exchanger.targets(g, id) },
     { kind: "sheriff", role: "sheriff", label: "撃つ", can: (g, id) => ONW.sheriff.canUse(g, id), targets: (g, id) => ONW.sheriff.targets(g, id) },
+    { kind: "sheriff", role: "vanity", label: "撃つ", can: (g, id) => ONW.vanity.canUse(g, id), targets: (g, id) => ONW.vanity.targets(g, id) },   // ヴァニティ: 保安官と同じ「撃つ」。debugDayAbility の sheriff 分岐が hostVanity を先に試す
     { kind: "steal", role: "thief", label: "盗む", can: (g, id) => ONW.thief.canUse(g, id), targets: (g, id) => ONW.thief.targets(g, id) },
     { kind: "barrier", role: "fairy", label: "バリア", can: (g, id) => ONW.fairy.canUse(g, id), targets: (g, id) => ONW.fairy.targets(g, id) },
     { kind: "yomi", role: "yomi", label: "断ち切る", can: (g, id) => ONW.yomi.canUse(g, id), targets: (g, id) => ONW.yomi.targets(g, id) },
@@ -474,7 +488,10 @@ window.ONW = window.ONW || {};
     const kill = canKill
       ? g.players.map((p) => row(esc(p.name) + (p.isCpu ? cpuBadge : ""), (g.deadIds || []).includes(p.id) ? `<span class="dbg-val">死亡済み</span>` : b("死亡させる", "kill", [p.id]))).join("")
       : hint("昼の議論〜投票の間に使えます。死亡した人は投票・発言ができず、霊界チャットに入ります。");
-    return row("CPU議論発言", `<span class="dbg-val">${d.cpuTalkOff ? "OFF" : "ON"}</span> ${b("切り替え", "talkToggle")}`) +
+    const A = ONW.cpuAi, ai = A && ONW.net && ONW.net.isHost
+      ? row("CPU AI議論(β版)", `<span class="dbg-val">${g.cpuAi ? "ON" : "OFF"}</span> ${b("記録をリセット", "aiReset")}`) + A.debugLines().map((t) => `<div class="dbg-log">${esc(t)}</div>`).join("")
+      : "";
+    return row("CPU議論発言", `<span class="dbg-val">${d.cpuTalkOff ? "OFF" : "ON"}</span> ${b("切り替え", "talkToggle")}`) + ai +
       `<div class="dbg-h">昼中に死亡させる（霊界チャットの確認用）</div>${kill}<div class="dbg-h">夜ログ（GM用）</div>${logs}`;
   }
 
@@ -545,10 +562,13 @@ window.ONW = window.ONW || {};
   debug.tfOpen = (key) => { ui.sub = "t:" + key; refresh(); };      // 変化後の選択（さらに上に重ねる）
   debug.subClose = () => { ui.sub = null; refresh(); };
   debug.talkToggle = () => { const d = data(); d.cpuTalkOff = !d.cpuTalkOff; refresh(); };
+  debug.aiReset = () => { if (ONW.cpuAi) ONW.cpuAi.clearStats(); refresh(); };
 
   debug.kill = (id) => { ONW.net.killPlayer(id); refresh(); };
   debug.voteSet = (vid, tid, kind) => { ui.pick = null; ONW.net.debugVote(vid, tid || null, kind); refresh(); };   // kind: "f" = 妖狐投票 / "d" = 魔界公爵追放会議 / "v" = 通常投票
   debug.voteAll = (tid, kind) => { ui.pick = null; ONW.net.debugVoteAll(tid, kind); refresh(); };
+  debug.voteSelf = (kind) => { ui.pick = null; ONW.net.debugVoteSelf(kind); refresh(); };   // 全員が自分に入れる
+  debug.voteTwo = (kind) => { ui.pick = null; ONW.net.debugVoteTwoTwo(kind); refresh(); };   // 2/2 自投票: 2人が2票ずつ
   debug.voteClear = (kind) => { ui.pick = null; ONW.net.debugVoteClearAll(kind); refresh(); };
 
   debug.lockSet = (key, role) => {
@@ -594,6 +614,7 @@ window.ONW = window.ONW || {};
     if (t) store[key] = t; else delete store[key];
     ui.pick = null; refresh();
   };
+  debug.hackFakeSet = (key, role) => { const d = data(); if (role) d.rand.hackFake[key] = role; else delete d.rand.hackFake[key]; refresh(); };   // 銀狼の「思い込ませる役職」の指定（空 = 指定なし）
   debug.gwSet = (key, v) => {   // ギャンブラーの票数の指定（「能力先」タブ）: "" = 抽選（指定なし） / "0"〜"3" = その票数。押し直しで指定なしに戻る
     const d = data(), n = v === "" || v == null ? null : Number(v);
     if (n === null || !Number.isInteger(n) || n < 0 || n > 3 || d.rand.gw[key] === n) delete d.rand.gw[key]; else d.rand.gw[key] = n;
@@ -615,7 +636,7 @@ window.ONW = window.ONW || {};
     refresh();
   };
   debug.tfSet = (key, t) => { const d = data(); if (t) d.tf[key] = t; else delete d.tf[key]; ui.sub = null; ui.pick = null; refresh(); };   // 変化後を選んだら、重ねたメニューを全部閉じる
-  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.mimic = {}; d.trail = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, gw: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
+  debug.lockClear = () => { const d = data(); d.roles = {}; d.tf = {}; d.cpu = {}; d.master = {}; d.mimic = {}; d.trail = {}; d.rand = { cat: {}, freeter: {}, visitor: {}, straw: {}, exec: {}, muzzle: {}, hack: {}, hackFake: {}, gw: {}, drunk: [], lover: [] }; G().dbgWarn = []; ui.pick = null; refresh(); };
 
   // 指定を書き換える（空になったら項目ごと消す）
   const setCpu = (id, f) => { const d = data(), c = { ...(d.cpu[id] || {}), ...f }; Object.keys(c).forEach((k) => { if (c[k] == null || (Array.isArray(c[k]) && !c[k].length)) delete c[k]; }); if (Object.keys(c).length) d.cpu[id] = c; else delete d.cpu[id]; };

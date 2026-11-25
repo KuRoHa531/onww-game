@@ -52,7 +52,8 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   ONW.SELF_AS_VILLAGER = [];   // 本人は村人だと思い込む(groups.selfAsVillager: 忘却の人狼・狼憑き)
   ONW.SELF_AS_SEER = [];       // 本人は占い師だと思い込む(groups.selfAsSeer: 偽占い師。夜の能力は占い師と同じだが、結果はランダム)
   ONW.SELF_AS_WOLF = [];                                                     // 本人は人狼だと思い込む(相方のいない一人の人狼。groups.selfAsWolf: 狼夢人)
-  ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : ONW.SELF_AS_SEER.includes(role) ? ONW.ROLE.SEER : role);
+  ONW.SELF_AS_SHERIFF = [];                                                  // 本人は保安官だと思い込む(groups.selfAsSheriff: ヴァニティ)
+  ONW.shownRole = (role) => (ONW.SELF_AS_VILLAGER.includes(role) ? ONW.ROLE.VILLAGER : ONW.SELF_AS_WOLF.includes(role) ? ONW.ROLE.WEREWOLF : ONW.SELF_AS_SEER.includes(role) ? ONW.ROLE.SEER : ONW.SELF_AS_SHERIFF.includes(role) ? ONW.ROLE.SHERIFF : role);
   /** 酔っ払いが重なっていて、まだ酔いが覚めていない人か */
   ONW.hiddenDrunk = (g, id) => !!(g.drunkOverlay && g.drunkOverlay[id] && !(g.drunkRevealed && g.drunkRevealed[id]));
   /** 配布時の恋人の相方のid（なければ null）。恋人(重複役職)は「人」についているので、役職が入れ替わっても相方は変わらない。夜の「〇〇と恋人です」の表示はこれだけを見る */
@@ -77,7 +78,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
     ONW.loverMates(g, id).forEach((m) => out.push({ id: m, kind: "lovers" }));
     // 王国滅亡: 女王が昼中に死んだら（死因は問わない。ほかに生きている女王がいるうちは滅亡しない＝最後の女王が死んだときに滅亡）、その場で他の村人陣営も「王国滅亡」で死ぬ（投票のあとの結果発表まで待たない）。女王本人どうしは巻き込まない。ただし、生きている姫君がいて女王に昇格する（昇格済みの）ときは滅亡しない（ONW.princess.shields。docs/princess.md）
     if (g.currentRoles && g.currentRoles[id] === ONW.ROLE.QUEEN && !(g.players || []).some((q) => q.id !== id && g.currentRoles[q.id] === ONW.ROLE.QUEEN && !(g.deadIds || []).includes(q.id)) && !(ONW.seal && ONW.seal.is(g, id)) && !(ONW.princess && ONW.princess.shields(g, id))) (g.players || []).forEach((q) => { const info = ONW.ROLE_INFO[g.currentRoles[q.id]]; if (q.id !== id && g.currentRoles[q.id] !== ONW.ROLE.QUEEN && info && info.team === ONW.TEAM.VILLAGE && !out.some((o) => o.id === q.id)) out.push({ id: q.id, kind: "queen" }); });
-    if (SERVANT_FOLLOW.includes(kind) || ((kind === "shot" || kind === "tomo") && ONW.sheriff && ONW.sheriff.followsShot(g, id))) ONW.servantSubPairs(g).filter(([s, m]) => m === id && s !== id).forEach(([s]) => out.push({ id: s, kind: "follow" }));
+    if (SERVANT_FOLLOW.includes(kind) || ((kind === "shot" || kind === "tomo") && ((ONW.sheriff && ONW.sheriff.followsShot(g, id)) || (ONW.vanity && ONW.vanity.followsShot && ONW.vanity.followsShot(g, id))))) ONW.servantSubPairs(g).filter(([s, m]) => m === id && s !== id).forEach(([s]) => out.push({ id: s, kind: "follow" }));
     if (ONW.cupid) ONW.cupid.pairs(g).filter(([a, b, h]) => (a === id || b === id) && h !== id).forEach(([, , h]) => out.push({ id: h, kind: "cupid" }));
     if (ONW.fanatic && (g.currentRoles[id] === ONW.ROLE.FOX || (g.currentRoles[id] === ONW.ROLE.FOX_MARKED && kind === "fox"))) ONW.fanatic.followersOf(g).forEach((f) => out.push({ id: f, kind: "fanatic" }));
     return out;
@@ -441,10 +442,17 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
   /** 狂ったメイヤーの投票数（ルーム設定 g.madMayorVoteCount。マイクラ版 madMayorVoteCount と同じ 2〜10票、初期値2票。メイヤーとは別の設定） */
   ONW.madMayorVotes = (g) => Math.max(2, Math.min(10, Math.round(Number(g && g.madMayorVoteCount) || 2)));
   /** 役職の説明文。メイヤーだけは、いまのルーム設定の票数を入れて返す（差し込みを持つ役職は roles/<役職>.js の descFor。それ以外は ROLE_INFO の desc そのまま） */
+  /** 配布時・役職確認・ガイドに出す説明文の元: ①差し込み(descFor)を持つ役職は info.desc のまま（メイヤーの票数）→ ②役職ファイルの info.descShort（Web版だけ動きが違う役職を手で書き換えるとき）
+   *  → ③マイクラ版の説明（js/role-desc-mc.js。陣営名の頭書きは付けない）→ ④info.desc（マイクラ版に無い役職・重複役職） */
+  /** 陣営は役職の色で分かるので、説明文の頭の「村人陣営。」「人狼陣営。」「第三陣営。」は出さない（付けない・元の文にあっても外す） */
+  const stripTeamPre = (t) => String(t || "").replace(/^(?:村人|人狼|第三)陣営。\s*/, "");
   ONW.roleDesc = (role, g) => {
-    const d = (ONW.ROLE_INFO[role] || {}).desc || "";
+    const info = ONW.ROLE_INFO[role] || {};
     const f = g && ONW.roleHook ? ONW.roleHook(role, "descFor") : null;   // メイヤーの票数の差し込みは roles/mayor.js の descFor
-    return f ? f(d, g) : d;
+    if (f) return stripTeamPre(f(info.desc || "", g));
+    if (info.descShort) return stripTeamPre(info.descShort);
+    const m = (typeof window !== "undefined" && window.ONW_MC_ROLE_DESC || {})[role];
+    return stripTeamPre(m || info.desc || "");
   };
 
 
@@ -501,6 +509,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       smokeHideVote: false,             // 煙幕の狂人の詳細設定: 煙幕のあいだ、投票対象のプレイヤー名を ？？？ にして投票開始時に席をシャッフルする（初期値OFF。能力対象とは別の設定）
       winLadderFx: true,                // 勝利の乗っ取り演出（結果発表で、成立した勝利が低い順に貼り重ねられる）。OFFなら最終結果だけ
       bubbleChat: false,                // 吹き出しチャット（アモアス風。ホストがルーム設定のシステム設定で切り替える。初期はOFF）
+      cpuAi: false,                     // CPU AI議論(β版)（ホストの端末の小型AIで、CPUの発言・返事の言い方を自然にする。インストール確認に通ったときだけONにできる。ルームごとに初期はOFF。js/cpu-ai.js）
   revealManualRoles: false,       // 配役した役職(変化していないカード)も変化公開に出す（マイクラ版 revealManualRolesAsTransforms）。変化公開がONのときだけ有効
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）
@@ -510,7 +519,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       spectators: [], specNames: {},  // 途中参加の観戦者
       deadIds: [], ghostLog: [], chatTab: "main", isDead: false, specInfo: null, specInfoOpen: true, nightResolved: false,   // 死亡者 / 霊界チャット / 観戦者向けの全員情報
       codeText: "", importText: "", codeMsg: "", coBoard: [], boardView: [], tfView: null, tfLines: [], tfPairs: [], boardOpen: false, resultChatOpen: false, nightInfoClosed: false,
-      lobbyPlayers: [], meIndex: 0, showSettings: false, setPage: null, roleOpen: {}, presetName: "", isSpectator: false,
+      lobbyPlayers: [], meIndex: 0, showSettings: false, setPage: null, roleOpen: {}, presetName: "", renameIdx: null, renameText: "", isSpectator: false,
       timers: { deal: 5, night: 45, morning: 10, settle: 5, day: 120, vote: 30 }, // 各フェーズの秒数（起こる順: 役職配布(演出のあとの待ち) → 夜 → 朝 → 待機時間 → 昼・議論 → 夕方・投票。マイクラ版の初期値 / 朝・待機時間・役職配布は新規）
       graveCount: 2,                  // 墓地の枚数（マイクラ版の初期値）
       mayorVoteCount: 2,              // メイヤーの投票数（2〜10票。本家の mayorVoteCount と同じ初期値）
@@ -518,14 +527,16 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       seerGraveCount: 2,              // 占い師が一度に占える墓地の枚数（マイクラ版の初期値 seerCenterCount）
       fakeSeerGraveCount: 2,          // 偽占い師が一度に占える墓地の枚数（占い師とは別の設定）
       madSeerGraveCount: 2,           // 狂った占い師が一度に占える墓地の枚数（占い師とは別の設定）
-      drunkChance: 100,               // 酔っ払いの枠1つごとに、実際に酔う確率(%)
+      drunkChance: 100,               // 酔っ払いの枠の確率の初期値(%)（古い保存・ルールコードの1つだけの確率。drunkChances に無い枠はこれを使う）
+      drunkChances: [],               // 酔っ払いの枠ごと(①②…)に、実際に酔う確率(%)（js/assign.js A.dupChance。アサイン設定のON/OFFに関係なく効く）
       assignOn: false,                // アサイン設定（役職設定 > アサイン設定）。OFFなら従来どおり配役設定の枚数がそのまま配役 / ONなら配役設定の枚数が候補になり、陣営ごとの最少〜最大人数と役職ごとの確率で配役数ぶんを抽選（js/assign.js, docs/assign.md）
       assignRange: { village: [0, 0], wolf: [0, 0], third: [0, 0] },   // アサイン設定: 陣営ごとの [最少人数, 最大人数]（初期値は 0/0。ON/OFFを切り替えても残る）
       assignChance: {},               // アサイン設定: 役職ID → [①の確率, ②の確率, …]（%。書いていない札は100%）
       missingRoles: [],               // アサイン設定: 試合で選ばれなかった候補（欠け。結果の役職履歴の下に出る）
       drunkCount: 0,                  // 酔っ払い(重複役職)の人数。配役の枚数には数えない
       loverCount: 0,                  // 恋人(重複役職)の組数。配役の枚数には数えない
-      loverChance: 100,               // 恋人1組ごとに、実際に恋人になる確率(%)
+      loverChance: 100,               // 恋人の組の確率の初期値(%)（古い保存・ルールコードの1つだけの確率。loverChances に無い組はこれを使う）
+      loverChances: [],               // 恋人の組ごと(①②…)に、実際に恋人になる確率(%)（js/assign.js A.dupChance）
       loverOf: {},                    // 恋人の相方 id → 相方の id（試合中。2人とも入っている）
       drunkOverlay: {},               // 酔っ払いが重なっている人 id → true（試合中）
       drunkRevealed: {},              // 酔いが覚めた人 id → true

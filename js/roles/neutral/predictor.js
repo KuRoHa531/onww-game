@@ -98,7 +98,7 @@
     if (!u.length) return "あなたは誰も死亡しないと予想しました。";
     if (u.length === (g.players || []).length) return "あなたは全員死亡すると予想しました。";
     const names = u.map(nm);
-    return names.length === 1 ? `あなたは${names[0]}だけが死亡すると予想しました。` : `あなたは${names.join("と")}が死亡すると予想しました。`;
+    return names.length === 1 ? `あなたは${names[0]}だけが死亡すると予想していました。` : `あなたは${names.join("と")}が死亡すると予想していました。`;
   };
   /** 結果発表の「予想屋情報」に出す、予想の言い方: 「全員死亡する」「Aだけが死亡する」「AとBが死亡する」「誰も死亡しない」 */
   P.resultText = function resultText(g, ids, nm) {
@@ -108,7 +108,7 @@
     const names = u.map(nm);
     return names.length === 1 ? `${names[0]}だけが死亡する` : `${names.join("と")}が死亡する`;
   };
-  /** 結果発表の「予想屋情報」の1行: 「予想屋 〇〇 は A と B が死亡すると予想していました。」 */
+  /** 結果発表の「予想屋情報」の1行: 「予想屋 〇〇 は A と B が死亡すると予想しました。」 */
   P.infoLine = (g, id, nm) => `予想屋 ${nm(id)} は${P.resultText(g, P.guessOf(g, id) || [], nm)}と予想していました。`;
   /** 結果発表用: 予想を決めた予想屋（最終盤面）の一覧 [{ id, name, ids, names, text, hit }]。hit = 予想が最終死亡者と完全一致したか。決めていなければ空 */
   P.view = function view(g, nm, dead) {

@@ -53,7 +53,7 @@
       const b = document.createElement("div"); b.className = "gl-blade"; card.appendChild(b);
       later(() => b.remove(), 600);
     }, at + 1900);
-    later(() => { const s = R.$t().querySelector(`[data-k="${k}"]`); if (s) s.classList.remove("gl-shake"); const hs = glHalves(R, k); if (hs) requestAnimationFrame(() => hs.forEach((h) => h.classList.add("split"))); if (x.late) { R.badge[k] = "処刑"; R.paint(R.G()); } }, at + 2150);   // 刃が通り抜けた瞬間に真っ二つ（賞金稼ぎのターゲットは、ここで「追放」の札が「処刑」に変わる）
+    later(() => { if (ONW.sound) ONW.sound.se("executioner_success"); const s = R.$t().querySelector(`[data-k="${k}"]`); if (s) s.classList.remove("gl-shake"); const hs = glHalves(R, k); if (hs) requestAnimationFrame(() => hs.forEach((h) => h.classList.add("split"))); if (x.late) { R.badge[k] = "処刑"; R.paint(R.G()); } }, at + 2150);   // 刃が通り抜けた瞬間に真っ二つ（賞金稼ぎのターゲットは、ここで「追放」の札が「処刑」に変わる）。SE: 処刑人成功
     later(() => setCap(`<div class="res-cap__t t-third">処刑人勝利</div><div>${esc(x.exec)} のターゲット ${esc(x.target)} が追放されました</div>`), at + 3000);
   }
   const glWin = (res) => (res.execs || []).filter((x) => x.win && x.execId !== x.targetId);   // ターゲットが追放された処刑人

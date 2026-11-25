@@ -85,6 +85,33 @@ window.ONW = window.ONW || {};
     g.assignChance = next;
   };
 
+
+  // ---- 重複役職（酔っ払い・恋人）の「1枠ごとの確率」 ----
+  // アサイン設定のON/OFFには関係なく、いつでも効く。kind = "drunk"（酔っ払い。1人ごと）/ "lover"（恋人。1組ごと）。
+  //   g.drunkChances / g.loverChances: [①の確率, ②の確率, …]（%。書いていない枠は、従来の1つだけの確率 g.drunkChance / g.loverChance。それも無ければ100%）
+  const DUP = { drunk: { arr: "drunkChances", base: "drunkChance", max: 10 }, lover: { arr: "loverChances", base: "loverChance", max: 5 } };
+  /** kind の k枠目(0始まり)の確率(%) */
+  A.dupChance = function (g, kind, k) {
+    const d = DUP[kind]; if (!d) return 100;
+    return clamp(((g[d.arr] || [])[k]), 0, 100, clamp(g[d.base], 0, 100, 100));
+  };
+  /** kind の k枠目の確率を delta(%) 動かす */
+  A.stepDupChance = function (g, kind, k, delta) {
+    const d = DUP[kind]; if (!d || !(k >= 0 && k < d.max)) return;
+    const arr = Array.from({ length: Math.max(k + 1, (g[d.arr] || []).length) }, (_, i) => A.dupChance(g, kind, i));
+    arr[k] = clamp(arr[k] + delta, 0, 100, arr[k]);
+    g[d.arr] = arr;
+  };
+  /** 保存・通信用に直す（壊れた/古いデータでも安全な配列にする） */
+  A.sanitizeDup = (raw, kind) => (Array.isArray(raw) ? raw.slice(0, DUP[kind].max).map((v) => clamp(v, 0, 100, 100)) : []);
+  /** 画面の文: 全部同じなら「確率 X%」、違えば「①100% ②50%」。n = 枠の数 */
+  A.dupText = function (g, kind, n) {
+    const CIRC = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+    const ps = Array.from({ length: Math.max(0, n || 0) }, (_, i) => A.dupChance(g, kind, i));
+    if (!ps.length) return "";
+    return ps.every((p) => p === ps[0]) ? `確率 ${ps[0]}%` : ps.map((p, i) => `${CIRC[i] || i + 1}${p}%`).join(" ");
+  };
+
   // ---- 抽選 ----
   /** 役職の陣営（village / wolf / third）。陣営が分からない役職は村人陣営 */
   A.teamOf = function (role) {

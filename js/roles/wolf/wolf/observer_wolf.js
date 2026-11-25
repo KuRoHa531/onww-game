@@ -63,7 +63,7 @@
       const g = c.g;
       g.players.forEach((p) => {
         if (ONW.mimic.beforeEff(before, p.id) === ONW.mimic.eff(g, p.id) || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF) return;   // 模倣先に読み替えた役職で見る（9of9）
-        if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id)) return;   // 封印されている席には観測結果を渡さない（2of4a）
+        if (c.isDead(p.id) || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id) || (ONW.hack && ONW.hack.isFakeUi(g, p.id))) return;   // 封印されている席には観測結果を渡さない（2of4a） / ハッキングされた人には本当の結果は出さない
         if (g.observerSeen) delete g.observerSeen[p.id];
         const lines = deliver(g, p.id);
         const tx = textOf(lines);
@@ -80,6 +80,10 @@
     /** 待機時間: 最終盤面で酔いが覚めている観測の人狼に、観測結果を伝える（再入室では、すでに伝えた分だけ同じ内容を返す） */
     settleMsg: { order: 25, run(c, p, mode) {
       const g = c.g;
+      if (!p.isCpu && ONW.hack && ONW.hack.isFakeUi(g, p.id)) {   // 銀狼にハッキングされた人: 本当の観測結果は出ず、観測の人狼と思い込んでいれば偽の結果（その人にだけ）
+        const fl = g.hackRole[p.id] === "observer_wolf" && !sealed(g, p.id) ? ONW.hack.pub(g, p.id, "observe", mode === "settle") : null;
+        return fl ? { logs: textOf(fl), observe: { lines: fl } } : {};
+      }
       if (p.isCpu || ONW.mimic.eff(g, p.id) !== ONW.ROLE.OBSERVER_WOLF || ONW.hiddenDrunk(g, p.id) || sealed(g, p.id)) return {};   // 封印されている観測の人狼には、観測結果が出ない（2of4a）
       if (mode === "resync" && !(g.observerSeen || {})[p.id]) return {};
       const lines = deliver(g, p.id);

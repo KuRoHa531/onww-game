@@ -18,7 +18,8 @@
 
   /** 女王が夜の始まりに知る姫君（初期役職の時点で姫君だった人。共有者の相方と同じ考え方。模倣の人狼は模倣先で見る）。id 自身は除く */
   const princessIds = (g, id) => g.players.filter((q) => q.id !== id && ONW.mimic.actRole(g, q.id, g.initialRoles[q.id]) === ONW.ROLE.PRINCESS).map((q) => q.id);
-  const princessText = (g, ids, none) => ids.length ? `姫君: ${ids.map((i) => (g.players.find((q) => q.id === i) || {}).name || "?").join("、")}` : none;
+  /** 夜に女王へ出す姫君の文。姫君がいないときは何も出さない（「姫君はいません。」は出さない） */
+  const princessText = (g, ids) => ids.length ? `姫君: ${ids.map((i) => (g.players.find((q) => q.id === i) || {}).name || "?").join("、")}` : "";
   const cpuPrincess = (g, id, k) => princessIds(g, id).forEach((q) => { k.infoOf(g, id).known[q] = "princess"; });   // CPU: 姫君を知る
 
   const logs = (g, ids) => ids.map((qid) => ONW.queenNoticeText((g.players.find((q) => q.id === qid) || {}).name));
@@ -33,7 +34,7 @@
   function noticeFor(g, id) {
     const seen = ((g.queenSeen = g.queenSeen || {})[id] = g.queenSeen[id] || []);
     if (!ONW.isQueenViewer(g, id)) return [];
-    const fresh = ONW.queenHolders(g).filter((q) => !seen.includes(q));
+    const fresh = ONW.queenHolders(g).filter((q) => !seen.includes(q) && !(q === id && ONW.hack && ONW.hack.isFakeUi(g, id)));   // 銀狼にハッキングされた人は、本当は女王でも自分が女王とは思っていないので、自分のぶんの通知は出ない
     if (!fresh.length) return [];
     seen.push(...fresh);
     const me = g.players.find((q) => q.id === id);
@@ -131,15 +132,15 @@
     cpuInit: cpuPrincess, cpuLearn: cpuPrincess,   // CPU: 夜に姫君を知る（女王で始まったとき / 酔い覚め・墓荒らし・ドッペルで女王を手にしたとき）
     nightMsg(c, p) {
       const g = c.g, ids = princessIds(g, p.id);
-      return { text: princessText(g, ids, "姫君はいません。"), princessMates: ids.length ? ids : null };   // 夜の始まりに、姫君のカードが表になる（夜が終わるまで出続ける）
+      return { text: princessText(g, ids), princessMates: ids.length ? ids : null };   // 夜の始まりに、姫君のカードが表になる（夜が終わるまで出続ける）
     },
     got(c, p, got, rev, opts) {
       const t = ONW.roleKit.gotTools(c, p, rev, opts), g = c.g, ids = princessIds(g, p.id);
-      c.hold(p.id, princessText(g, ids, "姫君はいません。"));   // 墓荒らし・ドッペル: 夜の始まりに見えるはずだった姫君が朝に分かる
+      if (ids.length) c.hold(p.id, princessText(g, ids));   // 墓荒らし・ドッペル: 夜の始まりに見えるはずだった姫君が朝に分かる
       t.both(t.eff());
       t.setPeek(ids.map((id) => ({ k: `p:${id}`, role: "princess" })), 380);
     },
-    soberLines(c, id) { return [princessText(c.g, princessIds(c.g, id), "姫君はいません。")]; },
+    soberLines(c, id) { return [princessText(c.g, princessIds(c.g, id))].filter(Boolean); },
     soberPeek(c, id) { const ids = princessIds(c.g, id); return ids.length ? { princesses: ids } : {}; },
     info: { sealTarget: true, deck: 46, name: "女王", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17,
       desc: "村人陣営。夜の能力はありません。朝のあとの待機時間に、最終盤面で村人陣営になっていて酔いが覚めている人にだけ、女王のカードが表になって誰が女王か知らされます（人狼陣営・第三陣営には知らされません。恋人でも最終役職が村人陣営なら知らされます）。女王が追放または道連れで倒れると「王国滅亡」: 他の村人陣営（チキン・恋人になっている人も含む）のカードが一斉にめくれ、勝利条件を失います。女王と人狼判定の者が同時に倒れたときは勝者なし、人狼判定の者が倒れていなければ人狼陣営の勝利です。" },

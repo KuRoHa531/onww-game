@@ -137,6 +137,13 @@ window.ONW_WIKI_SYNERGY = {
    ]
   },
   {
+   "trigger": "mad_priest",
+   "required": [
+    "god"
+   ],
+   "priority": []
+  },
+  {
    "trigger": "priest",
    "required": [
     "god"
@@ -242,6 +249,7 @@ window.ONW_WIKI_SYNERGY = {
    "fake_seer",
    "carmen",
    "eraser_wolf",
+   "silver_wolf",
    "mad_seer",
    "exposed_madman",
    "seal_madman",
@@ -281,6 +289,7 @@ window.ONW_WIKI_SYNERGY = {
    "fake_seer",
    "carmen",
    "eraser_wolf",
+   "silver_wolf",
    "mad_seer",
    "exposed_madman",
    "seal_madman",
@@ -394,6 +403,7 @@ window.ONW_WIKI_SYNERGY = {
    "tenacious_madman",
    "jester_madman",
    "smoke_madman",
+   "mad_priest",
    "love_tanner",
    "freeter",
    "doppelganger",
@@ -470,6 +480,7 @@ window.ONW_WIKI_SYNERGY = {
    "tenacious_madman",
    "jester_madman",
    "smoke_madman",
+   "mad_priest",
    "love_tanner",
    "freeter",
    "doppelganger",
@@ -654,6 +665,7 @@ window.ONW_WIKI_SYNERGY = {
   "fake_seer": "偽占い師が出る闇鍋には、占い師も最低1枚出す（偽占い師の結果は、本物の占い師と見比べて初めて意味が出る）。",
   "aa": "A.A.が出る闇鍋には、鍵師も最低1枚出す（A.A.は鍵師にロックされて初めて役職変化が通る）。",
   "priest": "神官が出る闇鍋には、銀色の影から変化した神も最低1枚出す（神官は神がいてこそ働く）。",
+  "mad_priest": "狂った神官が出る闇鍋にも、銀色の影から変化した神も最低1枚出す（狂った神官も神がいてこそ働く）。",
   "mirage_wolf": "蜃気狼が出る闇鍋には、占い師も最低1枚出す（占われてランダムな役職に見えるのが活きる盤面）。",
   "rebel_madman": "反逆の狂人が出る闇鍋には、独裁者も最低1枚出す（クーデターの相手がいないと活きない）。",
   "black_wolf_madman": "黒子の狂人が出る闇鍋には、人狼と占い師も最低1枚ずつ出す（占われて「人狼」と出るのが活きる盤面）。",

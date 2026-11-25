@@ -696,6 +696,7 @@ window.ONW = window.ONW || {};
    *   ・1票も入っていなければ "none"（どの陣営にもなれない）
    *   ・恋人（重複役職）になっている猫は恋人陣営として扱うので "lover"（この能力は働かない）
    * 保安官に撃たれた猫（game.sheriffCatFix[猫の持ち主] = 撃った保安官）は、参照先を保安官にして村人陣営に固定される（fixed: true）。
+   * ヴァニティに撃たれた猫も同じ仕組み（game.sheriffCatTeam = "vanity"）で、参照先を撃ったヴァニティにしてヴァニティ陣営に固定される（そのヴァニティが勝利すれば猫も勝利。マイクラ版 sheriffSpecialCatTeam "ヴァニティ"）。模倣保安官・模倣ヴァニティに撃たれた猫は人狼陣営（game.sheriffCatTeam = "wolf"）。
    * 番犬に噛まれた猫（game.dogBites の target。猫が飼い主で、番犬が猫に投票して噛み殺した）は、参照先を噛んだ番犬にして、番犬の陣営に固定される（fixed: true・bitten: true。今は番犬 = 村人陣営）。
    *   【確定メモ・今後の実装】模倣番犬・犬の狂人に噛まれた猫は人狼陣営に確定する（ONW.watchdog.biteTeam が噛んだ人の役職の陣営を返す）。【確定】一度陣営に入ることが決まった猫は、その後変わらない（保安官に撃たれて村人陣営に固定された猫は、あとで噛まれても村人陣営のまま）。
  * 参照先は一度決めたら game.catSources[猫の持ち主ID] に覚え、勝敗判定を何度呼び直しても同じ人になる（その人がまだ投票者に入っているかぎり）。試合開始時に net.js 側で空に戻す。
@@ -732,7 +733,7 @@ window.ONW = window.ONW || {};
       const src = game.catSources[id];
       let r;
       const bite = biteInfo(id);
-      if (game.sheriffCatFix && game.sheriffCatFix[id]) r = { team: (game.sheriffCatTeam && game.sheriffCatTeam[id]) || "village", direct: game.sheriffCatFix[id], final: game.sheriffCatFix[id], via: false, fixed: true };   // 保安官に撃たれた猫は村人陣営に固定（投票した人の陣営より優先。恋人の猫は下で恋人陣営）
+      if (game.sheriffCatFix && game.sheriffCatFix[id]) r = { team: (game.sheriffCatTeam && game.sheriffCatTeam[id]) || "village", direct: game.sheriffCatFix[id], final: game.sheriffCatFix[id], via: false, fixed: true };   // 保安官に撃たれた猫は村人陣営に固定（ヴァニティならヴァニティ陣営・模倣なら人狼陣営。投票した人の陣営より優先。恋人の猫は下で恋人陣営）
       else if (bite) r = { team: bite.team, direct: bite.by, final: bite.by, via: false, fixed: true, bitten: true, bitRandom: bite.random, biters: bite.biters };   // 番犬に噛まれた猫は、噛んだ犬の陣営に固定（番犬 = 村人陣営 / 模倣番犬・犬の狂人 = 人狼陣営。村人陣営の犬と人狼陣営の犬に同時に噛まれたらランダム: docs/schrodinger-cat-team.md）。投票した人の陣営より優先
       else if (!src) r = { team: "none", direct: null, final: null, via: false };
       else if (trail.includes(id)) r = { team: "loop", direct: src, final: null, via: true };
@@ -849,7 +850,7 @@ window.ONW = window.ONW || {};
     game.jesterMadmanWin = [];   // 道化の狂人: 追放・道連れで死亡して人狼陣営の勝利を作った人（分岐 1.9。結果の説明用）
     game.tenaciousCut = [];   // 執念の狂人: 死亡したため人狼陣営（または神の祝福）の勝利から外れた人（勝敗の説明用。下の 1 / 3.8 / 4 の分岐が決める）
     const gods = ids.filter((id) => role(id) === R.GOD);
-    game.priestMode = null; game.priestIds = []; game.priestBaseIds = null;   // 神官（docs/priest.md）: "block"（生存している神官が神降臨を無効にした）/ "help"（死亡している神官のおかげで村人陣営も追加勝利）/ null。結果の演出・説明用
+    game.priestMode = null; game.priestIds = []; game.madPriestIds = []; game.priestBaseIds = null;   // 神官・狂った神官（docs/priest.md・docs/mad-priest.md。priestMode は両方に共通。priestIds=神官 / madPriestIds=狂った神官）: "block"（生存している神官が神降臨を無効にした）/ "help"（死亡している神官のおかげで村人陣営も追加勝利）/ null。結果の演出・説明用
     game.godMode = null; game.godIds = []; game.godBlown = [];   // 結果の演出用: "bless"（神の祝福）/ "descend"（神降臨）/ null
     // 無理心中で巻き込まれたてるてる系は、自分のてるてる勝利は発動しない（相手の一目惚れしてるてると「一緒に勝った」扱いになるだけ）
     const byLove = (id) => ["love", "lovers"].includes((game.chainKind || {})[id]);   // 無理心中・心中で死んだてるてる系も同じ扱い
@@ -888,16 +889,19 @@ window.ONW = window.ONW || {};
       if (voted.has(id) && execAll.some(([, tg]) => tg === id)) return false;   // 処刑（処刑人のターゲットとして追放）
       return true;                                                              // 追放 / 道連れ
     });
-    const shotLostIds = ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : [];   // 保安官に撃たれて死に、勝利条件を失った人（身代わりで撃たれた従者は含まない）
+    const shotLostIds = [...(ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : []), ...(ONW.vanity && ONW.vanity.lostIds ? ONW.vanity.lostIds(game) : [])];   // 保安官・ヴァニティに撃たれて死に、勝利条件を失った人（身代わりで撃たれた従者は含まない）
     const godAlive = gods.filter((id) => !executed.includes(id) && !shotLostIds.includes(id));   // 撃たれて死んだ神は降臨しない（マイクラ版 teamVictoryBreaks.god）
-    // 神官（js/roles/village/priest.js・docs/priest.md。マイクラ版 getGodOverrideResult）: 神の祝福（追放・道連れ）は無効にしない。神降臨（神が追放されなかった）だけが対象。
-    //   最終盤面の神官が1人でも死んでいない → 神降臨は起きない / 神官がいて全員死亡 → 神降臨で村人陣営も追加勝利（恋人・(+反転)・シャッフラーの印がついた人は除く）。神がいない盤面では何も起きない
+    // 神官・狂った神官（js/roles/village/priest.js・js/roles/wolf/mad/mad_priest.js・docs/priest.md・docs/mad-priest.md。マイクラ版 getGodOverrideResult）: 神の祝福（追放・道連れ）は無効にしない。神降臨（神が追放されなかった）だけが対象。
+    //   最終盤面の神官・狂った神官が1人でも死んでいない → 神降臨は起きない / どちらかがいて全員死亡 → 神降臨で、死亡している神官がいれば村人陣営も・死亡している狂った神官がいれば人狼陣営も追加勝利（恋人・(+反転)・シャッフラーの印がついた人は除く）。神がいない盤面では何も起きない
     const priestHolders = ONW.priest ? ONW.priest.holders(game) : [];
-    const priestBlocks = !godBless.length && !!godAlive.length && priestHolders.some((id) => !dead.has(id));   // 神の祝福が起きるとき（神が追放・道連れ）は神官の演出も出さない（別の神が生存していても祝福が先）
-    const priestHelps = !godBless.length && !!godAlive.length && priestHolders.length > 0 && !priestBlocks;
-    const godDescends = godAlive.length > 0 && !priestBlocks;   // 神降臨が成立しうるか（神官が生存していなければ）
-    if (priestBlocks) { game.priestMode = "block"; game.priestIds = priestHolders.filter((id) => !dead.has(id)); }
-    else if (priestHelps) { game.priestMode = "help"; game.priestIds = priestHolders.slice(); }
+    const madPriestHolders = ONW.madPriest ? ONW.madPriest.holders(game) : [];
+    const anyPriestHolders = [...priestHolders, ...madPriestHolders];
+    const priestBlocks = !godBless.length && !!godAlive.length && anyPriestHolders.some((id) => !dead.has(id));   // 神の祝福が起きるとき（神が追放・道連れ）は神官の演出も出さない（別の神が生存していても祝福が先）
+    const priestHelps = !godBless.length && !!godAlive.length && priestHolders.length > 0 && !priestBlocks;   // 死亡している神官がいる（村人陣営が追加勝利）
+    const madPriestHelps = !godBless.length && !!godAlive.length && madPriestHolders.length > 0 && !priestBlocks;   // 死亡している狂った神官がいる（人狼陣営が追加勝利）
+    const godDescends = godAlive.length > 0 && !priestBlocks;   // 神降臨が成立しうるか（神官・狂った神官が生存していなければ）
+    if (priestBlocks) { game.priestMode = "block"; game.priestIds = priestHolders.filter((id) => !dead.has(id)); game.madPriestIds = madPriestHolders.filter((id) => !dead.has(id)); }
+    else if (priestHelps || madPriestHelps) { game.priestMode = "help"; game.priestIds = priestHolders.slice(); game.madPriestIds = madPriestHolders.slice(); }
     if (!godBless.length && godDescends) { game.godMode = "descend"; game.godIds = godAlive.slice(); }   // 神官が生存していると降臨しない（演出も出さない）   // 生存している神は、結果発表でめくれるときに降臨の演出（どの勝敗でも）
 
     // 殉職者（docs/martyr.md）: 最終盤面で殉職者を持っていて死亡した人は、死因を問わず追加勝利（追放・道連れ・番犬の噛殺・爆殺・保安官の執行 など）。
@@ -940,6 +944,10 @@ window.ONW = window.ONW || {};
       const martyrWin = ids.filter((id) => role(id) === R.MARTYR && dead.has(id) && !lostLover(id) && !martyrKingdomDead(id) && (!teams.includes("神の祝福") || martyrDirectExec(id)));
       martyrWin.forEach((id) => w.add(id));
       if (martyrWin.length && !teams.includes("殉職者")) teams.push("殉職者");
+      // ヴァニティ（js/roles/neutral/vanity.js・追加勝利。勝利優先度の表に新しい行は作らない）: 人外を撃ったら村人陣営の勝利で、村人陣営を撃ったら村人陣営の敗北で追加勝利。撃っていない・勝てなかった恋人・撃たれて勝利条件を失った人は敗北（マイクラ版 noVictoryIds の確認に相当）
+      const vanityWin = ONW.vanity ? ids.filter((id) => role(id) === R.VANITY && !lostLover(id) && !shotLoseIds.includes(id) && ONW.vanity.wins(game, id, teams, w)) : [];
+      vanityWin.forEach((id) => w.add(id));
+      if (vanityWin.length && !teams.includes("ヴァニティ")) teams.push("ヴァニティ");
       // 破局師（マイクラ版の追加勝利）: 破局に成功した（恋人関係を1つでも壊した）カードを最終盤面で持っている人は、どの結果でも追加で勝利（死亡・追放は関係なし）。勝てなかった恋人（本人が恋人）は追加勝利しない
       const breakers = ids.filter((id) => role(id) === R.HEARTBREAKER && ONW.heartbreaker && ONW.heartbreaker.succeeded(game, id) && !lostLover(id));
       breakers.forEach((id) => w.add(id));
@@ -956,7 +964,7 @@ window.ONW = window.ONW || {};
       const freeters = ids.filter((id) => role(id) === R.FREETER);
       const servants = ONW.servantPairs(game).filter(([s, m]) => s !== m);
       const gremlins = ONW.gremlinPairs(game);   // グレムリン: 選んだ2人（コピー元・コピー先）のどちらかが勝利していれば追加で勝利
-      // シュレディンガーの猫: 参照先の陣営が勝利していれば追加で勝利（村人陣営・人狼陣営は勝利陣営かどうか / 第三陣営の役職の人が参照先なら、その人が勝利しているか）。無所属・堂々巡り・恋人の猫は勝てない
+      // シュレディンガーの猫: 参照先の陣営が勝利していれば追加で勝利（村人陣営・人狼陣営は勝利陣営かどうか / 第三陣営の役職の人が参照先なら、その人が勝利しているか / ヴァニティ陣営に固定された猫は、撃ったヴァニティが勝利しているか）。無所属・堂々巡り・恋人の猫は勝てない
       const cats = ids.filter((id) => role(id) === R.SCHRODINGER_CAT && !lostLover(id) && !isLover(id));
       const catWins = (id) => {
         const c = (game.catInfo || {})[id];
@@ -964,6 +972,7 @@ window.ONW = window.ONW || {};
         if (c.team === "village") return teams.includes("村人陣営");
         if (c.team === "wolf") return teams.includes("人狼陣営");
         if (c.team === "third") return !!c.final && w.has(c.final);
+        if (c.team === "vanity") return !!c.final && w.has(c.final);   // ヴァニティ陣営に固定された猫（マイクラ版: ヴァニティの勝利時に sheriffSpecialCatAligned の猫も勝者に入る）
         return false;
       };
       // キューピッド（マイクラ版の追加勝利）: 選んだ2人がどちらも死んでおらず（吊られておらず）、2人とも勝利していれば、キューピッド本人が吊られていても・後追いで死んでいても追加で勝利する。勝てなかった恋人（本人が恋人）は追加勝利しない
@@ -1017,7 +1026,7 @@ window.ONW = window.ONW || {};
       if (ONW.shuffler && ONW.shuffler.addWinnerPairs && ONW.shuffler.addWinnerPairs(game, w).length && !teams.includes("シャッフラー")) teams.push("シャッフラー");
       if (shBan.size && ONW.shuffler) game.winDetail = `${game.winDetail}\n${ONW.shuffler.failText(game, [...shBan])}`;
       shotLoseIds.forEach((id) => { if (w.has(id)) shotCut.add(id); w.delete(id); });   // 追加勝利（破局師・天邪鬼・勝ち組など）でも、撃たれて死んだ人は勝てない
-      if (shotCut.size) game.winDetail = `${game.winDetail}\n${nm([...shotCut])} は保安官に撃たれたため、勝利条件を失いました。`;
+      if (shotCut.size) game.winDetail = `${game.winDetail}\n${nm([...shotCut])} は${(game.vanityShots || []).length ? "撃たれた" : "保安官に撃たれた"}ため、勝利条件を失いました。`;   // ヴァニティが撃った試合では、保安官と決め打ちしない文にする
       if ((game.tenaciousCut || []).length && !game.foxTake && !game.shufflerTake) game.winDetail = `${game.winDetail}\n執念の狂人 ${nm(game.tenaciousCut)} は死亡したため、勝利条件を失いました。`;   // 執念の狂人（docs/tenacious-madman.md）
       const martyrDone = martyrWin.filter((id) => w.has(id));
       if (martyrDone.length && !game.foxTake && !game.shufflerTake) game.winDetail = `${game.winDetail}\n殉職者 ${nm(martyrDone)} は死亡したため、追加で勝利しました。`;
@@ -1120,11 +1129,15 @@ window.ONW = window.ONW || {};
     // 3. 神降臨（処刑人より後）（神が追放されなかった）
     if (hit(11, !game.chickenForce && godDescends)) {
       game.godMode = "descend"; game.godIds = godAlive.slice();
-      if (priestHelps) {   // 死亡している神官: 村人陣営も追加で勝つ（マイクラ版 priestTeamWinners。恋人・(+反転)・シャッフラーの印がついた人は受けられない）
+      if (priestHelps || madPriestHelps) {   // 死亡している神官: 村人陣営も / 死亡している狂った神官: 人狼陣営も追加で勝つ（マイクラ版 priestTeamWinners / madPriestTeamWinners。恋人・(+反転)・シャッフラーの印がついた人は受けられない）
         const canRecv = (id) => !isLover(id) && !(ONW.reverse && ONW.reverse.is && ONW.reverse.is(game, id)) && !(ONW.shuffler && ONW.shuffler.tagged && ONW.shuffler.tagged(game, id));
-        const vill = ids.filter((id) => !(game.cursedWolfIds || []).includes(id) && ONW.roles.getInfo(role(id)).team === ONW.TEAM.VILLAGE && canRecv(id));
-        game.priestBaseIds = godAlive.slice();   // 陣営の勝者は神だけ。村人陣営は神官の祈りによる「追加勝利」（set が winBaseIds から村人陣営を外す。結果発表の追加勝利の演出・勝者欄の色になる）
-        return set("神降臨", ["神", "村人陣営"], [...new Set([...godAlive, ...vill])], `神が追放されませんでした。 死亡している神官 ${nm(priestHolders)} により村人陣営も追加勝利します。`, [ONW.TEAM.THIRD, ONW.TEAM.VILLAGE]);
+        const vill = priestHelps ? ids.filter((id) => !(game.cursedWolfIds || []).includes(id) && ONW.roles.getInfo(role(id)).team === ONW.TEAM.VILLAGE && canRecv(id)) : [];
+        const wolfSide = madPriestHelps ? ids.filter((id) => ((game.cursedWolfIds || []).includes(id) || ONW.roles.getInfo(role(id)).team === ONW.TEAM.WOLF) && canRecv(id)) : [];   // 吊られた呪われし者は人狼陣営の側（ほかの人狼陣営の勝利と同じ）
+        game.priestBaseIds = godAlive.slice();   // 陣営の勝者は神だけ。村人陣営・人狼陣営は神官・狂った神官の祈りによる「追加勝利」（set が winBaseIds から外す。結果発表の追加勝利の演出・勝者欄の色になる）
+        const teams = ["神", ...(priestHelps ? ["村人陣営"] : []), ...(madPriestHelps ? ["人狼陣営"] : [])];
+        const winTeams = [ONW.TEAM.THIRD, ...(priestHelps ? [ONW.TEAM.VILLAGE] : []), ...(madPriestHelps ? [ONW.TEAM.WOLF] : [])];
+        const detail = `神が追放されませんでした。${priestHelps ? ` 死亡している神官 ${nm(priestHolders)} により村人陣営も追加勝利します。` : ""}${madPriestHelps ? ` 死亡している狂った神官 ${nm(madPriestHolders)} により人狼陣営も追加勝利します。` : ""}`;
+        return set("神降臨", teams, [...new Set([...godAlive, ...vill, ...wolfSide])], detail, winTeams);
       }
       return set("神降臨", ["神"], godAlive, "神が追放されませんでした。", [ONW.TEAM.THIRD]);
     }
@@ -1262,7 +1275,7 @@ window.ONW = window.ONW || {};
     game.chickenForce = toWolf ? "wolf" : true;
     ONW.vote.determineWinnersCore(game);
     game.chickenForce = false;
-    game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = [];   // 逆転後は神の演出は出さない
+    game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = []; game.madPriestIds = [];   // 逆転後は神の演出は出さない
     game.chickenReverse = { fromTitle: from.title, fromTeams: from.teams, ids: list, names: list.map((id) => (ONW.utils.playerById(game, id) || {}).name), toWolf };
     game.winDetail = toWolf
       ? `生存した模倣チキン ${nm(list)} が人狼陣営の敗北を逆転させました。（逆転前: ${from.title}）`
@@ -1292,7 +1305,7 @@ window.ONW = window.ONW || {};
     const nm = (id) => (ONW.utils.playerById(game, id) || {}).name || "?";
     const dead = ONW.vote.deadSet(game);
     const loverWin = new Set(ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).flat());
-    const shot = ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : [];
+    const shot = [...(ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : []), ...(ONW.vanity && ONW.vanity.lostIds ? ONW.vanity.lostIds(game) : [])];   // ヴァニティに撃たれて死んだ人も勝利条件を失っている（保安官と同じ）
     const noWin = new Set(ids.filter((id) => (ONW.isLover(game, id) && !loverWin.has(id) && game.currentRoles[id] !== R.WINNER) || (game.shufflerBan || []).includes(id) || (shot.includes(id) && game.currentRoles[id] !== R.MARTYR) || (game.kingdomIds || []).includes(id) || (game.queenFallen || []).includes(id) || (game.deadKind || {})[id] === "queen"));
     const before = new Set(game.winnerIds || []);
     const pIds = ids.filter((id) => game.currentRoles[id] === R.PRANKSTER);
@@ -1324,7 +1337,7 @@ window.ONW = window.ONW || {};
     if (chickens.length) {
       const from = { title: game.winTitle, teams: [...teams] };
       game.chickenForce = true; ONW.vote.determineWinnersCore(game); game.chickenForce = false;
-      game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = [];
+      game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = []; game.madPriestIds = [];
       game.chickenReverse = { fromTitle: from.title, fromTeams: from.teams, ids: chickens, names: chickens.map(nm), toWolf: false };
       game.winDetail = `生存したチキン ${chickens.map(nm).join("、")} が愉快犯の影響を逆転させました。（逆転前: ${from.title}）`;
       saved = true;
@@ -1335,7 +1348,7 @@ window.ONW = window.ONW || {};
       if (mc.length) {
         const from = { title: game.winTitle, teams: [...(game.winTeams || [])] };
         game.chickenForce = "wolf"; ONW.vote.determineWinnersCore(game); game.chickenForce = false;
-        game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = [];
+        game.godMode = null; game.godIds = []; game.godBlown = []; game.priestMode = null; game.priestIds = []; game.madPriestIds = [];
         game.chickenReverse = { fromTitle: from.title, fromTeams: from.teams, ids: mc, names: mc.map(nm), toWolf: true };
         game.winDetail = `生存した模倣チキン ${mc.map(nm).join("、")} が愉快犯の影響を逆転させました。（逆転前: ${from.title}）`;
         saved = true;
@@ -1359,7 +1372,7 @@ window.ONW = window.ONW || {};
     const nm = (id) => (ONW.utils.playerById(game, id) || {}).name || "?";
     const dead = ONW.vote.deadSet(game);
     const loverWin = new Set(ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).flat());
-    const shot = ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : [];
+    const shot = [...(ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : []), ...(ONW.vanity && ONW.vanity.lostIds ? ONW.vanity.lostIds(game) : [])];   // ヴァニティに撃たれて死んだ人も勝利条件を失っている（保安官と同じ）
     const noWin = new Set(ids.filter((id) => (ONW.isLover(game, id) && !loverWin.has(id) && game.currentRoles[id] !== R.WINNER) || (game.shufflerBan || []).includes(id) || shot.includes(id) || (game.kingdomIds || []).includes(id) || (game.queenFallen || []).includes(id) || (game.deadKind || {})[id] === "queen"));
     const hanged = B.hangedIds(game), blown = B.explodedIds(game);
     const w = new Set(game.winnerIds || []);
@@ -1386,7 +1399,11 @@ window.ONW = window.ONW || {};
     determineWinnersInner(game);
     ONW.vote.applyPrankster(game);
     ONW.vote.applyBomber(game);
-    if (game.priestMode === "block" && !game.abandoned && game.winTitle !== "神降臨") game.winDetail = `${game.winDetail ? game.winDetail + " " : ""}（神は追放されませんでしたが、神官 ${(game.priestIds || []).map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、")} が生存しているため、神降臨は起きませんでした。）`;   // 神官（docs/priest.md）: 神官が生存していて神降臨が無効になったことを結果の説明に残す
+    if (game.priestMode === "block" && !game.abandoned && game.winTitle !== "神降臨") {   // 神官・狂った神官（docs/priest.md・docs/mad-priest.md）: 生存していて神降臨が無効になったことを結果の説明に残す
+      const pn = (ids) => (ids || []).map((id) => (ONW.utils.playerById(game, id) || {}).name).join("、");
+      const who = [...((game.priestIds || []).length ? [`神官 ${pn(game.priestIds)}`] : []), ...((game.madPriestIds || []).length ? [`狂った神官 ${pn(game.madPriestIds)}`] : [])].join("、");
+      game.winDetail = `${game.winDetail ? game.winDetail + " " : ""}（神は追放されませんでしたが、${who} が生存しているため、神降臨は起きませんでした。）`;
+    }
     return game.winners;
   };
 

@@ -13,6 +13,11 @@
     }
     const fg = (n.forced(p).graves || []).filter((k) => k >= 0 && k < g.center.length);   // デバッグ: 交換する墓地の指定
     const idx0 = fg.length ? fg[0] : n.pick([...g.center.keys()]), idx = ONW.watcher.shiftGrave(g, idx0), got = g.center[idx], seen = ONW.shownRole(got);   // 静観者の札の墓地を選んだら、静観者でない別の墓地と交換する（docs/watcher.md）。   // seen: 本人が思う新しい役職（忘却の人狼・狼憑きは村人、狼夢人は人狼）
+    if (ONW.hack && ONW.hack.blocks(got)) {   // 銀狼のハッキングに阻まれて交換できない（墓地も自分の役職も動かない。docs/silver-wolf.md）
+      i.mode = "relic"; i.keyFail = { kind: "hack" };
+      n.hold(p.id, ONW.hack.fail(g, "relic", `${label} ${p.name}`, `墓地${idx + 1}`));
+      return;
+    }
     ONW.swapGrave(g, p.id, idx);
     if (ONW.moses) ONW.moses.drewFromGrave(g, p.id);   // モーゼスを引いたら票数は1票（マイクラ版）
     i.mode = "relic"; i.graveIdx = idx; i.newRole = seen; i.known[p.id] = seen;
@@ -32,6 +37,7 @@
   function cpuClaim(k, g, p, r, i, c) {
     const { rn, isNonVillage, nonVillageLie } = k;
     c.co = "relic_robber";
+    if (i.keyFail && i.keyFail.kind === "hack") { c.result = { short: "ハッキングで失敗", text: ONW.hack.failLine("relic"), claim: null }; return; }   // 銀狼に阻まれて失敗した: 正直に言う
     if (i.keyFail) { c.result = { short: "ロックで失敗", text: "自身の役職がロックされていたため交換に失敗しました。", claim: null }; return; }   // ロックされて交換に失敗した: 正直に言う
     if (!i.relic) return;   // 墓荒らし（交換情報なし）: COだけする
     if (isNonVillage(i.relic.newRole) && !ONW.cpu.relicDoppelHonest(i)) { const lie = nonVillageLie(g, p, "relic_robber", i, i.relic.newRole); c.co = lie.co; c.result = lie.result; }
@@ -97,6 +103,7 @@
         const i0 = i; i = ONW.watcher.shiftGrave(g, i);   // 静観者の札の墓地を選んだら、静観者でない別の墓地と交換する（移す先がなければ選んだまま。マイクラ版 resolveWatcherShiftCenterIndex。docs/watcher.md）
         if (ONW.keymaster.gate(g, p.id, [])) { c.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "交換", [], `${rn(c.eff(p))} ${p.name}`)); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: 自分の席がロック中なら失敗。墓地は動かず、新聞・観測にも載らない
         const got = g.center[i];
+        if (ONW.hack && ONW.hack.blocks(got)) { c.hold(p.id, ONW.hack.fail(g, "relic", `${rn(c.eff(p))} ${p.name}`, `墓地${i + 1}`)); c.rev[p.id] = ONW.hack.failRev("g:" + i); return; }   // 銀狼のハッキングに阻まれて交換できない。墓地は動かず、新聞・観測にも載らない
         ONW.swapGrave(g, p.id, i);
         if (ONW.moses) ONW.moses.drewFromGrave(g, p.id);   // モーゼスを引いたら票数は1票
         g.nightLogsAll.push(ONW.watcher.graveText(`${rn(c.eff(p))} ${p.name}`, i0, i, rn(got)) || `${rn(c.eff(p))} ${p.name} は 墓地${i + 1} と役職を交換し、${rn(got)} になりました。`);
@@ -114,6 +121,7 @@
         if (!c.graves.length) return null;
         const g = c.g, rn = c.rn, id = c.id, idx0 = c.graves[0], idx = ONW.watcher.shiftGrave(c.g, idx0);   // 静観者の札の墓地を選んだら別の墓地（ドッペル経由・酔い覚めでも同じ）
         if (ONW.keymaster.gate(g, id, [])) return { lines: [ONW.keymaster.fail(g, id, "self", "交換", [], `${c.label} ${c.me.name}`)], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true };   // 朝のうち・酔い覚めにもロックは効く
+        if (ONW.hack && ONW.hack.blocks(g.center[idx])) return { lines: [ONW.hack.fail(g, "relic", `${c.label} ${c.me.name}`, `墓地${idx + 1}`)], reveal: ONW.hack.failRev("g:" + idx), nextChain: null, failed: true };   // 銀狼のハッキングに阻まれて交換できない（ドッペル経由・酔い覚めでも同じ）
         ONW.swapGrave(g, id, idx);
         if (ONW.moses) ONW.moses.drewFromGrave(g, id);   // モーゼスを引いたら票数は1票
         const got = g.currentRoles[id];
