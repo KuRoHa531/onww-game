@@ -162,7 +162,8 @@ window.ONW = window.ONW || {};
    * 戻り値: { votes: 書き換えたあとの投票先 { 投票者ID: 投票先ID }, list: [{ by, voterId, fromId, toId, w }（使った順）] }（game.votes は書き換えない）。御乱心が使われていなければ votes は game.votes と同じ内容・list は空。
    */
   vote.goranshinRun = function goranshinRun(game) {
-    return ONW.goranshin ? ONW.goranshin.run(game, game.votes || {}) : { votes: { ...(game.votes || {}) }, list: [] };
+    const base = ONW.elfrinde ? ONW.elfrinde.shiftVotes(game, game.votes || {}) : (game.votes || {});   // エルフリンデ（侵食）: 投票先のずれが一番先（マイクラ版 baseVotes の加工順）。元の game.votes は書き換えない
+    return ONW.goranshin ? ONW.goranshin.run(game, base) : { votes: { ...base }, list: [] };
   };
   /**
    * 御乱心の途中経過（結果発表の演出用）: { list: [{ by, voterId, fromId, toId, w }（使った順）], steps: [書き換える前の得票数, 1つ目を書き換えた後, ...] }
@@ -329,11 +330,14 @@ window.ONW = window.ONW || {};
     const maxVotes = Math.max(0, ...Object.values(counts));
     game.mentalIds = [];
     game.shockIds = [];
+    game.curseWolfKills = {};   // 呪術の人狼: { 呪術の人狼のID: 呪殺した相手のID }（resolveElimination のたびに決め直す）
+    game.curseKillIds = [];     // 呪術の人狼: 呪殺で死ぬ人のID（貫通する死。騎士の護衛・身代わり・追放で発動する能力の対象外）
     game.servantSubs = [];
     game.majorSacrificed = [];
     game.toughBounces = [];
     game.kingGuards = [];
     if (ONW.knight) ONW.knight.reset(game, ["exec", "dictator", "coup", "sub"]);   // 騎士: 追放の守りは計算のたびにやり直す（守った騎士を未使用に戻す）。連鎖(chain)・保安官(shot)の守りは触らない
+    if (ONW.mercenary) ONW.mercenary.reset(game, ["exec", "dictator", "coup", "sub"]);   // 傭兵: 追放の守りも計算のたびにやり直す（守った傭兵を未使用に戻す）。保安官(shot)の守りは触らない
     if (maxVotes === 0) {
       game.eliminated = [];
       if (ONW.matthias) ONW.matthias.applyVoteSubstitution(game);   // マティアス: 得票が無くても、昼中に死亡したマティアスは娘ちゃんの犠牲で救われる（マイクラ版は preVoteDead 側でも身代わりが働く）。娘が代わりに追放される場合は game.eliminated に入る
@@ -351,19 +355,49 @@ window.ONW = window.ONW || {};
     // チキン: 1票でも入ったら、つられている人と同時にショック死（追放扱い）
     game.shockIds = game.players.map((p) => p.id).filter((id) => E(game, id) === ONW.ROLE.CHICKEN && counts[id] > 0 && !gone0.has(id) && !ONW.seal.is(game, id));   // 封印されているチキンはショック死しない（2of4b）
     game.shockIds.forEach((id) => { if (!game.eliminated.includes(id)) game.eliminated.push(id); });
+    // 呪術の人狼（マイクラ版 applyCurseWolfExecution）: 自分が投票した相手が最多得票なら、その相手は追放ではなく呪殺で死ぬ。
+    //   騎士の護衛・従者/少佐/マティアスの身代わりより前に確定させ、対象は game.curseKillIds に記録する（護衛・身代わり・連鎖の各処理が貫通扱いで読み飛ばす）。
+    //   タフガイのはじき返し・人狼王の守りで追放を免れた相手も、最多得票なら呪殺の対象に戻る（curse_wolf.js の applyVoteCurse）。
+    if (ONW.curseWolf) ONW.curseWolf.applyVoteCurse(game, counts, maxVotes);
     // 独裁処刑(game.dictator): 議論を打ち切って投票は行わない（票は独裁者→対象の1票だけ）。
     //   2026-11-17 ユーザー指定: 独裁処刑の対象（ご主人）にも従者の身代わりが働く（結果発表は通常の追放と同じ「身代わり」演出: ご主人のカードがめくれそうになる → 従者のカードがめくれる）。少佐の身代わりは従来どおり独裁処刑では働かない。
     //   クーデター（反逆の狂人が独裁を跳ね返して独裁者本人が処刑される）は従来どおり身代わりなし（docs/rebel-madman.md）。
     // 騎士（js/roles/village/knight.js・マイクラ版 applyKnightProtection）: 追放が決まった人（投票・独裁処刑・クーデター）を死から守る。従者・少佐の身代わりより【先】に働く（守られたご主人には身代わりが起きない）。
     //   身代わりのあとにもう一度働き、身代わりで追放される従者・少佐（kind: "sub"）も守る。守られた人は game.eliminated から外れ、結果発表の 🛡️ 演出は game.knightGuards（net.js の res.knights）が持つ。
     const kindOf = (id) => (game.dictator && game.dictator.target === id ? (game.dictator.coup ? "coup" : "dictator") : "exec");
+    ONW.vote.applyMercenaryGuard(game, null, kindOf);   // 傭兵（js/roles/neutral/mercenary.js・マイクラ版 applyMercenaryProtection）: 護衛対象が追放されそうなら、騎士より先に守る
     ONW.vote.applyKnightGuard(game, null, kindOf);
     const beforeSub = new Set(game.eliminated);
     if (game.dictator) { game.servantSubs = []; if (!game.dictator.coup) ONW.vote.applyServantSubstitution(game); }
     else { ONW.vote.applyServantSubstitution(game); ONW.vote.applyMajorSubstitution(game); }   // 本家の順序どおり: 豆腐の人狼のメンタル崩壊 → 従者の身代わり → 少佐の身代わり → 連鎖（resolveChain）
     if (ONW.matthias) ONW.matthias.applyVoteSubstitution(game);   // マティアス: 従者・少佐の身代わりのあと（マイクラ版 applyMatthiasSubstitution の位置）。昼中に死亡したマティアス（呪殺は除く）の救済もここ。犠牲になった娘は、このあとの騎士の守り（kind "sub"）の対象になる
+    ONW.vote.applyMercenaryGuard(game, game.eliminated.filter((id) => !beforeSub.has(id)), () => "sub");   // 傭兵: 身代わりで新しく追放になった護衛対象も、騎士より先に守る
     ONW.vote.applyKnightGuard(game, game.eliminated.filter((id) => !beforeSub.has(id)), () => "sub");   // 身代わりで新しく追放になった人だけ
     return game.eliminated;
+  };
+
+  /**
+   * 傭兵の守り（追放）。騎士の applyKnightGuard と同じ作りで、騎士より先に呼ぶ（マイクラ版 applyMercenaryProtection → applyKnightProtection の順）。
+   *   game.eliminated のうち only（省略で全員）に入っている人が護衛対象なら、守れる傭兵全員が守る。
+   *   守られた人は game.eliminated・mentalIds・shockIds から外れる（死なない）。game.mercenaryGuards に { id, mercenary, kind } を積む（結果発表用。傭兵が複数でも演出は1回）
+   * 戻り値: 守られた人のID（守った順）
+   */
+  vote.applyMercenaryGuard = function applyMercenaryGuard(game, only, kindOf) {
+    if (!ONW.mercenary) return [];
+    const out = [];
+    [...game.eliminated].forEach((id) => {
+      if (only && !only.includes(id)) return;
+      if (!game.eliminated.includes(id)) return;
+      if ((game.curseKillIds || []).includes(id)) return;   // 呪術の人狼の呪殺は護衛を貫通する（マイクラ版 tryMercenaryProtect の isPiercingVoteKillReason）
+      const kind = kindOf(id), ms = ONW.mercenary.protect(game, id, kind, new Set(game.eliminated));
+      if (!ms || !ms.length) return;
+      game.eliminated = game.eliminated.filter((x) => x !== id);
+      game.mentalIds = (game.mentalIds || []).filter((x) => x !== id);
+      game.shockIds = (game.shockIds || []).filter((x) => x !== id);
+      ONW.mercenary.addGuard(game, id, ms[0], kind);
+      out.push(id);
+    });
+    return out;
   };
 
   /**
@@ -379,6 +413,7 @@ window.ONW = window.ONW || {};
     [...game.eliminated].forEach((id) => {
       if (only && !only.includes(id)) return;
       if (!game.eliminated.includes(id)) return;
+      if ((game.curseKillIds || []).includes(id)) return;   // 呪術の人狼の呪殺は護衛を貫通する（マイクラ版 tryKnightProtect の isPiercingVoteKillReason）
       const kind = kindOf(id), knight = ONW.knight.protect(game, id, kind, new Set(game.eliminated));
       if (!knight) return;
       game.eliminated = game.eliminated.filter((x) => x !== id);
@@ -409,6 +444,7 @@ window.ONW = window.ONW || {};
       changed = false;
       ONW.servantSubPairs(game).forEach(([s, m]) => {
         if (s === m) return;                                        // 自分がご主人: 何も起きない
+        if ((game.curseKillIds || []).includes(m)) return;          // 呪術の人狼の呪殺は身代わりを貫通する（マイクラ版 applyServantSubstitution の isPiercingVoteKillReason）
         if (!game.eliminated.includes(m) || game.eliminated.includes(s)) return;
         if (ONW.isLover(game, s)) return;                         // 従者自身が恋人（恋人陣営）なら身代わりにならない
         if (gone.has(s)) return;                                    // すでに死んでいる従者は身代わりになれない
@@ -434,6 +470,7 @@ window.ONW = window.ONW || {};
   vote.applyMajorSubstitution = function applyMajorSubstitution(game) {
     const gone = new Set(game.deadIds || []);
     (ONW.major ? ONW.major.rescued(game) : []).forEach((t) => {
+      if ((game.curseKillIds || []).includes(t)) return;   // 呪術の人狼の呪殺は身代わりを貫通する（マイクラ版 applyMajorSubstitution の isPiercingVoteKillReason）
       if (!game.eliminated.includes(t)) return;
       const cands = (game.players || []).map((p) => p.id).filter((h) => h !== t && ONW.mimic.eff(game, h) === ONW.ROLE.MAJOR && ONW.major.targetOf(game, h) === t && !game.eliminated.includes(h) && !gone.has(h) && !ONW.hiddenDrunk(game, h) && !(ONW.seal && ONW.seal.is(game, h)));
       if (!cands.length) return;
@@ -476,7 +513,8 @@ window.ONW = window.ONW || {};
     const R = ONW.ROLE, pick = ONW.utils.randomChoice;
     if (ONW.pureLover) ONW.pureLover.sync(game);   // 純愛者: 恋人の組を、投票時点の最終盤面から確定し直す（昼のうちの役職の移動・酔い覚めを反映）
     const done = new Set(game.eliminated), gone = new Set(game.deadIds || []);
-    let queue = [...game.eliminated];
+    // 呪術の人狼の呪殺で死んだ人は、死んではいる（done）が連鎖の波には入れない: 道連れ・暗殺・賞金稼ぎの指名など、めくれたときの能力は一切発動しない（マイクラ版 resolveChainDeaths の isPiercingVoteKillReason の continue）
+    let queue = [...game.eliminated].filter((id) => !(game.curseKillIds || []).includes(id));
     game.chainIds = []; game.chainBy = {}; game.chainKind = {}; game.chainSub = {}; game.strawPending = null; game.toughBlocks = [];
     if (ONW.knight) ONW.knight.reset(game, ["chain"]);   // 騎士: 道連れの守りも、連鎖を解くたびに作り直す（追放の守りは resolveElimination で決まったまま）
     game.kingGuards = (game.kingGuards || []).filter((b) => b.kind !== "tomo");   // 道連れのガードは、連鎖を解くたびに作り直す（追放のガードは resolveElimination で決まったまま）   // game.chainSub[身代わりになった従者] = 守られたご主人（道連れの身代わり）
@@ -590,7 +628,8 @@ window.ONW = window.ONW || {};
       });
     }
     // 始めの心中: 追放・メンタル崩壊・ショック死・昼中の死亡など、resolveChain の前にすでに死んでいる人の相方も、ここで一緒に死ぬ
-    [...game.eliminated, ...gone].forEach((id) => {
+    //   呪殺で死んだ人は除く（心中・後追いは起きない。マイクラ版の貫通扱い）
+    [...game.eliminated.filter((id) => !(game.curseKillIds || []).includes(id)), ...gone].forEach((id) => {
       cupidFollowers(id).forEach((h) => kill(h, id, "follow", false));   // キューピッド: 選んだ2人の一方がすでに死んでいる（追放・昼中の死亡）なら、後を追う
       ONW.loverMates(game, id).forEach((mate) => { if (ONW.steve && ONW.steve.keepsAfterMate(game, mate, id)) return; kill(mate, id, "lovers"); });   // 昼に復活したスティーブは、自分の死で心中した相方のせいで、もう一度は死なない（ONW.steve.keepsAfterMate）
       if (game.currentRoles[id] === R.FOX && ONW.fanatic) ONW.fanatic.followersOf(game).forEach((f) => kill(f, id, "follow", false));   // すでに死んでいる妖狐（追放など）のあとを背徳者が追う
@@ -720,6 +759,7 @@ window.ONW = window.ONW || {};
     Object.keys(game.catSources).forEach((k) => { if (!cats.includes(k)) delete game.catSources[k]; });   // 猫でなくなった人の記録は消す
     const votersOf = (id) => ids.filter((v) => (game.votes || {})[v] === id && ONW.vote.weightOf(game, v) > 0);   // 投票数0票の人（盗賊に盗まれて0票になった人など）が入れた票は、猫の陣営候補にならない（0票を入れている人は参照先に選ばれない・票数にも数えない）
     cats.forEach((id) => {
+      if ((game.curseKillIds || []).includes(id)) { delete game.catSources[id]; return; }   // 呪術の人狼に呪殺された猫は参照先を持たない（マイクラ版 assignSchrodingerSources の curse_kill 除外）
       const vs = votersOf(id);
       if (!vs.length) { delete game.catSources[id]; return; }
       if (!vs.includes(game.catSources[id])) game.catSources[id] = ONW.utils.randomChoice(vs);   // 自分に投票した人からランダムに1人
@@ -819,7 +859,7 @@ window.ONW = window.ONW || {};
     if (!game.currentRoles || !ONW.ROLE.JESTER_MADMAN) return [];
     const ex = new Set(game.executed || []), ck = game.chainKind || {}, promoted = game.promotedWolfIds || [];
     return game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.JESTER_MADMAN && ex.has(id) && (ck[id] === undefined || ck[id] === "tomo")
-      && !promoted.includes(id) && !(ONW.seal && ONW.seal.is(game, id)));
+      && !(game.curseKillIds || []).includes(id) && !promoted.includes(id) && !(ONW.seal && ONW.seal.is(game, id)));   // 呪術の人狼の呪殺は「追放」ではない（マイクラ版の死因 execute / chain だけが対象）
   };
 
   /**
@@ -842,7 +882,7 @@ window.ONW = window.ONW || {};
   vote.cursedWolfIds = function cursedWolfIds(game) {
     if (!game.currentRoles || !ONW.ROLE.CURSED_ONE) return [];
     const ex = new Set(game.executed || []), ck = game.chainKind || {};
-    return game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.CURSED_ONE && ex.has(id) && (ck[id] === undefined || ck[id] === "tomo") && !(ONW.seal && ONW.seal.is(game, id)));
+    return game.players.map((p) => p.id).filter((id) => game.currentRoles[id] === ONW.ROLE.CURSED_ONE && ex.has(id) && (ck[id] === undefined || ck[id] === "tomo") && !(game.curseKillIds || []).includes(id) && !(ONW.seal && ONW.seal.is(game, id)));   // 呪術の人狼に呪殺された呪われし者は人狼陣営にならない（マイクラ版 isCursedOneWolfTeamAtEnd の curse_kill 除外）
   };
 
   vote.determineWinnersCoreBase = function determineWinnersCoreBase(game) {
@@ -870,8 +910,8 @@ window.ONW = window.ONW || {};
     // タフガイのとばっちりで追放された人は、てるてる・一目惚れしてるてる・処刑人のターゲットとしての「追放」には数えない（追放されても、その勝利条件は満たさない）
     const bounced = new Set((game.toughBounces || []).flatMap((b) => b.to || []));
     const bitten = (id) => ["bite", "bomb"].includes((game.chainKind || {})[id]);   // 番犬に噛み殺された人・道化の爆弾魔に爆殺された人: 追放ではないので、てるてる系・賞金稼ぎ・神の祝福の「追放」条件を満たさない
-    const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id));
-    const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id));
+    const tanners = executed.filter((id) => role(id) === R.TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id) && !(game.curseKillIds || []).includes(id));
+    const loveTanners = executed.filter((id) => role(id) === R.LOVE_TANNER && !byLove(id) && !isLover(id) && !bounced.has(id) && !bitten(id) && !(game.curseKillIds || []).includes(id));   // 呪術の人狼に呪殺されたてるてる系は「追放」ではないので勝利しない（マイクラ版 hasExecutedTannerRole の curse_kill 除外）
     // 賞金稼ぎ: 追放（道連れを含む）でめくれて、選んだ相手が人狼判定なら単独勝利。心中・無理心中・タフガイのとばっちりでは発動せず、恋人（重複役職）の賞金稼ぎは勝てない（マイクラ版 applyLimitedSingleWinners）
     const bountyWinIds = (game.bountyResult || []).filter((b) => b.hit && executed.includes(b.by) && !bitten(b.by) && role(b.by) === R.BOUNTY_HUNTER && !byLove(b.by) && !isLover(b.by) && !bounced.has(b.by)).map((b) => b.by);
     const opportunists = ids.filter((id) => role(id) === R.OPPORTUNIST && !dead.has(id));
@@ -894,6 +934,7 @@ window.ONW = window.ONW || {};
     const execLoseIds = execAll.filter(([, tg]) => (!voted.has(tg) || subbed.has(tg) || bounced.has(tg)) && dead.has(tg)).map(([e]) => e);
     // 神の祝福が起きるのは、神が「追放」か「道連れ」で死んだときだけ。心中・無理心中・処刑（処刑人のターゲットとして追放）で死んだ神は、祝福なし
     const godBless = gods.filter((id) => {
+      if ((game.curseKillIds || []).includes(id)) return false;   // 呪術の人狼に呪殺された神は祝福しない（マイクラ版の godExecuted 判定の curse_kill 除外）
       if (!executed.includes(id)) return false;
       const ck = (game.chainKind || {})[id];
       if (ck === "lovers" || ck === "love" || ck === "bite" || ck === "bomb") return false;       // 心中・無理心中・番犬の噛殺・爆殺
@@ -929,7 +970,7 @@ window.ONW = window.ONW || {};
       game.winTitle = title; game.winTitleStage = null; game.winTeams = teams; game.winDetail = detail; game.winners = winnerTeams;   // winTitleStage: 勝利演出の字幕用。追加勝利の「＆〇〇勝利」を付ける前のタイトル（追加勝利は役職の札で出すので、字幕には重ねない）
       const w = new Set(winners);
       game.winBaseIds = [...w].filter((id) => !(title === "神降臨" && game.priestBaseIds && !game.priestBaseIds.includes(id)));   // 神降臨+神官（priestBaseIds）のときは、神だけが陣営の勝者 / 追加勝利の演出用（docs/extra-win-fx.md）: 陣営の勝者としてここまでに決まっていた人。最終の勝者（game.winnerIds）のうちここにいない人が「追加勝利」
-      const shotLoseIds = shotLostIds.filter((id) => role(id) !== R.MARTYR);   // 殉職者は撃たれても勝利条件を失わない（下の shotCut / 追加勝利の後ろの除外から外す）
+      const shotLoseIds = shotLostIds.filter((id) => role(id) !== R.MARTYR && !(role(id) === R.AGENT && ONW.agent && ONW.agent.commandOf(game, id) === "die"));   // 殉職者は撃たれても勝利条件を失わない（下の shotCut / 追加勝利の後ろの除外から外す）。死の指令の代行者も同じ（マイクラ版 sheriffDeathKeepsVictory）
       // 王国滅亡で死んだ人（結果発表で倒れた game.kingdomIds・昼中に倒れた deadKind "queen"）と、倒れた女王は勝者から外す。
       //   メモ（docs/victory-priority.md「王国滅亡の判定メモ」）: 本来は 無理心中した / 反転(+反転が奇数個) / 神の祝福が発動 / 羅刹の愛する人として勝利 / (+コピリスト)つき のときだけ勝てる。ここは今、例外なしで外している（例外は未実装）
       [...(game.kingdomIds || []), ...Object.keys(game.deadKind || {}).filter((id) => game.deadKind[id] === "queen"), ...(game.queenFallen || [])].forEach((id) => w.delete(id));
@@ -989,6 +1030,18 @@ window.ONW = window.ONW || {};
       const nkBel = nkWin.rasetsuBeloved.filter((id) => !lostLover(id));
       nkRas.forEach((id) => w.add(id)); nkBel.forEach((id) => w.add(id));
       if ((nkRas.length || nkBel.length) && !teams.includes("羅刹")) teams.push("羅刹");
+      // 代行者（js/roles/neutral/agent.js・追加勝利。マイクラ版 applyThirdSpecials）: 昼開始時に受けた指令を達成した人が追加で勝利する（静観=生存 / 村人勝利 / 人狼勝利 / 両陣営敗北 / 死亡 / 対象の生存。指令が無い人は静観相当）。勝てなかった恋人・撃たれて勝利条件を失った人は追加勝利しない（死の指令の代行者は shotLoseIds から外れているので撃たれても残る＝マイクラ版 sheriffDeathKeepsVictory）
+      const agentWin = ONW.agent ? ONW.agent.extraWins(game, teams, dead).filter((id) => !lostLover(id) && !shotLoseIds.includes(id)) : [];
+      agentWin.forEach((id) => w.add(id));
+      if (agentWin.length && !teams.includes("代行者")) teams.push("代行者");
+      // エルフリンデ（js/roles/neutral/elfrinde.js・追加勝利。マイクラ版 extraRoles.js）: 人外を封印→村人陣営の勝利で / 村人陣営を封印（侵食）→村人陣営の敗北で / 自分が封印されて封印できなかった→村人陣営の勝利で追加勝利。黄泉に自分・封印した相手を断ち切られたら敗北。勝てなかった恋人は追加勝利しない（他の追加勝利と同じ）
+      const elfWin = ONW.elfrinde ? ONW.elfrinde.extraWins(game, teams, w).filter((id) => !lostLover(id)) : [];
+      elfWin.forEach((id) => w.add(id));
+      if (elfWin.length && !teams.includes("エルフリンデ")) teams.push("エルフリンデ");
+      // 傭兵（js/roles/neutral/mercenary.js・追加勝利。マイクラ版 extraRoles.js）: 護衛対象を死から守れた傭兵が追加で勝利する（自分が死亡した場合は敗北）。勝てなかった恋人は追加勝利しない（他の追加勝利と同じ）
+      const mercWin = ONW.mercenary ? ONW.mercenary.extraWins(game, dead).filter((id) => !lostLover(id)) : [];
+      mercWin.forEach((id) => w.add(id));
+      if (mercWin.length && !teams.includes("傭兵")) teams.push("傭兵");
       // 破局師（マイクラ版の追加勝利）: 破局に成功した（恋人関係を1つでも壊した）カードを最終盤面で持っている人は、どの結果でも追加で勝利（死亡・追放は関係なし）。勝てなかった恋人（本人が恋人）は追加勝利しない
       const breakers = ids.filter((id) => role(id) === R.HEARTBREAKER && ONW.heartbreaker && ONW.heartbreaker.succeeded(game, id) && !lostLover(id));
       breakers.forEach((id) => w.add(id));
@@ -1172,8 +1225,8 @@ window.ONW = window.ONW || {};
       game.godMode = "descend"; game.godIds = godAlive.slice();
       if (priestHelps || madPriestHelps) {   // 死亡している神官: 村人陣営も / 死亡している狂った神官: 人狼陣営も追加で勝つ（マイクラ版 priestTeamWinners / madPriestTeamWinners。恋人・(+反転)・シャッフラーの印がついた人は受けられない）
         const canRecv = (id) => !isLover(id) && !(ONW.reverse && ONW.reverse.is && ONW.reverse.is(game, id)) && !(ONW.shuffler && ONW.shuffler.tagged && ONW.shuffler.tagged(game, id));
-        const vill = priestHelps ? ids.filter((id) => !(game.cursedWolfIds || []).includes(id) && (ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.VILLAGE && canRecv(id)) : [];
-        const wolfSide = madPriestHelps ? ids.filter((id) => ((game.cursedWolfIds || []).includes(id) || (ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF) && canRecv(id)) : [];   // 吊られた呪われし者は人狼陣営の側（ほかの人狼陣営の勝利と同じ）。魔法少女は闇堕ちで人狼側・素では村人側（teamOf）
+        const vill = priestHelps ? ids.filter((id) => !(game.cursedWolfIds || []).includes(id) && (ONW.hotaru && ONW.hotaru.teamOf ? ONW.hotaru.teamOf(game, id) : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.VILLAGE && canRecv(id)) : [];
+        const wolfSide = madPriestHelps ? ids.filter((id) => ((game.cursedWolfIds || []).includes(id) || (ONW.hotaru && ONW.hotaru.teamOf ? ONW.hotaru.teamOf(game, id) : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF) && canRecv(id)) : [];   // 吊られた呪われし者は人狼陣営の側（ほかの人狼陣営の勝利と同じ）。魔法少女は闇堕ちで人狼側・素では村人側（teamOf）。ホタルは村人側・サムは人狼側（ONW.hotaru.teamOf が魔法少女の物差しへ委ねる）
         game.priestBaseIds = godAlive.slice();   // 陣営の勝者は神だけ。村人陣営・人狼陣営は神官・狂った神官の祈りによる「追加勝利」（set が winBaseIds から外す。結果発表の追加勝利の演出・勝者欄の色になる）
         const teams = ["神", ...(priestHelps ? ["村人陣営"] : []), ...(madPriestHelps ? ["人狼陣営"] : [])];
         const winTeams = [ONW.TEAM.THIRD, ...(priestHelps ? [ONW.TEAM.VILLAGE] : []), ...(madPriestHelps ? [ONW.TEAM.WOLF] : [])];
@@ -1191,7 +1244,7 @@ window.ONW = window.ONW || {};
       const tenJ = ONW.vote.tenaciousLostIds(game);
       game.tenaciousCut = tenJ.slice();
       const cwJ = game.cursedWolfIds || [], deadWolvesJ = ONW.vote.wolfJudgeIds(game).filter((id) => dead.has(id));
-      const winJ = ids.filter((id) => (cwJ.includes(id) ? ONW.TEAM.WOLF : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF && !tenJ.includes(id));
+      const winJ = ids.filter((id) => (cwJ.includes(id) ? ONW.TEAM.WOLF : ONW.hotaru && ONW.hotaru.teamOf ? ONW.hotaru.teamOf(game, id) : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF && !tenJ.includes(id));
       return set("人狼陣営勝利", ["人狼陣営"], winJ,
         `道化の狂人 ${nm(jesterIds)} が追放または道連れで死亡したため、人狼陣営の勝利です。${deadWolvesJ.length ? `（死亡した人狼: ${nm(deadWolvesJ)}）` : ""}`, [ONW.TEAM.WOLF]);
     }
@@ -1206,7 +1259,7 @@ window.ONW = window.ONW || {};
       if (wqDead.length) return set("勝者なし", [], [], `女王 ${nm(fallenQueens)} と人狼判定の者 ${nm(wqDead)} が同時に倒れました。村人陣営は勝利条件を失い、人狼陣営も勝てないため勝者なしです。`, []);
       const tenQ = ONW.vote.tenaciousLostIds(game);   // 執念の狂人: 死亡していたら人狼陣営の勝利でも勝てない（封印されていれば勝てる）
       game.tenaciousCut = tenQ.slice();
-      const wolfTeam = ids.filter((id) => (ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF || (game.cursedWolfIds || []).includes(id)).filter((id) => !tenQ.includes(id));
+      const wolfTeam = ids.filter((id) => (ONW.hotaru && ONW.hotaru.teamOf ? ONW.hotaru.teamOf(game, id) : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === ONW.TEAM.WOLF || (game.cursedWolfIds || []).includes(id)).filter((id) => !tenQ.includes(id));
       if (wolfTeam.length) return set("人狼陣営勝利", ["人狼陣営"], wolfTeam, `女王 ${nm(fallenQueens)} が倒れ、人狼判定の者は倒れていないため人狼陣営の勝利です。（村人陣営は勝利条件を失いました）`, [ONW.TEAM.WOLF]);
       return set("勝者なし", [], [], `女王 ${nm(fallenQueens)} が倒れ、村人陣営も人狼陣営も勝利条件を満たしませんでした。`, []);
     }
@@ -1233,7 +1286,7 @@ window.ONW = window.ONW || {};
     const cw = game.cursedWolfIds || [];   // 吊られた呪われし者は人狼陣営の側に入る（村人陣営の勝利には入らない）
     const tenB = side === ONW.TEAM.WOLF ? ONW.vote.tenaciousLostIds(game) : [];   // 執念の狂人: 人狼陣営が勝つ結果（アサシンの逆転・模倣チキンの逆転も含む）でも、死亡していたら勝者から外れる（封印されていれば外れない）
     game.tenaciousCut = tenB.slice();
-    const win = ids.filter((id) => (cw.includes(id) ? ONW.TEAM.WOLF : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === side && !tenB.includes(id));
+    const win = ids.filter((id) => (cw.includes(id) ? ONW.TEAM.WOLF : ONW.hotaru && ONW.hotaru.teamOf ? ONW.hotaru.teamOf(game, id) : ONW.magicalGirl ? ONW.magicalGirl.teamOf(game, id) : ONW.roles.getInfo(role(id)).team) === side && !tenB.includes(id));
     if (cw.length) detail += `（呪われし者 ${nm(cw)} は吊られて人狼陣営になりました）`;
     return set(side === ONW.TEAM.VILLAGE ? "村人陣営勝利" : "人狼陣営勝利", [side === ONW.TEAM.VILLAGE ? "村人陣営" : "人狼陣営"], win, detail, [side]);
   };
@@ -1349,7 +1402,7 @@ window.ONW = window.ONW || {};
     const dead = ONW.vote.deadSet(game);
     const loverWin = new Set(ONW.loverPairs(game).filter(([a, b]) => !dead.has(a) && !dead.has(b)).flat());
     const shot = [...(ONW.sheriff && ONW.sheriff.lostIds ? ONW.sheriff.lostIds(game) : []), ...(ONW.vanity && ONW.vanity.lostIds ? ONW.vanity.lostIds(game) : [])];   // ヴァニティに撃たれて死んだ人も勝利条件を失っている（保安官と同じ）
-    const noWin = new Set(ids.filter((id) => (ONW.isLover(game, id) && !loverWin.has(id) && game.currentRoles[id] !== R.WINNER) || (game.shufflerBan || []).includes(id) || (shot.includes(id) && game.currentRoles[id] !== R.MARTYR) || (game.kingdomIds || []).includes(id) || (game.queenFallen || []).includes(id) || (game.deadKind || {})[id] === "queen"));
+    const noWin = new Set(ids.filter((id) => (ONW.isLover(game, id) && !loverWin.has(id) && game.currentRoles[id] !== R.WINNER) || (game.shufflerBan || []).includes(id) || (shot.includes(id) && game.currentRoles[id] !== R.MARTYR && !(game.currentRoles[id] === R.AGENT && ONW.agent && ONW.agent.commandOf(game, id) === "die")) || (game.kingdomIds || []).includes(id) || (game.queenFallen || []).includes(id) || (game.deadKind || {})[id] === "queen"));
     const before = new Set(game.winnerIds || []);
     const pIds = ids.filter((id) => game.currentRoles[id] === R.PRANKSTER);
     const targetIsPrankster = rec.t !== hid && game.currentRoles[rec.t] === R.PRANKSTER;

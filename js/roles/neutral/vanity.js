@@ -118,7 +118,7 @@ function wins(g, id, teams, winners) {
 const e = (g.vanityShots || []).find((x) => x.by === id);
 if (!e ||!e.kind) return false;
 let villageWon = (teams || []).includes("村人陣営");
-if (villageWon && winners) { const cw = g.cursedWolfIds || []; villageWon = [...winners].some((x) => x !== id && !cw.includes(x) && (ONW.magicalGirl ? ONW.magicalGirl.teamOf(g, x) : ((ONW.ROLE_INFO[(g.currentRoles || {})[x]] || {}).team)) === ONW.TEAM.VILLAGE); }
+if (villageWon && winners) { const cw = g.cursedWolfIds || []; villageWon = [...winners].some((x) => x !== id && !cw.includes(x) && (ONW.hotaru && ONW.hotaru.teamOf ? ONW.hotaru.teamOf(g, x) : ONW.magicalGirl ? ONW.magicalGirl.teamOf(g, x) : ((ONW.ROLE_INFO[(g.currentRoles || {})[x]] || {}).team)) === ONW.TEAM.VILLAGE); }
 return e.kind === "outsider"? villageWon:!villageWon;
 }
 /** 結果発表「昼行動結果」の1行（保安官と同じ言い回し。誰が誰を撃ったかだけ） */

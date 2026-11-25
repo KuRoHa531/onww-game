@@ -253,9 +253,9 @@ window.ONW = window.ONW || {};
 
   /** 役職の一覧（配役設定・役職設定の詳細設定で共通）。並びは wiki 順（ONW.sortByRoleOrder = ONW.ROLE_ORDER） */
   function roleLists() {
-    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi", "carmen", "knight", "trailblazer"]);
-    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman", "mad_priest"]), dark = ["dark_avatar"];
-    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher", "vanity", "beggar", "magical_girl", "matthias", "chesed", "yokai_tanuki", "nanoka"]);   // 娘ちゃん(daughter)と なのかの形態3種は内部専用役職なので配役設定の一覧には出さない
+    const village = ONW.sortByRoleOrder(["light_apostle", "villager", "seer", "robber", "relic_robber", "troublemaker", "insomniac", "mason", "merlin", "wolf_dreamer", "spy", "cosplayer", "wolf_marked", "fox_marked", "keymaster", "straw_doll", "cat_sidhe", "baker", "star", "newspaper", "chicken", "mayor", "visitor", "queen", "tough_guy", "dictator", "exchanger", "penguin", "watchdog", "sheriff", "cursed_one", "thief", "sense_seer", "princess", "libra", "fake_seer", "poet", "major", "finger_reader", "gambler", "priest", "fairy", "aa", "goranshin", "steve", "icarus", "election_manager", "moses", "yomi", "carmen", "knight", "trailblazer", "hokma"]);
+    const wolfLike = ONW.sortByRoleOrder(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "command_wolf", "curse_wolf"]), madLike = ONW.sortByRoleOrder(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen", "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman", "mad_priest"]), dark = ["dark_avatar"];
+    const third = ONW.sortByRoleOrder(["silver_shadow", "tanner", "love_tanner", "god", "opportunist", "amanojaku", "freeter", "servant", "winner", "loser", "doppelganger", "schrodinger_cat", "executioner", "gremlin", "pure_lover", "evil_woman", "cupid", "heartbreaker", "shuffler", "bounty_hunter", "fox", "fanatic", "balancer", "avenger", "prankster", "jester_bomber", "detective", "demon_duke", "martyr", "predictor", "reverser", "lawyer", "watcher", "vanity", "beggar", "magical_girl", "matthias", "chesed", "yokai_tanuki", "nanoka", "agent", "elfrinde", "hotaru", "mercenary"]);   // 娘ちゃん(daughter)と なのかの形態3種・サム(sam)は内部専用役職なので配役設定の一覧には出さない
     return { village, wolfLike, madLike, dark, third };
   }
 
@@ -1253,7 +1253,7 @@ window.ONW = window.ONW || {};
     const g = ONW.game, flash = (t) => { g.abilityMsg = t; ui.render(g); setTimeout(() => { if (g.abilityMsg === t) { g.abilityMsg = ""; ui.render(g); } }, 4000); };
     if (g.phase !== ONW.PHASE.ONLINE_DAY || g.isDead || g.isSpectator) return;
     if (kind === "day") {   // 昼能力: 独裁者だけが使える。押すとホストに確認し、使える人にだけカード選択が開く（使えない人は押しても何も起きない = 誰が独裁者か透けない）。もう一度押すと閉じる
-      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen || g.yomiOpen || g.thiefOpen || g.fairyOpen || g.icarusOpen || g.goranshinOpen || g.libraOpen || g.predOpen) { g.yomiOpen = false; g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.thiefOpen = false; g.fairyOpen = false; g.icarusOpen = false; g.goranshinOpen = false; g.libraOpen = false; g.predOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
+      if (g.dictOpen || g.rejobOpen || g.mindOpen || g.exchOpen || g.sheriffOpen || g.yomiOpen || g.thiefOpen || g.fairyOpen || g.icarusOpen || g.goranshinOpen || g.libraOpen || g.predOpen || g.hokmaOpen || g.agentOpen) { g.yomiOpen = false; g.dictOpen = false; g.rejobOpen = false; g.mindOpen = false; g.exchOpen = false; g.sheriffOpen = false; g.thiefOpen = false; g.fairyOpen = false; g.icarusOpen = false; g.goranshinOpen = false; g.libraOpen = false; g.predOpen = false; g.hokmaOpen = false; g.agentOpen = false; g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); ui.render(g); return; }
       ONW.net.dictOpen();
       return;
     }
@@ -1614,6 +1614,77 @@ window.ONW = window.ONW || {};
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
       <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.icarusConfirm()">票を分け与える</button><button class="btn" onclick="ONW.ui.icarusCancel()">キャンセル</button></div>
+    </div>`;
+  };
+  /** ホクマー: 議論時間を10秒短縮する（確定）。対象は選ばない。何度でも使える。議論は続く */
+  ui.hokmaUse = function () {
+    const g = ONW.game;
+    if (!g.hokmaOpen) return;
+    g.hokmaOpen = false;
+    ONW.net.hokma();
+    ONW.stage.sync(g); ui.render(g);
+  };
+  ui.hokmaCancel = function () {
+    const g = ONW.game;
+    g.hokmaOpen = false;
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 代行者: 指令対象を確認する（確定）。対象は選ばない。「対象を守れ」の指令のときだけ、1日1回 */
+  ui.agentUse = function () {
+    const g = ONW.game;
+    if (!g.agentOpen) return;
+    g.agentOpen = false;
+    ONW.net.agent();
+    ONW.stage.sync(g); ui.render(g);
+  };
+  ui.agentCancel = function () {
+    const g = ONW.game;
+    g.agentOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 代行者（思い込み）: 守る対象を選んで使う（偽の昼能力） */
+  ui.agentFakeConfirm = function () {
+    const g = ONW.game, id = g.nightSel && g.nightSel.players && g.nightSel.players[0];
+    if (!g.agentOpen || !id) return;
+    g.agentOpen = false; g.nightSel = { players: [], graves: [] };
+    ONW.net.agentFake(id);
+    ONW.stage.sync(g); ui.render(g);
+  };
+  /** 代行者の昼能力の操作欄（昼能力ボタンで開いたとき）。本物は「指令対象を確認する」を押すだけ。思い込み（agentPick）のときは対象を1人選ぶ */
+  ui.agentBlock = function (game) {
+    if (game.isDead || game.isSpectator) return "";
+    if (!game.agentOpen) return "";
+    if (game.agentPick) {
+      const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
+      const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
+      return `<div class="sober-box dict-box">
+      ${ui.abHelpStart(game)}
+      <p class="night-step__hint"><strong>代行者の昼能力</strong>: 上のテーブルから、<strong>守る対象のカード</strong>を押してください（自分以外の1人）。</p>
+      <p class="night-step__hint">「守る対象にする」を押すと、その人を守る対象にします。取り消せません。</p>
+      </details>
+      <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.agentFakeConfirm()">守る対象にする</button><button class="btn" onclick="ONW.ui.agentCancel()">キャンセル</button></div>
+    </div>`;
+    }
+    return `<div class="sober-box dict-box">
+      ${ui.abHelpStart(game)}
+      <p class="night-step__hint"><strong>代行者の昼能力</strong>: 「指令対象を確認する」を押すと、あなたの指令対象が分かります。</p>
+      <p class="night-step__hint">指令対象が生存していれば追加勝利します。確認できるのは1日1回だけです。取り消せません。</p>
+      </details>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" onclick="ONW.ui.agentUse()">指令対象を確認する</button><button class="btn" onclick="ONW.ui.agentCancel()">キャンセル</button></div>
+    </div>`;
+  };
+  /** ホクマーの昼能力の操作欄（昼能力ボタンで開いたとき）。対象は選ばず、「昼時間を10秒短縮する」を押すだけ。使ったあとも、昼能力ボタンからまた開いて使える */
+  ui.hokmaBlock = function (game) {
+    if (game.isDead || game.isSpectator) return "";
+    if (!game.hokmaOpen) return "";
+    const n = game.hokmaCount || 0;
+    return `<div class="sober-box dict-box">
+      ${ui.abHelpStart(game)}
+      <p class="night-step__hint"><strong>ホクマーの昼能力</strong>: 「昼時間を10秒短縮する」を押すと、議論時間が<strong>10秒短く</strong>なります。</p>
+      <p class="night-step__hint">何度でも使えます（使うたびに10秒ずつ短くなります）。使うと全員の画面に時計が薄く浮き出て針が進む演出が出ます（だれが使ったかは分かりません）。取り消せません。${n ? `（これまでに${n}回使いました）` : ""}</p>
+      </details>
+      <div class="btn-row" style="justify-content:center;"><button class="btn" onclick="ONW.ui.hokmaUse()">昼時間を10秒短縮する</button><button class="btn" onclick="ONW.ui.hokmaCancel()">キャンセル</button></div>
     </div>`;
   };
   /** 御乱心: 選んだ相手の投票先をランダムに変える（確定）。取り消せない。議論は続く */
@@ -2034,6 +2105,8 @@ window.ONW = window.ONW || {};
         ${ui.yomiBlock(game)}
         ${ui.icarusBlock(game)}
         ${ui.goranshinBlock(game)}
+        ${ui.hokmaBlock(game)}
+        ${ui.agentBlock(game)}
         ${ui.rejobBlock(game)}
         ${ui.mindBlock(game)}
         ${game.abilityMsg ? `<p class="night-step__hint"><strong>${esc(game.abilityMsg)}</strong></p>` : ""}
@@ -2215,10 +2288,11 @@ window.ONW = window.ONW || {};
             [...(res.sheriffs || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">保安官:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
             [...(res.vanities || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">ヴァニティ:</span> ${esc(x.by)} が ${esc(x.target)} を撃った結果: ${esc(x.info)}`))],
             [...(res.beggars || []).filter((x) => x.info).map((x) => L(`<span class="rs-info">乞食:</span> ${esc(x.info)}`))],
+            [...(res.curseKills || []).map((x) => L(`<span class="rs-info">呪術の人狼:</span> ${esc(x.by)} は ${esc(x.target)} を呪殺しました。`))],
             [...(res.knightInfo || []).map((x) => L(`<span class="rs-info">${x.tb ? "存護" : "騎士"}:</span> ${esc(x.text)}`))],
             [...(res.prankster ? [L(`<span class="rs-info">愉快犯:</span> ${esc(res.prankster.name)} が適用されました。対象は ${esc(res.prankster.target)} です。`), L(`<span class="rs-info">[条件]</span> ${esc(res.prankster.label)}（${res.prankster.success ? "成立" : "不成立"}）`)] : []),
       ...((res.bomber && res.bomber.bombers) || []).map((x) => L(`<span class="rs-info">道化の爆弾魔:</span> ${esc(x.name)} が吊られて自爆しました。${x.names.length ? `${(x.loseNames || x.names).length ? `${(x.loseNames || x.names).map(esc).join("、")} が爆発して敗北しました。` : ""}${(x.keepNames || []).length ? `殉職者 ${x.keepNames.map(esc).join("、")} は爆発しても勝利条件を失いません。` : ""}` : "爆発する人はいませんでした。"}`))],
-            [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`)), ...(res.matthiasPairs || []).map((p) => L(`<span class="rs-info">マティアス:</span> ${esc(p[0])} は ${esc(p[1])} を娘ちゃんにしていました。`)), ...(res.cheseds || []).map((p) => L(`<span class="rs-info">ケセド:</span> ${esc(p.by)} は ${esc(p.target)} を占い（${esc(p.result)}）、結果とコーヒーを ${esc(p.recipient)} に渡していました。`)), ...(res.nanokaLong || []).map((p) => L(`<span class="rs-info">長夜月:</span> ${esc(p.by)} は ${esc(p.target)} に長夜をつけていました。`)), ...(res.nanokaLove || []).map((p) => L(`<span class="rs-info">羅刹:</span> ${esc(p.by)} の愛する人は ${esc(p.target)} でした。`))],
+            [...(res.lawyers || []).map((p) => L(`<span class="rs-info">弁護士:</span> ${esc(p[0])} は ${esc(p[1])} を弁護していました。`)), ...(res.servants || []).map((p) => L(`<span class="rs-info">従者:</span> ${esc(p[0])} のご主人は ${esc(p[1])} です。`)), ...(res.matthiasPairs || []).map((p) => L(`<span class="rs-info">マティアス:</span> ${esc(p[0])} は ${esc(p[1])} を娘ちゃんにしていました。`)), ...(res.cheseds || []).map((p) => L(`<span class="rs-info">ケセド:</span> ${esc(p.by)} は ${esc(p.target)} を占い（${esc(p.result)}）、結果とコーヒーを ${esc(p.recipient)} に渡していました。`)), ...(res.agents || []).map((p) => L(`<span class="rs-info">代行者:</span> ${esc(p.text)}`)), ...(res.elfrindes || []).map((p) => L(`<span class="rs-info">エルフリンデ:</span> ${esc(p.text)}`)), ...(res.mercenaries || []).map((p) => L(`<span class="rs-info">傭兵:</span> ${esc(p.text)}`)), ...(res.nanokaLong || []).map((p) => L(`<span class="rs-info">長夜月:</span> ${esc(p.by)} は ${esc(p.target)} に長夜をつけていました。`)), ...(res.nanokaLove || []).map((p) => L(`<span class="rs-info">羅刹:</span> ${esc(p.by)} の愛する人は ${esc(p.target)} でした。`))],
             [...(res.muzzles || []).map((x) => L(`<span class="rs-info">口封じの狂人:</span> ${esc(x.by)} は ${esc(x.target)} を口封じしました。`)), ...(res.hacks || []).map((x) => L(`<span class="rs-info">銀狼:</span> ${esc(x.by)} は ${esc(x.target)} をハッキングしていました。${x.fake ? `（${esc(x.target)} は ${esc(x.fake)} と思い込んでいました${x.cut ? "が、黄泉に断ち切られました" : ""}）` : ""}`))],
             [...(res.mimics || []).map((x) => L(`<span class="rs-info">模倣の人狼:</span> ${esc(x.by)} は ${x.grave ? "墓地から引いたあと " : ""}${esc(x.role)} の能力を模倣していました。`)), ...(res.trails || []).map((x) => L(`<span class="rs-info">開拓者:</span> ${esc(x.by)} は ${esc(x.name)}の運命を歩んでいました。`))],   // 何を模倣したかは夜行動結果ではなく役職情報
             ...((res.detective && res.detective.boards) || []).map((b) => {   // 名探偵情報（マイクラ版 buildDetectiveResultLines と同じ。名探偵ごとに1組）

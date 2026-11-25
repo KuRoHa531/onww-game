@@ -37,7 +37,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=20261125-13">
+<link rel="stylesheet" href="css/style.css?v=20261125-20">
 </head>
 <body>
 
@@ -102,168 +102,175 @@
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <!-- アカウント機能（Supabase）。js/config.js が空ならゲストプレイだけが動く -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/state.js?v=20261125-13"></script>
-  <script src="js/sound.js?v=20261125-13"></script>   <!-- BGM/SE（js/sound.js。他に依存しない。ONW.sound を各所から呼ぶ） -->
-  <script src="js/role-desc-mc.js?v=20261125-13"></script>   <!-- 配布時・役職確認の説明文（マイクラ版から転記。ONW.roleDesc が使う。Web版だけ違う役職は役職ファイルの info.descShort で上書き） -->
-  <script src="js/roleorder.js?v=20261125-13"></script>
-  <script src="js/utils.js?v=20261125-13"></script>
-  <script src="js/assign.js?v=20261125-13"></script>
-  <script src="js/config.js?v=20261125-13"></script>
-  <script src="js/account.js?v=20261125-13"></script>
-  <script src="js/friends.js?v=20261125-13"></script>
-  <script src="js/settings.js?v=20261125-13"></script>
-  <script src="js/png.js?v=20261125-13"></script>
+  <script src="js/state.js?v=20261125-20"></script>
+  <script src="js/sound.js?v=20261125-20"></script>   <!-- BGM/SE（js/sound.js。他に依存しない。ONW.sound を各所から呼ぶ） -->
+  <script src="js/role-desc-mc.js?v=20261125-20"></script>   <!-- 配布時・役職確認の説明文（マイクラ版から転記。ONW.roleDesc が使う。Web版だけ違う役職は役職ファイルの info.descShort で上書き） -->
+  <script src="js/roleorder.js?v=20261125-20"></script>
+  <script src="js/utils.js?v=20261125-20"></script>
+  <script src="js/assign.js?v=20261125-20"></script>
+  <script src="js/config.js?v=20261125-20"></script>
+  <script src="js/account.js?v=20261125-20"></script>
+  <script src="js/friends.js?v=20261125-20"></script>
+  <script src="js/settings.js?v=20261125-20"></script>
+  <script src="js/png.js?v=20261125-20"></script>
   <!-- 役職ファイル（1役職1ファイル）。役職を足すときは js/roles/<village|wolf/wolf|wolf/mad|neutral>/<役職ID>.js を作って、下の該当する陣営の並びに1行足すだけ(村人陣営=village / 人狼陣営=wolf / 第三陣営=neutral)。
        base.js(登録の仕組み)と wolf_base.js(人狼系の共有部品)は必ず先頭。役職ファイル同士の順番は関係ない。net.js より前に読み込む -->
-  <script src="js/roles/base.js?v=20261125-13"></script>
-  <script src="js/roles/wolf_base.js?v=20261125-13"></script>
+  <script src="js/roles/base.js?v=20261125-20"></script>
+  <script src="js/roles/wolf_base.js?v=20261125-20"></script>
   <!-- 村人陣営 -->
-  <script src="js/roles/village/baker.js?v=20261125-13"></script>
-  <script src="js/roles/village/cat_sidhe.js?v=20261125-13"></script>
-  <script src="js/roles/village/chicken.js?v=20261125-13"></script>
-  <script src="js/roles/village/insomniac.js?v=20261125-13"></script>
-  <script src="js/roles/village/light_apostle.js?v=20261125-13"></script>
-  <script src="js/roles/village/mason.js?v=20261125-13"></script>
-  <script src="js/roles/village/mayor.js?v=20261125-13"></script>
-  <script src="js/roles/village/merlin.js?v=20261125-13"></script>
-  <script src="js/roles/village/newspaper.js?v=20261125-13"></script>
-  <script src="js/roles/village/queen.js?v=20261125-13"></script>
-  <script src="js/roles/village/relic_robber.js?v=20261125-13"></script>
-  <script src="js/roles/village/robber.js?v=20261125-13"></script>
-  <script src="js/roles/village/seer.js?v=20261125-13"></script>
-  <script src="js/roles/village/star.js?v=20261125-13"></script>
-  <script src="js/roles/village/straw_doll.js?v=20261125-13"></script>
-  <script src="js/roles/village/tough_guy.js?v=20261125-13"></script>
-  <script src="js/roles/village/troublemaker.js?v=20261125-13"></script>
-  <script src="js/roles/village/villager.js?v=20261125-13"></script>
-  <script src="js/roles/village/visitor.js?v=20261125-13"></script>
-  <script src="js/roles/village/wolf_dreamer.js?v=20261125-13"></script>
-  <script src="js/roles/village/wolf_marked.js?v=20261125-13"></script>
-  <script src="js/roles/village/fox_marked.js?v=20261125-13"></script>
-  <script src="js/roles/village/keymaster.js?v=20261125-13"></script>
-  <script src="js/roles/village/dictator.js?v=20261125-13"></script>
-  <script src="js/roles/village/exchanger.js?v=20261125-13"></script>
-  <script src="js/roles/village/penguin.js?v=20261125-13"></script>
-  <script src="js/roles/village/watchdog.js?v=20261125-13"></script>
-  <script src="js/roles/village/sheriff.js?v=20261125-13"></script>
-  <script src="js/roles/village/cursed_one.js?v=20261125-13"></script>
-  <script src="js/roles/village/thief.js?v=20261125-13"></script>
-  <script src="js/roles/village/sense_seer.js?v=20261125-13"></script>
-  <script src="js/roles/village/princess.js?v=20261125-13"></script>
-<script src="js/roles/village/libra.js?v=20261125-13"></script>
-  <script src="js/roles/village/fake_seer.js?v=20261125-13"></script>
-  <script src="js/roles/village/poet.js?v=20261125-13"></script>
-  <script src="js/roles/village/spy.js?v=20261125-13"></script>
-  <script src="js/roles/village/cosplayer.js?v=20261125-13"></script>
-<script src="js/roles/village/major.js?v=20261125-13"></script>
-  <script src="js/roles/village/finger_reader.js?v=20261125-13"></script>
-  <script src="js/roles/village/gambler.js?v=20261125-13"></script>
-  <script src="js/roles/village/priest.js?v=20261125-13"></script>
-  <script src="js/roles/village/fairy.js?v=20261125-13"></script>
-  <script src="js/roles/village/aa.js?v=20261125-13"></script>
-  <script src="js/roles/village/goranshin.js?v=20261125-13"></script>
-  <script src="js/roles/village/steve.js?v=20261125-13"></script>
-  <script src="js/roles/village/icarus.js?v=20261125-13"></script>
-   <script src="js/roles/village/election_manager.js?v=20261125-13"></script>
-  <script src="js/roles/village/moses.js?v=20261125-13"></script>
-  <script src="js/roles/village/yomi.js?v=20261125-13"></script>
-  <script src="js/roles/village/carmen.js?v=20261125-13"></script>
-  <script src="js/roles/village/knight.js?v=20261125-13"></script>
-  <script src="js/roles/village/trailblazer.js?v=20261125-13"></script>
+  <script src="js/roles/village/baker.js?v=20261125-20"></script>
+  <script src="js/roles/village/cat_sidhe.js?v=20261125-20"></script>
+  <script src="js/roles/village/chicken.js?v=20261125-20"></script>
+  <script src="js/roles/village/insomniac.js?v=20261125-20"></script>
+  <script src="js/roles/village/light_apostle.js?v=20261125-20"></script>
+  <script src="js/roles/village/mason.js?v=20261125-20"></script>
+  <script src="js/roles/village/mayor.js?v=20261125-20"></script>
+  <script src="js/roles/village/merlin.js?v=20261125-20"></script>
+  <script src="js/roles/village/newspaper.js?v=20261125-20"></script>
+  <script src="js/roles/village/queen.js?v=20261125-20"></script>
+  <script src="js/roles/village/relic_robber.js?v=20261125-20"></script>
+  <script src="js/roles/village/robber.js?v=20261125-20"></script>
+  <script src="js/roles/village/seer.js?v=20261125-20"></script>
+  <script src="js/roles/village/star.js?v=20261125-20"></script>
+  <script src="js/roles/village/straw_doll.js?v=20261125-20"></script>
+  <script src="js/roles/village/tough_guy.js?v=20261125-20"></script>
+  <script src="js/roles/village/troublemaker.js?v=20261125-20"></script>
+  <script src="js/roles/village/villager.js?v=20261125-20"></script>
+  <script src="js/roles/village/visitor.js?v=20261125-20"></script>
+  <script src="js/roles/village/wolf_dreamer.js?v=20261125-20"></script>
+  <script src="js/roles/village/wolf_marked.js?v=20261125-20"></script>
+  <script src="js/roles/village/fox_marked.js?v=20261125-20"></script>
+  <script src="js/roles/village/keymaster.js?v=20261125-20"></script>
+  <script src="js/roles/village/dictator.js?v=20261125-20"></script>
+  <script src="js/roles/village/exchanger.js?v=20261125-20"></script>
+  <script src="js/roles/village/penguin.js?v=20261125-20"></script>
+  <script src="js/roles/village/watchdog.js?v=20261125-20"></script>
+  <script src="js/roles/village/sheriff.js?v=20261125-20"></script>
+  <script src="js/roles/village/cursed_one.js?v=20261125-20"></script>
+  <script src="js/roles/village/thief.js?v=20261125-20"></script>
+  <script src="js/roles/village/sense_seer.js?v=20261125-20"></script>
+  <script src="js/roles/village/princess.js?v=20261125-20"></script>
+<script src="js/roles/village/libra.js?v=20261125-20"></script>
+  <script src="js/roles/village/fake_seer.js?v=20261125-20"></script>
+  <script src="js/roles/village/poet.js?v=20261125-20"></script>
+  <script src="js/roles/village/spy.js?v=20261125-20"></script>
+  <script src="js/roles/village/cosplayer.js?v=20261125-20"></script>
+<script src="js/roles/village/major.js?v=20261125-20"></script>
+  <script src="js/roles/village/finger_reader.js?v=20261125-20"></script>
+  <script src="js/roles/village/gambler.js?v=20261125-20"></script>
+  <script src="js/roles/village/priest.js?v=20261125-20"></script>
+  <script src="js/roles/village/fairy.js?v=20261125-20"></script>
+  <script src="js/roles/village/aa.js?v=20261125-20"></script>
+  <script src="js/roles/village/goranshin.js?v=20261125-20"></script>
+  <script src="js/roles/village/steve.js?v=20261125-20"></script>
+  <script src="js/roles/village/icarus.js?v=20261125-20"></script>
+   <script src="js/roles/village/election_manager.js?v=20261125-20"></script>
+  <script src="js/roles/village/moses.js?v=20261125-20"></script>
+  <script src="js/roles/village/yomi.js?v=20261125-20"></script>
+  <script src="js/roles/village/carmen.js?v=20261125-20"></script>
+  <script src="js/roles/village/knight.js?v=20261125-20"></script>
+  <script src="js/roles/village/trailblazer.js?v=20261125-20"></script>
+  <script src="js/roles/village/hokma.js?v=20261125-20"></script>
   <!-- 人狼陣営 -->
   <!-- 　人狼系 -->
-  <script src="js/roles/wolf/wolf/assassin.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/big_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/dark_avatar.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/forgetful_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/lone_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/mapo_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/observer_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/mind_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/mimic_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/eraser_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/mirage_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/silver_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/tofu_wolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/werewolf.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/wolf_king.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/white_wolf.js?v=20261125-13"></script>
+  <script src="js/roles/wolf/wolf/assassin.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/big_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/dark_avatar.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/forgetful_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/lone_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/mapo_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/observer_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/mind_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/mimic_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/eraser_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/mirage_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/silver_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/command_wolf.js?v=20261125-20"></script>
+<script src="js/roles/wolf/wolf/curse_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/tofu_wolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/werewolf.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/wolf_king.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/white_wolf.js?v=20261125-20"></script>
   <!-- 　狂人系 -->
-  <script src="js/roles/wolf/mad/black_cat.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/wolf/cat_pumpkin.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/cultist.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/exposed_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/muzzle_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/rebel_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/mad_queen.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/black_wolf_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/mad_mayor.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/seal_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/mad_exchanger.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/tenacious_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/jester_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/smoke_madman.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/mad_priest.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/mad_seer.js?v=20261125-13"></script>
-  <script src="js/roles/wolf/mad/madman.js?v=20261125-13"></script>
+  <script src="js/roles/wolf/mad/black_cat.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/wolf/cat_pumpkin.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/cultist.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/exposed_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/muzzle_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/rebel_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/mad_queen.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/black_wolf_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/mad_mayor.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/seal_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/mad_exchanger.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/tenacious_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/jester_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/smoke_madman.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/mad_priest.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/mad_seer.js?v=20261125-20"></script>
+  <script src="js/roles/wolf/mad/madman.js?v=20261125-20"></script>
   <!-- 第三陣営 -->
-  <script src="js/roles/neutral/amanojaku.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/bounty_hunter.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/doppelganger.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/executioner.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/fox.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/fanatic.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/foxvote.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/freeter.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/god.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/gremlin.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/loser.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/love_tanner.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/opportunist.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/pure_lover.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/evil_woman.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/balancer.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/detective.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/demon_duke.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/martyr.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/predictor.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/reverser.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/lawyer.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/watcher.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/avenger.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/prankster.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/jester_bomber.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/cupid.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/heartbreaker.js?v=20261125-13"></script>
-<script src="js/roles/neutral/shuffler.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/schrodinger_cat.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/vanity.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/beggar.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/magical_girl.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/matthias.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/chesed.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/yokai_tanuki.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/nanoka.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/servant.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/silver_shadow.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/tanner.js?v=20261125-13"></script>
-  <script src="js/roles/neutral/winner.js?v=20261125-13"></script>
-  <script src="js/net.js?v=20261125-13"></script>
-  <script src="js/roles.js?v=20261125-13"></script>
-  <script src="js/cpu.js?v=20261125-13"></script>
-  <script src="js/cpu-talk.js?v=20261125-13"></script>   <!-- CPUの会話（人間・他CPUのチャット/COへの返事。マイクラ版 cpuDiscussionTalk の移植。docs/cpu-talk.md） -->
-  <script src="js/cpu-ai.js?v=20261125-13"></script>   <!-- CPU AI議論(β版): ホストの端末の小型AI（WebLLM）の対応判定・インストール確認。docs/cpu-ai.md -->
-  <script src="js/night.js?v=20261125-13"></script>
-  <script src="js/vote.js?v=20261125-13"></script>
-  <script src="js/ui.js?v=20261125-13"></script>
-  <script src="js/stage.js?v=20261125-13"></script>
-  <script src="js/account-ui.js?v=20261125-13"></script>
-  <script src="js/stats.js?v=20261125-13"></script>
-  <script src="js/profile.js?v=20261125-13"></script>
-  <script src="js/co.js?v=20261125-13"></script>
-  <script src="js/debug.js?v=20261125-13"></script>
-  <script src="js/wikiview.js?v=20261125-13"></script>
-  <script src="js/rolebook.js?v=20261125-13"></script>
+  <script src="js/roles/neutral/amanojaku.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/bounty_hunter.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/doppelganger.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/executioner.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/fox.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/fanatic.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/foxvote.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/freeter.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/god.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/gremlin.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/loser.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/love_tanner.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/opportunist.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/pure_lover.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/evil_woman.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/balancer.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/detective.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/demon_duke.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/martyr.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/predictor.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/reverser.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/lawyer.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/watcher.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/avenger.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/prankster.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/jester_bomber.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/cupid.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/heartbreaker.js?v=20261125-20"></script>
+<script src="js/roles/neutral/shuffler.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/schrodinger_cat.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/vanity.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/beggar.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/magical_girl.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/matthias.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/chesed.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/yokai_tanuki.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/nanoka.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/agent.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/elfrinde.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/hotaru.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/mercenary.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/servant.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/silver_shadow.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/tanner.js?v=20261125-20"></script>
+  <script src="js/roles/neutral/winner.js?v=20261125-20"></script>
+  <script src="js/net.js?v=20261125-20"></script>
+  <script src="js/roles.js?v=20261125-20"></script>
+  <script src="js/cpu.js?v=20261125-20"></script>
+  <script src="js/cpu-talk.js?v=20261125-20"></script>   <!-- CPUの会話（人間・他CPUのチャット/COへの返事。マイクラ版 cpuDiscussionTalk の移植。docs/cpu-talk.md） -->
+  <script src="js/cpu-ai.js?v=20261125-20"></script>   <!-- CPU AI議論(β版): ホストの端末の小型AI（WebLLM）の対応判定・インストール確認。docs/cpu-ai.md -->
+  <script src="js/night.js?v=20261125-20"></script>
+  <script src="js/vote.js?v=20261125-20"></script>
+  <script src="js/ui.js?v=20261125-20"></script>
+  <script src="js/stage.js?v=20261125-20"></script>
+  <script src="js/account-ui.js?v=20261125-20"></script>
+  <script src="js/stats.js?v=20261125-20"></script>
+  <script src="js/profile.js?v=20261125-20"></script>
+  <script src="js/co.js?v=20261125-20"></script>
+  <script src="js/debug.js?v=20261125-20"></script>
+  <script src="js/wikiview.js?v=20261125-20"></script>
+  <script src="js/rolebook.js?v=20261125-20"></script>
   <script>
     /* スマホのキーボードで画面の高さが縮んでも、レイアウトをずらさない: --app-h に「キーボードが無い時の高さ」を保持する */
     (function () {
@@ -281,6 +288,6 @@
       document.addEventListener("webkitfullscreenchange", refit);
     })();
   </script>
-  <script src="js/main.js?v=20261125-13"></script>
+  <script src="js/main.js?v=20261125-20"></script>
 </body>
 </html>

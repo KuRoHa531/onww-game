@@ -40,6 +40,10 @@
     "matthias", "daughter",   // マティアス・娘ちゃん（マイクラ版 shufflerEligibleRoles が両方とも除外。娘ちゃんは内部専用役職）
     "chesed",   // ケセド（マイクラ版 shufflerEligibleRoles の除外どおり。夜に2人を選ぶ役職）
     "nanoka",   // なのか（マイクラ版 shufflerEligibleRoles の除外どおり。形態3種は除外しない＝山札に入る。形態が置かれたら対象は state.js の assignDerived で割り当てる）
+    "command_wolf",   // 統率の人狼（マイクラ版 shufflerEligibleRoles の除外どおり）
+    "elfrinde",   // エルフリンデ（マイクラ版 shufflerEligibleRoles の除外どおり。夜に封印する役職）
+    "sam",   // サム（マイクラ版 shufflerEligibleRoles の除外どおり。ホタルが変身した姿の内部専用役職。ホタル自体は山札に入る）
+    "mercenary",   // 傭兵（マイクラ版 shufflerEligibleRoles の除外どおり。夜に護衛対象を選ぶ役職）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
   function pool() {
@@ -117,7 +121,7 @@
   function pairFails(g, [sh, th, , self], w, dead) {
     const asg = g.currentRoles[th];
     if (asg === ONW.ROLE.WINNER) return !self && (dead.has(sh) || dead.has(th));   // 勝ち組: 対象は必ず勝つ。シャッフラーだけが死亡条件を見る
-    const allowDeath = DEATH_WIN().includes(asg) && w.has(th);
+    const allowDeath = (DEATH_WIN().includes(asg) || (asg === ONW.ROLE.AGENT && ONW.agent && ONW.agent.commandOf(g, th) === "die")) && w.has(th);   // 死の指令の代行者も「死んで勝った」扱い（マイクラ版 shuffler.js の代行者の特例）
     if (self) return dead.has(th) && !allowDeath;
     if ([ONW.TEAM.VILLAGE, ONW.TEAM.WOLF].includes(teamOfRole(asg)) && dead.has(sh)) return true;
     return dead.has(th) && !allowDeath;

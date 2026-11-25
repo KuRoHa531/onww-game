@@ -140,7 +140,7 @@
   function applyVoteSubstitution(game) {
     const out = [], sacrificed = new Set((game.matthiasSubs || []).map((x) => x.d));
     const dying = (id) => game.eliminated.includes(id) || (game.deadIds || []).includes(id);
-    const curseDead = (id) => (game.deadIds || []).includes(id) && !game.eliminated.includes(id) && (game.deadKind || {})[id] === "fox";   // 呪殺で死んだ人は身代わりできない（マイクラ版 curse_kill 除外）
+    const curseDead = (id) => ((game.deadIds || []).includes(id) && !game.eliminated.includes(id) && (game.deadKind || {})[id] === "fox") || (game.curseKillIds || []).includes(id);   // 呪殺で死んだ人は身代わりできない（マイクラ版 curse_kill 除外。妖狐の呪殺＝昼中の死 / 呪術の人狼の呪殺＝投票の死）
     let changed = true, guard = 0;
     while (changed && guard++ < 50) {
       changed = false;

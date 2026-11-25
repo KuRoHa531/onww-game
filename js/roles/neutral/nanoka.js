@@ -164,16 +164,25 @@ ONW.nanoka = { ID, MITSUKI, LONGNIGHT, RASETSU, FORMS, isForm, modeOf, holdersOf
 
 // ---------------------------------------------------------
 // CPU: 夜の形態選択（デバッグ指定 f.nanokaMode があればその形態、なければランダム。マイクラ版 cpu.js と同じ）
+// 呼び出しは本番経路 ONW.cpu.runNight の共通シグネチャ cpuNight.run(n, p, label, cur, rid)
+// （n = { g, stage, forced, validPlayer, nn, ob, hold, rn, pick, infoOf, nameOf }。コスプレイヤー・ホタルと同じ形）。
+// 封印されているCPUは runNight 側の ONW.seal.failIfSealed が先に失敗させるので、ここでは見ない。
 // ---------------------------------------------------------
-function cpuRun(k, g, p, i) {
+function cpuRun(n, p, label, cur, rid) {
+const g = n.g, i = n.infoOf(p.id);
 if (modeOf(g, p.id)) return; // すでに変化している
-if (ONW.seal && ONW.seal.is(g, p.id)) { i.nanoka = { failed: true}; return;} // 封印: 変化できない（勝利もできない）
-if (ONW.keymaster && ONW.keymaster.gate(g, p.id, [])) { i.nanoka = { failed: true}; return;} // 鍵師のロック: 変化できない
-const f = k.forced(p) || {};
+if (ONW.keymaster && ONW.keymaster.gate(g, p.id, [])) { // 鍵師のロック: 変化できない（勝利もできない）
+i.nanoka = { failed: true};
+n.hold(p.id, ONW.keymaster.fail(g, p.id, "self", "変化", [], `${label} ${p.name}`));
+return;
+}
+const f = n.forced(p) || {};
 const form = isForm(f.nanokaMode)? f.nanokaMode: FORMS[Math.floor(Math.random() * FORMS.length)];
 const r = applyTransform(g, p.id, form);
 i.nanoka = { form: r.form, target: r.target};
-k.hold(p.id, resultText(g, r));
+(g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${p.name} は 山札から3枚めくり、「${rn(r.form)}」になりました。`); // 人間の night.resolve と同じ夜ログ
+n.hold(p.id, resultText(g, r));
+if (!cur) n.nn(rid); // 新聞: 夜に能力を使った役職として記録（朝の連鎖・酔い覚めは載らない）
 }
 /** 墓荒らし・ドッペル・酔い覚めでなのかを手にしたCPUの、続けて言う結果（結果開示なので AI議論OFF でも出る） */
 function cpuChainResult(k, g, p, i) {
@@ -186,7 +195,7 @@ return { text: `「${rn(x.form)}」になりました。`};
 /** CPUの三月なのかが写真撮影する相手（デバッグ指定があればその人。なければ、まだ気配の分からない人を優先してランダム） */
 function cpuPhotoPick(k, g, p) {
 const ts = photoTargets(g, p.id); if (!ts.length) return null;
-const f = k.forced(p) || {};
+const f = (ONW.debug && ONW.debug.cpuTarget ? ONW.debug.cpuTarget(g, p.id) : null) || {}; // デバッグ指定（呼び出し側の cpu.kit には forced が無いので、cpu.js の n.forced と同じ読み方をする）
 if (f.player && ts.includes(f.player)) return f.player;
 const info = k.infoOf(g, p.id), seen = info.senseSeen || {};
 const unk = ts.filter((t) => seen[t] === undefined && info.known[t] === undefined);
@@ -281,7 +290,12 @@ return { lines: [resultText(g, r)], reveal: { kind: "nanoka", cards: FORMS.slice
 },
 cpuNight: { order: 95, stage: "gremlin", chain: true, run: cpuRun}, // グレムリン(80)・マティアス(90)のあと・怪盗の前
 cpuChainResult,
-cpuClaim(k, g, p, r, i, c) { return false;}, // 変化できなかったなのかには開示する結果が無い（形態になっていれば、最終役職＝形態の cpuClaim が使われる）
+cpuClaim(k, g, p, r, i, c) { // 変化できなかったなのかには開示する結果が無い。変化していれば形態の結果開示に委ねる（本番の発言プランは初期役職の cpuClaim を引くので、ここで委ねないと形態の開示に届かない。コスプレイヤーと同じ考え方）
+const form = modeOf(g, p.id);
+if (!form) return false;
+const h = ONW.roleHook(form, "cpuClaim");
+return h ? h(k, g, p, form, i, c) : false;
+},
 });
 
 // ---------------------------------------------------------

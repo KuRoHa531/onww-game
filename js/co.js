@@ -79,11 +79,15 @@ window.ONW = window.ONW || {};
     if (kind === "cosplay") return set({ step: "crole", kind, chain });   // コスプレイヤー: コスプレした役職を選ぶ（山札の役職 / コスプレしなかった / ロックで失敗）
     if (kind === "trailblazer") return set({ step: "tfate", kind, chain });   // 開拓者: 歩んでいる運命を選ぶ（調和・愉悦はそのあと、カルメン・いたずらっ子の結果開示へ続く）
     if (kind === "mgdark") return set({ step: "mgdark", kind, chain });   // 魔法少女: 闇落ちしているかどうかを選ぶ
+    if (kind === "hokma") return set({ step: "hokma", kind, chain });   // ホクマー: 対象を選ばず「昼時間を短縮していました。」の1択
+    if (kind === "command") return set({ step: "command", kind, chain });   // 統率の人狼: 対象を選ばず「統率の人狼として人狼陣営の配置を確認していました。」の1択
+    if (kind === "sam") return set({ step: "sam", kind, chain });   // サム: 対象を選ばず「サムに変身していました。」の1択
     if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid" || kind === "chesed") return set({ step: "tm", kind, chain, sel: [] });   // chesed: 占い先 → コーヒーを渡した相手の2人
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
     if (kind === "love") return set({ step: "love", kind, chain });
     if (kind === "poet") return set({ step: "poetrole", kind, chain });
+    if (kind === "agent") return set({ step: "agentcmd", kind, chain });   // 代行者: 受けた指令を選ぶ（対象を守れ のときは対象も選ぶ）
     return set({ step: "target", kind, chain });
   }
   // 詩人の結果開示（マイクラ版どおり: 使われていた役職を選ぶ → 対象を選ぶ（2人を対象にする役職は2人）/ 「情報がなかった」）
@@ -121,6 +125,13 @@ co.poetPick = function (id) {
   };
   // 魔法少女の結果開示（マイクラ版のCOフォームと同じ2択）: 闇落ちしていません / 闇落ちしています
   co.pickMgDark = function (dark) { const h = hookOfKind("mgdark"); if (h && h.pickDark) return done(...h.pickDark(dark, K).args); };
+  co.pickHokma = function () { const h = hookOfKind("hokma"); if (h && h.fixedText) return done(h.fixedText, { kind: "hokma" }, null, "disclose", h.fixedShort); };   // ホクマーの結果開示: 固定文（マイクラ版のホクマーCO結果）をそのまま言う
+  co.pickCommand = function () { const h = hookOfKind("command"); if (h && h.fixedText) return done(h.fixedText, { kind: "command" }, null, "disclose", h.fixedShort); };   // 統率の人狼の結果開示: 固定文（マイクラ版の統率の人狼CO結果）をそのまま言う
+  co.pickSam = function () { const h = hookOfKind("sam"); if (h && h.fixedText) return done(h.fixedText, { kind: "sam" }, null, "disclose", h.fixedShort); };   // サムの結果開示: 固定文（マイクラ版のサムCO結果）をそのまま言う
+  // 代行者の結果開示（マイクラ版どおり: 指令を6種から選ぶ → 「対象を守れ」のときは対象を選ぶ。嘘もつける）
+  co.pickAgentCmd = function (key) { if (key === "protect") return set({ step: "agenttgt", kind: "agent", chain: (G().co || {}).chain }); const h = hookOfKind("agent"); if (h && h.pickCommand) return done(...h.pickCommand(key, K)); };
+  co.pickAgentTarget = function (id) { const h = hookOfKind("agent"); if (h && h.pickTarget) return done(...h.pickTarget(id, K)); };
+  co.agentBack = () => set({ step: "agentcmd", kind: "agent", chain: (G().co || {}).chain });
   co.pickTm = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
@@ -223,6 +234,8 @@ co.poetPick = function (id) {
   };
   // 封印の狂人に封印されていたことを伝える（情報開示。封印された人のCO）。封印の狂人のCOは役職CO → 結果開示（封印した相手）
   co.sealedInfo = () => done("封印の狂人に封印されていました。", { kind: "sealed", by: "seal_madman" }, null, "disclose", "封印の狂人に封印されていた");   // 2026-11-07: 必ず「封印の狂人に」を付ける（封印通知と同じ）   // 4of4: claim を付けて、CPUの投票判断が真偽を見られるようにする
+  co.sealedInfoElf = () => done("エルフリンデに封印されていました。", { kind: "sealed", by: "elfrinde" }, null, "disclose", "エルフリンデに封印されていた");   // エルフリンデに封印されていた（マイクラ版 openSealedInfoCoMenu: どちらに封印されていたかを選ぶ）
+  co.sealedMenu = () => set({ step: "sealedby" });
   co.pickChanged = (i) => { const x = CHANGED_LINES[i]; if (x) done(x[1], null, null, "disclose", x[2]); };
 
   // 情報開示のページは、戻るボタンを上（見出しの横）に置く。下まで押し下げてスクロールしなくても戻れる
@@ -306,6 +319,22 @@ co.poetPick = function (id) {
     } else if (s.step === "mgdark") {
       title = "結果開示";
       body = `<p class="night-step__hint">闇落ちしているかどうかを選んでください。</p>` + btn("闇落ちしていません", "ONW.co.pickMgDark(false)") + btn("闇落ちしています", "ONW.co.pickMgDark(true)") + back;
+    } else if (s.step === "hokma") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("昼時間を短縮していました", "ONW.co.pickHokma()") + back;
+    } else if (s.step === "sam") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("サムに変身していました", "ONW.co.pickSam()") + back;
+    } else if (s.step === "command") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("統率の人狼として人狼陣営の配置を確認していました", "ONW.co.pickCommand()") + back;
+    } else if (s.step === "agentcmd") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">受けた指令を選んでください。</p>` + ((hookOfKind("agent") || {}).commands || []).map((c) => btn(c.title, `ONW.co.pickAgentCmd('${c.key}')`)).join("") + back;
+    } else if (s.step === "agenttgt") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">守る対象を選んでください。</p>` +
+        (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickAgentTarget('${p.id}')`)).join("") + btn("指令を選び直す", "ONW.co.agentBack()") + back;
     } else if (s.step === "tm") {
       title = "結果開示";
       body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).twoHint || "入れ替えた2人を選んでください。"}${s.sel.length ? `（選択中: ${s.sel.map((id) => pn(nameOf(id))).join("、")}）` : ""}</p>` +
@@ -344,7 +373,10 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedInfo()") + btn("反転されている", "ONW.co.reversedInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedMenu()") + btn("反転されている", "ONW.co.reversedInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()");
+    } else if (s.step === "sealedby") {
+      title = "封印されていた";
+      body = `<p class="night-step__hint">どちらに封印されていましたか？</p>` + btn("封印の狂人に封印されていた", "ONW.co.sealedInfo()") + btn("エルフリンデに封印されていた", "ONW.co.sealedInfoElf()") + back;
     } else if (s.step === "visited") {
       title = "訪問された";
       body = `<p class="night-step__hint">訪問してきた人を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickVisitor('${p.id}')`)).join("");

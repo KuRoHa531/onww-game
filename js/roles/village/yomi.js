@@ -115,6 +115,8 @@
     if ((g.icarusGrants || []).some((e) => e.target === target)) { g.icarusGrants = g.icarusGrants.filter((e) => e.target !== target); cuts.push("icarus"); }
     // 妖精さんのバリア: target に付与されたバリア、または target が付与したバリアを取り消す
     if ((g.fairyBarriers || []).some((e) => e.target === target || e.by === target)) { g.fairyBarriers = g.fairyBarriers.filter((e) => !(e.target === target || e.by === target)); cuts.push("fairy"); }
+    // エルフリンデ: 本人・封印した相手のどちらを断ち切られても敗北する（マイクラ版 yomiCutStates）。封印の解除そのものは下の封印ブロックが共通で行うので、その前に敗北だけ記録する
+    if (ONW.elfrinde) ONW.elfrinde.yomiCut(g, target);
     // 封印の狂人の封印: 封印された側でも封印した側でも解除する（封印の記録 g.sealedBy[封印された席] = 封印した人・g.sealTargets[封印した人] = 封印された席）
     {
       const free = [];

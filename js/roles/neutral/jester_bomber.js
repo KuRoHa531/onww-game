@@ -42,6 +42,7 @@
     const ck = g.chainKind || {}, votes = g.votes || {}, all = (g.players || []).map((p) => p.id);
     B.holders(g).forEach((b) => {
       if (!done.has(b) || gone.has(b)) return;                    // 吊られていない / 昼中に死んでいた
+      if ((g.curseKillIds || []).includes(b)) return;             // 呪術の人狼の呪殺は貫通する死: 爆発しない（マイクラ版 applyJesterBomberResult の curse_kill 除外）
       if (!B.TRIGGER_KINDS.includes(ck[b])) return;               // 噛殺・後追い・王国滅亡・爆殺では爆発しない
       // 自爆する死因は「追放・処刑・独裁処刑・道連れ」だけ。メンタル崩壊・ショック死・とばっちり・クーデターは自爆しない（2026-10-17 ユーザー指定）
       const bounced = (g.toughBounces || []).some((t) => (t.to || []).includes(b));

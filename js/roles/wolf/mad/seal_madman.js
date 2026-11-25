@@ -32,12 +32,23 @@
   const has = (g, id) => !!id && g.players.some((q) => q.id === id);
   /** 夜ログの名乗り（模倣の人狼が封印の狂人を模倣しているときは「模倣の人狼」） */
   const cardOf = (g, h) => (g.currentRoles || g.initialRoles || {})[h];   // いまのカード（夜の最初の段階では配役直後と同じ。朝・昼は動いたあと）
-  const labelOf = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? ONW.ROLE_INFO[cardOf(g, h)].name : ONW.ROLE_INFO.seal_madman.name);   // 開拓者が封印の狂人の能力を使うことは無い（運命の5役職のみ）が、カード側の名前を出す形に揃える
+  /** 封印を使っている役職（封印の狂人 / エルフリンデ。模倣の人狼が使っているときは模倣先） */
+  const actRoleOf = (g, h) => (ONW.mimic && ONW.mimic.actRole ? ONW.mimic.actRole(g, h, cardOf(g, h)) : cardOf(g, h));
+  const labelOf = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? ONW.ROLE_INFO[cardOf(g, h)].name : (ONW.ROLE_INFO[actRoleOf(g, h)] || ONW.ROLE_INFO.seal_madman).name);   // 開拓者が封印の狂人の能力を使うことは無い（運命の5役職のみ）が、カード側の名前を出す形に揃える
   /** 夜ログ・新聞・観測に残す役職（模倣の人狼が使ったときは「模倣の人狼」） */
-  const roleOfNews = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? cardOf(g, h) : R_());
+  const roleOfNews = (g, h) => (ONW.mimic && ONW.mimic.isMimic(g, h, cardOf(g, h)) ? cardOf(g, h) : actRoleOf(g, h));
 
   const FAIL_TEXT = "あなたは封印の狂人に能力を封印されていたため失敗しました。";
   const sealLine = (g, t) => `${nm(g, t)} を封印しました。`;
+  // ---- 封印した側で文面を変える（エルフリンデ。マイクラ版 game.js / night.js: 「あなたはエルフリンデに能力を封印されました。」） ----
+  /** その席を封印した役職（"seal_madman" | "elfrinde"。封印されていなければ null）。封印の確定（commit）で g.sealByRole に記録する */
+  const byRole = (g, id) => ((g && g.sealByRole) || {})[id] || null;
+  const sealerName = (g, id) => (byRole(g, id) === "elfrinde" ? "エルフリンデ" : "封印の狂人");
+  const failText = (g, id) => `あなたは${sealerName(g, id)}に能力を封印されていたため失敗しました。`;
+  const noticeText = (g, id) => `【封印通知】あなたは${sealerName(g, id)}に能力を封印されました。`;
+  const dayText = (g, id) => `あなたは${sealerName(g, id)}に封印されているため昼能力を使用できません。`;
+  /** 演出の面の印: エルフリンデの封印は鎖と魔法陣（"elfrinde"）、封印の狂人は御札（undefined） */
+  const markOf = (g, h) => (actRoleOf(g, h) === "elfrinde" ? "elfrinde" : undefined);
 
   // ---- 封印の状態（席ごと） ----
   /** 封印している人の席（封印されていなければ null） */
@@ -56,8 +67,11 @@
     ONW.setRoleBound(g, "sealTargets", holder, target);
     if (g.sealedBy[target]) return false;
     g.sealedBy[target] = holder;
+    (g.sealByRole = g.sealByRole || {})[target] = actRoleOf(g, holder);   // 封印した役職（文面・演出の印・黄泉の判定に使う。最初の封印元だけ）
     return true;
   }
+  /** エルフリンデの封印が成功したら、固有の記録（相手の陣営・侵食）を残す（elfrinde.js の recordSeal） */
+  const noteElfrinde = (g, holder, target) => { if (actRoleOf(g, holder) === "elfrinde" && ONW.elfrinde) ONW.elfrinde.recordSeal(g, holder, target); };
   /** 朝・昼にその場で封印する（墓荒らし・ドッペルゲンガー・酔い覚めで手にした封印の狂人）。io = { hold(id, text) }。
    *  戻り値: "ok" | "failed"（自分が封印されていて失敗）。呼ぶ側は新聞・観測の記録を、成功のときだけ行う */
   function apply(g, holder, target, io) {
@@ -65,10 +79,11 @@
     if (is(g, holder)) {
       (g.sealFails = g.sealFails || {})[holder] = true;
       (g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${nm(g, holder)} は 封印されていたため能力に失敗しました。`);
-      hold(holder, FAIL_TEXT);
+      hold(holder, failText(g, holder));
       return "failed";
     }
     commit(g, holder, target);
+    noteElfrinde(g, holder, target);
     (g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${nm(g, holder)} は ${nm(g, target)} を封印した`);
     hold(holder, sealLine(g, target));
     return "ok";
@@ -78,29 +93,35 @@
    *  封印されている封印の狂人は失敗する。戻り値: 処理した順の [{ holder, target, ok }]（テスト用） */
   function settle(g, io) {
     const intent = g.sealIntent || {}, hold = (io && io.hold) || (() => {}), rnd = (io && io.rnd) || Math.random, rv = io && io.reveal;   // io.reveal(席, reveal): 朝の演出を本人に届ける
-    let todo = Object.keys(intent).filter((h) => has(g, h) && has(g, intent[h]) && intent[h] !== h);
+    const all = Object.keys(intent).filter((h) => has(g, h) && has(g, intent[h]) && intent[h] !== h);
     const done = [];
-    while (todo.length) {
-      let cand = todo.filter((h) => !todo.some((o) => o !== h && intent[o] === h));   // 他の（まだ処理していない）封印の狂人から封印されようとしていない人
-      if (!cand.length) cand = todo;                                                 // 輪になっている: ランダムな方が優先
-      const h = cand[Math.floor(rnd() * cand.length)];
-      todo = todo.filter((x) => x !== h);
-      const t = intent[h], label = labelOf(g, h);
-      if (is(g, h)) {   // 封印されていて失敗（選んだ相手は封印されない）
-        (g.sealFails = g.sealFails || {})[h] = true;
-        g.nightLogsAll.push(`${label} ${nm(g, h)} は 封印されていたため能力に失敗しました。`);
-        hold(h, FAIL_TEXT);
-        if (rv) rv(h, ONW.seal.revealFail(h));   // 3of4d: 封印されて失敗した封印の狂人は、自分のカードにお札が貼られて揺れる（成功した側・動けた側には何も出ない）
-        done.push({ holder: h, target: t, ok: false });
-        continue;
+    // 処理順（docs/role-process-order.md）: エルフリンデ → 封印の狂人。エルフリンデの封印をすべて先に決め、そのあと封印の狂人同士の規則で決める
+    //   （封印の狂人がエルフリンデを封印しても、エルフリンデの封印はすでに決まっている。エルフリンデ同士・封印の狂人同士は従来の優先の規則）
+    const phases = [all.filter((h) => actRoleOf(g, h) === "elfrinde"), all.filter((h) => actRoleOf(g, h) !== "elfrinde")];
+    for (let todo of phases) {
+      while (todo.length) {
+        let cand = todo.filter((h) => !todo.some((o) => o !== h && intent[o] === h));   // 他の（まだ処理していない）封印の狂人から封印されようとしていない人
+        if (!cand.length) cand = todo;                                                 // 輪になっている: ランダムな方が優先
+        const h = cand[Math.floor(rnd() * cand.length)];
+        todo = todo.filter((x) => x !== h);
+        const t = intent[h], label = labelOf(g, h);
+        if (is(g, h)) {   // 封印されていて失敗（選んだ相手は封印されない）
+          (g.sealFails = g.sealFails || {})[h] = true;
+          g.nightLogsAll.push(`${label} ${nm(g, h)} は 封印されていたため能力に失敗しました。`);
+          hold(h, failText(g, h));
+          if (rv) rv(h, ONW.seal.revealFail(h, byRole(g, h)));   // 3of4d: 封印されて失敗した封印の狂人は、自分のカードに封印（封印した側の見た目）が貼られて揺れる（成功した側・動けた側には何も出ない）
+          done.push({ holder: h, target: t, ok: false });
+          continue;
+        }
+        commit(g, h, t);
+        noteElfrinde(g, h, t);
+        g.nightLogsAll.push(`${label} ${nm(g, h)} は ${nm(g, t)} を封印した`);
+        hold(h, sealLine(g, t));
+        if (rv) rv(h, ONW.seal.revealPut(t, markOf(g, h)));       // 3of4d: 封印に成功した人は、封印した相手のカードに封印（自分の見た目）が貼られる
+        ONW.newsNote(g, roleOfNews(g, h));          // 新聞・観測は、封印に成功した分だけ
+        ONW.observeNote(g, h, [t], null, roleOfNews(g, h));
+        done.push({ holder: h, target: t, ok: true });
       }
-      commit(g, h, t);
-      g.nightLogsAll.push(`${label} ${nm(g, h)} は ${nm(g, t)} を封印した`);
-      hold(h, sealLine(g, t));
-      if (rv) rv(h, ONW.seal.revealPut(t));       // 3of4d: 封印に成功した封印の狂人は、封印した相手のカードにお札が貼られる
-      ONW.newsNote(g, roleOfNews(g, h));          // 新聞・観測は、封印に成功した分だけ
-      ONW.observeNote(g, h, [t], null, roleOfNews(g, h));
-      done.push({ holder: h, target: t, ok: true });
     }
     return done;
   }
@@ -109,11 +130,11 @@
    *  封印の狂人自身は、封印の決着(settle)と朝の連鎖(apply)が失敗を扱うので、ここでは false を返す。
    *  戻り値: true = 失敗した（呼ぶ側は、その能力を実行しない） */
   function failIfSealed(g, id, actRole, io) {
-    if (!is(g, id) || actRole === R_()) return false;
+    if (!is(g, id) || actRole === R_() || actRole === "elfrinde") return false;   // 封印を使う側（封印の狂人・エルフリンデ）の失敗は、決着(settle)と朝の連鎖(apply)が扱う
     const o = io || {}, info = ONW.ROLE_INFO[actRole] || {};
     const label = o.mimic ? ONW.ROLE_INFO[typeof o.mimic === "string" ? o.mimic : "mimic_wolf"].name : (info.name || actRole);   // o.mimic = 能力を借りているカードの役職ID（模倣の人狼 / 開拓者）。true のときは模倣の人狼
     (g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${nm(g, id)} は 封印されていたため能力に失敗しました。`);
-    if (o.hold) o.hold(id, FAIL_TEXT);
+    if (o.hold) o.hold(id, failText(g, id));
     return true;
   }
   /** 夜の能力がない役職が封印されたとき、待機時間に出す通知（夜の能力がある役職は、夜の結果として「失敗しました」が出る） */
@@ -135,10 +156,11 @@
   // ---- 演出（3of4）: 朝の演出データ(reveal)と、本人が封印に気づけるかの判定 ----
   /** 封印されたことを本人が知ってよいか（酔っ払い＝まだ覚めていない人は、能力を使って失敗するまで気づけない） */
   const noticeable = (g, id) => is(g, id) && !ONW.hiddenDrunk(g, id);
-  /** 封印されて失敗した人の画面: 自分のカードにお札が貼られて揺れる（鍵師の「🔒に弾かれる」の封印版） */
-  const revealFail = (id) => ({ kind: "seal", mode: "fail", ids: [id] });
-  /** 封印の狂人の画面: 封印した相手のカードにお札が貼られる */
-  const revealPut = (ids) => ({ kind: "seal", mode: "put", ids: [].concat(ids) });
+  /** 封印されて失敗した人の画面: 自分のカードに封印が貼られて揺れる（鍵師の「🔒に弾かれる」の封印版）。
+   *  mark/by: 封印した側の見た目（"elfrinde" = 鎖と魔法陣。それ以外 = 御札） */
+  const revealFail = (id, by) => ({ kind: "seal", mode: "fail", ids: [id], ...(by === "elfrinde" ? { mark: "elfrinde" } : {}) });
+  /** 封印した人の画面: 封印した相手のカードに封印が貼られる（mark: 自分の見た目） */
+  const revealPut = (ids, mark) => ({ kind: "seal", mode: "put", ids: [].concat(ids), ...(mark === "elfrinde" ? { mark: "elfrinde" } : {}) });
   // ---- CPUの発言・投票（4of4。マイクラ版 _cpuCoOnlyMaybeSealResult を参考） ----
   /** 「〇〇に封印されていました。」（2026-11-07: 必ず「誰に」を付ける）。本当に封印されたときは、封印通知(NOTICE_TEXT)と同じ「封印の狂人」。騙りは配役・変化公開にいる封印の役職(by)から選ぶ */
   const SEALED_CLAIM = (by) => { const id = by || "seal_madman", nm = (ONW.ROLE_INFO[id] || {}).name || (id === "elfrinde" ? "エルフリンデ" : "封印の狂人"); return { short: `${nm}に封印されていた`, text: `${nm}に封印されていました。`, claim: { kind: "sealed", by: id } }; };
@@ -159,7 +181,7 @@
       c.result = SEALED_CLAIM(k.pick(sealers)); c.extra = null;   // 誰に封印されたかは嘘（いる封印の役職から選ぶ）
       return true;
     }
-    c.result = SEALED_CLAIM(); c.extra = null;
+    c.result = SEALED_CLAIM(byRole(g, p.id) || undefined); c.extra = null;   // 本当に封印した側（エルフリンデ / 封印の狂人）を言う
     return true;
   }
   const RESULT_KINDS = ["seer", "robber", "relic", "doppel", "troublemaker", "watchdog", "keymaster", "mind", "sense", "poet"];   // 結果を言う申告（封印されていたら結果は出ないので、封印された人が言えば嘘）
@@ -172,9 +194,9 @@
     const co = (g.coBoard && g.coBoard[q.id] && g.coBoard[q.id].co) || null;
     const pSealed = noticeable(g, p.id), known = k.roleInSetup(g, R_()) || k.roleInSetup(g, "elfrinde");   // エルフリンデがいるときも「封印されていました」は成り立つ
     let s = 0;
-    if (co === R_()) s += known ? 2.0 : 3.0;
+    if (co === R_() || co === "elfrinde") s += known ? 2.0 : 3.0;   // 封印を使う役職のCO（封印の狂人は人狼陣営・エルフリンデは第三陣営。どちらも「封印しました」の真偽は同じ読み方）
     claims.forEach((c) => {
-      if (c.kind === "seal_madman") {
+      if (c.kind === "seal_madman" || c.kind === "elfrinde") {
         if (c.target === p.id) s += pSealed ? 6 : (ONW.hiddenDrunk(g, p.id) ? 2 : 3);   // 自分が封印されている → 本物 / 封印されていない → 嘘
         else s += known ? 2.0 : 3.0;
       } else if (c.kind === "sealed" && !pSealed && !known) s += 2.5;                    // 封印の狂人がいないのに封印されたと言う
@@ -193,7 +215,7 @@
     if (mine && claims.some((c) => RESULT_KINDS.includes(c.kind))) s -= 2.0;
     return s;
   }
-  ONW.seal = { cpuSealResult, cpuVoteSee, cpuVoteScore, SEALED_CLAIM, specLines, noticeable, revealFail, revealPut, of, is, sealedIds, dayBlocked, ignoringSeal, DAY_TEXT, intend, commit, apply, settle, failIfSealed, FAIL_TEXT, NOTICE_TEXT, sealLine, labelOf };
+  ONW.seal = { cpuSealResult, cpuVoteSee, cpuVoteScore, SEALED_CLAIM, specLines, noticeable, revealFail, revealPut, of, is, sealedIds, dayBlocked, ignoringSeal, DAY_TEXT, intend, commit, apply, settle, failIfSealed, FAIL_TEXT, NOTICE_TEXT, sealLine, labelOf, byRole, failText, noticeText, dayText, actRoleOf };
 
   // ---- CPUの夜の行動: 自分以外の1人をランダムに選ぶ（デバッグの指定があればそれ）。夜は選んだ相手を控えるだけ（決着は段階の終わり）。朝のうち(墓荒らし・ドッペル・酔い覚め)はその場で封印 ----
   function cpuRun(n, p, label, cur, rid) {
@@ -246,9 +268,10 @@
       kind: "seal",
       dur: (r) => (r.mode === "fail" ? 1500 : 1400 + Math.max(0, (r.ids || []).length - 1) * 300),
       play(r, SK) {
+        const face = r.mark === "elfrinde" ? SK.ELFRINDE_MARK : SK.SEAL_MARK;   // エルフリンデの封印は鎖と魔法陣、封印の狂人は御札
         (r.ids || []).forEach((id, i) => SK.later(() => {
           const k = `p:${id}`;
-          SK.show(k, SK.SEAL_MARK, true);
+          SK.show(k, face, true);
           if (r.mode === "fail") SK.later(() => SK.shake(k), 650);
         }, i * 300));
       },
@@ -267,11 +290,12 @@
     settleMsg: { order: 5, run(c, p, mode) {
       const g = c.g;
       if (p.isCpu || !ONW.seal.is(g, p.id) || (g.drunkOverlay && g.drunkOverlay[p.id]) || !ONW.seal.noticeable(g, p.id)) return {};
+      const markKey = ONW.seal.byRole(g, p.id) === "elfrinde" ? "sealMarkElf" : "sealMark";   // エルフリンデに封印された人は鎖と魔法陣の面（elfrinde.js の stageSettle が出す）
       if (ONW.roleIsActive(ONW.mimic.actRole(g, p.id, g.initialRoles[p.id]))) {
         const rv = (g.morningReveals || {})[p.id];
-        return rv && rv.kind === "seal" ? {} : { sealMark: [p.id] };
+        return rv && rv.kind === "seal" ? {} : { [markKey]: [p.id] };
       }
-      return { logs: [ONW.seal.NOTICE_TEXT], sealMark: [p.id] };
+      return { logs: [ONW.seal.noticeText(g, p.id)], [markKey]: [p.id] };
     } },
     /** 待機時間の演出: 自分のカードがお札のマークでめくれて揺れる。待機時間にほかの演出が自分のカードに出ているときは、それが終わるのを待ってから（最大2.4秒）。
      *  終わったら元の面に戻す（昼になったら札を外す既存の処理もある） */
@@ -293,7 +317,7 @@
         if (!c.players.length) return null;
         const g = c.g, id = c.id, t = c.players[0];
         const r = ONW.seal.apply(g, id, t, { hold: () => {} });
-        if (r === "failed") return { lines: [ONW.seal.FAIL_TEXT], reveal: ONW.seal.revealFail(id), nextChain: null, failed: true };   // 3of4e: 封印されていて失敗: 自分のカードにお札が貼られて揺れる
+        if (r === "failed") return { lines: [ONW.seal.failText(g, id)], reveal: ONW.seal.revealFail(id, ONW.seal.byRole(g, id)), nextChain: null, failed: true };   // 3of4e: 封印されていて失敗: 自分のカードに封印（封印した側の見た目）が貼られて揺れる
         return { lines: [sealLine(g, t)], reveal: ONW.seal.revealPut(t), nextChain: null };                                            // 3of4e: その場で封印: 封印した相手のカードにお札が貼られる
       },
     },

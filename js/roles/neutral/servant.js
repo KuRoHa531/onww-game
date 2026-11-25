@@ -89,6 +89,14 @@
         subs.forEach((x) => {
           const mk = P(x.masterId), sk = P(x.servantId), sh = res.history.find((h) => h.id === x.servantId);
           later(() => { setCap(`<div class="res-cap__t t-wolf">${x.major ? "少佐" : "従者"}の身代わり</div><div>${esc(x.master)} が追放されそうになりました…</div>`); R.alm[mk] = true; paint(G()); }, R.t);
+          // 傭兵（mercenary.js）: 身代わりで追放されそうになった従者・少佐が護衛対象で守られたとき（res.mercGuards の kind "sub"）: 騎士より先に判定された守りなので、こちらを先に出す
+          const subM = (res.mercGuards || []).find((k) => k.kind === "sub" && k.id === x.servantId);
+          if (subM && ONW.knight && ONW.knight.stageShield) {
+            later(() => { delete R.alm[mk]; paint(G()); }, R.t + 1900);
+            ONW.knight.stageShield(R, x.servantId, R.t + 1900, `<div class="res-cap__t t-third">傭兵の守り</div><div>${esc(x.servant)} は死から守られました</div>`);
+            R.t += 5200;
+            return;
+          }
           // 騎士（knight.js）: 身代わりで追放されそうになった従者・少佐が守られたとき（res.knights の kind "sub"）: ご主人の次に、身代わりのカードがめくれそうになって 🛡️（めくれない・死なない）
           const subG = (res.knights || []).find((k) => k.kind === "sub" && k.id === x.servantId);
           if (subG && ONW.knight && ONW.knight.stageShield) {

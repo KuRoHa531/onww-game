@@ -464,6 +464,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.PRIEST,         required: [ONW.ROLE.GOD] },                              // 神官が出る闇鍋には、銀色の影から変化した神も最低1枚出す（神官は神がいてこそ働く。マイクラ版 YAMINABE の ensureSilverGodForPriest）
     { trigger: ONW.ROLE.AA,             required: [ONW.ROLE.KEYMASTER] },                        // A.A.が出る闇鍋には、鍵師も最低1枚出す（A.A.は鍵師にロックされて初めて役職変化が通る。マイクラ版 YAMINABE_TRANSFORM_SYNERGY_RULES）
     { trigger: ONW.ROLE.MASON,          required: [ONW.ROLE.MASON, ONW.ROLE.MASON] },           // 共有者が出る闇鍋には、光の使徒から変化した共有者を合わせて最低2枚出す（共有者が1人だけにならない）
+    { trigger: ONW.ROLE.HOTARU,         required: [ONW.ROLE.TRAILBLAZER, ONW.ROLE.SILVER_WOLF] },   // ホタルが出る闇鍋には、開拓者と銀狼も最低1枚ずつ出す（開拓者を知る通知・サムの銀狼への通知が活きる盤面。マイクラ版 YAMINABE_TRANSFORM_SYNERGY_RULES）
   ];
   /** 闇鍋シナジー一覧。SYNERGY_RULES に、自認村人の役職(ONW.SELF_AS_VILLAGER)で村人のルールがまだ無いものを自動で足す（優先度高め）。新しい自認村人の役職を足しても、村人が出るシナジーが自動でつく */
   roles.synergyRules = function () {
@@ -515,6 +516,7 @@ window.ONW = window.ONW || {};
     { trigger: ONW.ROLE.HEARTBREAKER, label: "恋人系役職", anyOf: [ONW.ROLE.EVIL_WOMAN, ONW.ROLE.PURE_LOVER, ONW.ROLE.CUPID], min: 1, unlessLover: true },   // 恋人(重複役職)が最初から配られているときは足さない（変化候補でOFFの役職は出ない）
     { trigger: ONW.ROLE.MAPO_WOLF, label: "麻婆対抗役", get anyOf() { return ONW.MAPO_COUNTER_ROLES; }, min: 1, force: true },   // 麻婆の人狼が出る闇鍋には、麻婆豆腐(豆腐の人狼の3票)に対抗できる役職を最低1枚出す（現世でも墓地でもよい）。候補は ONW.MAPO_COUNTER_ROLES に足す
     { trigger: ONW.ROLE.SEAL_MADMAN, label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES; }, min: 3 },   // 封印の狂人が出る闇鍋には、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE の封印の狂人シナジー: YAMINABE_SEAL_TARGET_ROLES を3枚。Web版にある役職の分）
+    { trigger: "elfrinde", label: "封印作用のある役職", get anyOf() { return ONW.SEAL_TARGET_ROLES.filter((r) => r !== "elfrinde"); }, min: 3 },   // エルフリンデが出る闇鍋にも、封印の効果を受ける役職を最低3枚出す（マイクラ版 YAMINABE_ELFRINDE_TARGET_ROLES = 封印の対象からエルフリンデ自身を除いたもの。自分を数えて条件を満たさないため。エルフリンデは役職ファイルが後から読み込まれるので trigger は文字列）
     { trigger: "moses", label: "能力を使われる役職", get anyOf() { return ONW.SEAL_TARGET_ROLES.filter((r) => r !== "moses"); }, min: 4 },   // モーゼスが出る闇鍋には、能力を使われる（選ばれて票が増える）役職を最低4枚出す（マイクラ版 YAMINABE の優先度なしシナジー: YAMINABE_MOSES_TOUCH_ROLES = 封印の対象からモーゼス自身を除いたものを4枚。Web版にある役職の分。モーゼスは役職ファイルが後から読み込まれるので trigger は文字列で書く。対象は info.sealTarget から自動）
     { trigger: "yomi", label: "状態が付く役職", get anyOf() { return ONW.existingRoles(ONW.YOMI_TARGET_ROLES); }, min: 3 },   // 黄泉が出る闇鍋には、断ち切れる状態（反転・恋人・シャッフラー・各役職の対象・思い込みなど）が付く役職を最低3枚出す（マイクラ版 YAMINABE の黄泉シナジー: YAMINABE_YOMI_TARGET_ROLES を3枚。Web版にある役職の分）。黄泉は役職ファイルが後から読み込まれるので trigger は文字列
     { trigger: "carmen", label: "囁く相手になる役職", get anyOf() { return ONW.existingRoles(ONW.CARMEN_TARGET_ROLES); }, min: 2 },   // カルメンが出る闇鍋には、囁かれて夜能力・昼能力をもう1回使える役職（マイクラ版 YAMINABE_CARMEN_TARGET_ROLES）を合わせて最低2枚出す。カルメンは役職ファイルが後から読み込まれるので trigger は文字列

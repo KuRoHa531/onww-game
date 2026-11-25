@@ -2210,6 +2210,14 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .tb-front .tb-wolfmark.tb-seal .tb-ofuda s::after { transform: rotate(-45deg); }
 @keyframes sealSlap { 0% { transform: rotate(-6deg) scale(2.2); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(-6deg) scale(1); opacity: 1; } }
 
+/* ---- エルフリンデ: 封印の鎖と魔法陣（失敗の演出 / 待機時間の封印マーク / 封印した相手のカード。御札とは別の見た目）---- */
+.tb-front.tb-team-elfseal { border-color: #7d5ba6; background: #1d1430; box-shadow: 0 0 14px rgba(150,110,255,.45), inset 0 0 18px rgba(60,30,110,.65); }
+.tb-front .tb-wolfmark.tb-elfseal { position: relative; filter: drop-shadow(0 0 8px rgba(160,120,255,.9)); }
+.tb-front .tb-wolfmark.tb-elfseal .tb-mcircle { display: block; flex: 0 0 auto; width: calc(var(--cw) * .82); height: calc(var(--cw) * .82); animation: elfCircleSpin 16s linear infinite; }
+.tb-front .tb-wolfmark.tb-elfseal .tb-mcircle svg { display: block; width: 100%; height: 100%; fill: none; stroke: #c9a7ff; stroke-width: 3; stroke-linejoin: round; }
+.tb-front .tb-wolfmark.tb-elfseal .tb-mchain { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%) rotate(-18deg); font-size: calc(var(--cw) * .4); line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
+@keyframes elfCircleSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 /* ---- ペンギンの滑り（結果発表。js/roles/village/penguin.js の stageResult。交換者の .ex-* と同じ要領で、画面の上に重ねる） ---- */
 .tb-seat.gx-pgsel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(140,205,255,.95)); }
 .tb-seat.gx-fairysel .tb-card { transform: translateY(-6px); filter: drop-shadow(0 0 10px rgba(255,215,120,.95)); }   /* 妖精さん: バリアを付与された人のカード（結果発表。3of4） */
@@ -2389,6 +2397,17 @@ body.ovl-open .dbg-fab--float, body:has(.dbg-sheet) .dbg-fab--float { visibility
 @keyframes gx-bombblink { 0% { opacity: 1; } 100% { opacity: .25; } }
 @keyframes gx-boomcard { 0% { transform: scale(1.25); filter: brightness(3); } 40% { transform: scale(.9) rotate(-3deg); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
 @keyframes gx-boompop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 35% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
+/* 呪術の人狼の呪殺: 毒に侵される演出（紫と緑の毒がカードの下から這い上がり、毒色に染まったまま残る） */
+.tb-seat.gx-poison, .tb-seat.gx-poisoned { z-index: 8; }
+.tb-seat.gx-poison .tb-card { animation: gx-poison 1.7s ease-in both; }
+.tb-seat.gx-poison::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9; transform-origin: 50% 100%;
+  background: radial-gradient(circle at 18% 88%, rgba(124, 58, 237, .9), transparent 55%), radial-gradient(circle at 82% 92%, rgba(74, 222, 128, .55), transparent 50%), radial-gradient(circle at 50% 102%, rgba(88, 28, 135, .95), transparent 68%);
+  animation: gx-poison-creep 1.7s ease-in both; }
+@keyframes gx-poison { 0% { filter: none; } 40% { filter: saturate(1.5) hue-rotate(-38deg) brightness(.9); } 100% { filter: saturate(.55) hue-rotate(-55deg) brightness(.6) contrast(1.05); } }
+@keyframes gx-poison-creep { 0% { opacity: 0; transform: scaleY(.12); } 55% { opacity: .95; } 100% { opacity: .9; transform: scaleY(1); } }
+.tb-seat.gx-poisoned .tb-card { filter: saturate(.55) hue-rotate(-55deg) brightness(.6) contrast(1.05); }
+.tb-seat.gx-poisoned::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9;
+  background: radial-gradient(circle at 18% 88%, rgba(124, 58, 237, .5), transparent 55%), radial-gradient(circle at 50% 102%, rgba(88, 28, 135, .55), transparent 68%); }
 
 /* =========================================================
    上皿天秤（js/stage.js の libraSync）— 天秤で投票が制限されているとき、選ばれた2人のカードを皿に載せる。
@@ -2678,6 +2697,14 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .tb-wrap.em-room .tb-table { padding-bottom: 54px; }
 
 /* 黄泉: 刀で切りつける演出（3of4。js/roles/village/yomi.js の slash） */
+/* ホクマー: 昼時間を短縮したときの演出（js/roles/village/hokma.js ONW.hokma.playFx）。全員の画面に、時計が薄く浮き出て針が進む（約1.9秒）。だれが使ったかは出さない */
+.hk-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; display: flex; align-items: center; justify-content: center; opacity: 0; }
+.hk-clock { position: relative; width: 180px; height: 180px; opacity: .55; }
+.hk-face { position: absolute; inset: 0; border-radius: 50%; border: 6px solid rgba(240,240,255,.85); background: radial-gradient(circle, rgba(30,34,60,.25) 0%, rgba(30,34,60,.45) 100%); box-shadow: 0 0 34px rgba(160,180,255,.35), inset 0 0 24px rgba(0,0,0,.35); }
+.hk-hand { position: absolute; bottom: 50%; border-radius: 3px; background: rgba(245,245,255,.95); transform-origin: 50% 100%; }
+.hk-hour { left: calc(50% - 3px); width: 6px; height: 46px; }
+.hk-min { left: calc(50% - 2px); width: 4px; height: 68px; }
+.hk-pin { position: absolute; left: calc(50% - 6px); top: calc(50% - 6px); width: 12px; height: 12px; border-radius: 50%; background: rgba(245,245,255,.95); }
 .yo-fx { position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden; }
 .yo-sword { position: absolute; left: 0; top: 0; font-size: clamp(34px, 4vw, 56px); line-height: 1; opacity: 0; will-change: transform, opacity; filter: drop-shadow(0 0 8px rgba(255,255,255,.95)) drop-shadow(0 0 14px rgba(255,60,60,.7)) drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .yo-line { position: absolute; height: 5px; border-radius: 3px; opacity: 0; transform-origin: 50% 50%; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #fff 18%, #fff 82%, rgba(255,255,255,0) 100%); box-shadow: 0 0 10px 3px rgba(255,70,70,.95), 0 0 22px 6px rgba(255,40,40,.55); will-change: transform, opacity; }

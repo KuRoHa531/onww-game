@@ -33,7 +33,7 @@
   const FEEL = { village: "村人の気配", wolf: "人狼の気配", mad: "狂っている気配", third: "第三陣営の気配", lover: "恋人陣営の気配" };
   /** 人狼系（マイクラ版 isRealWolfRole のうち Web版にある役職。白狼・忘却の人狼・模倣の人狼も含む。闇の化身は含まない） */
   const WOLF_ROLES = new Set(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf",
-    "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf"]);
+    "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "sam"]);   // sam: ホタルが変身した姿（本物の人狼扱い）
   /** 狂人系（マイクラ版 isMadRole のうち Web版にある役職） */
   const MAD_ROLES = new Set(["madman", "mad_seer", "cultist", "black_cat", "exposed_madman", "muzzle_madman", "rebel_madman", "mad_queen",
     "black_wolf_madman", "mad_mayor", "seal_madman", "mad_exchanger", "tenacious_madman", "jester_madman", "smoke_madman"]);
@@ -41,6 +41,8 @@
   /** 役職 role（持ち主 id）の気配の種類（蜃気狼・恋人は見ない。そこは judge）。昇格した狂人は人狼 */
   function classify(g, role, id) {
     if (role === "magical_girl" && ONW.magicalGirl) return ONW.magicalGirl.isDark(g, id) ? "wolf" : "village";   // 魔法少女: 闇堕ちしていれば人狼の気配、いなければ村人の気配（マイクラ版 senseSeerMessage）
+    if (role === "elfrinde" && ONW.elfrinde) return ONW.elfrinde.corrupted(g, id) ? "third" : "village";   // エルフリンデ: 侵食されていれば第三陣営の気配、いなければ村人の気配（マイクラ版 senseSeerMessage）
+    if (role === "hotaru") return "village";   // ホタル: 変身していないホタルは村人の気配（マイクラ版 senseSeerMessage。サムは WOLF_ROLES で人狼の気配）
     if (id && (g.promotedWolfIds || []).includes(id) && MAD_ROLES.has(role)) return "wolf";
     if (WOLF_ROLES.has(role)) return "wolf";
     if (MAD_ROLES.has(role)) return "mad";

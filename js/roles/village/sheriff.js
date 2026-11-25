@@ -90,6 +90,7 @@
   function substituteOf(g, target) {
     const r = R();
     if (g.currentRoles[target] === r.SERVANT || g.currentRoles[target] === r.MARTYR) return null;   // 殉職者の身代わりにもならない（マイクラ版 servantSubstituteForSheriffTarget）
+    if (g.currentRoles[target] === "agent" && ONW.agent && ONW.agent.commandOf(g, target) === "die") return null;   // 死の指令の代行者も身代わりにならない（マイクラ版 servantSubstituteForSheriffTarget）
     const pair = ONW.servantSubPairs(g).find(([s, m]) => m === target && s !== target && !isDead(g, s) && !ONW.isLover(g, s));
     return pair ? pair[0] : null;
   }
@@ -211,7 +212,7 @@
   /** 「〇〇を撃ちました。」（CPUの発言・5of6b の COボタンの結果開示と同じ文言） */
   const shotText = (name) => `${name} を撃ちました。`;
   /** 撃った本人の情報確認の文。騎士に守られたときだけ「🛡️ 騎士に守られました。」を足す（執行か誤爆かは分からない文のまま。撃った人にだけ届く） */
-  const doneText = (e, name) => shotText(name) + (e && e.knightGuard && e.knightGuard.length ? " 🛡️ 騎士に守られました。" : "");
+  const doneText = (e, name) => shotText(name) + (e && e.mercGuard && e.mercGuard.length ? " 🛡️ 傭兵に守られました。" : "") + (e && e.knightGuard && e.knightGuard.length ? " 🛡️ 騎士に守られました。" : "");
   /** CO一覧に出す短い結果 */
   const shotShort = (name) => `${name} を撃った`;
   /** 撃てば執行される人外と、役職から言えるか（CPUが知っている役職で判断する）。白狼は村人陣営扱い・ネコカボチャ（保安官も死ぬ）・シュレディンガーの猫（何も起きない）・人狼王（ガードされることがある）は、撃っても効果がないか危ないので狙わない */

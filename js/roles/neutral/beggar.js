@@ -66,7 +66,8 @@
 
   /** 役職に紐づくデータ（ONW.ROLE_BOUND_KEYS）と猫の固定・参照を、取られた人から乞食へ移す（マイクラ版 transferImmediateBeggarData / transferBeggarLinkedData 相当） */
   function transferData(g, fromId, toId) {
-    const keys = [...(ONW.ROLE_BOUND_KEYS || []), "sheriffCatFix", "sheriffCatTeam", "catSources", "catInfo", "catBitePick"];
+    // エルフリンデの記録（封印した相手・侵食・黄泉の敗北）は移さない（マイクラ版 transferImmediateBeggarData にエルフリンデの記録が無い。取った乞食は記録なしのエルフリンデとして判定される）
+    const keys = [...(ONW.ROLE_BOUND_KEYS || []), "sheriffCatFix", "sheriffCatTeam", "catSources", "catInfo", "catBitePick"].filter((k) => !["elfrindeTarget", "elfrindeTargetTeam", "elfrindeCorrupted", "elfrindeCutByYomi"].includes(k));
     keys.forEach((k) => {
       const m = g[k];
       if (m && typeof m === "object" && fromId in m) { m[toId] = m[fromId]; delete m[fromId]; }
@@ -124,6 +125,7 @@
   /** 投票で死んだ人の死因（候補グループ分け用。マイクラ版 beggarDeathCandidateGroups の死因に対応させる） */
   function deathReason(g, id, executedSet) {
     if ((g.foxCursed || []).includes(id)) return "curse";
+    if ((g.curseKillIds || []).includes(id)) return "curse_kill";   // 呪術の人狼の呪殺: マイクラ版 beggarDeathCandidateGroups のグループ分けでは、どの候補グループにも入らない（取れない）
     if (g.dictator && (g.dictator.chosen || g.dictator.target) === id && executedSet.has(id)) return g.dictator.coup ? "coup" : "dictator";
     const dk = (g.deadKind || {})[id];
     if (dk === "fox" || dk === "foxvote") return "curse";
@@ -228,7 +230,7 @@
     return out;
   }
 
-  ONW.beggar = { holders, excludedTarget, resolveDay, resolveVote, deathReason, deathBlocksWin, staysBeggarWin, noticeText, lines, voteSwaps, achievements, EXCLUDED_ROLES };
+  ONW.beggar = { holders, excludedTarget, resolveDay, resolveVote, deathReason, deathBlocksWin, staysBeggarWin, noticeText, lines, voteSwaps, achievements, EXCLUDED_ROLES, transferData };
 
   ONW.defineRole("beggar", {
     info: { sealTarget: true, deck: 120, name: "乞食", team: ONW.TEAM.THIRD, wakeOrder: null, sort: 48,
