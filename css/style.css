@@ -754,16 +754,16 @@ body.is-title .credits-link {
   .wikiv__box { height: 100%; border: 0; border-radius: 0; }
 }
 .fs-btn { position: fixed; top: 6px; left: 6px; z-index: 500; width: 28px; height: 28px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: rgba(27,29,43,.85); color: var(--gold-dim); font-size: 16px; line-height: 1; cursor: pointer; }
-/* 左上: サウンドボタン（全画面ボタンの隣）と音量パネル（js/sound.js が開閉・同期） */
-.snd-btn { position: fixed; top: 6px; left: 40px; z-index: 500; }
-.snd-panel { position: fixed; top: 44px; left: 6px; z-index: 510; width: 248px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(27,29,43,.97); box-shadow: 0 8px 24px rgba(0,0,0,.5); color: var(--ink); }
+/* 左下: サウンドボタンと音量パネル（js/sound.js が開閉・同期）。ヘッダー左のフェーズ表示・タイマーやルーム待機の表示と被らないよう、左上から左下へ移した（2026-11-25 作者指示） */
+.snd-btn { position: fixed; left: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 500; }
+.snd-panel { position: fixed; left: 10px; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); z-index: 510; width: 248px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(27,29,43,.97); box-shadow: 0 8px 24px rgba(0,0,0,.5); color: var(--ink); }
 .snd-panel[hidden] { display: none; }
 .snd-panel__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; font-weight: 700; }
 .snd-panel__row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .snd-panel__row label { flex: 0 0 34px; font-size: 13px; color: var(--ink-dim); }
 .snd-panel__row input[type="range"] { flex: 1 1 auto; min-width: 0; }
 .snd-panel__val { flex: 0 0 38px; text-align: right; font-size: 12px; color: var(--ink-dim); }
-@media (min-width: 900px) { .snd-panel { top: 60px; } }   /* PC版は 🔊 ボタンが大きくなる分、パネルを下げる */
+
 body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glow, body.pseudo-fs .onw-app + * { }
 body.pseudo-fs .onw-header, body.pseudo-fs .onw-footer, body.pseudo-fs .moon-glow, body.pseudo-fs body > p { display: none; }
 /* トップ画面 */
@@ -2047,7 +2047,7 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 body.ovl-open .top-right { visibility: hidden; pointer-events: none; }   /* JS(debug.js)が付ける。:has非対応の古いスマホ用 */
 body:has(.settings-modal) .top-right { visibility: hidden; pointer-events: none; }   /* 最新ブラウザ用（セレクタを分けているのは、:hasが分からない端末でも上の行を有効にするため） */
 body:has(.dbg-sheet) .top-right { visibility: hidden; pointer-events: none; }
-/* 左上のサウンドボタン・音量パネルも、設定・デバッグを開いている間は同じように隠す */
+/* 左下のサウンドボタン・音量パネルも、設定・デバッグを開いている間は同じように隠す */
 body.ovl-open .snd-btn, body.ovl-open .snd-panel { visibility: hidden; pointer-events: none; }
 body:has(.settings-modal) .snd-btn, body:has(.settings-modal) .snd-panel { visibility: hidden; pointer-events: none; }
 body:has(.dbg-sheet) .snd-btn, body:has(.dbg-sheet) .snd-panel { visibility: hidden; pointer-events: none; }

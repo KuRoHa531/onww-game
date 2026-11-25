@@ -15,7 +15,7 @@
  *   ONW.sound.noteFlip(key, up)   … stage の paint から呼ばれるカードのめくれ検出（SE: card_flip。裏→表／表→裏の双方向）
  *   ONW.sound.resetFlips()        … テーブルの作り直し・破棄時にめくれ記録を消す（stage.sync から）
  *   ONW.sound.forgetFlip(key)     … 席要素が破棄されたときにその席のめくれ記録だけ消す（stage の cosClear 等から）
- *   ONW.sound.togglePanel()       … 左上の 🔊 ボタンから開く音量パネル（BGM/SE 別スライダー＋ミュート）の開閉
+ *   ONW.sound.togglePanel()       … 左下の 🔊 ボタンから開く音量パネル（BGM/SE 別スライダー＋ミュート）の開閉
  * タップ音: ボタンやカードなどのタップ可能要素を押したとき、委譲リスナーで SE "tap" を鳴らす（このファイル内で配線）。
  * 対応表は docs/sound.md を参照。
  */
@@ -214,7 +214,7 @@
   }
   try { document.addEventListener("click", onTapSound, true); } catch (e) {}
 
-  // ---------------- 音量パネル（左上の 🔊 から開く） ----------------
+  // ---------------- 音量パネル（左下の 🔊 から開く） ----------------
   // index.html の #snd-panel（BGM/SE 別スライダー＋ミュート）。状態は cfg が唯一の正で、
   // ルーム設定モーダルのスライダーとも同じ setter を使うため、どちらを操作しても連動する。
   let panel = null, pBgm = null, pSe = null, pBgmVal = null, pSeVal = null, pMute = null, panelOpen = false;
