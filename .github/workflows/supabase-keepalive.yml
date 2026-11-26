@@ -14,6 +14,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl -sS -w "\nHTTP %{http_code}\n" \
+          set -e
+          curl -fsS -o /dev/null -w "HTTP %{http_code}\n" \
             "${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1" \
             -H "apikey: ${SUPABASE_ANON_KEY}"
