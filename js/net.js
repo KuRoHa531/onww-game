@@ -71,7 +71,10 @@ window.ONW = window.ONW || {};
       if (g.tickId !== myTick) { clearInterval(myTick); return; }   // 取り残された古い時計（ホスト復元などで置き換わったもの）は止める。二重に動くと残り時間が倍速で進み、フェーズ移行も二重に走る
       g.remain -= 1;
       sendAll({ t: "tick", sec: g.remain }); sendSpec({ t: "tick", sec: g.remain });
-      if (onTick) onTick(g.remain);
+      // 作者要望（2026-11-26）: 議論の残り20秒からは秒針の音を1秒ごとに鳴らす（ホスト本人の分。参加者・観戦者は tick 受信側で鳴らす）
+      try { if (ONW.sound && g.phase === PH().ONLINE_DAY && g.remain >= 1 && g.remain <= 20) ONW.sound.se("tick"); } catch (e) {}
+      // 作者報告（2026-11-26）「議論時間から自動で投票時間に行かない」対策: 毎秒処理(onTick)の中の例外でフェーズ遷移(onEnd)が止まらないよう、onTick は例外を飲んでから遷移判定をする
+      if (onTick) { try { onTick(g.remain); } catch (e) { if (typeof console !== "undefined" && console.error) console.error("[timer] onTick で例外（遷移は続行します）:", e); } }
       if (g.remain <= 0) { stopTimer(); onEnd(); }
     }, 1000);
   }
@@ -214,7 +217,8 @@ window.ONW = window.ONW || {};
     if (d.t === "lobby") { g.deckCnt = null; g.smokeOn = false; g.dukeIds = null; g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.villageSize = d.vsize || 4; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.fakeSeerGraveCount = d.fsgrave ?? d.sgrave; g.madSeerGraveCount = d.msgrave ?? d.sgrave; g.mayorVoteCount = d.mvote ?? 2; g.madMayorVoteCount = d.mmvote ?? 2; g.drunkCount = d.drunk || 0; g.drunkChance = d.drunkp ?? 100; g.drunkChances = ONW.assign.sanitizeDup(d.drunkps, "drunk"); g.loverCount = d.lover || 0; g.loverChance = d.loverp ?? 100; g.loverChances = ONW.assign.sanitizeDup(d.loverps, "lover"); g.timers = { deal: 5, settle: 5, ...d.timers }; g.revealTransforms = d.reveal; g.revealManualRoles = !!d.revm; g.winLadderFx = d.wlf !== false; g.bubbleChat = d.bub === true; g.cpuAi = false; g.smokeHideAbility = !!(d.smk && d.smk[0]); g.smokeHideVote = !!(d.smk && d.smk[1]); g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; ONW.assign.unpack(g, d.asg); g.debugOn = !!d.dbg; const keepRes = g.phase === PH().ONLINE_RESULT && net.rejoinedAt && Date.now() - net.rejoinedAt < 8000 && ONW.ui.hasLastResult(g); g.phase = PH().LOBBY; g.remain = null; if (keepRes) g.viewResult = true; }   // 結果画面のまま切れて、戻ったらもうロビーだった: 結果画面を開いたままにする（「ロビーに戻る」を押すまで）
     if (d.t === "noop") return;   // 何も出さない人へ送る空のメッセージ（ハッキングされた人にだけ出す公開演出で、その人の目線では何もないとき）
     if (d.t === "tfskip") { ONW.stage.skipPaper(); return; }   // ホストが変化公開をスキップした → 全員の紙を飛ばす
-    if (d.t === "tick") { g.remain = d.sec; tkAuth = d.sec; tkAt = Date.now(); tkOff = 0; ONW.ui.updateTimer(); if (d.sec <= 1 && g.phase === PH().ONLINE_MORNING && !g.settling && ONW.stage.morningEnd) ONW.stage.morningEnd(); return; }   // 朝の残り1秒: 朝にめくれた面を裏に戻す（待機時間の演出と重ならないように）
+    if (d.t === "tick") { g.remain = d.sec; tkAuth = d.sec; tkAt = Date.now(); tkOff = 0; ONW.ui.updateTimer(); try { if (ONW.sound && (g.phase === PH().ONLINE_DAY || (g.phase === PH().ONLINE_SPECTATE && g.specPhase === PH().ONLINE_DAY)) && d.sec >= 1 && d.sec <= 20) ONW.sound.se("tick"); } catch (e) {}   // 作者要望（2026-11-26）: 議論の残り20秒からは秒針の音を1秒ごとに鳴らす
+      if (d.sec <= 1 && g.phase === PH().ONLINE_MORNING && !g.settling && ONW.stage.morningEnd) ONW.stage.morningEnd(); return; }   // 朝の残り1秒: 朝にめくれた面を裏に戻す（待機時間の演出と重ならないように）
     if (d.t === "coboard") { g.boardView = d.board || []; g.tfView = d.tf || null; ONW.ui.updateBoard(); if (g.co && g.co.step === "history" && ONW.co) ONW.co.render(); ONW.stage.sync(g); return; }
     if (d.t === "specinfo") { g.specInfo = d.info || null; g.mimicView = (d.info && d.info.mimicMap) || {}; g.cloneView = (d.info && d.info.cloneMap) || {}; g.personaView = (d.info && d.info.personaMap) || {}; if (ONW.ui.isSpecDeal(g)) ONW.ui.render(g); ONW.ui.updateSpecInfo(); ONW.stage.sync(g); return; }   // 観戦者: 全員の役職・夜の行動・投票
     if (d.t === "ghostlog") { g.ghostLog = d.log || []; ONW.ui.updateChat(); return; }                              // 霊界チャット

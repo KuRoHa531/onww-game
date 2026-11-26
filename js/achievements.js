@@ -123,15 +123,17 @@ if (!def) return;
 const b = document.createElement("div");
 b.className = "achv-banner";
 if (ix) b.style.top = `calc(18% + ${ix * 84}px)`;
-b.innerHTML = `<span class="achv-banner__icon">🏆</span><span class="achv-banner__text">実績『${esc(def.n)}』を解除しました</span>`;
+b.innerHTML = `<span class="achv-banner__icon">🏆</span><span class="achv-banner__text">実績<span style="color:${catDefOf(def.c).col || "inherit"}">『${esc(def.n)}』</span>を解除しました</span>`;
 document.body.appendChild(b);
 setTimeout(() => { try { b.remove();} catch (err) {}}, 3900 + ix * 300);
 });
 } catch (e) { /* 通知の失敗でログイン処理を止めない */}
 };
 
-/** 新規解除分を保存する（ログイン中は Supabase、ダメなら/ゲストは端末保存）。失敗しても投げない */
+/** 新規解除分を保存する（ログイン中は Supabase、失敗時は端末にも控える）。ゲストは保存しない（作者指示 2026-11-26）。失敗しても投げない */
 achv.saveNew = async function (ids) {
+const A0 = ONW.account;
+if (!A0 ||!A0.user) return [];   // ゲストは実績を保存しない
 const fresh = (ids || []).filter((id) => DEFS.has(id) &&!mine.unlocked.has(id));
 if (!fresh.length) return [];
 fresh.forEach((id) => mine.unlocked.add(id));
@@ -377,6 +379,8 @@ achv.onResult = async function (result, key) {
 try {
 const G = ONW.game;
 if (!result || result.abandoned ||!Array.isArray(result.history) ||!ONW.net || G.debugOn || G.isSpectator) return [];   // 廃村の結果では保存・申告をしない（呼び出し側のガードと二重化）
+const AC = ONW.account;
+if (!AC ||!AC.user) return [];   // 作者指示（2026-11-26）: ゲストは実績の対象外（保存も通知もしない。累計カウンタも進めない）
 const myId = ONW.net.myId();
 const me = result.history.find((h) => h.id === myId);
 if (!me ||!me.ini) return [];
@@ -400,7 +404,7 @@ for (const [aid, n] of COLLECT_RULES) if (totalAfter >= n &&!mine.unlocked.has(a
 if (totalAfter >= DATA.length - 1 &&!mine.unlocked.has("achievement_all_497")) fresh.push("achievement_all_497");
 fresh = [...new Set(fresh)].filter((id) => DEFS.has(id));
 if (fresh.length) await achv.saveNew(fresh);
-if (fresh.length && ONW.net.reportAchv) ONW.net.reportAchv(fresh);
+if (fresh.length && A && A.user && ONW.net.reportAchv) ONW.net.reportAchv(fresh);   // 作者指示（2026-11-26）: ゲストは実績通知なし（申告しないのでリザルトの解除行・モーダルにも出ない。ゲストは保存自体もしない＝onResult の入口で対象外）
 return fresh;
 } catch (e) { return []; /* 実績の失敗でゲームを止めない */}
 };
@@ -432,7 +436,7 @@ document.body.appendChild(w);
 }
 const body = rows.length? rows.map((r) => `
 <div class=\"achv-player\"><div class=\"achv-player__name\">🏆 ${esc(r.name)}</div>
-${r.ids.map((id) => { const d = DEFS.get(id); return d? `<div class=\"achv-row\"><span class=\"achv-row__name\">${esc(d.n)}</span><span class=\"achv-row__desc\">${esc(d.d)}</span></div>`: "";}).join("")}</div>`).join("")
+${r.ids.map((id) => { const d = DEFS.get(id); return d? `<div class=\"achv-row\"><span class=\"achv-row__name\" style=\"color:${catDefOf(d.c).col || "inherit"}\">${esc(d.n)}</span><span class=\"achv-row__desc\">${esc(d.d)}</span></div>`: "";}).join("")}</div>`).join("")
 : `<p class=\"rs-dim\">今回新しく解除した人はいませんでした。</p>`;
 w.innerHTML = `<div class=\"pf-card\" role=\"dialog\" aria-modal=\"true\"><button class=\"pf-x\" aria-label=\"閉じる\" onclick=\"ONW.achievements.closeModal()\">×</button><h2>解除した実績</h2>${body}</div>`;
 };
