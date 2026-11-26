@@ -513,6 +513,7 @@
     sheep_madman: { kinds: ["sheep"], n: 1, ok: () => ({ t: "sheepok", on: true }), text: (g, A) => `${A}を迷える子羊状態にしました。` },   // 羊の狂人を思い込んだ人: 迷える子羊にする相手を1人選ぶ（マイクラ版の偽の通知「羊の狂人通知: 〇〇を迷える子羊状態にしました。」）
     medium: { kinds: ["medium"], n: 1, ok: (f, g, id) => ({ t: "mediumok", on: true, targets: ONW.medium ? ONW.medium.targetList(g, id) : [] }), text: (g, A) => `${A}の役職は${roleName(rnd(g))}でした。` },   // 霊媒師を思い込んだ人: 霊媒する死亡者を1人選ぶ（対象は本物と同じ死亡者。マイクラ版の偽の通知「霊媒通知: 〇〇の役職は△△でした。」。対象が死亡者なので dayAct は専用分岐で検証する）
     counselor: { kinds: ["counsel"], n: 1, ok: () => ({ t: "counselok", on: true }), text: (g, A) => `${A}を選びました。` },
+    psychologist: { kinds: ["psy"], n: 2, ok: () => ({ t: "psyok", on: true }), text: (g, A, B) => `${A}と${B}の検査結果は${Math.random() < 0.5 ? "適合しました" : "適合しませんでした"}。` },   // 心理士を思い込んだ人: 検査する2人を選ぶ（対象は本物と同じ生きている自分以外の2人）。結果はランダム（マイクラ版 silverWolfFakeRoleResult の心理士は対象名の無い文だが、Web版の偽昼能力は天秤と同じく対象名入りの文で統一）
     ren: { kinds: ["ren"], n: 1, ok: () => ({ t: "renok", on: true }), text: (g, A) => `${A}を選びました。` },   // カウンセラーを思い込んだ人: 更生させる相手を1人選ぶ（対象は本物と同じ生きている自分以外の1人。マイクラ版にカウンセラー専用の偽文は無く、既定の偽文「〇〇を選びました。」）
     freeter: { kinds: ["rejob"], n: 1, ok: () => ({ t: "rejobok", on: true }), text: (g, A) => `${A} に再就職しました。` },
     mind_wolf: { kinds: ["mind"], n: 1, ok: () => ({ t: "mindok", on: true, role: "mind_wolf" }), text: (g, A) => (ONW.mindWolf && ONW.mindWolf.resultText ? ONW.mindWolf.resultText(A, roleName(rnd(g))) : `${A} の最終役職は「${roleName(rnd(g))}」でした。`) },
