@@ -98,10 +98,36 @@ await achv.grantWelcome();
 return syncing;
 };
 
-/** welcome_onw: 初めて接続したら解除（マイクラ版の「ワールドに接続」相当を、初回読み込みに読み替え） */
+/** welcome_onw: 初めてアカウントにログインしたら解除（2026-11-26 作者指示）。
+* MC版の「ワールドに接続する」は Web版には無い言い回しなので、条件ごと「アカウントへのログイン」に読み替えた。
+* 付与はログイン時の読み込み（syncUser）で行うので、実績実装前にログインしていた人も次回ログインで自動で獲得できる。
+* ゲスト（アカウント無し）は対象外。新たに付いた時だけ獲得通知バナーを1回出す（所持済み・再ログインでは出ない）。 */
 achv.grantWelcome = async function () {
-if (!mine.loaded || mine.unlocked.has("welcome_onw")) return;
-await achv.saveNew(["welcome_onw"]);
+const A = ONW.account;
+if (!A ||!A.enabled ||!A.user ||!A.sb) return false;   // ゲストは対象外
+if (!mine.loaded || mine.unlocked.has("welcome_onw")) return false;
+const fresh = await achv.saveNew(["welcome_onw"]);
+if (!fresh.includes("welcome_onw")) return false;
+achv.showUnlockNotice(["welcome_onw"]);
+return true;
+};
+
+/** 実績の獲得通知バナー（ログイン時の welcome_onw のような単発解除用。パン屋バナーと同型で、数秒で消える） */
+achv.showUnlockNotice = function (ids) {
+try {
+if (typeof document === "undefined" ||!document.body ||!document.createElement) return;
+document.querySelectorAll && document.querySelectorAll(".achv-banner").forEach((e) => { try { e.remove();} catch (err) {}});
+(ids || []).forEach((id, ix) => {
+const def = DEFS.get(id);
+if (!def) return;
+const b = document.createElement("div");
+b.className = "achv-banner";
+if (ix) b.style.top = `calc(18% + ${ix * 84}px)`;
+b.innerHTML = `<span class="achv-banner__icon">🏆</span><span class="achv-banner__text">実績『${esc(def.n)}』を解除しました</span>`;
+document.body.appendChild(b);
+setTimeout(() => { try { b.remove();} catch (err) {}}, 3900 + ix * 300);
+});
+} catch (e) { /* 通知の失敗でログイン処理を止めない */}
 };
 
 /** 新規解除分を保存する（ログイン中は Supabase、ダメなら/ゲストは端末保存）。失敗しても投げない */
@@ -214,11 +240,40 @@ return t.filter(Boolean);
 const ANIMALS = new Set(["chicken", "penguin", "watchdog", "cat_sidhe", "black_cat", "schrodinger_cat", "cat_pumpkin", "fox", "werewolf", "yokai_tanuki"]);
 const CATS = new Set(["cat_sidhe", "black_cat", "schrodinger_cat", "cat_pumpkin"]);
 const animalCount = players.filter((p) => ANIMALS.has((g.currentRoles || {})[p.id])).length;
-let roleLost = false, kittenMoves = 0;
+let roleLost = false;
 for (const p of players) {
 const h = trailOf(p.id); let changes = 0;
-for (let i = 1; i < h.length; i++) if (h[i]!== h[i - 1]) { changes++; if (CATS.has(h[i])) kittenMoves++;}
+for (let i = 1; i < h.length; i++) if (h[i]!== h[i - 1]) changes++;
 if (changes >= 3) roleLost = true;
+}
+// 迷子の迷子の子猫ちゃん（lost_kittens）: 猫役職が2回以上「移動」した試合に参加する。
+// 作者決定: 光の使徒・闇の化身・銀色の影による「変化」で猫役職になった遷移は移動に数えない。
+// 変化は配布時に transformFrom（変化前）→ 初期役職として記録され、カード自体は動かない。
+// 夜以降の遷移は cards.trail（roleTrail と並行するカードIDの履歴）で「カードが動いたか」を見て、
+// 交換・墓荒らし等のカード移動は変化前の役職が変化役でも数え、カードが動いていない上書きで
+// 変化役から猫役職になった遷移（変化の延長）だけを除外する。
+const BASES = new Set(["light_apostle", "dark_avatar", "silver_shadow"]);
+let kittenMoves = 0;
+for (const p of players) {
+const id = p.id, stages = [];
+const tf = (g.transformFrom || {})[id];
+if (tf) stages.push(tf);
+const ini = (g.initialRoles || {})[id];
+if (ini) stages.push(ini);
+const trailStart = stages.length;   // roleTrail 由来の段階が始まる添字（これより前は配布時の変化）
+((g.roleTrail || {})[id] || []).forEach((r) => stages.push(r));
+const fin = (g.currentRoles || {})[id];
+if (fin && stages[stages.length - 1]!== fin) stages.push(fin);
+const cardTrail = (g.cards && g.cards.trail && g.cards.trail[id]) || [];
+for (let i = 1; i < stages.length; i++) {
+if (stages[i] === stages[i - 1] ||!CATS.has(stages[i])) continue;
+if (i < trailStart) continue;   // 配布時の変化（変化役 → 猫役職）は移動に数えない
+const j = i - trailStart;   // roleTrail の添字（cards.trail と並行）
+const cardBefore = j === 0? "P:" + id: (cardTrail[j - 1] || "P:" + id);
+const cardAfter = cardTrail[j] || cardBefore;
+if (cardAfter === cardBefore && BASES.has(stages[i - 1])) continue;   // カードが動いていない変化役からの上書きは数えない
+kittenMoves++;
+}
 }
 const onlyBases = players.length > 0 && players.every((p) => ["light_apostle", "dark_avatar", "silver_shadow"].includes((g.initialRoles || {})[p.id]));
 const loverPartners = (id) => {
@@ -384,44 +439,139 @@ w.innerHTML = `<div class=\"pf-card\" role=\"dialog\" aria-modal=\"true\"><butto
 achv.closeModal = function () { const w = document.getElementById("achv-overlay"); if (w) w.remove();};
 
 /** プロフィールの実績欄（profile.js から呼ばれる）。data: achv.loadFor(見ている相手のID) の戻り値。
- *  解除状況・装備中はすべて「見ている相手」のデータで描く（閲覧者の状態では変わらない）。
- *  カテゴリ（基本/村人陣営/人狼陣営/第三陣営/その他）→ サブカテゴリ（役職ごと。役職に紐づかないものは
- *  「基本」/「その他」）の2段でグループ見出し＋解除数を付ける。
- *  未解除の実績は、自分のプロフィールでも他人のプロフィールでも名前・条件文とも「？？？」で伏せる
- *  （解除数とカテゴリ自体は見えてよい）。装備ボタンは自分のプロフィールのときだけ（isMine）。 */
-achv.profileHtml = function (data, isMine) {
-if (!data || data.error) return `<h2>実績</h2><p class=\"night-step__hint\">実績を読み込めませんでした。（管理者向け: setup.sql の「10.」を実行してください）</p>`;
-const unlocked = data.unlocked || new Set();
-const cats = (typeof window!== "undefined" && window.ONW_ACHIEVEMENT_CATS) || {};
-const roleName = (r) => { try { return ONW.roles.getInfo(r).name;} catch (e) { return r;}};
-const roleRank = (r) => { try { return ONW.roleRank(r);} catch (e) { return 9999;}};
-const byCat = {};
-DATA.forEach((e) => { (byCat[e.c] = byCat[e.c] || []).push(e);});
-const order = ["basic", "village", "wolf", "third", "other"];
-const rowHtml = (e) => {
-const has = unlocked.has(e.i), eq = has && data.equipped === e.i;
-const btn = isMine && has? `<button class=\"btn tf-chip\" onclick=\"ONW.achievements.equipFromProfile(${eq? "null": `'${e.i}'`})\">${eq? "装備中（外す）": "装備する"}</button>`: "";
-return `<div class=\"achv-row${has? "": " achv-row--locked"}${eq? " achv-row--eq": ""}\"><span class=\"achv-row__name\">${has? esc(e.n): "？？？"}</span><span class=\"achv-row__desc\">${has? esc(e.d): "？？？"}</span>${eq? `<span class=\"st st-ready\">装備中</span>`: ""}${btn}</div>`;
-};
-const sec = order.filter((c) => byCat[c]).map((c) => {
-const subs = new Map();   // サブカテゴリキー → { label, rank, items }
-byCat[c].forEach((e) => {
-const key = e.r || "";
-if (!subs.has(key)) subs.set(key, { label: e.r? roleName(e.r): (c === "basic"? "基本": "その他"), rank: e.r? roleRank(e.r): -1, items: []});
-subs.get(key).items.push(e);
-});
-const subHtml = [...subs.values()].sort((a, b) => a.rank - b.rank).map((s) =>
-`<div class=\"achv-sub\"><div class=\"achv-sub__name\">${esc(s.label)}（${s.items.filter((e) => unlocked.has(e.i)).length}/${s.items.length}）</div>${s.items.map(rowHtml).join("")}</div>`).join("");
-return `<div class=\"achv-cat\"><div class=\"achv-cat__name\">${esc(cats[c] || c)}（${byCat[c].filter((e) => unlocked.has(e.i)).length}/${byCat[c].length}）</div>${subHtml}</div>`;
+* マイクラ版の実績UIと同じドリルダウン式:
+* 実績一覧（トップ: 全実績の解除数＋カテゴリ一覧）→ カテゴリ →（人狼陣営は「人狼系/狂人系」の振り分け）→
+* サブカテゴリ（役職）→ 実績リスト → 実績詳細（自分の解除済みには「装備する」ボタン）。
+* 解除状況・装備中はすべて「見ている相手」のデータで描く（閲覧者の状態では変わらない）。
+* 未達成でも名前・説明を表示する（作者決定で「？？？」伏せは廃止）。装備ボタンは自分のプロフィールのときだけ（isMine）。 */
+const CAT_DEFS = (typeof window!== "undefined" && window.ONW_ACHIEVEMENT_CATEGORY_DEFS) || [];
+const catDefOf = (cid) => CAT_DEFS.find((c) => c.i === cid) || { i: cid, n: cid, col: "", o: 999, h: false};
+// マイクラ版 isRealWolfRole の移植（人狼陣営カテゴリの「人狼系」判定に使う役職ID。闇の化身は MC の wolfAchievementSubCategoryKind どおり別枠で人狼系）
+const REAL_WOLVES = new Set(["werewolf", "big_wolf", "lone_wolf", "white_wolf", "tofu_wolf", "negi_wolf", "forgetful_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "command_wolf", "curse_wolf", "sam", "patch"]);
+const wolfKindOf = (role) => (role === "dark_avatar" || REAL_WOLVES.has(role)? "real": "mad");
+let pfState = null; // { data, isMine, level: top|kind|subs|list|detail, cat, kind, role, achvId}
+const pfRoleName = (r) => { try { return ONW.roles.getInfo(r).name;} catch (e) { return r;}};
+const pfRoleRank = (r) => { try { return ONW.roleRank(r);} catch (e) { return 9999;}};
+const pfByCat = (cid) => DATA.filter((e) => e.c === cid);
+const pfCount = (list, unlocked) => list.filter((e) => unlocked.has(e.i)).length;
+/** 表示するカテゴリ（MC achievementVisibleCategories: hiddenByDefault のカテゴリは、その実績を1つでも解除するまで出さない） */
+const pfVisibleCats = (unlocked) => CAT_DEFS.filter((c) =>!c.h || pfByCat(c.i).some((e) => unlocked.has(e.i))).slice().sort((a, b) => a.o - b.o);
+/** カテゴリ内のサブカテゴリ（役職ID）。ROLE_ORDER 順。kind を渡すと人狼陣営の人狼系/狂人系で絞る */
+const pfSubsOf = (cid, kind) => [...new Set(pfByCat(cid).map((e) => e.r).filter(Boolean))]
+.filter((r) =>!kind || wolfKindOf(r) === kind).sort((a, b) => pfRoleRank(a) - pfRoleRank(b));
+// 役職検索（デバッグの役職検索と同じ流儀: 名前＋読み仮名＋役職IDを正規化して data-rq に埋め、入力では再描画せずDOMだけ絞る）
+const pfNormQ = (s) => String(s || "").replace(/[\s　]/g, "").replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60)).toLowerCase();
+const pfSearchKey = (r) => { const kana = (ONW.detectiveGhost && ONW.detectiveGhost.kanaOf)? ONW.detectiveGhost.kanaOf(r): ""; return pfNormQ(`${pfRoleName(r)} ${kana || ""} ${r}`);};
+const pfBackBtn = (label) => `<div class="achv-backrow"><button type="button" class="btn tf-chip" onclick="ONW.achievements.pfBack()">${label}</button></div>`;
+const pfNavRow = (onclick, nameHtml, countText) => `<button type="button" class="achv-navrow" onclick="${onclick}"><span class="achv-navrow__name">${nameHtml}</span><span class="achv-navrow__count">${countText}</span></button>`;
+
+function pfTopHtml() { // 実績一覧トップ（MC openAchievementsMenu / buildAchievementListBody）
+const unlocked = pfState.data.unlocked || new Set();
+const cats = pfVisibleCats(unlocked);
+const visEntries = cats.flatMap((c) => pfByCat(c.i)); // 全体集計は表示中カテゴリだけ（MC achievementOverallStats と同じ）
+const rows = cats.map((c) => {
+const list = pfByCat(c.i);
+return pfNavRow(`ONW.achievements.pfCat('${c.i}')`, `<span style="color:${c.col || "inherit"}">${esc(c.n)}</span>`, `${pfCount(list, unlocked)} / ${list.length}`);
 }).join("");
-return `<h2>実績（${unlocked.size}/${DATA.length}）</h2><div class=\"achv-list\">${sec}</div>`;
+return `<div class="achv-top__title">【実績一覧】</div><div class="achv-top__overall">全実績 ${pfCount(visEntries, unlocked)} / ${visEntries.length}</div><p class="rs-dim">カテゴリを選ぶと詳細を開けます。</p>${rows}`;
+}
+function pfKindHtml() { // 人狼陣営: 人狼系 / 狂人系の振り分け（MC openWolfAchievementKindMenu）
+const unlocked = pfState.data.unlocked || new Set();
+const cd = catDefOf(pfState.cat), list = pfByCat(pfState.cat);
+const rows = [["real", "人狼系"], ["mad", "狂人系"]].map(([k, label]) => {
+const sub = list.filter((e) => e.r && wolfKindOf(e.r) === k);
+return pfNavRow(`ONW.achievements.pfKind('${k}')`, esc(label), `${pfCount(sub, unlocked)} / ${sub.length}`);
+}).join("");
+return `${pfBackBtn("実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(cd.n)}</div><div class="achv-catcount">${pfCount(list, unlocked)} / ${list.length}</div><p class="rs-dim">人狼系か狂人系かを選んでください。</p>${rows}`;
+}
+function pfSubsHtml() { // サブカテゴリ（役職）の一覧（MC openAchievementSubCategoryListMenu。役職検索つき）
+const unlocked = pfState.data.unlocked || new Set();
+const cd = catDefOf(pfState.cat), list = pfByCat(pfState.cat), kind = pfState.kind;
+const title = kind? `${cd.n}（${kind === "mad"? "狂人系": "人狼系"}）`: cd.n;
+const roles = pfSubsOf(pfState.cat, kind);
+const rows = roles.map((r) => {
+const sub = list.filter((e) => e.r === r);
+return `<button type="button" class="achv-navrow" data-rq="${esc(pfSearchKey(r))}" onclick="ONW.achievements.pfSub('${r}')"><span class="achv-navrow__name">${esc(pfRoleName(r))}</span><span class="achv-navrow__count">${pfCount(sub, unlocked)} / ${sub.length}</span></button>`;
+}).join("");
+const search = roles.length >= 10? `<div class="dbg-searchrow"><input class="dbg-search" type="search" placeholder="役職を検索（名前・読み）" oninput="ONW.achievements.pfSearch(this)"></div>`: "";
+return `${pfBackBtn(kind? "人狼系/狂人系の選択へ戻る": "実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(title)}</div><p class="rs-dim">サブカテゴリ（役職）を選んでください。</p>${search}<div class="achv-subs">${rows}<div class="achv-noresult" style="display:none">見つかりませんでした</div></div>`;
+}
+function pfListHtml() { // 実績リスト（MC openAchievementSubCategoryMenu / サブカテゴリの無いカテゴリは直接ここ）
+const unlocked = pfState.data.unlocked || new Set(), data = pfState.data;
+const cd = catDefOf(pfState.cat), role = pfState.role;
+const list = role? pfByCat(pfState.cat).filter((e) => e.r === role): pfByCat(pfState.cat);
+const rows = list.map((e) => {
+const has = unlocked.has(e.i), eq = has && data.equipped === e.i;
+return `<button type="button" class="achv-navrow${has? "": " achv-item--locked"}" onclick="ONW.achievements.pfDetail('${e.i}')"><span class="achv-navrow__name">『${esc(e.n)}』</span>${eq? `<span class="st st-ready">装備中</span>`: ""}<span class="achv-item__st ${has? "ok": "ng"}">${has? "達成済み": "未達成"}</span></button>`;
+}).join("");
+return `${pfBackBtn(role? "役職の一覧へ戻る": "実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(role? pfRoleName(role): cd.n)}</div><div class="achv-catcount">${pfCount(list, unlocked)} / ${list.length}</div><p class="rs-dim">実績を選ぶと詳細を開きます。</p>${rows || `<p class="rs-dim">このカテゴリの実績はまだ追加されていません。</p>`}`;
+}
+function pfDetailHtml() { // 実績詳細（MC openAchievementDetailMenu / achievementDetailBody）
+const unlocked = pfState.data.unlocked || new Set(), data = pfState.data;
+const e = DEFS.get(pfState.achvId);
+if (!e) return pfTopHtml();
+const has = unlocked.has(e.i), eq = has && data.equipped === e.i, cd = catDefOf(e.c);
+const prog = e.i === "achievement_all_497"? `<div class="achv-detail__prog">進捗：${[...unlocked].filter((id) => id!== e.i && DEFS.has(id)).length} / ${DATA.length - 1}</div>`: "";
+const equip = pfState.isMine && has? `<div class="btn-row"><button type="button" class="btn" onclick="ONW.achievements.pfEquip(${eq? "null": `'${e.i}'`})">${eq? "装備を外す": "装備する"}</button></div>`: "";
+return `${pfBackBtn("実績の一覧へ戻る")}<div class="achv-detail"><div class="achv-detail__name">『${esc(e.n)}』</div><div class="achv-item__st ${has? "ok": "ng"}">${has? "達成済み": "未達成"}</div>${prog}<div class="achv-detail__desc">説明：${esc(e.d)}</div><div class="achv-detail__cat" style="color:${cd.col || "inherit"}">${esc(cd.n)}</div>${e.r? `<div class="achv-detail__sub">サブカテゴリ：${esc(pfRoleName(e.r))}</div>`: ""}${eq? `<div><span class="st st-ready">装備中</span></div>`: ""}${equip}</div>`;
+}
+function pfRender() {
+if (!pfState) return "";
+if (pfState.level === "kind") return pfKindHtml();
+if (pfState.level === "subs") return pfSubsHtml();
+if (pfState.level === "list") return pfListHtml();
+if (pfState.level === "detail") return pfDetailHtml();
+return pfTopHtml();
+}
+function pfPaint() { const el = document.getElementById("achv-drill"); if (el && pfState) el.innerHTML = pfRender();}
+achv.profileHtml = function (data, isMine) {
+if (!data || data.error) return `<h2>実績</h2><p class="night-step__hint">実績を読み込めませんでした。（管理者向け: setup.sql の「10.」を実行してください）</p>`;
+pfState = { data, isMine:!!isMine, level: "top", cat: null, kind: null, role: null, achvId: null};
+return `<h2>実績</h2><div id="achv-drill">${pfRender()}</div>`;
 };
-achv.equipFromProfile = async function (id) {
+achv.pfCat = function (cid) {
+if (!pfState) return;
+pfState.cat = cid; pfState.kind = null; pfState.role = null;
+pfState.level = cid === "wolf"? "kind": (pfSubsOf(cid).length? "subs": "list"); // サブカテゴリの無いカテゴリ（基本・その他）は直接リストへ
+pfPaint();
+};
+achv.pfKind = function (kind) { if (!pfState) return; pfState.kind = kind; pfState.level = "subs"; pfPaint();};
+achv.pfSub = function (role) { if (!pfState) return; pfState.role = role; pfState.level = "list"; pfPaint();};
+achv.pfDetail = function (id) { if (!pfState ||!DEFS.has(id)) return; pfState.achvId = id; pfState.level = "detail"; pfPaint();};
+achv.pfBack = function () {
+if (!pfState) return;
+const v = pfState;
+if (v.level === "detail") v.level = "list";
+else if (v.level === "list") v.level = v.role? "subs": "top";
+else if (v.level === "subs") v.level = v.cat === "wolf"? "kind": "top";
+else if (v.level === "kind") v.level = "top";
+else v.level = "top";
+pfPaint();
+};
+/** 役職検索: 再描画せず、その場で役職行の表示だけを切り替える（デバッグの役職検索と同じ流儀。入力のフォーカスが外れない） */
+achv.pfSearch = function (input) {
+const rootEl = input && input.closest? input.closest("#achv-drill"): null;
+const grid = rootEl && rootEl.querySelector(".achv-subs");
+if (!grid) return;
+const q = pfNormQ(input.value);
+let any = false;
+[...grid.children].forEach((ch) => {
+if (ch.tagName!== "BUTTON") return;
+const hit =!q || (ch.getAttribute("data-rq") || "").indexOf(q) >= 0;
+ch.style.display = hit? "": "none";
+if (hit) any = true;
+});
+const nr = grid.querySelector(".achv-noresult");
+if (nr) nr.style.display = q &&!any? "": "none";
+};
+/** 詳細画面の「装備する」: 保存できたらその場で詳細を描き直す（プロフィールを開き直さない） */
+achv.pfEquip = async function (id) {
 const r = await achv.equip(id);
-if (!r.ok) { alert(r.msg); return;}
-const A = ONW.account;
-if (A && A.user && ONW.profile) ONW.profile.open(A.user.id, A.user.display_name);
+if (!r.ok) { if (typeof alert === "function") alert(r.msg); return;}
+if (pfState && pfState.data) pfState.data.equipped = id;
+pfPaint();
 };
+achv.equipFromProfile = function (id) { return achv.pfEquip(id);}; // 互換用（旧UIのボタンからの呼び出し）
 
 /** 装備中実績のラベル（。マイクラ版の equippedAchievementLabel と同じ形） */
 achv.labelOf = (id) => (id && DEFS.has(id)? ``: "");

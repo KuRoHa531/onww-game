@@ -1613,6 +1613,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .bread-banner__icon { font-size: 1.5em; }
 .donut-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(74,36,52,.94); border: 2px solid #f2a7c3; color: #ffe3ef; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
 .donut-banner__icon { font-size: 1.5em; }
+/* 実績の獲得通知バナー（ログイン時の welcome_onw など単発解除用。パン屋バナーと同型、金×トロフィーの配色） */
+.achv-banner { position: fixed; left: 50%; top: 18%; z-index: 1002; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(46,36,8,.95); border: 2px solid #d9a441; color: #ffe9a8; font-weight: 800; font-size: clamp(16px, 4.2vw, 26px); letter-spacing: .04em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.9s ease both; }
+.achv-banner__icon { font-size: 1.4em; }
 /* スクリューガム: 銀狼の気配の通知バナー（スクリューガム本人の画面だけ。パン屋のバナーと同型、銀狼らしい青銀の配色） */
 .screw-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(16,26,48,.94); border: 2px solid #9db8dd; color: #dbe9ff; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
 .screw-banner__icon { font-size: 1.5em; }
@@ -3102,3 +3105,22 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .achv-row--eq { border-color: var(--gold-dim); background: rgba(217, 164, 65, .08); }
 .achv-player { margin-bottom: 12px; }
 .achv-player__name { font-weight: 700; margin-bottom: 4px; }
+/* 実績ドリルダウン（マイクラ版式: 一覧→カテゴリ→役職→リスト→詳細） */
+.achv-top__title { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
+.achv-top__overall { font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 2px; }
+.achv-navrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2, transparent); color: var(--ink); cursor: pointer; font: inherit; }
+.achv-navrow:hover { border-color: var(--gold-dim); }
+.achv-navrow__name { font-weight: 700; font-size: 13px; flex: 1 1 auto; }
+.achv-navrow__count { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.achv-cathead { font-size: 15px; font-weight: 800; margin: 4px 0 2px; }
+.achv-catcount { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 2px; }
+.achv-backrow { margin-bottom: 8px; }
+.achv-item__st { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.achv-item__st.ok { color: #4ecb71; }
+.achv-item__st.ng { color: var(--ink-dim); }
+.achv-item--locked { opacity: .55; }
+.achv-detail__name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+.achv-detail__desc { font-size: 13px; margin: 6px 0; }
+.achv-detail__cat { font-size: 13px; font-weight: 700; }
+.achv-detail__sub, .achv-detail__prog { font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
+.achv-noresult { font-size: 12px; color: var(--ink-dim); padding: 6px 2px; }
