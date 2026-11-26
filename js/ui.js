@@ -101,7 +101,8 @@ window.ONW = window.ONW || {};
     if (!sameResult) $app().innerHTML = html;
     ui._lastHtml = html;
     if (lcDraft !== null) { const ni = document.getElementById("lobby-chat-in"); if (ni) { ni.value = lcDraft; if (lcFocus) ni.focus(); } }
-    if (game.phase === ONW.PHASE.LOBBY) { ui.updateLobbyChat(); ui.updateLobbyTyping(); }
+    if (game.phase === ONW.PHASE.LOBBY) { ui.syncLobbyChatOverlay(); ui.updateLobbyChat(); ui.updateLobbyTyping(); }
+    else ui.closeLobbyChatOverlay();
     if (keepY && !sameResult) window.scrollTo(0, keepY);
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
@@ -673,18 +674,9 @@ window.ONW = window.ONW || {};
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>
-        ${ONW.net.code ? `<div class="lobby-chat">
-          <h2>チャット</h2>
-          <div id="lobby-chat-log" class="chat-log lobby-chat-log"></div>
-          <div id="lobby-typing" class="lobby-typing"></div>
-          <div class="chat-input">
-            <input id="lobby-chat-in" class="onw-input" maxlength="100" placeholder="メッセージを入力" oninput="ONW.ui.lobbyChatInput()" onkeydown="if(event.key==='Enter')ONW.ui.sendLobbyChat()">
-            <button class="btn" onclick="ONW.ui.sendLobbyChat()">送信</button>
-          </div>
-          <p class="night-step__hint">試合が始まるとチャットの履歴は消えます。</p>
-        </div>` : ""}
         ${canInvite && game.invOpen ? `<div class="invite-panel"><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleInvite()">×</button><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
         <div class="btn-row lobby-actions" style="justify-content:center;">
+          ${ONW.net.code ? `<button class="btn" onclick="ONW.ui.toggleLobbyChat()">💬 チャット</button>` : ""}
           ${isHost ? `<button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>` : ""}
           ${ui.hasLastResult(game) ? `<button class="btn" onclick="ONW.ui.openResultReview()">前回の結果を見る</button>` : ""}
           ${canInvite ? `<button class="btn" onclick="ONW.ui.toggleInvite()">フレンドを招待</button>` : ""}
@@ -2185,6 +2177,37 @@ window.ONW = window.ONW || {};
       return `<div class="bub${mine ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(c.name, null, "av--bub") : ""}<div class="bub__body">${nameRow(esc(c.name), c.achv || null, mine)}<div class="bub__text">${esc(c.text)}</div></div></div>`;
     }).join("");
   }
+  // ロビーチャットは常時表示ではなく、💬ボタンで背景透過のオーバーレイとして重ねて出す（作者指定 2026-11-26）
+  let lobbyChatOpen = false;
+  ui.toggleLobbyChat = function (force) {
+    lobbyChatOpen = typeof force === "boolean" ? force : !lobbyChatOpen;
+    ui.syncLobbyChatOverlay();
+    if (lobbyChatOpen) { ui.updateLobbyChat(); ui.updateLobbyTyping(); const el = document.getElementById("lobby-chat-in"); if (el) el.focus(); }
+  };
+  ui.closeLobbyChatOverlay = function () {
+    lobbyChatOpen = false;
+    const w = document.getElementById("lobby-chat-overlay");
+    if (w) w.remove();
+  };
+  /** 開いている間だけオーバーレイを body 直下に保つ（ロビーの再描画で消えたり入力が飛んだりしない） */
+  ui.syncLobbyChatOverlay = function () {
+    if (!lobbyChatOpen || !ONW.game || ONW.game.phase !== ONW.PHASE.LOBBY) { if (!lobbyChatOpen) ui.closeLobbyChatOverlay(); return; }
+    if (document.getElementById("lobby-chat-overlay")) return;
+    const w = document.createElement("div");
+    w.id = "lobby-chat-overlay";
+    w.onclick = (e) => { if (e.target === w) ui.toggleLobbyChat(false); };
+    w.innerHTML = `<div class="lobby-chat-card" role="dialog" aria-modal="true">
+      <div class="lobby-chat-head"><span>チャット</span><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleLobbyChat(false)">×</button></div>
+      <div id="lobby-chat-log" class="chat-log lobby-chat-log"></div>
+      <div id="lobby-typing" class="lobby-typing"></div>
+      <div class="chat-input">
+        <input id="lobby-chat-in" class="onw-input" maxlength="100" placeholder="メッセージを入力" oninput="ONW.ui.lobbyChatInput()" onkeydown="if(event.key==='Enter')ONW.ui.sendLobbyChat()">
+        <button class="btn" onclick="ONW.ui.sendLobbyChat()">送信</button>
+      </div>
+      <p class="night-step__hint">試合が始まるとチャットの履歴は消えます。</p>
+    </div>`;
+    document.body.appendChild(w);
+  };
   /** ロビーチャットのログだけ描き直す（入力欄には触らない） */
   ui.updateLobbyChat = function () {
     const el = document.getElementById("lobby-chat-log");
@@ -2216,13 +2239,12 @@ window.ONW = window.ONW || {};
     if (typingIdle) clearTimeout(typingIdle);
     typingIdle = setTimeout(() => ui.lobbyTypingOff(), 3000);   // 打つのをやめたら消す
   };
-  /** 入力中表示の描き直し（自分の名前は出さない。古い表示は5秒で自然に消える） */
+  /** 入力中表示の描き直し（自分の入力中も自分に見える仕様。古い表示は5秒で自然に消える） */
   let typingClearTimer = null;
   ui.updateLobbyTyping = function () {
     const el = document.getElementById("lobby-typing");
     if (!el || !ONW.game) return;
-    const me = (ONW.game.lobbyPlayers || [])[ONW.game.meIndex] || {};
-    const names = (ONW.game.lobbyTypingNames || []).filter((n) => n !== me.name);
+    const names = (ONW.game.lobbyTypingNames || []).slice();
     el.textContent = names.length ? `${names.join("、")}が入力中…` : "";
     if (typingClearTimer) clearTimeout(typingClearTimer);
     if (names.length) {
@@ -2240,6 +2262,7 @@ window.ONW = window.ONW || {};
     if (!el) { el = document.createElement("div"); el.id = "chat-pop"; document.body.appendChild(el); }
     const me = (ONW.game.lobbyPlayers || [])[ONW.game.meIndex] || {};
     const mine = entry.name === me.name;
+    if (!mine && ONW.sound && ONW.sound.se) ONW.sound.se("chatpop");   // ロビーチャット着信音（LINE風のポッ。自分の発言では鳴らさない）
     const nm = ONW.achievements && ONW.achievements.bubbleNameHtml ? ONW.achievements.bubbleNameHtml(esc(entry.name), entry.achv || null, mine) : `<div class="bub__name">${esc(entry.name)}</div>`;
     el.innerHTML = `<div class="bub chat-pop__bub${mine ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(entry.name, null, "av--bub") : ""}<div class="bub__body">${nm}<div class="bub__text">${esc(entry.text)}</div></div></div>`;
     el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");

@@ -99,7 +99,7 @@
   // ---------------- SE（プール再生） ----------------
   const pool = {}, lastPlay = {}, keySeen = {};
   // 音源ファイルのある SE 名の一覧（audio/se/se_<名前>.mp3）。primeSe が事前生成の対象にする
-  const SE_NAMES = ["bakery", "bell", "bomb", "bounty_success", "card_flip", "card_fly", "chain", "chicken_reverse", "curse_kill", "deal", "dictator", "executioner_success", "expose", "follow_death", "glass_break", "gunshot", "libra", "newspaper", "reveal_text", "smoke", "steve_revive", "tap", "tick"];
+  const SE_NAMES = ["bakery", "bell", "bomb", "bounty_success", "card_flip", "card_fly", "chain", "chicken_reverse", "curse_kill", "deal", "dictator", "executioner_success", "expose", "follow_death", "glass_break", "gunshot", "libra", "newspaper", "reveal_text", "smoke", "steve_revive", "tap", "tick", "chatpop"];
   // ---------------- SE の事前再生（モバイルの自動再生制限対策） ----------------
   // ブラウザ（特にモバイル）は、ユーザー操作のタイミングで作られていない Audio 要素や、
   // 一度も操作中に再生されていない要素の、タイマー等からの再生を拒否する場合がある。
