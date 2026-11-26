@@ -1061,6 +1061,9 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .chat-log { cursor: pointer; }
 #chat-overlay { position: fixed; left: 0; right: 0; top: 0; bottom: 0; overscroll-behavior: contain; z-index: 900; display: flex; flex-direction: column; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg-night, #12131c); }
 #chat-overlay .co-head { display: flex; align-items: center; justify-content: space-between; color: var(--gold); font-size: 16px; }
+#chat-overlay .chat-timer { font-weight: 700; font-size: 15px; color: var(--paper, #e8eaf2); font-variant-numeric: tabular-nums; }
+#chat-overlay .chat-timer.low { color: var(--blood); animation: chat-timer-pulse 1s ease-in-out infinite; }
+@keyframes chat-timer-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 #chat-overlay .chat-log { flex: 1 1 0 !important; height: auto !important; min-height: 0 !important; margin: 0; font-size: 16px; cursor: default; }
 #chat-overlay .chat-input { margin: 0; }
 .vote-now { text-align: center; margin: 4px 0; }

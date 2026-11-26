@@ -80,7 +80,7 @@ window.ONW = window.ONW || {};
       try { if (ONW.sound && g.phase === PH().ONLINE_DAY && g.remain >= 1 && g.remain <= 20) ONW.sound.se("tick"); } catch (e) {}
       // 作者報告（2026-11-26）「議論時間から自動で投票時間に行かない」対策: 毎秒処理(onTick)の中の例外でフェーズ遷移(onEnd)が止まらないよう、onTick は例外を飲んでから遷移判定をする
       if (onTick) { try { onTick(g.remain); } catch (e) { if (typeof console !== "undefined" && console.error) console.error("[timer] onTick で例外（遷移は続行します）:", e); } }
-      if (g.remain <= 0) { stopTimer(); onEnd(); }
+      if (g.remain <= 0) { stopTimer(); try { onEnd(); } catch (e) { if (typeof console !== "undefined" && console.error) console.error("[timer] onEnd で例外:", e); if (onEnd === finishVoting && G() === g) forceFinalize("タイマー終了時の例外", e); } }   // 終わり方(onEnd)の中の例外でフェーズ遷移が黙って死なないようにする。投票の終わり方は、結果発表への強制確定フォールバックも効かせる
     }, 1000);
   }
   function clearTimers() {
@@ -1014,9 +1014,9 @@ window.ONW = window.ONW || {};
     const g = G();
     delete net.conns[seat];
     g.spectators = g.spectators.filter((id) => id !== seat);
-    if (g.inGame && g.phase === PH().ONLINE_VOTE && g.strawAsk && g.strawAsk[seat]) { clearTimeout(askDrop[seat]); askDrop[seat] = setTimeout(() => autoAsk(seat), ASK_GRACE_MS); }
-    if (g.inGame && g.phase === PH().ONLINE_VOTE && g.detAsk && g.detAsk[seat] && !g.detAsk[seat].cpu) { clearTimeout(askDrop[seat]); askDrop[seat] = setTimeout(() => detAuto(seat), ASK_GRACE_MS); }
-    if (g.inGame && g.phase === PH().ONLINE_VOTE && g.ghostAsk && g.ghostAsk[seat] && !g.ghostAsk[seat].cpu) { clearTimeout(askDrop[seat]); askDrop[seat] = setTimeout(() => ghostAuto(seat), ASK_GRACE_MS); }   // 探偵の亡霊が推理している最中に切れた: 少し待って、戻らなければ自動   // 推理している最中に切れた: 少し待って、戻らなければ自動   // 選んでいる最中に切れた: 少し待って、戻らなければ自動
+    if (g.inGame && g.phase === PH().ONLINE_VOTE && g.strawAsk && g.strawAsk[seat]) { clearTimeout(askDrop[seat]); askDrop[seat] = setTimeout(() => { try { autoAsk(seat); } catch (e) { forceFinalize("切断時の自動選択で例外", e); } }, ASK_GRACE_MS); }
+    if (g.inGame && g.phase === PH().ONLINE_VOTE && g.detAsk && g.detAsk[seat] && !g.detAsk[seat].cpu) { clearTimeout(askDrop[seat]); askDrop[seat] = setTimeout(() => { try { detAuto(seat); } catch (e) { forceFinalize("切断時の自動推理で例外", e); } }, ASK_GRACE_MS); }
+    if (g.inGame && g.phase === PH().ONLINE_VOTE && g.ghostAsk && g.ghostAsk[seat] && !g.ghostAsk[seat].cpu) { clearTimeout(askDrop[seat]); askDrop[seat] = setTimeout(() => { try { ghostAuto(seat); } catch (e) { forceFinalize("切断時の自動推理で例外", e); } }, ASK_GRACE_MS); }   // 探偵の亡霊が推理している最中に切れた: 少し待って、戻らなければ自動   // 推理している最中に切れた: 少し待って、戻らなければ自動   // 選んでいる最中に切れた: 少し待って、戻らなければ自動
     if (!g.inGame) {                                  // ロビー: 少しの間は席を残して、戻ってきたら同じ席に戻す
       const p = g.players.find((q) => q.id === seat);
       if (p && !net.xfer) { p.off = true; dropTimers[seat] = setTimeout(() => removeSeat(seat), LOBBY_GRACE_MS); }
@@ -1076,15 +1076,15 @@ window.ONW = window.ONW || {};
     if ([P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_RESULT].includes(ph) && (g.deathNotes || []).length) m.push({ t: "deathnote", lines: g.deathNotes });   // 再入室: 死亡の知らせを情報確認へ戻す
     if ([P.ONLINE_DAY, P.ONLINE_VOTE, P.ONLINE_RESULT].includes(ph)) { m.push({ t: "chatlog", log: g.chatLog || [] }); m.push({ t: "coboard", board: boardView(), tf: tfView() }); }
     if (ph === P.ONLINE_VOTE && chainAsking()) {   // 道連れ・暗殺を選んでいる最中: 本人には選択を出し直し、全員に待ち表示を送る
-      if (g.strawAsk[seat]) { clearTimeout(askDrop[seat]); m.push(askMsg(seat)); }
+      if (g.strawAsk[seat]) { m.push(askMsg(seat)); if (!g.strawAsk[seat].cpu) armAskDrop(seat, autoAsk, ASK_HUMAN_MS); }   // 選択画面を出し直したら、無回答のまま止まらないための保険タイマーも仕掛け直す（以前は clearTimeout だけで保険が消えていた）
       m.push(askWaitMsg(seat));
     }
     if (ph === P.ONLINE_VOTE && detAsking()) {   // 再入室: 名探偵には推理の画面を出し直し、全員に待ち表示を送る
-      if (g.detAsk[seat] && !g.detAsk[seat].cpu) { clearTimeout(askDrop[seat]); m.push(detAskMsg(seat)); }
+      if (g.detAsk[seat] && !g.detAsk[seat].cpu) { m.push(detAskMsg(seat)); armAskDrop(seat, detAuto, ASK_HUMAN_MS); }   // 推理画面を出し直したら、保険タイマーも仕掛け直す
       m.push({ t: "detwait", on: true });
     }
     if (ph === P.ONLINE_VOTE && ghostAsking()) {   // 再入室: 探偵の亡霊には推理の画面を出し直し、全員に待ち表示を送る
-      if (g.ghostAsk[seat] && !g.ghostAsk[seat].cpu) { clearTimeout(askDrop[seat]); m.push(ghostAskMsg(seat)); }
+      if (g.ghostAsk[seat] && !g.ghostAsk[seat].cpu) { m.push(ghostAskMsg(seat)); armAskDrop(seat, ghostAuto, ASK_HUMAN_MS); }   // 推理画面を出し直したら、保険タイマーも仕掛け直す
       m.push({ t: "ghostwait", on: true });
     }
     if (ph !== P.ONLINE_RESULT && Number.isFinite(g.remain)) m.push({ t: "tick", sec: g.remain });
@@ -1157,6 +1157,14 @@ window.ONW = window.ONW || {};
     }
     else if (ph === P.ONLINE_VOTE) {
       if (chainAsking()) Object.keys(g.strawAsk).forEach((id) => { if (id !== net.selfSeat) { clearTimeout(askDrop[id]); askDrop[id] = setTimeout(() => autoAsk(id), g.strawAsk[id].cpu ? CPU_THINK_MS : ASK_GRACE_MS); } });   // 選んでいる最中の引き継ぎ（CPUは2秒で選ぶ）: 選んでいた人が戻ってくるのを待つ（タイマーは動かさない）
+      else if (detAsking()) Object.keys(g.detAsk).forEach((id) => { if (id !== net.selfSeat) armAskDrop(id, detAuto, g.detAsk[id].cpu ? CPU_THINK_MS : ASK_GRACE_MS); });   // 名探偵の推理中の引き継ぎ: 待ちを再開する（投票タイマーを回すと finishVoting が推理待ちで即returnしてタイマーだけ消費され、二度と進まなくなる。タイマーは動かさない）
+      else if (ghostAsking()) Object.keys(g.ghostAsk).forEach((id) => { if (id !== net.selfSeat) armAskDrop(id, ghostAuto, g.ghostAsk[id].cpu ? CPU_THINK_MS : ASK_GRACE_MS); });   // 探偵の亡霊の推理中の引き継ぎ: 同上
+      else if (g.foxVote && g.foxVote.wait) {   // 妖狐投票の発表中の引き継ぎ: 発表後に本投票へ進める setTimeout は前のホストと一緒に消えている。演出は終わったものとして、追放を実行して本投票から再開する（このまま投票タイマーを回すと finishVoting が発表待ちで即returnして止まる）
+        const fv = g.foxVote, pl = (fv.executedIds || []).length ? ONW.foxVote.plan(g, { counts: fv.counts || {}, topIds: fv.topIds || [], executed: fv.executedIds, subs: fv.subs || [] }) : null;
+        if (pl) ONW.foxVote.execute(g, pl);
+        fv.wait = false; fv.completed = true;
+        beginVote(true);
+      }
       else { castMissingCpuVotes(); startTimer(remain, finishVoting); }   // 考え中だったCPUの票は、引き継いだ時点で入れる
     }
   }
@@ -3639,12 +3647,26 @@ window.ONW = window.ONW || {};
     if (fa) fa.list.filter((x) => x.ok).forEach((x) => pushChat(null, `妖狐投票 ${x.target}は妖精のバリアによって守られました。`, "sys"));   // 誰が付与したかは書かない（昼行動結果は結果発表で出る）。票を防げなかった（0票）バリアは書かない
     const wait = (pl ? pl.ms : 3000) + (fx ? fx.ms : 0);   // ペンギン・交換者・妖精さんの演出のぶん、追放（と本投票）を遅らせる
     setTimeout(() => {
-      const cur = ONW.game;
-      if (!cur || cur !== g || g.phase !== PH().ONLINE_VOTE || !g.foxVote || !g.foxVote.wait) return;
-      if (pl) ONW.foxVote.execute(g, pl);   // 演出が終わってから死亡にする（killPlayer が心中・後追いまで連鎖させる）
-      g.foxVote.wait = false; g.foxVote.completed = true;
-      beginVote(true);
+      try {
+        const cur = ONW.game;
+        if (!cur || cur !== g || g.phase !== PH().ONLINE_VOTE || !g.foxVote || !g.foxVote.wait) return;
+        if (pl) ONW.foxVote.execute(g, pl);   // 演出が終わってから死亡にする（killPlayer が心中・後追いまで連鎖させる）
+        g.foxVote.wait = false; g.foxVote.completed = true;
+        beginVote(true);
+      } catch (e) {   // 発表後の処理で例外が出ても、発表待ち(wait)のまま全員が止まらないようにする（以前は wait が戻らず、ホストの「次へ」でも finishVoting が即returnして詰んだ）
+        if (typeof console !== "undefined" && console.error) console.error("[foxvote] 発表後の処理で例外（本投票へ進めます）:", e);
+        if (ONW.game === g && g.phase === PH().ONLINE_VOTE && g.foxVote && g.foxVote.wait) { g.foxVote.wait = false; g.foxVote.completed = true; beginVote(true); }
+      }
     }, wait);
+  }
+
+  /** 結果確定の途中で例外が出ても「結果を待っています…」のまま止まらないための保険:
+   *  途中までの盤面のまま勝敗判定と結果の作成（finalizeResult）をやり直して、結果発表へ進める */
+  function forceFinalize(why, e) {
+    if (typeof console !== "undefined" && console.error) console.error("[vote] " + why + "（結果発表へ進めます）:", e);
+    const g = G();
+    if (!g || g.phase !== PH().ONLINE_VOTE || g.resultObj) return;
+    try { finalizeResult(); } catch (e2) { if (typeof console !== "undefined" && console.error) console.error("[vote] 結果の作成にも失敗しました:", e2); }
   }
 
   function finishVoting() {
@@ -3660,12 +3682,14 @@ window.ONW = window.ONW || {};
     g.emClosed = true; emSync();   // 選挙管理委員: 投票が締め切られた → 矢印を消す
     clearTimers();
     g.detectiveGuesses = {}; g.detectiveSuccess = {}; g.detectiveDone = false; g.detAsk = {};   // 名探偵の推理は投票のたびに作り直す
-    ONW.vote.resolveElimination(g);
-    g.catPicks = {}; g.tigerPicks = {}; g.catSources = {}; g.catBitePick = {}; g.catInfo = {}; g.cursedWolfIds = []; g.strawTargets = {}; g.hunterTargets = {}; g.hunterChain = {}; g.necromancerWraithIds = []; g.necromancerWraithIsMimic = {}; g.necromancerWraithFrom = {}; g.necromancerApplied = false; g.counselorTarget = {}; g.counselorLog = []; g.counselorConverted = {}; g.counselorForced = []; g.counselorMisplaced = []; g.psychologistResult = {}; g.psychologistLog = []; g.renUseCount = {}; g.renActionLog = {}; g.renUsedOnMoses = {}; g.assassinTargets = {}; g.assassinList = []; g.bountyTargets = {}; g.bountyList = []; g.strawAsk = {}; g.dukeResult = null; g.dukeJudged = []; g.dukeDead = []; g.dukeMeeting = null;   // 猫又・黒猫・わら人形・アサシン・賞金稼ぎの選択と、シュレディンガーの猫の参照先は、この結果ごとに決め直す
-    startDetective();   // カードがめくれる前に、名探偵が推理する（終わったら proceedChain へ）
+    try {
+      ONW.vote.resolveElimination(g);
+      g.catPicks = {}; g.tigerPicks = {}; g.catSources = {}; g.catBitePick = {}; g.catInfo = {}; g.cursedWolfIds = []; g.strawTargets = {}; g.hunterTargets = {}; g.hunterChain = {}; g.necromancerWraithIds = []; g.necromancerWraithIsMimic = {}; g.necromancerWraithFrom = {}; g.necromancerApplied = false; g.counselorTarget = {}; g.counselorLog = []; g.counselorConverted = {}; g.counselorForced = []; g.counselorMisplaced = []; g.psychologistResult = {}; g.psychologistLog = []; g.renUseCount = {}; g.renActionLog = {}; g.renUsedOnMoses = {}; g.assassinTargets = {}; g.assassinList = []; g.bountyTargets = {}; g.bountyList = []; g.strawAsk = {}; g.dukeResult = null; g.dukeJudged = []; g.dukeDead = []; g.dukeMeeting = null;   // 猫又・黒猫・わら人形・アサシン・賞金稼ぎの選択と、シュレディンガーの猫の参照先は、この結果ごとに決め直す
+      startDetective();   // カードがめくれる前に、名探偵が推理する（終わったら proceedChain へ）
+    } catch (e) { forceFinalize("結果確定の途中で例外", e); }   // 例外でタイマーも無いまま止まらないように、結果発表へ強制確定する
   }
 
-  // ---- 名探偵の推理（投票のあと・カードがめくれる前。わら人形・アサシンの選択とは別の待ち。タイマーなし）----
+  // ---- 名探偵の推理（投票のあと・カードがめくれる前。わら人形・アサシンの選択とは別の待ち。進行タイマーは無いが、無回答のまま止まらないための保険タイマーだけある）----
   //  待ち表示は全員同じ（「結果を待っています…」）で、誰が名探偵か・何人いるかは出さない。名探偵がいない試合は何も起きない
   const detAsking = () => { const a = G().detAsk; return !!a && Object.keys(a).length > 0; };
   const detAskMsg = (id) => { const g = G(); return { t: "detask", pool: ONW.detective.pool(g), slots: g.players.map((p) => ({ id: p.id, name: p.name, me: p.id === id })) }; };
@@ -3682,7 +3706,7 @@ window.ONW = window.ONW || {};
       const p = g.players.find((q) => q.id === id);
       if (p && p.isCpu) { g.detAsk[id] = { cpu: true }; clearTimeout(askDrop[id]); askDrop[id] = setTimeout(() => { if (G() === g) detAuto(id); }, CPU_THINK_MS); }   // CPUは2秒考えてから推理する
       else if (!p || (p.id !== net.selfSeat && !(net.conns[p.id] && net.conns[p.id].open))) ONW.detective.record(g, id, ONW.detective.autoPicks(g, id));   // 通信が切れている人はその場で自動
-      else g.detAsk[id] = {};
+      else { g.detAsk[id] = {}; armAskDrop(id, detAuto, ASK_HUMAN_MS); }   // 接続が生きていても答えない人への保険: 制限時間（ASK_HUMAN_MS）を過ぎたら自動で推理する。切断したら30秒猶予のタイマーが上書きする
     });
     if (!detAsking()) { proceedChain(); return; }
     sendAll({ t: "detwait", on: true });
@@ -3693,7 +3717,7 @@ window.ONW = window.ONW || {};
     const g = G();
     if (detAsking()) return;
     sendAll({ t: "detwait", on: false });
-    proceedChain();
+    try { proceedChain(); } catch (e) { forceFinalize("名探偵の推理の後処理で例外", e); }
   }
   /** 推理している人の代わりに自動で決める（CPU・通信が切れた人・ホストのスキップ） */
   function detAuto(id) {
@@ -3707,7 +3731,7 @@ window.ONW = window.ONW || {};
     detAfter();
   }
 
-  // ---- 探偵の亡霊の推理（連鎖と魔界公爵会議が終わったあと・勝敗判定の直前。名探偵の推理と同じ作り。タイマーなし）----
+  // ---- 探偵の亡霊の推理（連鎖と魔界公爵会議が終わったあと・勝敗判定の直前。名探偵の推理と同じ作り。進行タイマーは無いが、無回答の保険タイマーだけある）----
   //  死亡した探偵の亡霊だけが、相手を1人選んで最終役職をキーボードで入力する。待ち表示は全員同じ
   //  （「結果を待っています…」）で、誰が探偵の亡霊か・何人いるかは出さない。発動する亡霊がいない試合は何も起きない。
   //  入力が終わるまで結果発表は始まらない＝探偵の亡霊のカードは「はてな」のまま伏せられる（作者メモの演出）
@@ -3724,7 +3748,7 @@ window.ONW = window.ONW || {};
       const p = g.players.find((q) => q.id === id);
       if (p && p.isCpu) { g.ghostAsk[id] = { cpu: true }; clearTimeout(askDrop[id]); askDrop[id] = setTimeout(() => { if (G() === g) ghostAuto(id); }, CPU_THINK_MS); }   // CPUは2秒考えてから推理する
       else if (!p || (p.id !== net.selfSeat && !(net.conns[p.id] && net.conns[p.id].open))) ONW.detectiveGhost.autoPick(g, id);   // 通信が切れている人はその場で自動
-      else g.ghostAsk[id] = {};
+      else { g.ghostAsk[id] = {}; armAskDrop(id, ghostAuto, ASK_HUMAN_MS); }   // 接続が生きていても答えない人への保険: 制限時間（ASK_HUMAN_MS）を過ぎたら自動で推理する。切断したら30秒猶予のタイマーが上書きする
     });
     if (!ghostAsking()) { finalizeResult(); return; }
     sendAll({ t: "ghostwait", on: true });
@@ -3735,7 +3759,7 @@ window.ONW = window.ONW || {};
     const g = G();
     if (ghostAsking()) return;
     sendAll({ t: "ghostwait", on: false });
-    finalizeResult();
+    try { finalizeResult(); } catch (e) { forceFinalize("探偵の亡霊の推理の後処理で例外", e); }
   }
   /** 推理している人の代わりに自動で決める（CPU・通信が切れた人・ホストのスキップ） */
   function ghostAuto(id) {
@@ -3752,7 +3776,10 @@ window.ONW = window.ONW || {};
   // ---- わら人形・アサシンの選択（タイマーなし。選び終わるまで待つ）----
   const CPU_THINK_MS = 2000;   // CPUが「考える」時間（わら人形・賞金稼ぎ・アサシンの選択 / 酔い覚め後の能力 / 投票）。この時間が過ぎてから使う
   const ASK_GRACE_MS = 30000;   // 通信が切れた人が戻ってくるのを待つ時間（戻らなければランダム）
+  const ASK_HUMAN_MS = 120000;   // 接続が生きている人間が選択・推理に使える上限（過ぎたら自動）。進行タイマーとは別の「止まらないための保険」で、切断時は ASK_GRACE_MS のタイマーが上書きする
   const askDrop = {};
+  /** 選択・推理待ちの自動化タイマーを仕掛け直す（席ごとに1本。自動化の中で例外が出ても、結果発表への強制確定フォールバックに繋げる） */
+  function armAskDrop(id, fn, ms) { const g = G(); clearTimeout(askDrop[id]); askDrop[id] = setTimeout(() => { if (G() !== g) return; try { fn(id); } catch (e) { forceFinalize("選択・推理の自動化で例外", e); } }, ms); }
   const chainAsking = () => { const a = G().strawAsk; return !!a && Object.keys(a).length > 0; };
   const nameOf = (id) => (G().players.find((p) => p.id === id) || {}).name || "?";
   /** 誰かが選んでいる間の「待ち」表示（誰が・何の役職が選んでいるかは全員に伏せる） */
@@ -3792,7 +3819,7 @@ window.ONW = window.ONW || {};
       return;
     }
     sendAll({ t: "strawwait", on: false });
-    proceedChain();
+    try { proceedChain(); } catch (e) { forceFinalize("道連れ・暗殺の選択の後処理で例外", e); }
   }
   /** タイマーの表示を消す（選び終わるまで止まっている） */
   function haltClock() {
@@ -3817,7 +3844,7 @@ window.ONW = window.ONW || {};
       else humans.push(n);
     });
     if (!humans.length && !cpus.length) { proceedChain(); return; }
-    humans.forEach((n) => { g.strawAsk[n.id] = { cands: n.cands, kind: n.kind }; });
+    humans.forEach((n) => { g.strawAsk[n.id] = { cands: n.cands, kind: n.kind }; armAskDrop(n.id, autoAsk, ASK_HUMAN_MS); });   // 接続が生きていても選ばない人への保険: 制限時間（ASK_HUMAN_MS）を過ぎたら自動で選ぶ。切断したら30秒猶予のタイマーが上書きする
     cpus.forEach((n) => { g.strawAsk[n.id] = { cands: n.cands, kind: n.kind, cpu: true }; clearTimeout(askDrop[n.id]); askDrop[n.id] = setTimeout(() => { if (G() === g) autoAsk(n.id); }, CPU_THINK_MS); });
     sendAll(askWaitMsg);
     humans.forEach((n) => send(n.id, askMsg(n.id)));
@@ -4185,12 +4212,13 @@ window.ONW = window.ONW || {};
     const g = G(), m = g.dukeMeeting;
     if (!m || !m.active) return;
     flushCpuVotes(); clearTimers();
-    const r = ONW.demonDuke.resolve(g, { ...g.votes }, m.plan);
+    let r = null;
+    try { r = ONW.demonDuke.resolve(g, { ...g.votes }, m.plan); } catch (e) { if (typeof console !== "undefined" && console.error) console.error("[duke] 追放会議の解決で例外（会議は無かったものとして結果発表へ進めます）:", e); r = { none: true }; }   // 例外で止まらないための保険
     g.votes = g.mainVotes || {}; g.mainVotes = null;
     g.emClosed = true; emSync();   // 選挙管理委員: 追放会議の投票が終わった → 矢印を消す
     m.active = false;
     pushChat(null, r.none ? "魔界公爵追放会議は誰も投票しなかったため、誰も選ばれませんでした。" : `魔界公爵追放会議で ${nameOf(r.pickedId)} が選ばれました。`, "sys");
-    startGhostAsks();   // 探偵の亡霊の推理（あれば）を聞いてから結果発表へ
+    try { startGhostAsks(); } catch (e) { forceFinalize("魔界公爵会議の後処理で例外", e); }   // 探偵の亡霊の推理（あれば）を聞いてから結果発表へ
   }
 
   function finalizeResult() {

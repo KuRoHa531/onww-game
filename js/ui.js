@@ -2108,6 +2108,14 @@ window.ONW = window.ONW || {};
       bt.classList.toggle("low", has && t <= 10);
       bt.classList.toggle("idle", !has);
     }
+    // 全画面チャットを開いているときも、上の空きスペースで残り時間が分かるようにする（作者要望 2026-11-26: チャット中は本画面のタイマーが隠れて投票時間に気づけない）
+    const ct = document.getElementById("chat-timer");
+    if (ct) {
+      const has = !(t == null || t < 0);
+      const txt = has ? `${base} 残り ${ONW.utils.formatClock(t)}` : base;
+      if (ct.textContent !== txt) ct.textContent = txt;
+      ct.classList.toggle("low", has && t <= 10);
+    }
   };
 
   // ---- 下に固定: プレイヤー一覧と「何をCOしているか」----
@@ -2207,6 +2215,13 @@ window.ONW = window.ONW || {};
       <p class="night-step__hint">試合が始まるとチャットの履歴は消えます。</p>
     </div>`;
     document.body.appendChild(w);
+    ui.fitLobbyChat();
+  };
+  /** ロビーチャットを「見えている範囲」（キーボードを除いた部分）に合わせる。全画面チャットの fitChat と同じ理由: スマホでキーボードが開くと、固定配置のカードがキーボードの裏に隠れて入力欄も「入力中」表示も見えなくなる（作者報告 2026-11-26） */
+  ui.fitLobbyChat = function () {
+    const w = document.getElementById("lobby-chat-overlay"), vv = window.visualViewport;
+    if (!w || !vv) return;
+    w.style.top = vv.offsetTop + "px"; w.style.height = vv.height + "px"; w.style.bottom = "auto";
   };
   /** ロビーチャットのログだけ描き直す（入力欄には触らない） */
   ui.updateLobbyChat = function () {
@@ -2293,12 +2308,13 @@ window.ONW = window.ONW || {};
     const g = ONW.game, day = g.phase === ONW.PHASE.ONLINE_DAY, canGhost = ui.canGhost(), canSend = canGhost || (day && !g.isSpectator && !g.muzzled);   // 観戦者・死亡者はいつでも書ける（霊界チャットになる）
     const wrap = document.createElement("div");
     wrap.id = "chat-overlay";
-    wrap.innerHTML = `<div class="co-head"><span>チャット</span><button class="btn" onclick="ONW.ui.closeChat()">閉じる</button></div>
+    wrap.innerHTML = `<div class="co-head"><span>チャット</span><span id="chat-timer" class="chat-timer"></span><button class="btn" onclick="ONW.ui.closeChat()">閉じる</button></div>
       <div id="chat-log-big" class="chat-log chat-log--big"></div>
       ${canSend ? `${ui.tpToggle(g)}<div class="chat-input"><input id="chat-in-big" class="onw-input" maxlength="100" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" ontouchend="event.preventDefault();ONW.co.sendChat()" onclick="ONW.co.sendChat()">送信</button></div>` : ""}`;
     document.body.appendChild(wrap);
     ui.lockPage(true);                 // 開いている間、ページ本体は動かさない
     ui.fitChat();
+    ui.updateTimer();                  // 開いた直後からタイマーを出す（次の毎秒更新を待たない）
     ui.updateChat();
     const inp = document.getElementById("chat-in-big");
     if (inp) { if (document.activeElement && document.activeElement !== inp) document.activeElement.blur(); inp.focus({ preventScroll: true }); }
@@ -2318,7 +2334,7 @@ window.ONW = window.ONW || {};
     const log = document.getElementById("chat-log-big");
     if (log) log.scrollTop = log.scrollHeight;
   };
-  if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => ONW.ui.fitChat()); window.visualViewport.addEventListener("scroll", () => ONW.ui.fitChat()); }
+  if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); }); window.visualViewport.addEventListener("scroll", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); }); }
   ui.closeChat = function () { const w = document.getElementById("chat-overlay"); if (w) w.remove(); ui.lockPage(false); };
 
   /** 朝（墓荒らしの交換後）と、昼（酔いが覚めたあと）に使う能力の操作欄。late=昼 */

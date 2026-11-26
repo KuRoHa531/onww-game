@@ -212,10 +212,16 @@ for (const h of hooks) {
 try { (h(g, p.id, won.has(p.id)) || []).forEach((aid) => add(p.id, aid));} catch (e) { /* 1役職の失敗で全体を止めない */}
 }
 }
-// 2) 全役職共通: 初めてその役職になる（初期・最終どちらの役職でも） / その役職で勝利（最終役職）
+// 2) 全役職共通: 初めてその役職になる（この試合で「なった」役職すべて = 変化前・初期・経由（roleTrail）・最終。
+//    マイクラ版 roleHistoryIncludes と同じ範囲で、戦績の became とも一致させる） / その役職で勝利（最終役職のみ。マイクラ版 finalRole === role）
 for (const p of g.players) {
-const ini = (g.initialRoles || {})[p.id], fin = (g.currentRoles || {})[p.id];
-[ini, fin].forEach((r) => { if (r) (FIRST_BY_ROLE[r] || []).forEach((e) => add(p.id, e.i));});
+const fin = (g.currentRoles || {})[p.id];
+const became = new Set();
+const tf = (g.transformFrom || {})[p.id]; if (tf) became.add(tf);
+const ini = (g.initialRoles || {})[p.id]; if (ini) became.add(ini);
+((g.roleTrail || {})[p.id] || []).forEach((r) => { if (r) became.add(r);});
+if (fin) became.add(fin);
+became.forEach((r) => (FIRST_BY_ROLE[r] || []).forEach((e) => add(p.id, e.i)));
 if (won.has(p.id) && fin) (WIN_BY_ROLE[fin] || []).forEach((e) => add(p.id, e.i));
 }
 // 3) 基本実績（試合内容からの判定）と、結果データだけで分かる横断実績

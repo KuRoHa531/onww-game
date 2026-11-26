@@ -88,9 +88,15 @@
     return null;
   }
   function achievements(g, id, won) {
-    const out = ["first_yokai_tanuki", won ? "win_yokai_tanuki" : "lose_yokai_tanuki"];
-    const gone = new Set([...(g.deadIds || []), ...(g.executed || []), ...(g.eliminated || [])]);
-    if (!won && !((ONW.vote && ONW.vote.wolfJudgeIds ? ONW.vote.wolfJudgeIds(g) : []) || []).some((wid) => !gone.has(wid))) out.push("yokai_tanuki_no_living_wolf");   // 人狼系も昇格狂人も生存者にいない状態で敗北（マイクラ版 stats.js）
+    // first_yokai_tanuki / win_yokai_tanuki は collect の汎用判定が付ける（first=なった役職すべて、win=最終役職のみ）。
+    // ここでは最終役職が妖狸の人だけに、敗北系と呪殺系を返す（マイクラ版は finalRole === YOKAI_TANUKI で判定）
+    const out = [];
+    if ((g.currentRoles || {})[id] !== ID) return out;
+    if (!won) {
+      out.push("lose_yokai_tanuki");
+      const gone = new Set([...(g.deadIds || []), ...(g.executed || []), ...(g.eliminated || [])]);
+      if (!((ONW.vote && ONW.vote.wolfJudgeIds ? ONW.vote.wolfJudgeIds(g) : []) || []).some((wid) => !gone.has(wid))) out.push("yokai_tanuki_no_living_wolf");   // 人狼系も昇格狂人も生存者にいない状態で敗北（マイクラ版 stats.js）
+    }
     if ((g.tanukiCursed || []).includes(id)) out.push("yokai_tanuki_cursed");
     return out;
   }

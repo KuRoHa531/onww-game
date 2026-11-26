@@ -131,10 +131,14 @@
       return out;
     },
     achievements(g, id, won) {
-      const out = ["first_elfrinde"];
-      if (E.targetOf(g, id)) out.push(E.corrupted(g, id) ? "elfrinde_corrupted" : "elfrinde_seal_outsider");
-      if (E.targetTeamOf && E.targetTeamOf(g, id) === ONW.TEAM.VILLAGE) out.push("sealed_by_elfrinde_village");   // 村人陣営を封印した（マイクラ版 sealed_by_elfrinde_village）
-      if (won) out.push("win_elfrinde");
+      // first_elfrinde / win_elfrinde は collect の汎用判定が付ける（first=なった役職すべて、win=最終役職のみ）。
+      // 封印系は最終役職がエルフリンデの人だけ（マイクラ版 finalRole === ELFRINDE）
+      const out = [];
+      if ((g.currentRoles || {})[id] === R_() && E.targetOf(g, id)) out.push(E.corrupted(g, id) ? "elfrinde_corrupted" : "elfrinde_seal_outsider");
+      // sealed_by_elfrinde_village は「封印された側」の実績: 村人陣営としてエルフリンデに封印された人へ付ける
+      // （マイクラ版: sealedByElfrinde[p] がいて、そのエルフリンデの対象の陣営が村人陣営のとき、封印された p に付く）
+      const sealer = (g.sealedBy || {})[id];
+      if (sealer && ONW.seal && ONW.seal.byRole && ONW.seal.byRole(g, id) === R_() && E.targetTeamOf(g, sealer) === ONW.TEAM.VILLAGE) out.push("sealed_by_elfrinde_village");
       return out;
     },
   });

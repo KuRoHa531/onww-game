@@ -135,9 +135,10 @@ doneText(g, id) { const t = A.protectTargetOf(g, id); return `あなたの指令
 /** 再接続時の復元用: 昼能力を使い終わっていたら、その結果文を返す */
 doneOf(g, id) { return ((g.agentDayUsed || {})[id]) || null;},
 achievements(g, id, won) {
-const out = ["first_agent"];
-out.push(won? "win_agent": "agent_loss");
-return out;
+// first_agent / win_agent は collect の汎用判定が付ける（first=なった役職すべて、win=最終役職のみ）。
+// ここでは agent_loss だけを、最終役職が代行者のときだけ返す（マイクラ版 finalRole === AGENT && !playerWon）
+if ((g.currentRoles || {})[id] === "agent" && !won) return ["agent_loss"];
+return [];
 },
 });
 

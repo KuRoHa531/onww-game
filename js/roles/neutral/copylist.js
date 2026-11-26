@@ -186,7 +186,7 @@
     const out = [], ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
     const target = targetOf(g, id);
     if (ini === ID || cur === ID || target) out.push("first_copyist");
-    if (won && (ini === ID || target)) out.push("win_copyist");
+    if (won && cur === ID) out.push("win_copyist");   // 勝利系は最終役職のみで判定する（初期役職・コピー先では付けない。マイクラ版 finalRole === COPYIST）
     if (!won && target) {   // 二番煎じ: コピーした役職の持ち主が最後まで生きていて、墓地にも無かった
       const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set();
       const holderAlive = (g.players || []).some((q) => (g.currentRoles || {})[q.id] === target && !dead.has(q.id));
