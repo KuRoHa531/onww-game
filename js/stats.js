@@ -8,6 +8,8 @@
  * ・setup.sql「11.」が未実行のDBでは、カウンタが無いので従来方式（最新500戦をブラウザ側で集計）に
  *   フォールバックする。その間は死因別の集計は出ない（death_reason 列自体が無いため）
  * ・死因の分類はマイクラ版 stats.js の deathReasonKey / DEFAULT_DEATH_REASONS と同じ22種（docs/stats.md）
+ * ・役職別の集計は最終役職ベース（勝利は最終役職で見る）＋「なった回数」（その試合でなった役職すべて。
+ *   結果の history.became を match_results.roles_became に保存する）。直近の戦いの役職表示も最終役職
  */
 window.ONW = window.ONW || {};
 (function (ONW) {
@@ -15,6 +17,18 @@ window.ONW = window.ONW || {};
   const done = new Set();
   const teamOf = (role) => { try { return ONW.roles.getInfo(role).team; } catch (e) { return "village"; } };
   const rate = (w, n) => (n ? Math.round((w * 1000) / n) / 10 : 0);
+  /** 役職別カウンタの形を {play, fin, w} にそろえる（旧形式 {n,w,ex} = 配られた役職で数えた分は、なった回数・最終回数とも n として近似する） */
+  const normRoles = (m) => {
+    const out = {};
+    Object.entries(m || {}).forEach(([r, x]) => {
+      if (!x) return;
+      out[r] = typeof x.fin === "number"
+        ? { play: x.play || 0, fin: x.fin || 0, w: x.w || 0 }
+        : { play: x.n || 0, fin: x.n || 0, w: x.w || 0 };
+    });
+    return out;
+  };
+  stats.normRoles = normRoles;
 
   /** マイクラ版 DEFAULT_DEATH_REASONS と同じ並びの死因ラベル */
   const DEATH_REASONS = [
@@ -69,6 +83,7 @@ window.ONW = window.ONW || {};
   stats.deathReasonOf = deathReasonOf;
 
   let deathCol = true;   // death_reason 列があるか（setup.sql「11.」未実行のDBには無いので、失敗したら列なしで保存する）
+  let becameCol = true;   // roles_became 列があるか（同上）
 
   /** result: ホストから届いた結果 / key: 試合の識別子 */
   stats.record = async function (result, key) {
@@ -80,15 +95,21 @@ window.ONW = window.ONW || {};
       if (!me || !me.ini) return;                       // 観戦中などで自分の行が無ければ保存しない
       done.add(key);
       const turned = (result.cursed || []).some((c) => c.id === me.id);   // 呪われし者: 吊られて人狼陣営になった人の戦績は、最終役職（村人陣営）ではなく人狼陣営で数える
+      const became = [...new Set((Array.isArray(me.became) && me.became.length ? me.became : [me.ini, me.role]).filter((r) => typeof r === "string" && r))];   // この試合で「なった」役職すべて（マイクラ版の「なった回数」用）
       const row = {
         user_id: A.user.id, match_key: String(key).slice(0, 64), initial_role: me.ini, final_role: me.role,
         team: turned ? "wolf" : teamOf(me.role), won: !!me.win, executed: !!me.dead, players: Math.max(1, Math.min(30, result.history.length)),
       };
       if (deathCol) row.death_reason = deathReasonOf(me);
+      if (becameCol) row.roles_became = became;
       let { error } = await A.sb.from("match_results").insert(row);
-      if (error && deathCol && (error.code === "PGRST204" || error.code === "42703")) {
-        deathCol = false; delete row.death_reason;    // 列が無い古いDB: 死因なしで保存し直す（戦績自体は残す）
-        ({ error } = await A.sb.from("match_results").insert(row));
+      if (error && (error.code === "PGRST204" || error.code === "42703")) {
+        // 列が無い古いDB: まず新しい roles_became だけ外して再試行し、それでもダメなら death_reason も外す（戦績自体は残す）
+        if (becameCol) { becameCol = false; delete row.roles_became; ({ error } = await A.sb.from("match_results").insert(row)); }
+        if (error && (error.code === "PGRST204" || error.code === "42703") && deathCol) {
+          deathCol = false; delete row.death_reason;
+          ({ error } = await A.sb.from("match_results").insert(row));
+        }
       }
       if (error && error.code !== "23505") done.delete(key);   // 重複(23505)以外の失敗は次回また試せる
     } catch (e) { /* 戦績の保存に失敗してもゲームは止めない */ }
@@ -107,9 +128,18 @@ window.ONW = window.ONW || {};
       return m;
     };
     const total = rows.length, wins = rows.filter((r) => r.won).length;
+    // 役職別は最終役職ベース（勝利は最終役職で見る）。なった回数は過去分には記録が無いので初期・最終の2役で近似する
+    const roles = {};
+    rows.forEach((r) => {
+      [...new Set([r.initial_role, r.final_role].filter(Boolean))].forEach((role) => {
+        const x = (roles[role] = roles[role] || { play: 0, fin: 0, w: 0 }); x.play++;
+      });
+      const f = r.final_role || r.initial_role;
+      if (f) { const x = (roles[f] = roles[f] || { play: 0, fin: 0, w: 0 }); x.fin++; if (r.won) x.w++; }
+    });
     return {
       total, wins, losses: total - wins, rate: rate(wins, total), executed: rows.filter((r) => r.executed).length,
-      teams: tally((r) => r.team), roles: tally((r) => r.initial_role), recent: rows.slice(0, 10), rateOf: rate,
+      teams: tally((r) => r.team), roles, recent: rows.slice(0, 10), rateOf: rate,
       deaths: null, counted: false,
     };
   }
@@ -125,13 +155,13 @@ window.ONW = window.ONW || {};
       if (!error && data) {
         let recent = [];
         const rr = await A.sb.from("match_results")
-          .select("initial_role,won").eq("user_id", uid)
+          .select("final_role,won").eq("user_id", uid)
           .order("played_at", { ascending: false }).limit(10);
         if (!rr.error) recent = rr.data || [];
         const total = data.total || 0, wins = data.wins || 0;
         return {
           total, wins, losses: total - wins, rate: rate(wins, total), executed: data.executed || 0,
-          teams: data.teams || {}, roles: data.roles || {}, recent, rateOf: rate,
+          teams: data.teams || {}, roles: normRoles(data.roles), recent, rateOf: rate,
           deaths: { total: data.deaths || 0, survive: data.survive || 0, reasons: data.death_reasons || {} },
           counted: true,
         };

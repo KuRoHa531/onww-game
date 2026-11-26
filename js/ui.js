@@ -95,8 +95,13 @@ window.ONW = window.ONW || {};
     // 結果発表: 中身が前回と全く同じなら作り直さない（通信などで再描画が走っても、画面・カードがちらつかない）
     const sameResult = game.phase === P.ONLINE_RESULT && !specDeal && ui._lastPhase === game.phase && ui._lastHtml === html && !!$app().firstElementChild;
     document.body.classList.toggle("res-compact", game.phase === P.ONLINE_RESULT || reviewing);   // 結果発表のあいだもヘッダーを小さいまま（ヘッダーの高さが変わってカードがジャンプしない）
+    // ロビーチャットの入力途中は、再描画で消えないように下書きとフォーカスを保つ
+    const lcIn = game.phase === ONW.PHASE.LOBBY ? document.getElementById("lobby-chat-in") : null;
+    const lcDraft = lcIn ? lcIn.value : null, lcFocus = !!lcIn && document.activeElement === lcIn;
     if (!sameResult) $app().innerHTML = html;
     ui._lastHtml = html;
+    if (lcDraft !== null) { const ni = document.getElementById("lobby-chat-in"); if (ni) { ni.value = lcDraft; if (lcFocus) ni.focus(); } }
+    if (game.phase === ONW.PHASE.LOBBY) { ui.updateLobbyChat(); ui.updateLobbyTyping(); }
     if (keepY && !sameResult) window.scrollTo(0, keepY);
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
@@ -668,6 +673,16 @@ window.ONW = window.ONW || {};
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>
+        ${ONW.net.code ? `<div class="lobby-chat">
+          <h2>チャット</h2>
+          <div id="lobby-chat-log" class="chat-log lobby-chat-log"></div>
+          <div id="lobby-typing" class="lobby-typing"></div>
+          <div class="chat-input">
+            <input id="lobby-chat-in" class="onw-input" maxlength="100" placeholder="メッセージを入力" oninput="ONW.ui.lobbyChatInput()" onkeydown="if(event.key==='Enter')ONW.ui.sendLobbyChat()">
+            <button class="btn" onclick="ONW.ui.sendLobbyChat()">送信</button>
+          </div>
+          <p class="night-step__hint">試合が始まるとチャットの履歴は消えます。</p>
+        </div>` : ""}
         ${canInvite && game.invOpen ? `<div class="invite-panel"><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleInvite()">×</button><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
         <div class="btn-row lobby-actions" style="justify-content:center;">
           ${isHost ? `<button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>` : ""}
@@ -2158,6 +2173,84 @@ window.ONW = window.ONW || {};
     while (el.scrollHeight > el.clientHeight + 1 && k > 0.6) { k = Math.round((k - 0.05) * 100) / 100; el.style.setProperty("--cb-s", String(k)); }
   };
   window.addEventListener("resize", () => ONW.ui.fitBoard());
+
+  // ---- ロビーチャット（アモアス式） ----
+  function lobbyChatHtml(game) {
+    const log = game.lobbyChat || [];
+    const me = (game.lobbyPlayers || [])[game.meIndex] || {};
+    if (!log.length) return `<div class="chat-line chat-empty">まだメッセージはありません。</div>`;
+    const nameRow = (nameHtml, achvId, mine) => (ONW.achievements && ONW.achievements.bubbleNameHtml ? ONW.achievements.bubbleNameHtml(nameHtml, achvId, mine) : `<div class="bub__name">${nameHtml}</div>`);
+    return log.map((c) => {
+      const mine = c.name === me.name;
+      return `<div class="bub${mine ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(c.name, null, "av--bub") : ""}<div class="bub__body">${nameRow(esc(c.name), c.achv || null, mine)}<div class="bub__text">${esc(c.text)}</div></div></div>`;
+    }).join("");
+  }
+  /** ロビーチャットのログだけ描き直す（入力欄には触らない） */
+  ui.updateLobbyChat = function () {
+    const el = document.getElementById("lobby-chat-log");
+    if (!el || !ONW.game) return;
+    el.innerHTML = lobbyChatHtml(ONW.game);
+    el.scrollTop = el.scrollHeight;
+  };
+  ui.sendLobbyChat = function () {
+    const el = document.getElementById("lobby-chat-in");
+    if (!el) return;
+    const v = el.value;
+    el.value = "";
+    ui.lobbyTypingOff();
+    if (ONW.net && ONW.net.sendLobbyChat) ONW.net.sendLobbyChat(v);
+    el.focus();
+  };
+  // 「〇〇が入力中…」（Discord式・ロビーだけ）: 打っている間だけホストへ申告する（送りすぎないよう間引く）
+  let typingOn = false, typingSentAt = 0, typingIdle = null;
+  ui.lobbyTypingOff = function () {
+    if (typingIdle) { clearTimeout(typingIdle); typingIdle = null; }
+    if (typingOn) { typingOn = false; if (ONW.net && ONW.net.sendLobbyTyping) ONW.net.sendLobbyTyping(false); }
+  };
+  ui.lobbyChatInput = function () {
+    const el = document.getElementById("lobby-chat-in");
+    if (!el || !ONW.net || !ONW.net.sendLobbyTyping) return;
+    if (!el.value.trim()) { ui.lobbyTypingOff(); return; }
+    const now = Date.now();
+    if (!typingOn || now - typingSentAt > 2000) { typingOn = true; typingSentAt = now; ONW.net.sendLobbyTyping(true); }
+    if (typingIdle) clearTimeout(typingIdle);
+    typingIdle = setTimeout(() => ui.lobbyTypingOff(), 3000);   // 打つのをやめたら消す
+  };
+  /** 入力中表示の描き直し（自分の名前は出さない。古い表示は5秒で自然に消える） */
+  let typingClearTimer = null;
+  ui.updateLobbyTyping = function () {
+    const el = document.getElementById("lobby-typing");
+    if (!el || !ONW.game) return;
+    const me = (ONW.game.lobbyPlayers || [])[ONW.game.meIndex] || {};
+    const names = (ONW.game.lobbyTypingNames || []).filter((n) => n !== me.name);
+    el.textContent = names.length ? `${names.join("、")}が入力中…` : "";
+    if (typingClearTimer) clearTimeout(typingClearTimer);
+    if (names.length) {
+      const at = ONW.game.lobbyTypingAt || 0;
+      typingClearTimer = setTimeout(() => { if ((ONW.game.lobbyTypingAt || 0) === at) { ONW.game.lobbyTypingNames = []; ui.updateLobbyTyping(); } }, 5000);
+    }
+  };
+  // 最新メッセージを画面上部に吹き出しでポップ表示する（アモアス式）。同じ発言を二度出さないよう時刻で dedupe する
+  let popTimer = null, popSeenAt = 0;
+  ui.popChat = function (entry) {
+    if (!entry || !entry.name || !entry.at || entry.at <= popSeenAt) return;
+    popSeenAt = entry.at;
+    if (!ONW.game || ONW.game.phase !== ONW.PHASE.LOBBY) return;
+    let el = document.getElementById("chat-pop");
+    if (!el) { el = document.createElement("div"); el.id = "chat-pop"; document.body.appendChild(el); }
+    const me = (ONW.game.lobbyPlayers || [])[ONW.game.meIndex] || {};
+    const mine = entry.name === me.name;
+    const nm = ONW.achievements && ONW.achievements.bubbleNameHtml ? ONW.achievements.bubbleNameHtml(esc(entry.name), entry.achv || null, mine) : `<div class="bub__name">${esc(entry.name)}</div>`;
+    el.innerHTML = `<div class="bub chat-pop__bub${mine ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(entry.name, null, "av--bub") : ""}<div class="bub__body">${nm}<div class="bub__text">${esc(entry.text)}</div></div></div>`;
+    el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+    clearTimeout(popTimer);
+    popTimer = setTimeout(() => { el.classList.remove("on"); }, 3600);
+  };
+  /** ロビー再同期で既存の履歴を受け取ったとき用: 既存分はポップ済みとして扱う */
+  ui.lobbyChatSeen = function () {
+    const log = (ONW.game && ONW.game.lobbyChat) || [];
+    if (log.length) popSeenAt = Math.max(popSeenAt, log[log.length - 1].at || 0);
+  };
 
   ui.updateChat = function () {
     const big = document.getElementById("chat-log-big");

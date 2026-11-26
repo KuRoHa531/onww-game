@@ -442,6 +442,12 @@ body.is-title .credits-link {
 
 /* チャット */
 .chat-log { height: 200px; overflow-y: auto; text-align: left; background: var(--bg-night); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 10px 0; font-size: 14px; }
+.lobby-chat-log { height: 150px; margin: 6px 0; }
+.lobby-typing { min-height: 18px; font-size: 12px; font-weight: 700; color: var(--muted, #9aa7c2); padding: 0 4px; text-align: left; }
+#chat-pop { position: fixed; top: 10px; left: 50%; transform: translate(-50%, -14px); opacity: 0; pointer-events: none; z-index: 1200; max-width: min(92vw, 430px); transition: opacity .18s ease, transform .18s ease; }
+#chat-pop.on { opacity: 1; transform: translate(-50%, 0); }
+#chat-pop .bub { margin: 0; max-width: 100%; }
+#chat-pop .bub__text { box-shadow: 0 8px 26px rgba(0, 0, 0, .4); }
 .chat-line { padding: 2px 0; word-break: break-all; }
 .chat-co { color: #7fd3e6; }
 .chat-empty { color: var(--ink-dim); }

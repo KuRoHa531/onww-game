@@ -164,6 +164,7 @@ A.user.equipped_achievement = id;
 }
 mine.equipped = id;
 if (!A ||!A.user) guestSave();
+if (ONW.net && ONW.net.reportAchvEquip) ONW.net.reportAchvEquip(id || null);   // 作者指示（2026-11-26）: 装備はロビー等へ即時反映（再入室を待たない）
 return { ok: true};
 };
 

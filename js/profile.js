@@ -167,14 +167,14 @@ window.ONW = window.ONW || {};
     if (team !== "wolf") return team === "third" ? "third" : "village";
     return (ONW.MAD_KIND || []).includes(r) ? "mad" : "wolf";   // 人狼陣営のうち groups.mad の役職が狂人系、それ以外は人狼系
   }
-  const row = (cls, name, x, rateOf) => `<div class="pf-row"><span class="${cls}">${esc(name)}</span><span>${x.n}戦 ${x.w}勝</span><b>${pct(rateOf(x.w, x.n))}</b></div>`;
-  const sum = (list) => list.reduce((a, [, x]) => ({ n: a.n + x.n, w: a.w + x.w }), { n: 0, w: 0 });
+  const row = (cls, name, x, rateOf) => `<div class="pf-row"><span class="${cls}">${esc(name)}</span><span>${x.fin}戦 ${x.w}勝 ・ なった${x.play}回</span><b>${pct(rateOf(x.w, x.fin))}</b></div>`;
+  const sum = (list) => list.reduce((a, [, x]) => ({ n: a.n + (x.fin || 0), w: a.w + (x.w || 0) }), { n: 0, w: 0 });
 
   /** 陣営ボタン + 押した陣営の役職別の戦績。人狼陣営は「人狼系」「狂人系」に分けて見せる */
   function teamsHtml(st) {
     const groups = { village: [], wolf: [], mad: [], third: [] };
     Object.entries(st.roles).forEach(([r, x]) => groups[kindOf(r)].push([r, x]));
-    Object.values(groups).forEach((g) => g.sort((a, b) => b[1].n - a[1].n || ONW.roleRank(a[0]) - ONW.roleRank(b[0])));
+    Object.values(groups).forEach((g) => g.sort((a, b) => (b[1].fin || 0) - (a[1].fin || 0) || (b[1].play || 0) - (a[1].play || 0) || ONW.roleRank(a[0]) - ONW.roleRank(b[0])));
     const TABS = [["village", "村人陣営", ["village"]], ["wolf", "人狼陣営", ["wolf", "mad"]], ["third", "第三陣営", ["third"]]];
     const list = (k) => groups[k].length
       ? groups[k].map(([r, x]) => row(TEAM[k === "mad" ? "wolf" : k][1], rn(r), x, st.rateOf)).join("")
@@ -232,7 +232,7 @@ window.ONW = window.ONW || {};
     lastSt = st && !st.error ? st : null; openTeam = null;
     if (!st || st.error) return `<h2>戦績</h2><p class="night-step__hint">戦績を読み込めませんでした。（管理者向け: setup.sql の「8.」を実行してください）</p>`;
     if (!st.total) return `<h2>戦績</h2><p class="night-step__hint">まだ戦績がありません。</p>`;
-    const recent = st.recent.map((r) => `<span class="pf-chip ${r.won ? "win" : "lose"}" title="${esc(rn(r.initial_role))}">${r.won ? "勝" : "負"}<small>${esc(rn(r.initial_role))}</small></span>`).join("");
+    const recent = st.recent.map((r) => `<span class="pf-chip ${r.won ? "win" : "lose"}" title="${esc(rn(r.final_role || r.initial_role))}">${r.won ? "勝" : "負"}<small>${esc(rn(r.final_role || r.initial_role))}</small></span>`).join("");
     return `
       <h2>戦績</h2>
       <div class="pf-sum">
@@ -240,7 +240,7 @@ window.ONW = window.ONW || {};
         <div><b>${st.losses}</b><span>敗北</span></div><div><b>${pct(st.rate)}</b><span>勝率</span></div>
       </div>
       <p class="night-step__hint" style="margin:6px 0 0;">追放された回数: ${st.executed}回</p>
-      <h2>陣営別・役職別（配られた役職）</h2>
+      <h2>陣営別・役職別（最終役職）</h2>
       <div id="pf-teams">${teamsHtml(st)}</div>
       ${deathsHtml(st)}
       <h2>直近の戦い</h2><div class="pf-recent">${recent}</div>`;
