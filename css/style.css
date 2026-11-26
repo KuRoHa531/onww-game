@@ -1406,6 +1406,10 @@ body.deal-fit .onw-app > .deal-stage { flex: 0 0 auto; margin: 0; }
 .pf-row { display: grid; grid-template-columns: 1fr auto 64px; gap: 10px; align-items: center; padding: 5px 2px; border-bottom: 1px solid rgba(52, 54, 77, .6); font-size: 14px; }
 .pf-row b { text-align: right; color: var(--gold); }
 .pf-roles { max-height: 280px; overflow-y: auto; margin-top: 6px; }
+.pf-tabs { display: flex; gap: 8px; margin: 12px 0 2px; }   /* プロフィール: 戦績/実績タブ */
+.pf-tab { flex: 1; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-night); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.pf-tab:hover { background: rgba(217, 196, 143, .08); }
+.pf-tab.on { border-color: var(--gold); background: rgba(217, 196, 143, .14); }
 .pf-teams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .pf-team { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-night); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .pf-team small { font-size: 11px; font-weight: 400; color: var(--ink-dim); }
@@ -1736,6 +1740,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 @keyframes trapSprungShake { 0%, 100% { transform: translateX(0) rotate(0); } 20% { transform: translateX(-3px) rotate(-2deg); } 40% { transform: translateX(3px) rotate(2deg); } 60% { transform: translateX(-2px) rotate(-1deg); } 80% { transform: translateX(2px) rotate(1deg); } }
 .tb-front .tb-wolfmark.tb-counsel { font-weight: 900; font-size: calc(var(--cw) * .32); letter-spacing: .06em; white-space: nowrap; color: #1e7a46; text-shadow: 0 1px 0 rgba(255,255,255,.7), 0 0 10px rgba(64, 199, 120, .55); }   /* カウンセラー: 更生の面（緑の大きな「更生」） */
 .tb-front .tb-wolfmark.tb-counselfail { font-weight: 900; font-size: calc(var(--cw) * .32); letter-spacing: .06em; white-space: nowrap; color: #8a5a1d; text-shadow: 0 1px 0 rgba(255,255,255,.65), 0 0 9px rgba(190, 130, 50, .4); }   /* カウンセラー: 失敗の面（茶色の大きな「失敗」。気まぐれな占い師のひび割れとは別） */
+.tb-front .tb-wolfmark.tb-psymatch { font-weight: 900; font-size: calc(var(--cw) * .32); letter-spacing: .06em; white-space: nowrap; color: #1e9e4a; text-shadow: 0 1px 0 rgba(255,255,255,.7), 0 0 10px rgba(46, 204, 113, .55); }   /* 心理士: 適合の面（緑の大きな「適合」。色は作者メモで一任されたため、正の色として緑を選択） */
+.tb-front .tb-wolfmark.tb-psymismatch { font-weight: 900; font-size: calc(var(--cw) * .27); letter-spacing: .04em; white-space: nowrap; color: #d43a31; text-shadow: 0 1px 0 rgba(255,255,255,.7), 0 0 10px rgba(231, 76, 60, .5); }   /* 心理士: 未適合の面（赤の大きな「未適合」。適合の緑と対になる色。3文字なので少し小さめ） */
 .tb-front .tb-wolfmark.tb-renmaru, .tb-front .tb-wolfmark.tb-renbatsu { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .38); }   /* レン: 変化していたら ⭕・していなかったら ❌ */
 .tb-front .tb-wolfmark.tb-renmaru { filter: drop-shadow(0 0 7px rgba(64, 199, 120, .9)); }
 .tb-front .tb-wolfmark.tb-renbatsu { filter: drop-shadow(0 0 7px rgba(230, 80, 80, .85)); }
@@ -3088,6 +3094,7 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .bub__achv { font-size: 10px; font-weight: 700; color: var(--gold, #d9a441); margin: 0 4px 1px; word-break: break-all; }
 .achv-list { display: flex; flex-direction: column; gap: 10px; }
 .achv-cat__name { font-size: 12px; font-weight: 700; color: var(--ink-dim); margin: 4px 0; }
+.achv-sub__name { font-size: 12px; font-weight: 700; color: var(--gold); margin: 7px 0 3px; }   /* 実績のサブカテゴリ（役職ごと）見出し */
 .achv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 4px; }
 .achv-row__name { font-weight: 700; font-size: 13px; }
 .achv-row__desc { font-size: 12px; color: var(--ink-dim); flex: 1 1 55%; }

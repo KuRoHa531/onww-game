@@ -11,6 +11,7 @@ window.ONW = window.ONW || {};
   const esc = (s) => ONW.utils.esc(s);
   const TEAM = { village: ["村人陣営", "t-village"], wolf: ["人狼陣営", "t-wolf"], third: ["第三陣営", "t-third"] };
   let token = 0, cur = null, frMsg = "", lastSt = null, openTeam = null;   // openTeam: 戦績で開いている陣営（village / wolf / third / null=閉じている）
+  let pfTab = "stats";   // プロフィールのタブ（stats=戦績 / achv=実績）。別の人を開いたら戦績に戻す。同じ人の開き直し（実績の装備など）では維持する
 
   const rn = (r) => { try { return ONW.roles.getInfo(r).name; } catch (e) { return r; } };
   const pct = (v) => `${v.toFixed(1)}%`;
@@ -55,6 +56,7 @@ window.ONW = window.ONW || {};
   /** uid: 相手のユーザーUUID / name: 表示名（読み込み中の仮表示） */
   pf.open = async function (uid, name) {
     const A = ONW.account, me = ++token;
+    if (!cur || cur.id !== uid) pfTab = "stats";   // 別の人のプロフィールを開いたら戦績タブから（戦績・実績はすべて「見ている相手」のデータで描く）
     if (!A || !A.enabled) return;
     if (!A.user) { shell(`<p class="lede">プロフィールを見るにはログインが必要です。</p>`); return; }
     if (!uid) { shell(`<p class="lede">ゲストのプレイヤーにはプロフィールがありません。</p>`); return; }
@@ -74,8 +76,12 @@ window.ONW = window.ONW || {};
       <div class="pf-head">${av}<div><div class="pf-name">${esc(prof.display_name)}</div><div class="rs-dim">@${esc(prof.user_id)}</div></div></div>
       ${friendHtml() || `<div id="pf-fr"></div>`}
       <div class="pf-bio ${prof.bio ? "" : "pf-bio--empty"}">${prof.bio ? esc(prof.bio) : "ひとこと未設定"}</div>
-      ${statsHtml(st)}
-      ${ONW.achievements ? ONW.achievements.profileHtml(ach, mine) : ""}
+      <div class="pf-tabs" role="tablist">
+        <button type="button" class="pf-tab${pfTab === "stats" ? " on" : ""}" data-pftab="stats" onclick="ONW.profile.tab('stats')">戦績</button>
+        <button type="button" class="pf-tab${pfTab === "achv" ? " on" : ""}" data-pftab="achv" onclick="ONW.profile.tab('achv')">実績</button>
+      </div>
+      <div id="pf-pane-stats"${pfTab === "stats" ? "" : " hidden"}>${statsHtml(st)}</div>
+      <div id="pf-pane-achv"${pfTab === "achv" ? "" : " hidden"}>${ONW.achievements ? ONW.achievements.profileHtml(ach, mine) : ""}</div>
       <div class="btn-row" style="justify-content:center;margin-top:14px;">
         ${mine ? `<button class="btn" onclick="ONW.profile.edit()">プロフィールを編集</button>` : ""}
         ${!mine && prof.avatar_updated_at ? `<button class="btn" onclick="ONW.friends.report('${esc(prof.id)}')">アイコンを通報</button>` : ""}
@@ -190,6 +196,15 @@ window.ONW = window.ONW || {};
     }
     return `<div class="pf-teams">${tabs}</div>${body}`;
   }
+  /** 戦績/実績タブの切り替え（表示中の相手のデータはそのまま。ペインの表示だけ切り替える） */
+  pf.tab = function (t) {
+    pfTab = t === "achv" ? "achv" : "stats";
+    const s = document.getElementById("pf-pane-stats"), a = document.getElementById("pf-pane-achv");
+    if (s) s.hidden = pfTab !== "stats";
+    if (a) a.hidden = pfTab !== "achv";
+    document.querySelectorAll("[data-pftab]").forEach((b) => b.classList.toggle("on", b.getAttribute("data-pftab") === pfTab));
+  };
+
   pf.toggleTeam = function (t) {
     if (!lastSt) return;
     openTeam = openTeam === t ? null : t;

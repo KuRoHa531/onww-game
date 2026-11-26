@@ -84,6 +84,7 @@ window.ONW = window.ONW || {};
     if (kind === "screw") return set({ step: "screw", kind, chain });   // スクリューガム: 銀狼がいます / 銀狼がいません（マイクラ版のスクリューガムCOフォーム）
     if (kind === "mp") return set({ step: "mp", kind, chain });   // 多重人格: 今の人格は村人です / 狂人です（マイクラ版の多重人格COフォーム）
     if (kind === "counselor") return set({ step: "counseltgt", kind, chain });   // カウンセラー: 更生させようとした相手を選ぶ → 成功した/失敗したを選ぶ（マイクラ版のカウンセラーCOフォーム）
+    if (kind === "psychologist") return set({ step: "psytgt1", kind, chain });   // 心理士: 検査した1人目を選ぶ → 2人目を選ぶ → 適合した/適合しなかったを選ぶ（マイクラ版の心理士COフォーム）
     if (kind === "ren") return set({ step: "rentgt", kind, chain });   // レン: 調べた相手を選ぶ → 変わっていたかどうかを選ぶ → モーゼスだったかどうかを選ぶ（マイクラ版のレンCOフォーム。Web版は1回の開示で1人ぶん）
     if (kind === "trailblazer") return set({ step: "tfate", kind, chain });   // 開拓者: 歩んでいる運命を選ぶ（調和・愉悦はそのあと、カルメン・いたずらっ子の結果開示へ続く）
     if (kind === "mgdark") return set({ step: "mgdark", kind, chain });   // 魔法少女: 闇落ちしているかどうかを選ぶ
@@ -160,6 +161,12 @@ co.poetPick = function (id) {
   co.counselTarget = function (id) { set({ step: "counselres", kind: "counselor", target: id, chain: (G().co || {}).chain }); };
   co.counselBack = () => set({ step: "counseltgt", kind: "counselor", chain: (G().co || {}).chain });
   co.pickCounsel = function (ok) { const s = G().co, who = nameOf(s.target), h = hookOfKind("counselor"); done(h && h.coText ? h.coText(who, ok) : (ok ? `${who} の更生に成功しました。` : `${who} の更生に失敗しました。`), { kind: "counselor", target: s.target, ok }, null, "disclose", h && h.coShort ? h.coShort(who, ok) : `${who} → ${ok ? "更生成功" : "更生失敗"}`); };
+  // 心理士の結果開示（マイクラ版の心理士COフォーム: 検査した1人目を選ぶ → 2人目を選ぶ → 適合した/適合しなかったを選ぶ）
+  co.psyTarget1 = function (id) { set({ step: "psytgt2", kind: "psychologist", first: id, chain: (G().co || {}).chain }); };
+  co.psyTarget2 = function (id) { const s = G().co; set({ step: "psyres", kind: "psychologist", first: s.first, second: id, chain: s.chain }); };
+  co.psyBack1 = () => set({ step: "psytgt1", kind: "psychologist", chain: (G().co || {}).chain });
+  co.psyBack2 = () => { const s = G().co; set({ step: "psytgt2", kind: "psychologist", first: s.first, chain: s.chain }); };
+  co.pickPsy = function (m) { const s = G().co, A = nameOf(s.first), B = nameOf(s.second), h = hookOfKind("psychologist"); done(h && h.coText ? h.coText(A, B, m) : `${A}と${B}の検査結果は${m ? "適合しました" : "適合しませんでした"}。`, { kind: "psychologist", first: s.first, second: s.second, matched: !!m }, null, "disclose", h && h.coShort ? h.coShort(A, B, m) : `${A}と${B} → ${m ? "適合" : "不適合"}`); };
   // レンの結果開示（マイクラ版のレンCOフォーム: 調べた相手を選ぶ → 役職が変わっていたかどうかを選ぶ → モーゼスだったかどうかを選ぶ（伏せるも選べる））
   co.renTarget = function (id) { set({ step: "renres", kind: "ren", target: id, chain: (G().co || {}).chain }); };
   co.renBack = () => set({ step: "rentgt", kind: "ren", chain: (G().co || {}).chain });
@@ -406,6 +413,17 @@ co.poetPick = function (id) {
     } else if (s.step === "counselres") {
       title = "結果開示";
       body = `<p class="night-step__hint">${pn(nameOf(s.target))} の更生は成功しましたか？</p>` + btn("成功した", "ONW.co.pickCounsel(true)") + btn("失敗した", "ONW.co.pickCounsel(false)") + btn("相手を選び直す", "ONW.co.counselBack()");
+    } else if (s.step === "psytgt1") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">検査した1人目を選んでください。</p>` +
+        (G().others || []).map((p) => btn(pn(p.name), `ONW.co.psyTarget1('${p.id}')`)).join("") + back;
+    } else if (s.step === "psytgt2") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">検査した2人目を選んでください。</p>` +
+        (G().others || []).filter((p) => p.id !== s.first).map((p) => btn(pn(p.name), `ONW.co.psyTarget2('${p.id}')`)).join("") + btn("1人目を選び直す", "ONW.co.psyBack1()");
+    } else if (s.step === "psyres") {
+      title = "結果開示";
+      body = `<p class="night-step__hint">${pn(nameOf(s.first))} と ${pn(nameOf(s.second))} の検査結果は適合しましたか？</p>` + btn("適合した", "ONW.co.pickPsy(true)") + btn("適合しなかった", "ONW.co.pickPsy(false)") + btn("2人目を選び直す", "ONW.co.psyBack2()");
     } else if (s.step === "rentgt") {
       title = "結果開示";
       body = `<p class="night-step__hint">調べた相手を選んでください。</p>` +

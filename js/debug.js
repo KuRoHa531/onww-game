@@ -484,6 +484,7 @@ window.ONW = window.ONW || {};
     { kind: "medium", role: "medium", label: "霊媒", can: (g, id) => ONW.medium && ONW.medium.canUse(g, id), targets: (g, id) => ONW.medium.targets(g, id) },
     { kind: "counsel", role: "counselor", label: "更生", can: (g, id) => ONW.counselor && ONW.counselor.canUse(g, id), targets: (g, id) => ONW.counselor.targets(g, id) },
     { kind: "ren", role: "ren", label: "変化調査", can: (g, id) => ONW.ren && ONW.ren.canUse(g, id), targets: (g, id) => ONW.ren.targets(g, id) },
+    { kind: "psy", role: "psychologist", label: "検査", two: true, can: (g, id) => ONW.psychologist && ONW.psychologist.canUse(g, id), targets: (g, id) => ONW.psychologist.targets(g, id) },
     { kind: "yomi", role: "yomi", label: "断ち切る", can: (g, id) => ONW.yomi.canUse(g, id), targets: (g, id) => ONW.yomi.targets(g, id) },
     { kind: "icarus", role: "icarus", label: "票を分け与える", can: (g, id) => ONW.icarus.canUse(g, id), targets: (g, id) => ONW.icarus.targets(g, id) },
     { kind: "goranshin", role: "goranshin", label: "投票先ランダム", can: (g, id) => ONW.goranshin.canUse(g, id), targets: (g, id) => ONW.goranshin.targets(g, id) },

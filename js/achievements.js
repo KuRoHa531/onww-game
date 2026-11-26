@@ -383,21 +383,36 @@ w.innerHTML = `<div class=\"pf-card\" role=\"dialog\" aria-modal=\"true\"><butto
 };
 achv.closeModal = function () { const w = document.getElementById("achv-overlay"); if (w) w.remove();};
 
-/** プロフィールの実績欄（profile.js から呼ばれる）。data: achv.loadFor の戻り値 */
+/** プロフィールの実績欄（profile.js から呼ばれる）。data: achv.loadFor(見ている相手のID) の戻り値。
+ *  解除状況・装備中はすべて「見ている相手」のデータで描く（閲覧者の状態では変わらない）。
+ *  カテゴリ（基本/村人陣営/人狼陣営/第三陣営/その他）→ サブカテゴリ（役職ごと。役職に紐づかないものは
+ *  「基本」/「その他」）の2段でグループ見出し＋解除数を付ける。
+ *  未解除の実績は、自分のプロフィールでも他人のプロフィールでも名前・条件文とも「？？？」で伏せる
+ *  （解除数とカテゴリ自体は見えてよい）。装備ボタンは自分のプロフィールのときだけ（isMine）。 */
 achv.profileHtml = function (data, isMine) {
 if (!data || data.error) return `<h2>実績</h2><p class=\"night-step__hint\">実績を読み込めませんでした。（管理者向け: setup.sql の「10.」を実行してください）</p>`;
 const unlocked = data.unlocked || new Set();
 const cats = (typeof window!== "undefined" && window.ONW_ACHIEVEMENT_CATS) || {};
+const roleName = (r) => { try { return ONW.roles.getInfo(r).name;} catch (e) { return r;}};
+const roleRank = (r) => { try { return ONW.roleRank(r);} catch (e) { return 9999;}};
 const byCat = {};
 DATA.forEach((e) => { (byCat[e.c] = byCat[e.c] || []).push(e);});
 const order = ["basic", "village", "wolf", "third", "other"];
-const sec = order.filter((c) => byCat[c]).map((c) => {
-const items = byCat[c].map((e) => {
-const has = unlocked.has(e.i), eq = data.equipped === e.i;
+const rowHtml = (e) => {
+const has = unlocked.has(e.i), eq = has && data.equipped === e.i;
 const btn = isMine && has? `<button class=\"btn tf-chip\" onclick=\"ONW.achievements.equipFromProfile(${eq? "null": `'${e.i}'`})\">${eq? "装備中（外す）": "装備する"}</button>`: "";
-return `<div class=\"achv-row${has? "": " achv-row--locked"}${eq? " achv-row--eq": ""}\"><span class=\"achv-row__name\">${has || isMine? esc(e.n): "？？？"}</span><span class=\"achv-row__desc\">${esc(e.d)}</span>${eq? `<span class=\"st st-ready\">装備中</span>`: ""}${btn}</div>`;
-}).join("");
-return `<div class=\"achv-cat\"><div class=\"achv-cat__name\">${esc(cats[c] || c)}（${byCat[c].filter((e) => unlocked.has(e.i)).length}/${byCat[c].length}）</div>${items}</div>`;
+return `<div class=\"achv-row${has? "": " achv-row--locked"}${eq? " achv-row--eq": ""}\"><span class=\"achv-row__name\">${has? esc(e.n): "？？？"}</span><span class=\"achv-row__desc\">${has? esc(e.d): "？？？"}</span>${eq? `<span class=\"st st-ready\">装備中</span>`: ""}${btn}</div>`;
+};
+const sec = order.filter((c) => byCat[c]).map((c) => {
+const subs = new Map();   // サブカテゴリキー → { label, rank, items }
+byCat[c].forEach((e) => {
+const key = e.r || "";
+if (!subs.has(key)) subs.set(key, { label: e.r? roleName(e.r): (c === "basic"? "基本": "その他"), rank: e.r? roleRank(e.r): -1, items: []});
+subs.get(key).items.push(e);
+});
+const subHtml = [...subs.values()].sort((a, b) => a.rank - b.rank).map((s) =>
+`<div class=\"achv-sub\"><div class=\"achv-sub__name\">${esc(s.label)}（${s.items.filter((e) => unlocked.has(e.i)).length}/${s.items.length}）</div>${s.items.map(rowHtml).join("")}</div>`).join("");
+return `<div class=\"achv-cat\"><div class=\"achv-cat__name\">${esc(cats[c] || c)}（${byCat[c].filter((e) => unlocked.has(e.i)).length}/${byCat[c].length}）</div>${subHtml}</div>`;
 }).join("");
 return `<h2>実績（${unlocked.size}/${DATA.length}）</h2><div class=\"achv-list\">${sec}</div>`;
 };
