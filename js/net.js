@@ -32,6 +32,12 @@ window.ONW = window.ONW || {};
   const TEAM = { village: "村人陣営", wolf: "人狼陣営", third: "第三陣営" };
 
   net.myId = () => net.selfSeat || (net.peer && net.peer.id) || "";
+  /** 実績: 自分が今回新規解除した実績IDをホストへ申告する（js/achievements.js の onResult から呼ばれる） */
+  net.reportAchv = function (ids) {
+    const msg = { t: "achvreport", ids: (ids || []).filter((x) => typeof x === "string").slice(0, 100) };
+    if (!msg.ids.length) return;
+    if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
+  };
   const HS = () => net.hostSeat;   // いまホスト権限を持っている席ID
   /** 夜の行動をまだ選んでいない（またはまだ足りない）人の数 */
   const selComplete = (role, sel) => {
@@ -72,7 +78,11 @@ window.ONW = window.ONW || {};
   }
   function pushChat(name, text, kind) {
     const g = G();
-    g.chatLog.push({ name, text, kind, at: Date.now() });
+    const entry = { name, text, kind, at: Date.now() };
+    // 実績: 吹き出しチャットで名前の上に出す装備中実績（人間は参加時の自己申告、CPUは試合開始時にランダムで決めた分）
+    const sp = (g.players || []).find((p) => p.name === name);
+    if (sp) entry.achv = sp.isCpu ? (g.cpuAchv || {})[sp.id] || null : (net.meta[sp.id] || {}).achv || null;
+    g.chatLog.push(entry);
     sendAll({ t: "chatlog", log: g.chatLog }); sendSpec({ t: "chatlog", log: g.chatLog });
   }
   /** 昼中の死亡の知らせ（呪殺・後追い・心中・王国滅亡・撃たれた）。チャットには流さず、全員の「情報確認」(公開された情報)にだけ載せる。
@@ -454,7 +464,10 @@ window.ONW = window.ONW || {};
     if (d.t === "result") { g.dukeIds = null;
       g.strawPick = null; g.strawWait = null; g.detWait = false; if (ONW.detective && ONW.detective.closeAsk) ONW.detective.closeAsk(); g.strawShake = []; g.result = d.result; g.mimicView = { ...(g.mimicView || {}), ...((d.result && d.result.mimic) || {}) }; g.cloneView = { ...(g.cloneView || {}), ...((d.result && d.result.clone) || {}) }; g.personaView = { ...(g.personaView || {}), ...((d.result && d.result.persona) || {}) };   // クローン: 結果発表でめくれるカードに、思い込んでいる役職の枠を出す / ペルソナ: 仮面を被せる if (d.ghost) g.ghostLog = d.ghost; g.resultStage = d.result && d.result.abandoned ? "sheet" : "exec"; g.resultCap = ""; g.phase = PH().ONLINE_RESULT;   // 廃村は演出なしで最終結果（シート）へ飛ぶ
       if (ONW.stats && !g.isSpectator && !g.debugOn && !(d.result && d.result.abandoned)) ONW.stats.record(d.result, `${net.code || ""}:${g.dealStart || 0}`);   // 自分の戦績を保存（ログイン中のみ・デバッグモード中は保存しない）
+      g.achvReports = (d.result && d.result.achvReports) || {};   // 実績: 今回新規解除した人の申告（CPU分はホストが載せ済み。人間分は achvupdate で届く）
+      if (ONW.achievements && !g.isSpectator && !g.debugOn && !(d.result && d.result.abandoned)) ONW.achievements.onResult(d.result, `${net.code || ""}:${g.dealStart || 0}`);   // 実績: 自分の新規解除を保存してホストへ申告する
     }
+    if (d.t === "achvupdate") { g.achvReports = d.reports || {}; }   // 実績: 新規解除の申告が集まった（結果シートの下の欄を更新する）
     if (!quiet) rerender();
   }
 
@@ -693,7 +706,7 @@ window.ONW = window.ONW || {};
     if (net.isHost && ONW.cpuAi) ONW.cpuAi.sanitize(g);   // CPU AI議論(β版)は、AIの準備ができているときだけONで配る
     return {
       t: "lobby", code: net.code, me: humans.findIndex((p) => p.id === forId),
-      players: humans.map((p) => { const m = net.meta[p.id] || {}; return { name: p.name, status: p.id === HS() ? "host" : p.off ? "offline" : p.status, spec: !!p.spectate, uid: m.uid || null, av: m.av || 0 }; }),
+      players: humans.map((p) => { const m = net.meta[p.id] || {}; return { name: p.name, status: p.id === HS() ? "host" : p.off ? "offline" : p.status, spec: !!p.spectate, uid: m.uid || null, av: m.av || 0, achv: m.achv || null }; }),
       counts: g.roleCounts, fake: g.fakeWolfWhenNoWolf, vsize: g.villageSize, cpu: g.cpuCount, grave: g.graveCount, sgrave: g.seerGraveCount, fsgrave: g.fakeSeerGraveCount ?? g.seerGraveCount, msgrave: g.madSeerGraveCount ?? g.seerGraveCount, mvote: g.mayorVoteCount ?? 2, mmvote: g.madMayorVoteCount ?? 2, drunk: g.drunkCount || 0, drunkp: g.drunkChance ?? 100, drunkps: g.drunkChances || [], lover: g.loverCount || 0, loverp: g.loverChance ?? 100, loverps: g.loverChances || [], timers: g.timers, reveal: g.revealTransforms, revm: !!g.revealManualRoles, wlf: g.winLadderFx !== false, bub: g.bubbleChat === true, cai: g.cpuAi === true, smk: [g.smokeHideAbility ? 1 : 0, g.smokeHideVote ? 1 : 0], cand: g.transformCandidates, off: g.transformOff || [], cpuNames: g.cpuNames || [], asg: ONW.assign.pack(g), dbg: !!g.debugOn,
     };
   }
@@ -1398,7 +1411,7 @@ window.ONW = window.ONW || {};
       const g = G(), saved = ONW.settings.load();
       if (saved) ONW.settings.apply(g, saved);            // 前回のルールを復元
       try { g.debugOn = localStorage.getItem("onw.debugOn.v1") === "1" && !!(ONW.debug && ONW.debug.allowed()); } catch (e) {}   // デバッグモードのON/OFFも前回のまま
-      try { g.bubbleChat = localStorage.getItem("onw.bubbleChat.v1") === "1"; } catch (e) {}   // 吹き出しチャットのON/OFFも前回のまま
+      try { g.bubbleChat = localStorage.getItem("onw.bubbleChat.v1") !== "0"; } catch (e) {}   // 吹き出しチャット: 保存済みのON/OFFはそのまま尊重し、未保存ならデフォルトON
       Object.assign(g, { players: [{ id: "host", name, isCpu: false, status: "host" }], inGame: false, spectators: [], specNames: {}, phase: PH().LOBBY });
       fitVillage();
       startHosting(peer);
@@ -1790,6 +1803,9 @@ window.ONW = window.ONW || {};
     if (n < 3 || n !== g.villageSize || (g.assignOn ? roles.length < n + g.graveCount : roles.length !== n + g.graveCount)) return;   // 定員ぴったり（何人村）で開始
     if (humans.some((p) => p.id !== HS() && p.status !== "ready")) return;   // 全員の準備完了が必要
     g.players = [...humans, ...cpus];
+    g.cpuAchv = {};   // 実績: CPUの装備中実績（表示専用。マイクラ版どおり試合開始時にランダムで1個。保存はしない）
+    if (ONW.achievements) cpus.forEach((p) => { g.cpuAchv[p.id] = ONW.achievements.randomId(); });
+    g.achvReports = {};
     g.inGame = true; g.spectators = []; g.specNames = {};
     g.specRoster = specs.map((p) => ({ id: p.id, name: p.name }));
     g.hostSpec = specs.some((p) => p.id === HS());
@@ -2810,6 +2826,17 @@ window.ONW = window.ONW || {};
     if (d.t === "ready") {
       const p = byId(id);
       if (p && !p.spectate && (p.status === "waiting" || p.status === "ready")) { p.status = d.v ? "ready" : "waiting"; broadcastLobby(); }
+    }
+    if (d.t === "achvreport") {   // 実績: 本人が今回新規解除した実績IDの自己申告。集めて全員へ配り直す（結果シートの下の欄用）。デバッグモード中は申告を受け付けない
+      const p = byId(id);
+      const ids = (d.ids || []).filter((x) => typeof x === "string" && (!ONW.achievements || ONW.achievements.def(x)));
+      if (p && ids.length && !g.debugOn) {
+        g.achvReports = g.achvReports || {};
+        g.achvReports[id] = { name: p.name, ids };
+        if (g.resultObj) g.resultObj.achvReports = g.achvReports;   // 再入室した人にも最新の申告を送る
+        sendAll({ t: "achvupdate", reports: g.achvReports }); sendSpec({ t: "achvupdate", reports: g.achvReports });
+      }
+      return;
     }
     if (d.t === "spec") spectateOf(id, d.v);
     if (d.t === "return") {
@@ -3841,6 +3868,7 @@ window.ONW = window.ONW || {};
       else if (s.direct) h.role = "__blank";
     });
     const result = {
+      achvMatch: !g.abandoned && !g.debugOn && ONW.achievements ? ONW.achievements.collect(g, winIds) : {},   // 実績: この試合で各プレイヤーが満たした実績ID（新規かどうかは各クライアントが自分の保存済みと比べて決める。js/achievements.js）。デバッグモード中は生成・配布しない
       title: g.winTitle,
       stageTitle: (!g.abandoned && !g.pranksterFx && g.winTitleStage && g.winTitle === g.winTitleStage.replace(/勝利$/, "＆道化の爆弾魔勝利") && winIds.some((id) => !(g.winBaseIds || []).includes(id))) ? g.winTitleStage : null,   // 勝利演出の字幕: 追加勝利の札（res.extraWin）が出るときは「村人陣営勝利」だけにして、「＆道化の爆弾魔勝利」は結果シート（title）だけに残す
       abandoned: !!g.abandoned,   // 廃村: 勝者・敗者なしで、演出なしに最終結果へ
@@ -4072,6 +4100,9 @@ window.ONW = window.ONW || {};
     ONW.vote.determineWinners(g);
     if (g.abandoned) { g.winTitle = "廃村"; g.winDetail = "ホストが廃村にしました。"; g.winTeams = []; g.winners = []; g.winnerIds = []; }   // 廃村: 勝利陣営も勝者も敗者もいない
     const result = buildResultObj(g);
+    result.achvReports = {};   // 実績: 今回新規解除した人の自己申告（achvreport で集まる）。CPUは保存しないので、満たした分をそのままホストが載せる
+    if (result.achvMatch && !result.abandoned) g.players.filter((p) => p.isCpu).forEach((p) => { const m = result.achvMatch[p.id]; if (m && m.length) result.achvReports[p.id] = { name: p.name, ids: m.slice() }; });   // 廃村ではCPU分も載せない（achvMatch 自体も廃村では空）
+    g.achvReports = result.achvReports;
     g.players.forEach((p) => { if (!p.isCpu) p.status = "result"; });   // 戻るまで「結果確認中」
     g.resultObj = result;   // 再入室した人にも同じ結果を送るため
     sendAll({ t: "result", result, ghost: g.ghostLog || [] });   // 霊界チャットも結果画面では全員が読める

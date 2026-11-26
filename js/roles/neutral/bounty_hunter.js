@@ -20,7 +20,25 @@
     return (g.bountyList || []).map((b) => ({ by: b.id, target: b.target, hit: wolves.includes(b.target) }));
   };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "bounty_hunter" && !players.some((q) => !dead.has(q.id) && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id)))) out.push("bounty_no_living_wolf");
+    return out;
+  }
+
   ONW.defineRole("bounty_hunter", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult / skipResult が引く。アサシンの演出のあと・全員がめくれる前):
     //   賞金稼ぎのカードが金色に脈打つ → 選ばれた相手のカードが手配書に変わる(顔写真の位置は「？」) → 的中なら狼マーク🐺 / 外れならバツマーク❌
     //   昇格した狂人も的中扱い(res.bounty[].hit は最終盤面の人狼判定 = vote.js wolfJudgeIds で出したもの)。手配書はそのあとの全員めくりでも残る

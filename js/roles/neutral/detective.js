@@ -127,6 +127,7 @@
   D.achievements = function achievements(g, id, won) {
     const out = [], ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
     if (ini === R().DETECTIVE) out.push("first_detective");
+    if (cur === R().DETECTIVE && won && g.smokeOn) out.push("detective_smoke_win");   // 煙幕の中で勝利
     if (cur === R().DETECTIVE) {
       if (won) out.push("win_detective");
       if (g.detectiveGuesses && g.detectiveGuesses[id]) {

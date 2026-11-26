@@ -59,7 +59,10 @@ window.ONW = window.ONW || {};
 
   acc._loadProfile = async function (uid) {
     let { data, error } = await acc.sb.from("profiles")
-      .select("id,user_id,display_name,avatar_updated_at,bio").eq("id", uid).maybeSingle();
+      .select("id,user_id,display_name,avatar_updated_at,bio,equipped_achievement").eq("id", uid).maybeSingle();
+    if (error) {   // setup.sql(10)をまだ実行していない場合は equipped_achievement 列が無い → それなしで読む
+      ({ data, error } = await acc.sb.from("profiles").select("id,user_id,display_name,avatar_updated_at,bio").eq("id", uid).maybeSingle());
+    }
     if (error) {   // setup.sql(8)をまだ実行していない場合は bio 列が無い → bio なしで読む
       ({ data, error } = await acc.sb.from("profiles").select("id,user_id,display_name,avatar_updated_at").eq("id", uid).maybeSingle());
     }
@@ -73,8 +76,8 @@ window.ONW = window.ONW || {};
   // ---------------------------------------------------------
   /** ログイン中の表示名（ゲストなら空文字） */
   Object.defineProperty(acc, "displayName", { get: () => (acc.user ? acc.user.display_name : "") });
-  /** ルーム参加時にホストへ渡す自己申告（P2Pなので表示用のみ。信用に使わない） */
-  acc.me = () => (acc.user ? { uid: acc.user.id, av: avatarVersion(acc.user) } : { uid: null, av: 0 });
+  /** ルーム参加時にホストへ渡す自己申告（P2Pなので表示用のみ。信用に使わない）。achv: 装備中の実績ID */
+  acc.me = () => (acc.user ? { uid: acc.user.id, av: avatarVersion(acc.user), achv: (ONW.achievements && ONW.achievements.equipped()) || null } : { uid: null, av: 0, achv: null });
 
   function avatarVersion(p) { return p && p.avatar_updated_at ? new Date(p.avatar_updated_at).getTime() : 0; }
 
@@ -104,7 +107,8 @@ window.ONW = window.ONW || {};
   acc.cleanMeta = function (m) {
     const uid = m && typeof m.uid === "string" && UUID_RE.test(m.uid) ? m.uid : null;
     const av = m && Number.isFinite(m.av) && m.av > 0 ? Math.floor(m.av) : 0;
-    return uid && av ? { uid, av } : { uid: uid, av: 0 };
+    const achv = m && typeof m.achv === "string" && /^[a-z0-9_]{1,64}$/.test(m.achv) && (!ONW.achievements || ONW.achievements.def(m.achv)) ? m.achv : null;   // 装備中の実績ID（表示専用。形と実在だけ確認）
+    return uid && av ? { uid, av, achv } : { uid: uid, av: 0, achv };
   };
   acc.sanitizePlayers = (players) => (Array.isArray(players) ? players : []).map((p) => ({ ...p, ...acc.cleanMeta(p) }));
 

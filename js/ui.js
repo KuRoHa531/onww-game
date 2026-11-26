@@ -653,7 +653,7 @@ window.ONW = window.ONW || {};
     const plName = (p) => `<span class="pl">${ONW.profile.link(p.uid, p.name, `${A.avatarHtml(p.name, { uid: p.uid, v: p.av }, "av--sm")}<span>${esc(p.name)}</span>`)}${myUid && p.uid && p.av && p.uid !== myUid ? `<button class="rep-btn" title="アイコンを通報" onclick="ONW.friends.report('${esc(p.uid)}')">⚑</button>` : ""}</span>`;
     // ロビーの名前: （自分以外の）人間の名前を押すとメニューが重なって出る。ホストは操作メニュー + プロフィール、ホスト以外は「プロフィールを見る」だけ（見られる相手のときのみ）
     const lobbyName = (p) => {
-      const idx = all.indexOf(p), inner = `${A.avatarHtml(p.name, { uid: p.uid, v: p.av }, "av--sm")}<span>${esc(p.name)}</span>`;
+      const idx = all.indexOf(p), inner = `${A.avatarHtml(p.name, { uid: p.uid, v: p.av }, "av--sm")}<span>${esc(p.name)}</span>${p.achv && ONW.achievements ? `<span class="pl-achv">${esc(ONW.achievements.labelOf(p.achv))}</span>` : ""}`;
       const rep = myUid && p.uid && p.av && p.uid !== myUid ? `<button class="rep-btn" title="アイコンを通報" onclick="ONW.friends.report('${esc(p.uid)}')">⚑</button>` : "";
       const menu = idx !== game.meIndex && (isHost || !!(p.uid && A && A.user));
       return `<span class="pl">${menu ? `<span class="pf-link" role="button" tabindex="0" onclick="ONW.ui.openPlayerMenu(${idx})">${inner}</span>` : inner}${rep}</span>`;
@@ -670,7 +670,7 @@ window.ONW = window.ONW || {};
         <div class="room-code-row"><span class="night-step__role room-code-mask">＊＊＊＊</span><button class="btn tf-chip room-code-copy" onclick="ONW.ui.copyRoomCode(this)">コピー</button></div>
         <h2>参加者 ${total}/${size}</h2>
         <div class="lobby-list">${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
-        ${Array.from({ length: game.cpuCount || 0 }, (_, i) => `<div class="result-role"><span>${esc((game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`).join("")}</div>
+        ${Array.from({ length: game.cpuCount || 0 }, (_, i) => { const cn = (game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`; return `<div class="result-role"><span>${esc(cn)}${ONW.achievements ? `<span class="pl-achv">${esc(ONW.achievements.labelOf(ONW.achievements.cpuDisplayAchv(cn)))}</span>` : ""}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`; }).join("")}</div>
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint">${hint}</p>
@@ -1941,12 +1941,15 @@ window.ONW = window.ONW || {};
     const names = ONW.utils.playerNames();   // COの文章の中のプレイヤー名をオレンジにする
     const bub = game.bubbleChat === true;   // 吹き出しチャット（ルーム設定）。ON のとき、発言をアイコン+名前つきの吹き出しにする
     const meP = (game.lobbyPlayers || [])[game.meIndex], myName = meP ? meP.name : null;
-    const bubble = (c, extra) => `<div class="bub${c.name === myName ? " bub--me" : ""}${extra || ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(c.name, null, "av--bub") : ""}<div class="bub__body"><div class="bub__name">${extra ? `<span class="chat-ghost__tag">【霊界】</span>` : ""}${esc(c.name)}</div><div class="bub__text">${esc(c.text)}</div></div></div>`;
+    const achvByName = {};   // 実績: 発言者の装備中実績（吹き出しチャットONのとき、名前の上に実績名を出す）
+    if (ONW.achievements) { (game.lobbyPlayers || []).forEach((p) => { if (p.achv) achvByName[p.name] = p.achv; }); src.forEach((c) => { if (c.name && c.achv) achvByName[c.name] = c.achv; }); }
+    const achvLine = (id) => (id && ONW.achievements ? `<div class="bub__achv">${esc(ONW.achievements.labelOf(id))}</div>` : "");
+    const bubble = (c, extra) => `<div class="bub${c.name === myName ? " bub--me" : ""}${extra || ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(c.name, null, "av--bub") : ""}<div class="bub__body">${achvLine(c.achv || achvByName[c.name])}<div class="bub__name">${extra ? `<span class="chat-ghost__tag">【霊界】</span>` : ""}${esc(c.name)}</div><div class="bub__text">${esc(c.text)}</div></div></div>`;
     // COボタンの発言（「名前: 占い師CO」。name は無く text の先頭が発言者）も、吹き出しのとき発言者つきの吹き出しにする。発言者が取れない行（口封じの通知など）は今までの1行
     const coBubble = (c) => {
       const m = String(c.text == null ? "" : c.text).match(/^([^:：\s][^:：]{0,30}?)\s*[:：]\s*([\s\S]*)$/);
       if (!m) return null;
-      return `<div class="bub bub--co${m[1] === myName ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(m[1], null, "av--bub") : ""}<div class="bub__body"><div class="bub__name">${esc(m[1])}</div><div class="bub__text">${ONW.utils.tintCo(m[2], names, false)}</div></div></div>`;
+      return `<div class="bub bub--co${m[1] === myName ? " bub--me" : ""}">${ONW.account && ONW.account.avatarHtml ? ONW.account.avatarHtml(m[1], null, "av--bub") : ""}<div class="bub__body">${achvLine(achvByName[m[1]])}<div class="bub__name">${esc(m[1])}</div><div class="bub__text">${ONW.utils.tintCo(m[2], names, false)}</div></div></div>`;
     };
     const lines = src.map((c) => c.tp
       ? `<div class="chat-line chat-tp"><span class="chat-ghost__tag">【テレパシー】</span><strong class="rs-pl rs-me">${esc(c.name)}</strong>: ${esc(c.text)}</div>`
@@ -2601,6 +2604,7 @@ window.ONW = window.ONW || {};
         })()}
         ${opts.preview ? "" : `${sep}${H("試合のチャット")}
 <div class="btn-row">${res.info && res.info.length ? `<button class="btn" onclick="ONW.ui.openResultInfo()">情報確認を見る</button>` : ""}<button class="btn" onclick="ONW.ui.openResultChat()">チャットを見る</button></div>`}
+        ${opts.preview ? "" : (ONW.achievements ? ONW.achievements.resultSectionHtml(game) : "")}
       </section>`;
   };
   ui.renderOnlineResult = function renderOnlineResult(game, review) {

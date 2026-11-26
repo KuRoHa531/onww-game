@@ -3081,3 +3081,17 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .dbg-search { width: 100%; box-sizing: border-box; padding: 7px 10px; font-size: 14px; border-radius: 8px; border: 1px solid var(--gold-dim); background: rgba(0, 0, 0, .35); color: var(--paper, #f3ead2); }
 .dbg-rolegrid { width: 100%; display: flex; flex-wrap: wrap; align-content: flex-start; }
 .dbg-noresult { width: 100%; font-size: 12px; opacity: .75; padding: 6px 2px; }
+
+/* ---- 実績（js/achievements.js） ---- */
+#achv-overlay { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
+.pl-achv { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--gold, #d9a441); white-space: nowrap; }
+.bub__achv { font-size: 10px; font-weight: 700; color: var(--gold, #d9a441); margin: 0 4px 1px; word-break: break-all; }
+.achv-list { display: flex; flex-direction: column; gap: 10px; }
+.achv-cat__name { font-size: 12px; font-weight: 700; color: var(--ink-dim); margin: 4px 0; }
+.achv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 4px; }
+.achv-row__name { font-weight: 700; font-size: 13px; }
+.achv-row__desc { font-size: 12px; color: var(--ink-dim); flex: 1 1 55%; }
+.achv-row--locked { opacity: .45; }
+.achv-row--eq { border-color: var(--gold-dim); background: rgba(217, 164, 65, .08); }
+.achv-player { margin-bottom: 12px; }
+.achv-player__name { font-weight: 700; margin-bottom: 4px; }

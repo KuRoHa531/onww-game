@@ -95,7 +95,25 @@
     n.nn(rid);
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "avenger" && (g.avengerTargets || {})[id] && (g.winnerIds || []).includes((g.avengerTargets || {})[id])) out.push("avenger_target_won");
+    return out;
+  }
+
   ONW.defineRole("avenger", {
+    achievements,   // 実績
     info: { observe: "player", sealTarget: true, deck: 82, name: "復讐者", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 35.7,
       desc: "第三陣営。夜に自分以外のプレイヤーを1人選び、復讐対象にします。復讐対象が敗北すると、あなたも追加で勝利します。ただし、復讐者がお互いを復讐対象にしていたり、役職交換やコピーによる影響で自分自身が復讐対象になっている場合は敗北します。朝、復讐者本人にだけ、復讐対象のカードが🔪（復讐相手）でめくれます。" },
     groups: { "transform:silver_shadow": 22 },   // 銀色の影の変化先（第三陣営の役職は必ず入れる。ロビーの変化候補・固定役の変化指定・設定のOFF・ガイドはここから自動で出る）

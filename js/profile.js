@@ -66,6 +66,8 @@ window.ONW = window.ONW || {};
     if (me !== token) return;                       // 読み込み中に閉じた / 別の人を開いた
     if (!prof) { shell(`<p class="lede">プロフィールが見つかりませんでした。</p>`); return; }
     const mine = prof.id === A.user.id;
+    const ach = ONW.achievements ? await ONW.achievements.loadFor(prof.id) : { error: true };   // 実績（解除済み・装備中）
+    if (me !== token) return;
     cur = prof; frMsg = "";
     const av = A.avatarHtml(prof.display_name, { uid: prof.id, v: A.avatarVersion(prof) }, "av--lg");
     shell(`
@@ -73,6 +75,7 @@ window.ONW = window.ONW || {};
       ${friendHtml() || `<div id="pf-fr"></div>`}
       <div class="pf-bio ${prof.bio ? "" : "pf-bio--empty"}">${prof.bio ? esc(prof.bio) : "ひとこと未設定"}</div>
       ${statsHtml(st)}
+      ${ONW.achievements ? ONW.achievements.profileHtml(ach, mine) : ""}
       <div class="btn-row" style="justify-content:center;margin-top:14px;">
         ${mine ? `<button class="btn" onclick="ONW.profile.edit()">プロフィールを編集</button>` : ""}
         ${!mine && prof.avatar_updated_at ? `<button class="btn" onclick="ONW.friends.report('${esc(prof.id)}')">アイコンを通報</button>` : ""}

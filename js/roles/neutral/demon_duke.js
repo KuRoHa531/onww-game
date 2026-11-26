@@ -197,7 +197,32 @@
     R.t = t + 400;
   };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "demon_duke") {
+      const wolfStart = players.some((q) => { const r = (g.initialRoles || {})[q.id]; return r && (teamKey(r) === "wolf" || r === "mimic_wolf"); });
+      if (!wolfStart) out.push("demon_no_wolf_start");
+      const dr = g.dukeResult || {};
+      if (dr.tie) out.push(won ? "demon_tie_win" : "demon_tie_loss");
+      if (dr.kind === "skip") out.push("demon_no_wolf_exiled");   // 死んだ人狼がいなくて会議が飛んだ
+      if (dr.kind === "vote" && dr.pickedId && dr.success === false) out.push("demon_duke_misjudgment");
+    }
+    return out;
+  }
+
   ONW.defineRole("demon_duke", {
+    achievements,   // 実績
     stageResult: {
       duke: { order: 5, run(R) { const v = R.res.duke; if (v) ONW.demonDuke.fx(R, v); } },
       clear(K) { bodyOff(); if (K && K.dkb) Object.keys(K.dkb).forEach((k) => delete K.dkb[k]); },   // 結果をスキップしたとき: 背景と黒いバッジを戻す
