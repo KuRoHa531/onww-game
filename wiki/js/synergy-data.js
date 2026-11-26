@@ -1201,7 +1201,9 @@ window.ONW_WIKI_SYNERGY = {
    "wolf_marked",
    "wolf_dreamer",
    "white_wolf",
-   "forgetful_wolf"
+   "forgetful_wolf",
+   "spy",
+   "yokai_tanuki"
   ],
   "min": 1,
   "max": null,

@@ -37,9 +37,13 @@
   const rules = data.rules, counts = data.counts;
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const nameOf = (id) => (byId[id] ? byId[id].name : id);
-  const orderOf = (id) => (byId[id] && byId[id].order != null ? byId[id].order : 9999);   // wiki順（ゲーム内順＝wiki-data の order）
-  const teamOf = (id) => (byId[id] ? byId[id].team : "third");
+  // ゲーム内IDと wiki-data の id が食い違う役職の対応表（コピリストだけゲーム内IDが copylist で wiki id が copyist）。
+  // 控え(synergy-data.js)も埋め込み時の本体ルールもゲーム内IDで来るので、名前引きはここで吸収する。
+  const ID_ALIAS = { copylist: "copyist" };
+  const roleOf = (id) => byId[ID_ALIAS[id] || id];
+  const nameOf = (id) => { const r = roleOf(id); return r ? r.name : id; };
+  const orderOf = (id) => { const r = roleOf(id); return r && r.order != null ? r.order : 9999; };   // wiki順（ゲーム内順＝wiki-data の order）
+  const teamOf = (id) => { const r = roleOf(id); return r ? r.team : "third"; };
   const chip = (id, extra) => `<span class="syn-chip syn-chip--${teamOf(id)}">${esc(nameOf(id))}${extra || ""}</span>`;
 
   /** required の並びを「役職 ×枚数」にまとめる（共有者 ×2 など） */

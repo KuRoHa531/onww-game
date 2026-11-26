@@ -121,27 +121,6 @@
   ];
   const FILTER_BY_ID = Object.fromEntries(FILTER_DEFS.map((f) => [f.id, f]));
 
-  // --- ウェブ版に実装されている役職 ----------------------------------------
-  // ゲーム内(iframe)で開かれている時は、ゲーム本体の ONW.ROLE_INFO から直接取る
-  // (= ゲームに役職を足せば、辞典側の「ウェブ版」にも自動で反映される)。
-  // 単体公開など親が見えない時は js/web-roles.js の一覧を使う。
-  function loadWebKeys() {
-    let keys = null;
-    try {
-      const parentOnw = window.parent && window.parent !== window ? window.parent.ONW : null;
-      if (parentOnw && parentOnw.ROLE_INFO) {
-        const list = Object.keys(parentOnw.ROLE_INFO).map((k) => k.toUpperCase());
-        if (list.length > 0) keys = new Set(list);
-      }
-    } catch (e) { /* 別オリジンなどで親に触れない → 予備の一覧へ */ }
-    if (!keys) keys = new Set(window.ONW_WEB_ROLE_KEYS || []);
-    // 別名対応: ゲーム側の内部IDは copylist だが、wiki のキーは COPYIST（マイクラ版準拠）のため両方引けるようにする
-    if (keys.has("COPYLIST")) keys.add("COPYIST");
-    return keys;
-  }
-  const WEB_KEYS = loadWebKeys();
-  function isWebRole(role) { return WEB_KEYS.has(role.key); }
-
   // ゲーム内オーバーレイ(?embed=1)として開かれている時の見た目調整 + Escで閉じる合図
   const isEmbed = /[?&]embed=1(&|$)/.test(location.search);
   if (isEmbed) {
@@ -154,7 +133,6 @@
   const state = {
     query: "",
     filter: "all",
-    webOnly: true,   // 「ウェブ版」絞り込み(初期状態でON = ウェブ版にある役職だけ表示)
     sort: "impl",
     sortPanelOpen: false,
     filterPanelOpen: false,
@@ -172,8 +150,6 @@
   const $empty = document.getElementById("empty-state");
   const $count = document.getElementById("role-count");
   const $filters = document.getElementById("team-filters");
-  const $webFilter = document.getElementById("web-filter");
-  const $webFilterNote = document.getElementById("web-filter-note");
   const $sortToggle = document.getElementById("sort-toggle");
   const $search = document.getElementById("search-input");
   const $searchScope = document.getElementById("search-scope");
@@ -182,24 +158,9 @@
   const $filterPanelToggle = document.getElementById("filter-panel-toggle");
   const $filterPanel = document.getElementById("filter-panel");
 
-  function buildWebFilter() {
-    $webFilter.innerHTML = `<button class="wiki-filter ${state.webOnly ? "active" : ""}" type="button" aria-pressed="${state.webOnly}" data-web-toggle>ウェブ版</button>`;
-    $webFilterNote.textContent = state.webOnly
-      ? "ウェブ版に実装されている役職だけを表示中(タップでオフ)"
-      : "ウェブ版にない役職も含めて、すべての役職を表示中";
-    $webFilter.querySelector("[data-web-toggle]").addEventListener("click", () => {
-      state.webOnly = !state.webOnly;
-      buildWebFilter();
-      buildFilters();
-      buildControlsToggle();
-      render();
-    });
-  }
-
   function buildFilters() {
-    const scope = state.webOnly ? roles.filter(isWebRole) : roles;
-    // ウェブ版ONで該当役職が無くなる絞り込み(例: ウェブ版に無い候補系)は出さない
-    const visible = FILTER_DEFS.filter((f) => f.id === "all" || scope.some((r) => f.test(r)));
+    // 該当役職が無くなる絞り込み(例: 候補が1役もいない候補系)は出さない
+    const visible = FILTER_DEFS.filter((f) => f.id === "all" || roles.some((r) => f.test(r)));
     if (!visible.some((f) => f.id === state.filter)) state.filter = "all";
     $filters.innerHTML = visible
       .map((f) => `<button class="wiki-filter ${f.id === state.filter ? "active" : ""}" data-filter="${f.id}">${f.label}</button>`)
@@ -222,8 +183,7 @@
     }
     if ($filterPanelToggle && $filterPanel) {
       $filterPanelToggle.setAttribute("aria-expanded", String(state.filterPanelOpen));
-      const webMark = state.webOnly ? "(ウェブ版)" : "";
-      $filterPanelToggle.textContent = `絞り込み${webMark} ${state.filterPanelOpen ? "▲" : "▼"}`;
+      $filterPanelToggle.textContent = `絞り込み ${state.filterPanelOpen ? "▲" : "▼"}`;
       $filterPanel.hidden = !state.filterPanelOpen;
     }
   }
@@ -263,7 +223,6 @@
   }
 
   function matches(role) {
-    if (state.webOnly && !isWebRole(role)) return false;
     const def = FILTER_BY_ID[state.filter] ?? FILTER_BY_ID.all;
     if (!def.test(role)) return false;
     if (!state.query) return true;
@@ -311,9 +270,7 @@
     const filtered = sortRoles(roles.filter(matches));
     $count.textContent = `${filtered.length}件`;
     $empty.hidden = filtered.length !== 0;
-    $empty.textContent = state.webOnly
-      ? "該当する役職が見つかりませんでした。(「絞り込み」のウェブ版がオンです)"
-      : "該当する役職が見つかりませんでした。";
+    $empty.textContent = "該当する役職が見つかりませんでした。";
 
     $list.innerHTML = filtered
       .map((role) => {
@@ -456,7 +413,6 @@
     });
   }
 
-  buildWebFilter();
   buildFilters();
   buildSearchScope();
   buildSortToggle();
