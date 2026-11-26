@@ -14,6 +14,14 @@ window.ONW = window.ONW || {};
   const CH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const genCode = () => Array.from({ length: 4 }, () => CH[Math.floor(Math.random() * CH.length)]).join("");
   const PREFIX = "onww-";
+  // WebRTCの接続設定: STUN + TURN中継(Metered)。直接接続できない相手同士でもTURN経由で繋ぐ
+  const PEER_OPTS = { config: { iceServers: [
+    { urls: "stun:stun.relay.metered.ca:80" },
+    { urls: "turn:jp.relay.metered.ca:80", username: "2469236e08b0413665cc1a02", credential: "gbP7JdhFarsN7+54" },
+    { urls: "turn:jp.relay.metered.ca:80?transport=tcp", username: "2469236e08b0413665cc1a02", credential: "gbP7JdhFarsN7+54" },
+    { urls: "turn:jp.relay.metered.ca:443", username: "2469236e08b0413665cc1a02", credential: "gbP7JdhFarsN7+54" },
+    { urls: "turns:jp.relay.metered.ca:443?transport=tcp", username: "2469236e08b0413665cc1a02", credential: "gbP7JdhFarsN7+54" },
+  ] } };
   // 夜に自分で操作する役職・朝に使える役職は js/roles/ の各役職ファイル(night 定義)から決まる。ここには役職名を書かない
   const isActive = (r) => ONW.roleIsActive(r);   // 夜に自分で操作する役職か
   /** 夜が明けるときに実行する段階(起床順)。各役職ファイルの night.kind がこのどれかに対応する。段階を増やすときは cpu.js の runNight も同じ名前で合わせる */
@@ -1272,7 +1280,7 @@ window.ONW = window.ONW || {};
   // 参加者側: 接続・再接続・（後継者なら）ホストの引き継ぎ
   // ---------------------------------------------------------------------
   function tryRegister(code, cb) {
-    const p = new Peer(PREFIX + code);
+    const p = new Peer(PREFIX + code, PEER_OPTS);
     let done = false;
     const fin = (ok, why) => { if (done) return; done = true; clearTimeout(to); if (!ok) { try { p.destroy(); } catch (e) {} } cb(ok ? p : null, why); };
     const to = setTimeout(() => fin(false, "timeout"), 9000);
@@ -1280,7 +1288,7 @@ window.ONW = window.ONW || {};
     p.on("error", (e) => fin(false, e.type));
   }
   function dial(o, cb) {
-    const peer = new Peer();
+    const peer = new Peer(PEER_OPTS);
     let done = false, conn = null;
     const fin = (ok, why) => { if (done) return; done = true; clearTimeout(to); if (!ok) { try { peer.destroy(); } catch (e) {} } cb(ok ? { peer, conn } : null, why); };
     const to = setTimeout(() => fin(false, "timeout"), 10000);
@@ -1407,7 +1415,7 @@ window.ONW = window.ONW || {};
     net.leave();
     net.onFail = onError; net.myName = name; net.myKey = randKey();
     const code = genCode(), gen = net.gen;
-    const peer = new Peer(PREFIX + code);
+    const peer = new Peer(PREFIX + code, PEER_OPTS);
     peer.on("open", () => {
       if (gen !== net.gen) { try { peer.destroy(); } catch (e) {} return; }
       net.peer = peer; net.isHost = true; net.code = code; net.hostSeat = "host"; net.selfSeat = "host";
@@ -1456,7 +1464,7 @@ window.ONW = window.ONW || {};
       const fin = (v) => { if (done) return; done = true; clearTimeout(to); try { if (peer) peer.destroy(); } catch (e) {} resolve(v); };
       const to = setTimeout(() => fin("unknown"), 9000);
       try {
-        peer = new Peer();
+        peer = new Peer(PEER_OPTS);
         peer.on("error", (e) => fin(e && e.type === "peer-unavailable" ? "gone" : "unknown"));
         peer.on("open", () => {
           const conn = peer.connect(PREFIX + code, { reliable: true });
