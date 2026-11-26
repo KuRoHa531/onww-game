@@ -454,10 +454,16 @@ const pfRoleName = (r) => { try { return ONW.roles.getInfo(r).name;} catch (e) {
 const pfRoleRank = (r) => { try { return ONW.roleRank(r);} catch (e) { return 9999;}};
 const pfByCat = (cid) => DATA.filter((e) => e.c === cid);
 const pfCount = (list, unlocked) => list.filter((e) => unlocked.has(e.i)).length;
+/** 件数表示（マイクラ版の色どおり: 解除数は §b=水色、総数は §e=黄色） */
+const pfCountHtml = (list, unlocked) => `<span style="color:#55FFFF">${pfCount(list, unlocked)}</span> / <span style="color:#FFFF55">${list.length}</span>`;
 /** 表示するカテゴリ（MC achievementVisibleCategories: hiddenByDefault のカテゴリは、その実績を1つでも解除するまで出さない） */
 const pfVisibleCats = (unlocked) => CAT_DEFS.filter((c) =>!c.h || pfByCat(c.i).some((e) => unlocked.has(e.i))).slice().sort((a, b) => a.o - b.o);
-/** カテゴリ内のサブカテゴリ（役職ID）。ROLE_ORDER 順。kind を渡すと人狼陣営の人狼系/狂人系で絞る */
-const pfSubsOf = (cid, kind) => [...new Set(pfByCat(cid).map((e) => e.r).filter(Boolean))]
+/** サブカテゴリのキー: 役職カテゴリは役職ID（r）、基本/その他はサブカテゴリ名（s。参加・勝敗・ネタ・酔っぱらい・恋人など。MCにも基本/その他にサブカテゴリがある） */
+const pfSubKey = (e) => e.r || e.s || null;
+/** サブカテゴリの表示名: 役職IDは役職名に、ラベルはそのまま（pfRoleName は引けないIDをそのまま返す） */
+const pfSubName = (key) => pfRoleName(key);
+/** カテゴリ内のサブカテゴリ。役職は ROLE_ORDER 順、ラベルはマスターの出現順。kind を渡すと人狼陣営の人狼系/狂人系で絞る */
+const pfSubsOf = (cid, kind) => [...new Set(pfByCat(cid).map((e) => pfSubKey(e)).filter(Boolean))]
 .filter((r) =>!kind || wolfKindOf(r) === kind).sort((a, b) => pfRoleRank(a) - pfRoleRank(b));
 // 役職検索（デバッグの役職検索と同じ流儀: 名前＋読み仮名＋役職IDを正規化して data-rq に埋め、入力では再描画せずDOMだけ絞る）
 const pfNormQ = (s) => String(s || "").replace(/[\s　]/g, "").replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60)).toLowerCase();
@@ -471,18 +477,18 @@ const cats = pfVisibleCats(unlocked);
 const visEntries = cats.flatMap((c) => pfByCat(c.i)); // 全体集計は表示中カテゴリだけ（MC achievementOverallStats と同じ）
 const rows = cats.map((c) => {
 const list = pfByCat(c.i);
-return pfNavRow(`ONW.achievements.pfCat('${c.i}')`, `<span style="color:${c.col || "inherit"}">${esc(c.n)}</span>`, `${pfCount(list, unlocked)} / ${list.length}`);
+return pfNavRow(`ONW.achievements.pfCat('${c.i}')`, `<span style="color:${c.col || "inherit"}">${esc(c.n)}</span>`, pfCountHtml(list, unlocked));
 }).join("");
-return `<div class="achv-top__title">【実績一覧】</div><div class="achv-top__overall">全実績 ${pfCount(visEntries, unlocked)} / ${visEntries.length}</div><p class="rs-dim">カテゴリを選ぶと詳細を開けます。</p>${rows}`;
+return `<div class="achv-top__title">【実績一覧】</div><div class="achv-top__overall">全実績 ${pfCountHtml(visEntries, unlocked)}</div><p class="rs-dim">カテゴリを選ぶと詳細を開けます。</p>${rows}`;
 }
 function pfKindHtml() { // 人狼陣営: 人狼系 / 狂人系の振り分け（MC openWolfAchievementKindMenu）
 const unlocked = pfState.data.unlocked || new Set();
 const cd = catDefOf(pfState.cat), list = pfByCat(pfState.cat);
 const rows = [["real", "人狼系"], ["mad", "狂人系"]].map(([k, label]) => {
 const sub = list.filter((e) => e.r && wolfKindOf(e.r) === k);
-return pfNavRow(`ONW.achievements.pfKind('${k}')`, esc(label), `${pfCount(sub, unlocked)} / ${sub.length}`);
+return pfNavRow(`ONW.achievements.pfKind('${k}')`, esc(label), pfCountHtml(sub, unlocked));
 }).join("");
-return `${pfBackBtn("実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(cd.n)}</div><div class="achv-catcount">${pfCount(list, unlocked)} / ${list.length}</div><p class="rs-dim">人狼系か狂人系かを選んでください。</p>${rows}`;
+return `${pfBackBtn("実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(cd.n)}</div><div class="achv-catcount">${pfCountHtml(list, unlocked)}</div><p class="rs-dim">人狼系か狂人系かを選んでください。</p>${rows}`;
 }
 function pfSubsHtml() { // サブカテゴリ（役職）の一覧（MC openAchievementSubCategoryListMenu。役職検索つき）
 const unlocked = pfState.data.unlocked || new Set();
@@ -490,8 +496,8 @@ const cd = catDefOf(pfState.cat), list = pfByCat(pfState.cat), kind = pfState.ki
 const title = kind? `${cd.n}（${kind === "mad"? "狂人系": "人狼系"}）`: cd.n;
 const roles = pfSubsOf(pfState.cat, kind);
 const rows = roles.map((r) => {
-const sub = list.filter((e) => e.r === r);
-return `<button type="button" class="achv-navrow" data-rq="${esc(pfSearchKey(r))}" onclick="ONW.achievements.pfSub('${r}')"><span class="achv-navrow__name">${esc(pfRoleName(r))}</span><span class="achv-navrow__count">${pfCount(sub, unlocked)} / ${sub.length}</span></button>`;
+const sub = list.filter((e) => pfSubKey(e) === r);
+return `<button type="button" class="achv-navrow" data-rq="${esc(pfSearchKey(r))}" onclick="ONW.achievements.pfSub('${r}')"><span class="achv-navrow__name">${esc(pfSubName(r))}</span><span class="achv-navrow__count">${pfCountHtml(sub, unlocked)}</span></button>`;
 }).join("");
 const search = roles.length >= 10? `<div class="dbg-searchrow"><input class="dbg-search" type="search" placeholder="役職を検索（名前・読み）" oninput="ONW.achievements.pfSearch(this)"></div>`: "";
 return `${pfBackBtn(kind? "人狼系/狂人系の選択へ戻る": "実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(title)}</div><p class="rs-dim">サブカテゴリ（役職）を選んでください。</p>${search}<div class="achv-subs">${rows}<div class="achv-noresult" style="display:none">見つかりませんでした</div></div>`;
@@ -499,12 +505,13 @@ return `${pfBackBtn(kind? "人狼系/狂人系の選択へ戻る": "実績一覧
 function pfListHtml() { // 実績リスト（MC openAchievementSubCategoryMenu / サブカテゴリの無いカテゴリは直接ここ）
 const unlocked = pfState.data.unlocked || new Set(), data = pfState.data;
 const cd = catDefOf(pfState.cat), role = pfState.role;
-const list = role? pfByCat(pfState.cat).filter((e) => e.r === role): pfByCat(pfState.cat);
+const list = role? pfByCat(pfState.cat).filter((e) => pfSubKey(e) === role): pfByCat(pfState.cat);
 const rows = list.map((e) => {
 const has = unlocked.has(e.i), eq = has && data.equipped === e.i;
-return `<button type="button" class="achv-navrow${has? "": " achv-item--locked"}" onclick="ONW.achievements.pfDetail('${e.i}')"><span class="achv-navrow__name">『${esc(e.n)}』</span>${eq? `<span class="st st-ready">装備中</span>`: ""}<span class="achv-item__st ${has? "ok": "ng"}">${has? "達成済み": "未達成"}</span></button>`;
+// 名前の色はマイクラ版 achievementButtonText どおり: 達成済みは実績の色（MC定義に個別色は無いので §f=白）、未達成は §7=グレー
+return `<button type="button" class="achv-navrow${has? "": " achv-item--locked"}" onclick="ONW.achievements.pfDetail('${e.i}')"><span class="achv-navrow__name" style="color:${has? "#FFFFFF": "#AAAAAA"}">『${esc(e.n)}』</span>${eq? `<span class="st st-ready">装備中</span>`: ""}<span class="achv-item__st ${has? "ok": "ng"}">${has? "達成済み": "未達成"}</span></button>`;
 }).join("");
-return `${pfBackBtn(role? "役職の一覧へ戻る": "実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(role? pfRoleName(role): cd.n)}</div><div class="achv-catcount">${pfCount(list, unlocked)} / ${list.length}</div><p class="rs-dim">実績を選ぶと詳細を開きます。</p>${rows || `<p class="rs-dim">このカテゴリの実績はまだ追加されていません。</p>`}`;
+return `${pfBackBtn(role? "サブカテゴリの一覧へ戻る": "実績一覧へ戻る")}<div class="achv-cathead" style="color:${cd.col || "inherit"}">${esc(role? pfSubName(role): cd.n)}</div><div class="achv-catcount">${pfCountHtml(list, unlocked)}</div><p class="rs-dim">実績を選ぶと詳細を開きます。</p>${rows || `<p class="rs-dim">このカテゴリの実績はまだ追加されていません。</p>`}`;
 }
 function pfDetailHtml() { // 実績詳細（MC openAchievementDetailMenu / achievementDetailBody）
 const unlocked = pfState.data.unlocked || new Set(), data = pfState.data;
@@ -513,7 +520,7 @@ if (!e) return pfTopHtml();
 const has = unlocked.has(e.i), eq = has && data.equipped === e.i, cd = catDefOf(e.c);
 const prog = e.i === "achievement_all_497"? `<div class="achv-detail__prog">進捗：${[...unlocked].filter((id) => id!== e.i && DEFS.has(id)).length} / ${DATA.length - 1}</div>`: "";
 const equip = pfState.isMine && has? `<div class="btn-row"><button type="button" class="btn" onclick="ONW.achievements.pfEquip(${eq? "null": `'${e.i}'`})">${eq? "装備を外す": "装備する"}</button></div>`: "";
-return `${pfBackBtn("実績の一覧へ戻る")}<div class="achv-detail"><div class="achv-detail__name">『${esc(e.n)}』</div><div class="achv-item__st ${has? "ok": "ng"}">${has? "達成済み": "未達成"}</div>${prog}<div class="achv-detail__desc">説明：${esc(e.d)}</div><div class="achv-detail__cat" style="color:${cd.col || "inherit"}">${esc(cd.n)}</div>${e.r? `<div class="achv-detail__sub">サブカテゴリ：${esc(pfRoleName(e.r))}</div>`: ""}${eq? `<div><span class="st st-ready">装備中</span></div>`: ""}${equip}</div>`;
+return `${pfBackBtn("実績の一覧へ戻る")}<div class="achv-detail"><div class="achv-detail__name">『${esc(e.n)}』</div><div class="achv-item__st ${has? "ok": "ng"}">${has? "達成済み": "未達成"}</div>${prog}<div class="achv-detail__desc">説明：${esc(e.d)}</div><div class="achv-detail__cat" style="color:${cd.col || "inherit"}">${esc(cd.n)}</div>${(e.r || e.s)? `<div class="achv-detail__sub">サブカテゴリ：${esc(pfSubName(e.r || e.s))}</div>`: ""}${eq? `<div><span class="st st-ready">装備中</span></div>`: ""}${equip}</div>`;
 }
 function pfRender() {
 if (!pfState) return "";
@@ -573,8 +580,24 @@ pfPaint();
 };
 achv.equipFromProfile = function (id) { return achv.pfEquip(id);}; // 互換用（旧UIのボタンからの呼び出し）
 
-/** 装備中実績のラベル（。マイクラ版の equippedAchievementLabel と同じ形） */
-achv.labelOf = (id) => (id && DEFS.has(id)? ``: "");
+/** 装備中実績のラベル（【実績名】。マイクラ版の equippedAchievementLabel と同じ形） */
+achv.labelOf = (id) => (id && DEFS.has(id)? "【" + (DEFS.get(id).n || "") + "】": "");
+/** 実績の色（マイクラ版は装備ラベルをカテゴリ色で出す。equippedAchievementLabel の color = カテゴリ色） */
+achv.colorOf = (id) => { const d = DEFS.get(id); return d? (catDefOf(d.c).col || ""): "";};
+/** 吹き出しチャットの名前行（作者決定 2026-11-26: 装備実績名は自分の発言では名前の左、他者では名前の右。色はカテゴリ色）。
+* nameHtml / tagHtml は呼び出し側でエスケープ済みのHTML。実績が無い・引けない場合はラベルを出さない */
+achv.bubbleNameHtml = function (nameHtml, id, mine, tagHtml) {
+const label = achv.labelOf(id);
+const tag = label? `<span class="bub__achv" style="color:${achv.colorOf(id)}">${esc(label)}</span>`: "";
+return `<div class="bub__name">${mine? tag: ""}${tagHtml || ""}${nameHtml}${mine? "": tag}</div>`;
+};
+/** ロビーの名前まわり（作者決定 2026-11-26: 装備実績名は名前の上。色はカテゴリ色）。
+* 実績が無い人にも同じ高さの空き行（.pl-achv）を必ず確保し、実績の有無・到着タイミングで行の高さが変わってボタンがずれないようにする */
+achv.lobbyNameHtml = function (nameHtml, id) {
+const label = achv.labelOf(id);
+const style = label? ` style="color:${achv.colorOf(id)}"`: "";
+return `<span class="pl-stack"><span class="pl-achv"${style}>${esc(label)}</span><span class="pl-name">${nameHtml}</span></span>`;
+};
 /** ロビーのCPU行用: 名前から決定的に1個選ぶ（表示専用。試合中のCPUは開始時にランダムで持ち直す） */
 achv.cpuDisplayAchv = function (name) {
 if (!DATA.length) return null;

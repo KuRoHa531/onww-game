@@ -151,14 +151,6 @@ window.ONW = window.ONW || {};
     return f.remove(fid, `${p ? p.display_name : "この人"} さんをフレンドから削除しますか？`);
   };
 
-  f.report = async function (uid) {
-    if (!me()) return;
-    const reason = window.prompt("通報の理由を書いてください（アイコン画像が不適切、など。200文字まで）", "不適切なアイコン画像");
-    if (reason === null) return;
-    const r = await ONW.account.report(uid, reason);
-    window.alert(r.ok ? "通報を受け付けました。" : r.msg);
-  };
-
   function say(text, ok) {
     f.msg = text;
     const el = document.getElementById("fr-msg");
@@ -247,6 +239,7 @@ window.ONW = window.ONW || {};
           <button class="btn btn--primary" onclick="ONW.friends.acceptInvite('${esc(i.id)}')">参加</button>
           <button class="btn" onclick="ONW.friends.ignoreInvite('${esc(i.id)}')">無視</button>
         </div>
+        <button class="toast__x" aria-label="閉じる" onclick="ONW.friends.ignoreInvite('${esc(i.id)}')">×</button>
       </div>`).join("");
   }
 
@@ -266,8 +259,7 @@ window.ONW = window.ONW || {};
         <button class="btn" onclick="ONW.friends.remove('${esc(p.fid)}')">取消</button></span></div>`).join("");
     const list = f.friends.map((p) => `
       <div class="fr-row">${dot(f.online.has(p.uid))}${who(p)}
-        <span class="fr-btns">${p.avatar_updated_at ? `<button class="btn tf-chip" title="アイコンを通報" onclick="ONW.friends.report('${esc(p.uid)}')">通報</button>` : ""}
-        <button class="btn tf-chip" onclick="ONW.friends.removeFriend('${esc(p.fid)}')">削除</button></span></div>`).join("");
+        <span class="fr-btns"><button class="btn tf-chip" onclick="ONW.friends.removeFriend('${esc(p.fid)}')">削除</button></span></div>`).join("");
     return `
       ${inc ? `<h2>届いた申請</h2>${inc}` : ""}
       <h2>フレンド ${f.friends.length}人 <small class="rs-dim">（オンライン ${f.friends.filter((p) => f.online.has(p.uid)).length}）</small></h2>

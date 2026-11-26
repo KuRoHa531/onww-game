@@ -4,6 +4,7 @@
  *   ・SE: Audio プールで同時再生可。BGM は止めない。
  *   ・音量・ミュートはこの端末だけの設定として localStorage（onw.sound.v1）に保存する（ルーム設定とは別）。
  *   ・ブラウザの自動再生制限: 初回のユーザー操作（タップ / クリック / キー）までは再生を保留し、操作の瞬間に保留中の BGM を流し始める。
+ *     SE は操作の瞬間に全要素を音量0で事前再生しておく（primeSe）。タイマー予約で初めて作られる要素（配布 SE など）がモバイルで拒否され無音になるのを防ぐ。
  *   ・音源が無い・再生に失敗してもゲームが止まらないよう、すべての処理を防御的に書く（例外は握りつぶす）。
  * 使い方:
  *   ONW.sound.bgm("night")        … BGM 切替（同じ曲なら継続）
@@ -82,8 +83,12 @@
       els.forEach((el) => { try { el.pause(); } catch (e) {} });
     } catch (e) {}
   }
-  // 初回のユーザー操作でロック解除: 保留中の BGM を流し始める
+  // 初回のユーザー操作でロック解除: 保留中の BGM を流し始める。
+  // あわせて SE の全要素をこのタップの中で無音で事前再生しておく（primeSe）。
+  // モバイルブラウザは「ユーザー操作の中で一度も再生されていない Audio 要素」の後からの再生を
+  // 拒否することがあり、setTimeout 予約で初めて作られる配布 SE（deal）などが無音になっていた。
   function unlock() {
+    try { primeSe(); } catch (e) {}
     if (unlocked) return; unlocked = true;
     try { if (pending) { const n = pending; pending = null; crossfadeTo(n); } } catch (e) {}
   }
@@ -93,6 +98,38 @@
 
   // ---------------- SE（プール再生） ----------------
   const pool = {}, lastPlay = {}, keySeen = {};
+  // 音源ファイルのある SE 名の一覧（audio/se/se_<名前>.mp3）。primeSe が事前生成の対象にする
+  const SE_NAMES = ["bakery", "bell", "bomb", "bounty_success", "card_flip", "card_fly", "chain", "chicken_reverse", "curse_kill", "deal", "dictator", "executioner_success", "expose", "follow_death", "glass_break", "gunshot", "libra", "newspaper", "reveal_text", "smoke", "steve_revive", "tap"];
+  // ---------------- SE の事前再生（モバイルの自動再生制限対策） ----------------
+  // ブラウザ（特にモバイル）は、ユーザー操作のタイミングで作られていない Audio 要素や、
+  // 一度も操作中に再生されていない要素の、タイマー等からの再生を拒否する場合がある。
+  // 配布 SE のように setTimeout 予約で初めて要素が作られる音は、その拒否に当たって無音になっていた。
+  // そこでロック解除のタップの瞬間に、全 SE の要素を作って音量0で一瞬だけ再生し、
+  // ブラウザに「再生済みの要素」として覚えさせる。以後の se() は覚えた要素を再利用するので鳴るようになる。
+  const primedEls = new Set();
+  function primeEl(el) {
+    if (!el || primedEls.has(el)) return;
+    if (el.paused === false) { primedEls.add(el); return; }   // 再生できている要素は覚えたも同然（止めない）
+    primedEls.add(el);
+    try {
+      const v = el.volume;
+      el.volume = 0;
+      const p = el.play();
+      const done = () => { try { el.pause(); try { el.currentTime = 0; } catch (e) {} el.volume = v; } catch (e) {} };
+      if (p && p.then) { p.then(done, () => { primedEls.delete(el); done(); }); }   // 拒否されたら覚えたことにせず、次のタップでやり直す
+      else done();
+    } catch (e) { primedEls.delete(el); }
+  }
+  function primeSe() {
+    try {
+      SE_NAMES.forEach((name) => {
+        const list = pool[name] || (pool[name] = []);
+        if (!list.length) { try { list.push(new Audio(SE_DIR + "se_" + name + ".mp3")); } catch (e) { return; } }
+        primeEl(list[0]);
+      });
+      Object.keys(pool).forEach((name) => pool[name].forEach(primeEl));   // 先に se() で作られた要素も覚えさせる
+    } catch (e) { /* 音でゲームを止めない */ }
+  }
   function se(name) {
     try {
       if (!name || seVol() <= 0) return;

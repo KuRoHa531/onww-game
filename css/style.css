@@ -831,8 +831,6 @@ body.chat-mode .panel > * { flex-shrink: 0; } body.chat-mode .panel > .chat-log 
 .dl-icon { overflow: hidden; position: relative; }
 .pl { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .pl > span:not(.av) { overflow-wrap: anywhere; }
-.rep-btn { background: none; border: none; color: var(--ink-dim); font-size: 13px; padding: 2px 4px; cursor: pointer; opacity: .6; }
-.rep-btn:hover { opacity: 1; color: var(--blood); }
 .cb-name { display: inline-flex; align-items: center; }
 .vote-target .av { margin-right: 6px; }
 
@@ -867,7 +865,8 @@ body.chat-mode .panel > * { flex-shrink: 0; } body.chat-mode .panel > .chat-log 
 .fr-btns { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
 .dot--on { background: #5fd38d; box-shadow: 0 0 6px #5fd38d; }
-.invite-panel { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-panel-raised); max-height: 40vh; overflow-y: auto; }
+.invite-panel { position: relative; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-panel-raised); max-height: 40vh; overflow-y: auto; }
+.toast__x { flex: none; align-self: flex-start; border: 0; background: transparent; color: var(--ink-dim); font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 4px; }
 
 /* 招待の通知（画面上部・どの画面でも出る） */
 #onw-toasts { position: fixed; top: 8px; left: 0; right: 0; z-index: 700; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 10px; pointer-events: none; }
@@ -1407,7 +1406,7 @@ body.deal-fit .onw-app > .deal-stage { flex: 0 0 auto; margin: 0; }
 .pf-row b { text-align: right; color: var(--gold); }
 .pf-roles { max-height: 280px; overflow-y: auto; margin-top: 6px; }
 .pf-tabs { display: flex; gap: 8px; margin: 12px 0 2px; }   /* プロフィール: 戦績/実績タブ */
-.pf-tab { flex: 1; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-night); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.pf-tab { flex: 1; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-night); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-shadow: 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 0 0 6px rgba(255, 255, 255, .6); }   /* 黒文字が暗い背景で埋もれないよう白縁を付ける（選択中/未選択の両状態に効く） */
 .pf-tab:hover { background: rgba(217, 196, 143, .08); }
 .pf-tab.on { border-color: var(--gold); background: rgba(217, 196, 143, .14); }
 .pf-teams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -3093,8 +3092,17 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 
 /* ---- 実績（js/achievements.js） ---- */
 #achv-overlay { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
-.pl-achv { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--gold, #d9a441); white-space: nowrap; }
-.bub__achv { font-size: 10px; font-weight: 700; color: var(--gold, #d9a441); margin: 0 4px 1px; word-break: break-all; }
+/* ロビー: 装備実績名は名前の上（カテゴリ色はインラインstyle）。実績が無い人にも同じ高さの行を確保し、行の高さとボタン位置がずれないようにする */
+.pl-stack { display: inline-flex; flex-direction: column; min-width: 0; }
+.pl-achv { display: block; height: 13px; line-height: 13px; font-size: 10px; font-weight: 700; color: var(--gold, #d9a441); white-space: nowrap; overflow: hidden; }
+.pl-name { overflow-wrap: anywhere; }
+.lobby-list .result-role { align-items: center; }
+/* ロビー: 状態で文面が変わるヒントは高さを予約し、下のボタンが上下しないようにする */
+.lobby-hint { min-height: 2.7em; }
+/* ロビー: 操作ボタン行は画面下に貼り付け、参加者の出入りや再描画で位置が動かないようにする */
+.lobby-actions { position: sticky; bottom: 8px; z-index: 30; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; box-shadow: 0 -4px 18px rgba(0, 0, 0, .25); }
+/* 吹き出し: 装備実績名は名前行の中（自分の発言は名前の左・他者は右。カテゴリ色はインラインstyle） */
+.bub__achv { font-size: 10px; font-weight: 700; color: var(--gold, #d9a441); margin: 0 4px; }
 .achv-list { display: flex; flex-direction: column; gap: 10px; }
 .achv-cat__name { font-size: 12px; font-weight: 700; color: var(--ink-dim); margin: 4px 0; }
 .achv-sub__name { font-size: 12px; font-weight: 700; color: var(--gold); margin: 7px 0 3px; }   /* 実績のサブカテゴリ（役職ごと）見出し */
@@ -3106,20 +3114,20 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .achv-player { margin-bottom: 12px; }
 .achv-player__name { font-weight: 700; margin-bottom: 4px; }
 /* 実績ドリルダウン（マイクラ版式: 一覧→カテゴリ→役職→リスト→詳細） */
-.achv-top__title { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
-.achv-top__overall { font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 2px; }
+.achv-top__title { font-size: 15px; font-weight: 800; color: #FFAA00; margin-bottom: 2px; }   /* MC buildAchievementListBody の §6（金） */
+.achv-top__overall { font-size: 14px; font-weight: 700; margin-bottom: 2px; }   /* 件数の色はインラインstyle（解除数 §b / 総数 §e） */
 .achv-navrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2, transparent); color: var(--ink); cursor: pointer; font: inherit; }
 .achv-navrow:hover { border-color: var(--gold-dim); }
 .achv-navrow__name { font-weight: 700; font-size: 13px; flex: 1 1 auto; }
 .achv-navrow__count { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
 .achv-cathead { font-size: 15px; font-weight: 800; margin: 4px 0 2px; }
-.achv-catcount { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 2px; }
+.achv-catcount { font-size: 13px; font-weight: 700; margin-bottom: 2px; }   /* 件数の色はインラインstyle（解除数 §b / 総数 §e） */
 .achv-backrow { margin-bottom: 8px; }
 .achv-item__st { font-size: 12px; font-weight: 700; white-space: nowrap; }
-.achv-item__st.ok { color: #4ecb71; }
-.achv-item__st.ng { color: var(--ink-dim); }
+.achv-item__st.ok { color: #55FF55; }   /* MC achievementButtonText の §a */
+.achv-item__st.ng { color: #555555; }   /* MC achievementButtonText の §8 */
 .achv-item--locked { opacity: .55; }
-.achv-detail__name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+.achv-detail__name { font-size: 16px; font-weight: 800; color: #FFAA00; margin-bottom: 4px; }   /* MC achievementDetailBody の §6（金） */
 .achv-detail__desc { font-size: 13px; margin: 6px 0; }
 .achv-detail__cat { font-size: 13px; font-weight: 700; }
 .achv-detail__sub, .achv-detail__prog { font-size: 12px; color: var(--ink-dim); margin-top: 2px; }

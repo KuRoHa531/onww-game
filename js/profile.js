@@ -82,10 +82,9 @@ window.ONW = window.ONW || {};
       </div>
       <div id="pf-pane-stats"${pfTab === "stats" ? "" : " hidden"}>${statsHtml(st)}</div>
       <div id="pf-pane-achv"${pfTab === "achv" ? "" : " hidden"}>${ONW.achievements ? ONW.achievements.profileHtml(ach, mine) : ""}</div>
-      <div class="btn-row" style="justify-content:center;margin-top:14px;">
-        ${mine ? `<button class="btn" onclick="ONW.profile.edit()">プロフィールを編集</button>` : ""}
-        ${!mine && prof.avatar_updated_at ? `<button class="btn" onclick="ONW.friends.report('${esc(prof.id)}')">アイコンを通報</button>` : ""}
-      </div>`);
+      ${mine ? `<div class="btn-row" style="justify-content:center;margin-top:14px;">
+        <button class="btn" onclick="ONW.profile.edit()">プロフィールを編集</button>
+      </div>` : ""}`);
   };
 
   // ---------------------------------------------------------
@@ -196,6 +195,23 @@ window.ONW = window.ONW || {};
     }
     return `<div class="pf-teams">${tabs}</div>${body}`;
   }
+  /** 死亡回数（マイクラ版 showDeathStats と同じ: 生存 / 全体死亡回数 / 死因別をマイクラ版の並びで全種出す）。
+   *  集計カウンタ（setup.sql「11.」）が無いDBでは st.deaths が null なので、その間はセクション自体を出さない */
+  function deathsHtml(st) {
+    if (!st.deaths) return "";
+    const reasons = (ONW.stats && ONW.stats.DEATH_REASONS) || [];
+    const cnt = (label) => (st.deaths.reasons || {})[label] || 0;
+    const rows = reasons.map((label) =>
+      `<div class="pf-row"><span>${esc(label)}</span><span></span><b>${cnt(label)}回</b></div>`).join("");
+    const extra = Object.keys(st.deaths.reasons || {}).filter((k) => !reasons.includes(k))
+      .map((label) => `<div class="pf-row"><span>${esc(label)}</span><span></span><b>${cnt(label)}回</b></div>`).join("");
+    return `<h2>死亡回数</h2>
+      <div class="pf-sum">
+        <div><b>${st.deaths.survive}</b><span>生存</span></div><div><b>${st.deaths.total}</b><span>全体死亡回数</span></div>
+      </div>
+      <div class="pf-roles">${rows}${extra}</div>`;
+  }
+
   /** 戦績/実績タブの切り替え（表示中の相手のデータはそのまま。ペインの表示だけ切り替える） */
   pf.tab = function (t) {
     pfTab = t === "achv" ? "achv" : "stats";
@@ -223,9 +239,10 @@ window.ONW = window.ONW || {};
         <div><b>${st.total}</b><span>試合</span></div><div><b>${st.wins}</b><span>勝利</span></div>
         <div><b>${st.losses}</b><span>敗北</span></div><div><b>${pct(st.rate)}</b><span>勝率</span></div>
       </div>
-      <p class="night-step__hint" style="margin:6px 0 0;">追放された回数: ${st.executed}回（直近${st.total}戦・最大500戦）</p>
+      <p class="night-step__hint" style="margin:6px 0 0;">追放された回数: ${st.executed}回</p>
       <h2>陣営別・役職別（配られた役職）</h2>
       <div id="pf-teams">${teamsHtml(st)}</div>
+      ${deathsHtml(st)}
       <h2>直近の戦い</h2><div class="pf-recent">${recent}</div>`;
   }
 

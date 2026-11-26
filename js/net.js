@@ -79,7 +79,7 @@ window.ONW = window.ONW || {};
   function pushChat(name, text, kind) {
     const g = G();
     const entry = { name, text, kind, at: Date.now() };
-    // 実績: 吹き出しチャットで名前の上に出す装備中実績（人間は参加時の自己申告、CPUは試合開始時にランダムで決めた分）
+    // 実績: 吹き出しチャットで名前の横に出す装備中実績（自分の発言は名前の左・他者は右。人間は参加時の自己申告、CPUは試合開始時にランダムで決めた分）
     const sp = (g.players || []).find((p) => p.name === name);
     if (sp) entry.achv = sp.isCpu ? (g.cpuAchv || {})[sp.id] || null : (net.meta[sp.id] || {}).achv || null;
     g.chatLog.push(entry);

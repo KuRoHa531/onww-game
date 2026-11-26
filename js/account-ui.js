@@ -30,7 +30,7 @@ window.ONW = window.ONW || {};
     if (!a || !a.enabled || !a.ready) return "";
     if (!a.user) return `<div class="acct-bar"><button class="acct-chip" onclick="ONW.accountUi.openLogin()">ログイン</button></div>`;
     const n = ONW.friends ? ONW.friends.incoming.length : 0;
-    return `<div class="acct-bar"><button class="acct-chip acct-chip--me" onclick="ONW.accountUi.openAccount()">
+    return `<div class="acct-bar"><button class="acct-chip acct-chip--me" onclick="ONW.accountUi.openMyProfile()">
       ${a.myAvatarHtml("av--xs")}<span class="acct-chip__name">${esc(a.user.display_name)}</span>${n ? `<span class="badge">${n}</span>` : ""}</button></div>`;
   };
   // ---------------------------------------------------------
@@ -47,6 +47,12 @@ window.ONW = window.ONW || {};
       : `<button class="acct-chip" onclick="ONW.accountUi.openFromGame()">ログイン</button>`;
     if (el.__html === html) return;
     el.__html = html; el.innerHTML = html;
+  };
+  /** タイトル画面の自分の名前チップ: 編集画面ではなく、自分のプロフィール（表示）を重ねて開く */
+  ui.openMyProfile = function () {
+    const a = A();
+    if (a && a.user && ONW.profile) { ONW.profile.open(a.user.id, a.user.display_name); return; }
+    ui.openAccount();
   };
   /** ルーム・ゲーム中: ログイン済みなら自分のプロフィールを重ねて表示（退出しない）/ 未ログインはログイン画面へ（退出の確認あり） */
   ui.openFromGame = function () {
@@ -134,7 +140,7 @@ window.ONW = window.ONW || {};
             <label class="btn">画像を選ぶ<input id="acc-file" type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="ONW.accountUi.pickAvatar(this)"></label>
             ${u.avatar_updated_at ? `<button class="btn" onclick="ONW.accountUi.removeAvatar()">アイコンを削除</button>` : ""}
           </div></div>
-        <p class="night-step__hint">PNG / JPEG / WebP。中央が正方形に切り抜かれ、256×256・100KB以下に縮小されます。不適切な画像は通報の対象です。</p>
+        <p class="night-step__hint">PNG / JPEG / WebP。中央が正方形に切り抜かれ、256×256・100KB以下に縮小されます。</p>
         <p id="acct-msg" class="acct-msg">${esc(s.msg)}</p>
         <div class="title-btns">
           <button class="btn btn--primary btn--wide" onclick="ONW.accountUi.openFriends()">フレンド${n ? ` <span class="badge">${n}</span>` : ""}</button>

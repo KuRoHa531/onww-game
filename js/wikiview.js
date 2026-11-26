@@ -14,8 +14,7 @@
  *   ONW.wikiView.open(tab?)  … 開く(tab: "room" | "deck" | "all" | "synergy")
  *   ONW.wikiView.close()     … 閉じる(×ボタン / 外側タップ / Esc)
  *
- * 「全役職」側の「ウェブ版」絞り込みは、このゲームの ONW.ROLE_INFO を親フレームから
- * 直接読んで判定する(wiki/js/wiki.js 参照)。
+ * 「全役職」側にあった「ウェブ版」絞り込みは、全役職の移植完了に伴い廃止した。
  * ------------------------------------------------------------
  */
 window.ONW = window.ONW || {};
