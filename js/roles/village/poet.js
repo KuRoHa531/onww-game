@@ -45,7 +45,22 @@
   const nameIn = (g, id) => ((g.players || []).find((q) => q.id === id) || {}).name || "?";
   const noneClaim = () => ({ short: "能力の使用なし", text: NONE_TEXT, claim: { kind: "poet", none: true } });
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (has("poet")) out.push("poet_notice");   // マイクラ版は詩人を持っていただけで解除（朝の通知が必ず届くため）
+    return out;
+  }
+
   ONW.defineRole("poet", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 90, name: "詩人", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 23.2,
       desc: "村人陣営。夜の能力はありません。朝のあとの待機時間に、昨夜ランダムな1つの役職の能力が誰に使われていたかが分かります（使った人は分かりません。墓地だけを対象にした能力は対象外）。結果は昼の「情報確認」からいつでも見返せます。酔っ払っているときは、酔いが覚めたときに分かります。" },
     groups: { "transform:light_apostle": 35 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER（wiki の order 35）で決まる

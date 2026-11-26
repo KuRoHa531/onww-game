@@ -46,7 +46,22 @@
 
   ONW.dictator = { canUse, targets, declare };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "dictator" && g.dictator && g.dictator.by === id && g.dictator.target && g.dictator.target !== id) out.push("dictator_execute");
+    return out;
+  }
+
   ONW.defineRole("dictator", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 64, name: "独裁者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.8,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから独裁を宣言すると、すぐに議論を打ち切り（投票はしません）、選んだ相手だけを処刑します。従者がご主人の身代わりになることがあります（クーデターのときは身代わりになれません）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に独裁者を持っている人が使えます。" },
     groups: { "transform:light_apostle": 25 },   // 光の使徒の変化先（村人系）

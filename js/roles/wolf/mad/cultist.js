@@ -2,7 +2,25 @@
 (function (ONW) {
   const cpuLearn = (g, id, k) => g.players.forEach((q) => { if (k.isVisibleWolf(g.initialRoles[q.id])) k.infoOf(g, id).known[q.id] = k.seenAs(g.initialRoles[q.id]); });
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "cultist" && (g.promotedWolfIds || []).includes(id)) out.push("cultist_becomes_master");
+    return out;
+  }
+
   ONW.defineRole("cultist", {
+    achievements,   // 実績
     // 夜の演出(stage.js が g.cultReveal を受け取って 700ms 後に呼ぶ): 夜の始まりに人狼プレイヤーのカードが順に表になり、🐺が出る → 夜時間の間ずっと開いたまま
     stageNight: {
       order: 30, field: "cultReveal",

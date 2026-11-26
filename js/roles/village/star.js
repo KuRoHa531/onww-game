@@ -13,7 +13,22 @@
     c.sendSpec({ t: "starup", ids, names: nameList(g, all) });
   };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "star" && players.filter((p) => (g.currentRoles || {})[p.id] === "star").length >= 2) out.push("star_multiple");
+    return out;
+  }
+
   ONW.defineRole("star", {
+    achievements,   // 実績
     // 朝の待機時間(stage.js が g.settleStars を受け取って呼ぶ): 最終盤面でスターを持っている人のカードが全員の画面で同時に表になる（後覚者の確認とは別に「スター」の札が付く。昼になったら札を外して伏せる）
     stageSettle: {
       field: "settleStars", shown: "settleStarShown",

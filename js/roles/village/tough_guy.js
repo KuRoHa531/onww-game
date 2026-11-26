@@ -3,7 +3,27 @@
   /** 効果が働いているタフガイか（酔いが覚めていない酔っ払いは、まだタフガイの能力を使えない） */
   const active = (g, id) => ONW.mimic.eff(g, id) === ONW.ROLE.TOUGH_GUY && !ONW.hiddenDrunk(g, id) && !(ONW.seal && ONW.seal.is(g, id));   // 封印の狂人に封印されているタフガイは、はじき返しも道連れ無効も働かない（2of4b）   // 模倣の人狼がタフガイを模倣していても働く（受動効果は模倣先で見る）
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const bounced = (g.toughBounces || []);
+    if (fin === "tough_guy" && !exiled(id)) {
+      let cnt = 0; try { cnt = (ONW.vote.tally(g) || {})[id] || 0; } catch (e) {}
+      if (cnt > 0 && bounced.some((b) => b && (b.id === id || b.by === id))) out.push("tough_substitute_exile");
+    }
+    if (bounced.some((b) => b && (b.to || []).includes(id))) out.push("tough_got_substituted");   // タフガイのはじき返しで追放された側
+    return out;
+  }
+
   ONW.defineRole("tough_guy", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 47, name: "タフガイ", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.5,
       desc: "村人陣営。夜の能力はありません。最多得票になっても追放されず、カードがめくれて票をはじき返します。はじき返された票は次点の得票者（同数なら全員）にとばっちりとして降りかかり、代わりに追放されます（とばっちりで追放された人は、てるてる・一目惚れしてるてるの勝利条件も、処刑人のターゲットが追放された扱いも満たしません）。猫又・黒猫・ネコカボチャ・わら人形の道連れでは死亡しません（心中・無理心中ははじき返せず、死亡します）。" },
     // CPUの発言: 本家(cpu.js)どおり55%で本当にタフガイCO、残り45%は村人騙り（村人が配役にいないときは、いる村役職の騙り）

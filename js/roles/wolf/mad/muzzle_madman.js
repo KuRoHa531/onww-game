@@ -66,7 +66,29 @@
     lineOf(g, id) { const t = (g.muzzleTargets || {})[id]; return t ? `あなたは ${nameOf(g, t)} を口封じしました。` : ""; },
   };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "muzzle_madman") {
+      const t = (g.muzzleTargets || {})[id];
+      if (t && t !== id) out.push("muzzle_other");
+      if (t && t === id) out.push("muzzle_self");
+    }
+    return out;
+  }
+
   ONW.defineRole(ROLE_ID, {
+    achievements,   // 実績
     info: { deck: 53, name: "口封じの狂人", team: ONW.TEAM.WOLF, wakeOrder: 43, sort: 1.85,
       desc: "人狼陣営。夜の始まりに、自分を含む全員からランダムな1人を口封じします。口封じされた人は、昼のチャットとCOボタン（結果開示も）が使えません。人狼が誰かは分かりません。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.6, "transform:dark_avatar": 15 },

@@ -110,7 +110,33 @@
   function cpuLearn(g, id, k) { const c = rec(g, id) && ensure(g, id, g.currentRoles, false); if (c) k.infoOf(g, id).known[c] = g.initialRoles[c] || g.currentRoles[c]; }
   function cpuClaim(k, g, p, r, i, c) { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "lawyer") {
+      if (won && exiled(id)) out.push("lawyer_extra_win");
+      if (won && !exiled(id)) out.push("lawyer_solo_win");
+      const client = (g.lawyerClient || {})[id];
+      if (client && dead.has(client)) out.push("lawyer_client_dead");
+      const cr = (g.lawyerClientRole || {})[id];
+      if (client && cr && (g.initialRoles || {})[client] !== cr && (g.currentRoles || {})[client] === cr) out.push("lawyer_client_moved");
+    }
+    if (ini === "lawyer" && fin === "opportunist") out.push("lawyer_to_opportunist");
+    return out;
+  }
+
   ONW.defineRole("lawyer", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 97, name: "弁護士", team: ONW.TEAM.THIRD, wakeOrder: null, sort: 35.995,
       desc: "第三陣営。夜の始まりに、依頼人（人狼陣営の1人）のカードが役職名でめくれて分かります。依頼人には待機時間に「あなたに弁護士がついています」と知らされます（誰が弁護士かは分かりません）。依頼人が勝利し、弁護士が生存していれば単独勝利、死亡していれば追加勝利します。ただし保安官執行死では勝てません。待機時間の時点で依頼人がいない（人狼陣営が盤面にいない）と、カードが裏返ってオポチュニストに変化します（鍵師にロックされていると失敗します）。" },
     groups: { "transform:silver_shadow": 22 },

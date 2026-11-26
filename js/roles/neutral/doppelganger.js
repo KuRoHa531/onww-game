@@ -32,6 +32,7 @@
     if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);
     if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: コピー元に使われた回数 +1 してからコピー（コピー先にもその票数が入る）
     const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id), shown = ONW.shownRole(got);
+    (g.doppelCopy = g.doppelCopy || {})[p.id] = seen;   // 実績用: コピーしようとした役職（追加記録のみ）
     const stolen = ONW.magician ? ONW.magician.trySteal(g, p.id, got, "doppelganger", "night") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら連鎖能力は使えない。見た役職はコピーした役職のまま。docs/magician.md）
     i.mode = "doppel"; i.target = t.id; i.newRole = shown; i.known[p.id] = shown; i.known[t.id] = ONW.shownRole(seen);
     i.doppel = { target: t.id, newRole: shown };
@@ -65,7 +66,29 @@
     return { co: "doppelganger", result: { short: `${nameOf(g, i.doppel.target)} → ${rn(role)}`, text: `${nameOf(g, i.doppel.target)} をコピーして ${rn(role)} になりました。`, claim: { kind: "doppel", target: i.doppel.target, role } } };
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    // コピーした役職はコピー時点の記録 g.doppelCopy で判定する（マイクラ版 doppelCopiedRole。最終役職での近似はしない）
+    if (ini === "doppelganger" && (g.doppelCopy || {})[id]) {
+      out.push("doppel_copy_" + teamKey((g.doppelCopy || {})[id]));
+      if ((g.doppelCopy || {})[id] === "doppelganger" && fin === "villager") out.push("doppel_copy_doppel_to_villager");
+    }
+    return out;
+  }
+
   ONW.defineRole("doppelganger", {
+    achievements,   // 実績
     // 夜の画面(ui.js の renderOnlineNight / chainBlock が引く): 夜に選ぶときの説明文(action)と、朝/昼の連鎖で「確定」できる条件(chainReady)・「押して」の文言(chainHow)
     uiNight: {
       action(X) {
@@ -141,6 +164,7 @@
         if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: コピー元に +1 してからコピー
         const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
+        (g.doppelCopy = g.doppelCopy || {})[p.id] = seen;   // 実績用: コピーしようとした役職（追加記録のみ）
         const stolen = ONW.magician ? ONW.magician.trySteal(g, p.id, got, "doppelganger", "night") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら朝の連鎖能力は使えない。見た役職・演出はコピーした役職のまま。docs/magician.md）
         ONW.observeNote(g, p.id, [t], null, "doppelganger");
         ONW.newsNote(g, "doppelganger");
@@ -164,6 +188,7 @@
         if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: コピー元に +1 してからコピー
         const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, id);
+        (g.doppelCopy = g.doppelCopy || {})[id] = seen;   // 実績用: コピーしようとした役職（追加記録のみ）
         const stolen = ONW.magician ? ONW.magician.trySteal(g, id, got, "doppelganger", "auto") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら連鎖能力は使えない。docs/magician.md）
         const lines = [`${c.nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
         g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.label} ${c.me.name}`, c.nameOf, (x) => `${x} をコピーしよう`, (x) => `${x} の役職をコピーしよう`, (x) => `${x} の役職をコピーし、${rn(got)} になりました。`) || `${c.label} ${c.me.name} は ${c.nameOf(t)} をコピーし、${rn(got)} になりました。`);

@@ -11,7 +11,22 @@
  * 詳細は docs/spy.md。
  */
 (function (ONW) {
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "spy" && won && !exiled(id)) out.push("spy_survive_win");
+    return out;
+  }
+
   ONW.defineRole("spy", {
+    achievements,   // 実績
     info: { deck: 98, name: "スパイ", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 23.3,
       desc: "村人陣営。人狼が分かる役職からは人狼として見えます。占い結果はスパイで、保安官に撃たれると誤爆になります。" },
     wolfLook: true,   // 人狼が分かる役職からは人狼の🐺として見える（ONW.WOLF_LOOK / WOLF_LOOK_ALL）

@@ -1,6 +1,29 @@
 /** 怪盗: 自分以外1人と役職を交換し、新しい自分の役職だけ確認する */
 (function (ONW) {
 
+  /** 実績用: 交換の記録（マイクラ版 game.robberTarget / game.robberSeen 相当）。targetId = 実際に交換した相手、seenRole = 交換で手にした役職 */
+  function noteRobber(g, actorId, targetId, seenRole) {
+    (g.robberTarget = g.robberTarget || {})[actorId] = targetId;
+    (g.robberSeen = g.robberSeen || {})[actorId] = seenRole;
+  }
+
+  /** 実績（マイクラ版 robberSeen / robberTarget 判定） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const teamKey = (r) => { const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const seen = (g.robberSeen || {})[id];
+    if ((ini === "robber" || fin === "robber") && seen) {
+      out.push("robber_steal_" + teamKey(seen));   // 奪った役職の陣営（村人/人狼/第三）
+      if (seen === "detective") out.push("robber_steal_detective");   // 名探偵を奪った
+      if (Object.entries(g.robberTarget || {}).some(([rid, tid]) => rid !== id && tid === id)) out.push("robber_robbed_after_steal");   // 盗んだあとに別の怪盗に盗まれた
+      if ((g.robberTarget || {})[id] && ini === fin) out.push("robber_back_to_initial");   // 交換したのに初期役職に戻った
+    }
+    for (const [rid, tid] of Object.entries(g.robberTarget || {})) {   // 盗まれた側
+      if (tid === id && (g.robberSeen || {})[rid]) out.push("robbed_" + teamKey((g.robberSeen || {})[rid]));
+    }
+    return out.filter((x, i) => out.indexOf(x) === i);
+  }
+
   // ---- CPUの夜の行動(もとは cpu.js の runNight にあったもの。中身は変更なし) ----
   function run(n, p, label, cur, rid) {
     const g = n.g;
@@ -23,6 +46,7 @@
     if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: 入れ替える「前」に使われた回数 +1（票数はカードについて動く）
     ONW.swapPlayers(g, p.id, ta);
     const gotRaw = g.currentRoles[p.id];   // 交換で手にした役職（魔法使いに奪われると自分の役職は村人になるが、怪盗が見た役職は取った役職のまま。マイクラ版 robberSeen）
+    noteRobber(g, p.id, ta, gotRaw);
     if (ONW.magician) ONW.magician.trySteal(g, p.id, gotRaw, "robber", "night");   // 魔法使い: 自分の役職を変えたので、変化後の役職を奪われる（docs/magician.md）
     i.mode = "robber"; i.target = t.id; i.newRole = ONW.shownRole(gotRaw);
     i.known[p.id] = i.newRole; i.known[t.id] = "robber";
@@ -63,6 +87,7 @@
   }
 
   ONW.defineRole("robber", {
+    achievements,   // 実績（奪った側・盗まれた側の分を判定）
     // 夜の画面(ui.js の renderOnlineNight / chainBlock が引く): 夜に選ぶときの説明文(action)と、朝/昼の連鎖で「確定」できる条件(chainReady)・「押して」の文言(chainHow)
     uiNight: {
       action(X) {
@@ -114,6 +139,7 @@
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, p.id, ta);
         const got = g.currentRoles[p.id];
+        noteRobber(g, p.id, ta, got);
         if (ONW.magician) ONW.magician.trySteal(g, p.id, got, "robber", "night");   // 魔法使い: 変化後の役職を奪われる（怪盗が見た役職・演出は取った役職のまま。docs/magician.md）
         g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${rn(c.eff(p))} ${p.name}`, c.nameOf, rn(got), "交換") || `${rn(c.eff(p))} ${p.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
         c.hold(p.id, `${c.nameOf(t)} と役職を交換しました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。`);
@@ -135,6 +161,7 @@
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, id, ta);
         const got = g.currentRoles[id];
+        noteRobber(g, id, ta, got);
         if (ONW.magician) ONW.magician.trySteal(g, id, got, "robber", "auto");   // 魔法使い: 変化後の役職を奪われる（見た役職・演出は取った役職のまま。docs/magician.md）
         g.nightLogsAll.push(ONW.watcher.shiftText(ch, `${c.label} ${c.me.name}`, c.nameOf, rn(got), "交換") || `${c.label} ${c.me.name} は ${c.nameOf(t)} と役職を交換し、${rn(got)} になりました。`);   // 静観者にずれたときは「〇〇と交換しようとしましたが、静観者だったため△△の村人と交換しました。」
         const ml = ONW.mimic.takenLine(g, id, got, rn);   // 模倣の人狼を奪ったら、模倣先も知らせる（カードにも枠が付く）

@@ -88,7 +88,8 @@
 
   /** 実績（wiki-data.js の「馬の狂人」に定義済み。履歴判定の first_horse_madman と horse_madman_coffee は返さない=先行干支狂人と同じ） */
   function achievements(g, id, won) {
-    const out = [], cur = (g.currentRoles || {})[id];
+    const out = [], cur = (g.currentRoles || {})[id], ini = (g.initialRoles || {})[id];
+    if ((ini === ID || cur === ID) && Object.values(g.chesedRecipient || {}).includes(id)) out.push("horse_madman_coffee");   // ケセドのコーヒーを受け取った
     if (cur !== ID) return out;   // 最終役職で判定（模倣の人狼が模倣しているだけでは対象外=マイクラ版と同じ）
     if (won) out.push("win_horse_madman");
     if ((g.players || []).some((p) => p.id !== id && ZODIAC_MADMEN.includes((g.currentRoles || {})[p.id]))) out.push("zodiac_horse_madman");

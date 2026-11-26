@@ -636,7 +636,28 @@
     },
   });
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "silver_wolf") {
+      if (!won) out.push("lose_silver_wolf");
+      if (dead.has(id)) out.push("silver_wolf_death");
+    }
+    return out;
+  }
+
   ONW.defineRole(ID, {
+    achievements,   // 実績
     info: {
       observe: "player", deck: 117, name: "銀狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.595,
       desc: "人狼陣営。試合開始時にランダムなプレイヤー1人をハッキングします。ハッキングされた人は、墓地のランダムな役職を自分の役職だと思い込みます。相方や狂信者からは人狼として見えます。",

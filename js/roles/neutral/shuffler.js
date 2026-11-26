@@ -242,7 +242,32 @@
     return [ONW.ROLE.TANNER, ONW.ROLE.LOVE_TANNER, ONW.ROLE.BOUNTY_HUNTER, ONW.ROLE.JESTER_BOMBER, ONW.ROLE.MARTYR].includes(i.shuffle.role) ? 100 : -100;
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "shuffler" && ONW.cardAt) {
+      const myCard = ONW.cardAt(g, id);
+      for (const [cardId, list] of Object.entries(g.shufflerMarks || {})) {
+        const arr = Array.isArray(list) ? list : [list];
+        if (!arr.some((m) => m && m.by === myCard)) continue;
+        if (cardId === myCard) out.push("shuffler_self"); else out.push("shuffler_other");
+      }
+    }
+    return out;
+  }
+
   ONW.defineRole("shuffler", {
+    achievements,   // 実績
     info: { observe: "player", sealTarget: true, deck: 58, name: "シャッフラー", team: ONW.TEAM.THIRD, wakeOrder: 55, sort: 40.5,
       desc: "第三陣営。夜に自分を含むプレイヤーを1人選びます。朝に山札から1枚引いてめくり、選んだ人のカードの上に置きます（その人の役職が、引いたカードの役職に変わります）。引いた役職はあなたに分かります。山札には、変化役・夜に誰かを選ぶ役職・マーリン・アサシン・共有者・狂信者などは入っていません。変化させられた人には知らされません（本人は元の役職のつもりのままです）。自分を変化させたときは変化後の役職として勝利すれば単独勝利、他人を変化させたときは変化させた人が変化後の役職として勝利すれば、シャッフラーと一緒に乗っ取り勝利です。ただし、追放・死亡しないと勝てない役職（てるてる・一目惚れしてるてる）以外に変化させたのに対象が死亡すると失敗、村人陣営・人狼陣営の役職に変化させたときはシャッフラー本人が死亡しても失敗です。複数のシャッフラーがいるときは、同じ人を変化させた全員が、その人の最終的な役職で判定され、1人でも失敗すると全員失敗です。村人陣営の役職どうし・人狼陣営の役職どうしに変化させた組も同じ運命で、1組でも失敗すると、その陣営に変化させた組は全員失敗です（陣営が違う組は別々に判定）。（処理順: 墓荒らし → ドッペルゲンガー → シャッフラー → グレムリン → 怪盗 → いたずらっ子）" },
     groups: { "transform:silver_shadow": 18 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）

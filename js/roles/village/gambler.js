@@ -41,7 +41,27 @@
     else { const pl = k.plainLie(g, p, r); c.co = pl.co; c.result = pl.result; }
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "gambler") {
+      if (!won) out.push("gambler_loss");
+      const w = (g.gamblerWeights || {})[id];
+      if (w === 3) out.push("gambler_three_votes");
+      if (w === 0) out.push("gambler_zero_votes");
+    }
+    return out;
+  }
+
   ONW.defineRole("gambler", {
+    achievements,   // 実績
     cpuClaim,
     info: { sealTarget: true, deck: 104, name: "ギャンブラー", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 15.8,
       desc: "村人陣営。夜の能力はありません。昼の投票の票数が、試合ごとに0〜3票のどれかになります。自分の票数は分かりません（結果発表で分かります）。" },

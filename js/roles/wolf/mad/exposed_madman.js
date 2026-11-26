@@ -79,7 +79,32 @@
     chainHow: () => "役職を暴露したい人の<strong>カード</strong>を押して（自分以外）",
   };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "exposed_madman") {
+      const t = (g.exposeTargets || {})[id];
+      if (t) {
+        out.push("exposed_reveal_" + teamOfP(t));
+        if (ONW.isLover && ONW.isLover(g, t)) out.push("exposed_reveal_lover");
+        if (roleOf(t) === "queen") out.push("exposed_reveal_queen");
+      }
+    }
+    return out;
+  }
+
   ONW.defineRole("exposed_madman", {
+    achievements,   // 実績
     info: { observe: "player", sealTarget: true, deck: 52, name: "暴露狂人", team: ONW.TEAM.WOLF, wakeOrder: 42, sort: 1.8,
       desc: "人狼陣営。夜に1人を選びます。昼の始まりに、その人の最終役職だけが全員に公開されます（選んだ相手の名前や暴露狂人本人は公開されません）。恋人や酔っ払いなどの付加情報も一緒に公開されます。人狼が誰かは分かりません。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.5, "transform:dark_avatar": 14 },

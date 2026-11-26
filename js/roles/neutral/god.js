@@ -5,7 +5,26 @@
     g.center0.forEach((c, idx) => k.infoOf(g, id).grave.push({ idx, role: c }));
   };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    const godActive = players.some((q) => roleOf(q.id) === "god" && exiled(q.id) && (g.winnerIds || []).includes(q.id));   // 神が追放されて勝利した（マイクラ版 godBlessingActive）
+    if (fin === "god" && godActive) out.push("god_blessing");
+    return out;
+  }
+
   ONW.defineRole("god", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult / skipResult が引く): 神降臨(生存している神がめくれると、ファーンと神が降臨) / 神の祝福(追放・道連れで死んだ神がキラキラ → 全員めくれたあと、負けた人が吹き飛ばされ、残りの人が祝福で勝つ)
     stageResult: {
       flipUp(R, h) { const god = R.res.god || {}; if (god.mode === "bless" && (god.ids || []).includes(h.id)) { R.gx[R.P(h.id)] = "spark"; R.gxStars(); } },

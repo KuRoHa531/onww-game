@@ -18,7 +18,25 @@
   const holders = (g) => (g.players || []).map((p) => p.id).filter((id) => g.currentRoles && g.currentRoles[id] === "mad_priest");
   ONW.madPriest = { holders };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "mad_priest" && (g.winTeams || []).includes("神") && (g.winTeams || []).includes("人狼陣営")) out.push("mad_priest_god_wolf");
+    return out;
+  }
+
   ONW.defineRole("mad_priest", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult が引く)。res.madPriest は net.js が渡す（神官 priest.js の stageResult の人狼陣営版。mode は神官と共通）。
     //   afterRest: 狂った神官が生きていて神が降臨できないとき（block）だけ、全員がめくれたあと（神降臨の位置）に、狂った神官のカードが光り、字幕で見せる
     //   winNote:   死んだ狂った神官のおかげで人狼陣営も追加勝利するとき（help）は、勝利の貼り重ね（人狼陣営勝利 → 神降臨）と最終結果の字幕のあと、追加勝利の札（人狼陣営）が貼られる前に出す

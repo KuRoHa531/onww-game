@@ -32,7 +32,26 @@
     if (real) c.sendSpec({ t: "news", lines: real, ...(late ? { late: true } : {}), quiet: true });
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "newspaper") {
+      const n = (g.newsRoles || []).length;
+      if (n <= 0) out.push("newspaper_no_info");
+      if (n >= 3) out.push("newspaper_three_info");
+    }
+    return out;
+  }
+
   ONW.defineRole("newspaper", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 43, name: "新聞配達員", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 13,
       desc: "村人陣営。夜の能力はありません。最終盤面に新聞配達員がいると、昼になって変化公開のあと、昨夜能力を使った役職の名前が新聞として全員に知らされます（プレイヤー名は分かりません）。闇の化身・光の使徒・銀色の影は載りません。新聞は「情報確認」からいつでも見返せます。" },
     groups: { "transform:light_apostle": 16 },

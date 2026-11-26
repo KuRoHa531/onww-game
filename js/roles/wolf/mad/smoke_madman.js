@@ -54,7 +54,28 @@
       return true;
     },
   };
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "smoke_madman" && g.smokeOn) {
+      const notice = !!(g.newsAnnounced || (g.newsRoles || []).length > 0 || Object.keys(g.exposeTargets || {}).length > 0 || Object.keys(g.princessUp || {}).length > 0 || Object.keys(g.formerQueens || {}).length > 0);
+      if (notice) out.push("smoke_hid_notice");
+    }
+    return out;
+  }
+
   ONW.defineRole("smoke_madman", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 100, name: "煙幕の狂人", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.698,
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。待機時間の時点で現世にいると煙幕を投げ、画面が白い煙に包まれます。変化公開以外の昼の演出・通知が見えなくなります（隠された基本情報は情報確認にも載りません）。封印されているときは発動しません。" },
     groups: { mad: 2.99, "transform:dark_avatar": 23 },

@@ -130,7 +130,22 @@
   /** 妖狐投票の演出用: 滑りにかかる時間(ms。動きを減らさない場合) */
   const slidesMs = (sl) => (sl || []).length * (450 + PEEK_MS + SLIDE_MS + 1100);
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "penguin" && (g.votes || {})[id] && Object.values(g.votes || {}).some((t) => t === id)) out.push(won ? "penguin_slide_win" : "penguin_slide_loss");
+    return out;
+  }
+
   ONW.defineRole("penguin", {
+    achievements,   // 実績
     info: { deck: 78, name: "ペンギン", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.92,
       desc: "村人陣営。夜の能力・昼の能力はありません。投票の集計のときに自動で発動し、ペンギンに投票した人の票は、ペンギンが投票した先へ滑って移動します。結果発表で、票数が出たあとにペンギンがカードから出てきて、腹ばいで滑って票数のバッジを運ぶ様子が見えます。ペンギンに投票したペンギンの票は滑りません。ペンギンの投票先が、ペンギンに投票した本人だったときは、その人の票は自分に残ります。封印されているペンギンは発動しません。" },
     groups: { "transform:light_apostle": 27.5 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER で決まる（番号は所属を表すだけ）

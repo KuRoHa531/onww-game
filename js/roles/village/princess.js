@@ -114,7 +114,29 @@
     c.sendSpecInfo();
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (ini === "princess" && fin === "queen") {
+      out.push("princess_succeeds");
+      if (((g.princessUp || {})[id] || {}).when === "settle") out.push("princess_day_succeeds");   // 待機時間（朝イチ）の昇格 = マイクラ版の princessPromotedAtDayStart
+    }
+    if (has("princess") && players.some((x) => (g.currentRoles || {})[x.id] === "queen" && exiled(x.id)) && players.some((x) => ((g.initialRoles || {})[x.id] === "princess" || (g.currentRoles || {})[x.id] === "princess") && exiled(x.id))) out.push("queen_princess_both_die");
+    const succeeded = ini === "princess" && fin === "queen" && Object.keys(g.formerQueens || {}).length > 0;
+    if (succeeded && won) out.push("princess_crown_continues");
+    if (succeeded && Object.keys(g.formerQueens || {}).some((qid) => ["follow", "lovers"].includes((g.chainKind || {})[qid]))) out.push("princess_love_follow_succession");
+    return out;
+  }
+
   ONW.defineRole("princess", {
+    achievements,   // 実績
     info: { deck: 87, name: "姫君", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.97,
       desc: "村人陣営。自認はただの村人で、占われても村人と出ます。朝のあとの待機時間に女王が盤面にいなければ、姫君の1人が女王に昇格します（自分のカードが「女王」としてめくれます）。昼のうちに女王が死んだときも、生きている姫君がいれば、その場で女王に昇格します（全員の画面で女王としてめくれ、王国滅亡は起きません）。女王は夜に、姫君が誰か分かります。" },
     seerSees: "villager",   // 占われたときに見える役職（マイクラ版 isDisplayedAsVillagerToSeer: 白狼と姫君は村人）

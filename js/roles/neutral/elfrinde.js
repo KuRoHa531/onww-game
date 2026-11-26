@@ -133,6 +133,7 @@
     achievements(g, id, won) {
       const out = ["first_elfrinde"];
       if (E.targetOf(g, id)) out.push(E.corrupted(g, id) ? "elfrinde_corrupted" : "elfrinde_seal_outsider");
+      if (E.targetTeamOf && E.targetTeamOf(g, id) === ONW.TEAM.VILLAGE) out.push("sealed_by_elfrinde_village");   // 村人陣営を封印した（マイクラ版 sealed_by_elfrinde_village）
       if (won) out.push("win_elfrinde");
       return out;
     },

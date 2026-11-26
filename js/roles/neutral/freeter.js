@@ -141,7 +141,28 @@
   }
   ONW.freeter = { cpuRejob, cpuRejobNow: false, jobOf, jobDead, history, canRejob, targets, rejob, applyRejob, noticeCut, cutText };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    const hist = (g.freeterHist || {})[id];
+    const n = Array.isArray(hist) ? hist.length : (hist && typeof hist === "object" ? Object.keys(hist).length : 0);
+    if (has("freeter") && n >= 2) out.push("freeter_reemployed");
+    if (fin === "freeter" && n >= 2) out.push("freeter_reemployed_after_death");
+    return out;
+  }
+
   ONW.defineRole("freeter", {
+    achievements,   // 実績
     // 昼中に誰かが死亡したとき(net.js killPlayer が呼ぶ): その人に就職しているフリーターへ「再就職できる」と知らせる
     dayDeath: { order: 30, run(c) { noticeCut(c); } },
     // 酔いが覚めたとき: 酔っている間に就職先が死亡していたら、いま知らされる（人間は昼能力で再就職できる / CPUは自動で再就職）

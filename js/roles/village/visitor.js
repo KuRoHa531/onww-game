@@ -58,7 +58,22 @@
     c.result = { short: `→ ${nameOf(g, i.target)}`, text: `${nameOf(g, i.target)} を訪問しました。`, claim: { kind: "visitor", target: i.target } };
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (Object.values(g.visitorTargets || {}).includes(id)) out.push("visited_by_visitor");   // 訪問された側
+    return out;
+  }
+
   ONW.defineRole("visitor", {
+    achievements,   // 実績
     // 朝の待機時間(stage.js が g.settleVisitors を受け取って呼ぶ): 訪問された人の画面で、訪問してきた訪問者のカードが表になる（訪問された本人だけ。昼になったら伏せる）。入れ替わりで訪問者のカードが動いていれば、いまの持ち主のカードが表になる
     stageSettle: { field: "settleVisitors", shown: "settleVisitorShown", run: { order: 40, run(ids, SK) { SK.later(() => { ids.forEach((id) => { SK.show(`p:${id}`, "visitor"); }); SK.paint(SK.G()); }, 900); } } },
     // 夜の画面(ui.js の renderOnlineNight / chainBlock が引く): 夜に選ぶときの説明文(action)と、朝/昼の連鎖で「確定」できる条件(chainReady)・「押して」の文言(chainHow)

@@ -303,7 +303,39 @@
   }
   Object.assign(ONW.sheriff, { shotClaims, claimJudge, confirmedHits, cpuVoteSee });
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "sheriff") {
+      const shots = (g.sheriffShots || []).filter((e) => e && e.by === id);
+      if (shots.some((e) => e.mode === "execute")) out.push("sheriff_execute_success");
+      if (shots.some((e) => e.mode === "misfire")) out.push("sheriff_misfire");
+      const loversOf = (pid) => { const s = new Set(); if (ONW.loverPairs) ONW.loverPairs(g).forEach((q) => { if (q[0] === pid) s.add(q[1]); if (q[1] === pid) s.add(q[0]); }); return s; };
+      if (shots.some((e) => loversOf(id).has(e.target))) out.push("sheriff_shoot_lover");
+      const special = shots.some((e) => {
+        if (e.mode !== "execute" || !e.target) return false;
+        if (teamOfP(e.target) !== "village") return false;
+        const marks = ONW.cardAt ? (g.shufflerMarks || {})[ONW.cardAt(g, e.target)] : null;
+        return (ONW.isLover && ONW.isLover(g, e.target)) || (marks && (Array.isArray(marks) ? marks.length : Object.keys(marks).length)) || (ONW.reverser && ONW.reverser.count(g, e.target) > 0);
+      });
+      if (special) out.push("sheriff_special_village");
+    }
+    // 従者が女王を保安官から守った（従者側の実績もここで拾う。マイクラ版 servant_shield_queen）
+    if (fin === "servant" && (g.sheriffShots || []).some((e) => e && e.sub === id && roleOf(e.target) === "queen")) out.push("servant_shield_queen");
+    // ネコカボチャが保安官に撃たれて道連れにした
+    if (fin === "cat_pumpkin" && (g.sheriffShots || []).some((e) => e && e.target === id) && Object.entries(g.chainBy || {}).some(([v, src]) => src === id && (g.chainKind || {})[v] === "tomo")) out.push("cat_pumpkin_sheriff_chain");
+    return out;
+  }
+
   ONW.defineRole("sheriff", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 67, name: "保安官", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.97,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている自分以外の1人を撃ちます。村人陣営でない人を撃つと、その人は死に、勝利条件と投票権を失います。村人陣営を撃ってしまうと、死ぬのは保安官自身です。（模倣の人狼が模倣したときは逆で、人狼陣営でない人を撃つと執行され、人狼陣営を撃つと自分が死にます。）どちらの場合も、昼のあいだは周りからは同じ「撃たれた」としか見えません（カードには銃痕とひびだけ）。結果発表で「執行」か「誤爆」かが分かります。シュレディンガーの猫を撃っても誰も死にませんが、その猫は村人陣営に固定されます（人狼王にガードされた場合などは何も起きません）。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に保安官を持っている人が使えます。" },
     groups: { "transform:light_apostle": 28 },   // 光の使徒の変化先（村人系）

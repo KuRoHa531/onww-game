@@ -145,7 +145,27 @@
     c.result = { short: `→ ${nameOf(g, i.target)}`, text: coText(nameOf(g, i.target)), claim: { kind: "major", target: i.target } };
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "major" && won) out.push("major_village_win");
+    if ((g.servantSubs || []).some((x) => x && x.major && x.servant === id)) out.push("major_sacrifice");   // 少佐の身代わりは servantSubs に major:true で積まれる
+    if (has("major") && g.drunkOverlay && g.drunkOverlay[id]) out.push("major_drunk");
+    if (has("major") && Object.values(g.chesedRecipient || {}).includes(id)) out.push("major_coffee");
+    // 消去の人狼と少佐が互いを対象にした（マイクラ版 major_eraser_mutual_villager。役職ゲートなし）
+    if ((g.eraserWolfResults || []).some((r) => r && ((r.actorId === id && (g.majorTargets || {})[r.targetId] === id) || (r.targetId === id && (g.majorTargets || {})[id] === r.actorId)))) out.push("major_eraser_mutual_villager");
+    return out;
+  }
+
   ONW.defineRole("major", {
+    achievements,   // 実績
     // 夜の画面(ui.js の renderOnlineNight / chainBlock が引く): 夜に選ぶときの説明文(action)と、朝/昼の連鎖で「確定」できる条件(chainReady)・「押して」の文言(chainHow)
     uiNight: {
       action(X) {

@@ -20,7 +20,22 @@
     else { const pl = k.plainLie(g, p, r); c.co = pl.co; c.result = pl.result; }
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "priest" && (g.winTeams || []).includes("神") && (g.winTeams || []).includes("村人陣営")) out.push("priest_god_village");
+    return out;
+  }
+
   ONW.defineRole("priest", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult が引く)。res.priest は net.js が渡す。
     //   afterRest: 神官が生きていて神が降臨できないとき（block）だけ、全員がめくれたあと（神降臨の位置）に、神官のカードが光り、字幕で見せる
     //   winNote:   死んだ神官のおかげで村人陣営も追加勝利するとき（help）は、勝利の貼り重ね（人狼陣営勝利 → 神降臨）と最終結果の字幕のあと、追加勝利の札（村人陣営）が貼られる前に出す

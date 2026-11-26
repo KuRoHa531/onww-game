@@ -105,7 +105,31 @@
     n.nn(rid);
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "heartbreaker") {
+      const t = (g.breakerTargets || {})[id];
+      const success = ONW.cardAt ? !!((g.breakerSuccess || {})[ONW.cardAt(g, id)]) : false;
+      if (success) out.push("heartbreaker_success");
+      if (t && !success) out.push("heartbreaker_fail");
+      if (t && ONW.isLover && ONW.isLover(g, id) && ONW.loverPairs && ONW.loverPairs(g).some((q) => (q[0] === id && q[1] === t) || (q[1] === id && q[0] === t))) out.push("heartbreaker_own_lover");
+    }
+    return out;
+  }
+
   ONW.defineRole("heartbreaker", {
+    achievements,   // 実績
     info: { observe: "player", sealTarget: true, deck: 57, name: "破局師", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.8,
       desc: "第三陣営（破局の側）。夜に自分以外の1人を選びます。選んだ人が恋人関係にあれば、その恋人関係を壊します（破局）。待機時間に、破局させた恋人のペアのカードが💔でめくれます。選ばれた人・恋人の人には何も知らされません。破局に成功すると、あなたも追加で勝利します。（闇鍋で破局師が出るときは、悪女・純愛者・キューピッドのどれかも必ず出ます。）" },
     groups: { "transform:silver_shadow": 17 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）

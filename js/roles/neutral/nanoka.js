@@ -207,7 +207,27 @@ return k.pick(unk.length? unk: ts);
 // ---------------------------------------------------------
 // なのか本体
 // ---------------------------------------------------------
-ONW.defineRole(ID, {
+  /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (won && fin === "long_night_moon") out.push("win_long_night_moon");
+    if (won && fin === "mitsuki_nanoka") out.push("win_mitsuki_nanoka");
+    if (won && fin === "rasetsu") out.push("win_rasetsu");
+    return out;
+  }
+
+  ONW.defineRole(ID, {
+    achievements,   // 実績
 info: { observe: "player", sealTarget: true, deck: 126, name: "なのか", team: ONW.TEAM.THIRD, wakeOrder: 55, sort: 52.5,
 desc: "第三陣営。夜に、山札からめくれた「長夜月」「三月なのか」「羅刹」の3枚から1枚選んで、その役職に変化します（朝になるまで選び直せます）。鍵師にロックされている・封印されているときは変化できず、変化できなかった場合は勝利できません。長夜月になるとランダムな自分以外の1人に「長夜」がつき、三月なのかは昼能力「写真撮影」が使え、羅刹になるとランダムな自分以外の1人が「愛する人」になります。各形態の勝利条件は、それぞれの役職の説明を見てください。"},
 groups: { "transform:silver_shadow": 29}, // 銀色の影の変化先（マイクラ版 TRANSFORM_ROLE_GROUPS の SILVER_SHADOW に NANOKA が入る）。光の使徒・闇の化身には入らない

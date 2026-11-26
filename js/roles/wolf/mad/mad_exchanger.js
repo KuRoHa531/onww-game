@@ -18,7 +18,32 @@
  * 実装の進み具合は docs/mad-exchanger.md を参照（1of4=登録 / 2of4=昼能力 / 3of4=CPU・デバッグ・封印対象・表示確認 / 4of4=勝敗確認・docs・総合。全4段階 完了）。
  */
 (function (ONW) {
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "mad_exchanger") {
+      const mine = (g.exchanges || []).filter((e) => e && e.by === id);
+      if (mine.length) {
+        out.push("mad_exchanger_swap_vote");
+        if (mine.some((e) => e.a === id || e.b === id)) out.push("mad_exchanger_swap_self");
+        if (mine.some((e) => e.a !== id && e.b !== id)) out.push("mad_exchanger_swap_others");
+      }
+    }
+    return out;
+  }
+
   ONW.defineRole("mad_exchanger", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 77, name: "狂った交換者", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.69,
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。昼の議論中に「昼能力」ボタンから生きている人を2人（自分を含めてよい）選ぶと、その2人の票数を入れ替えます。入れ替わるのは投票の集計のときで、結果発表で票数が出たあとに入れ替わる様子が見えます。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に狂った交換者を持っている人が使えます。交換者と同じく、使った順に入れ替わります。人狼を勝たせるのが目的です。" },
     groups: { mad: 2.96, "transform:dark_avatar": 20 },

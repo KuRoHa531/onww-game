@@ -32,7 +32,27 @@
     return lieClaim(g, p, "merlin", co);
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (has("merlin")) {
+      if ((g.assassinResult || []).some((a) => a && a.target === id) || Object.values(g.assassinTargets || {}).includes(id)) out.push("merlin_assassin_target");
+      const VISIBLE = ["werewolf", "big_wolf", "lone_wolf", "tofu_wolf", "forgetful_wolf", "assassin", "wolf_king", "wolf_marked", "mapo_wolf", "black_wolf_madman", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "spy"];
+      const n = players.filter((p) => VISIBLE.includes((g.initialRoles || {})[p.id]) || (g.promotedWolfIds || []).includes(p.id)).length;
+      if (n <= 0) out.push("merlin_no_wolf"); else out.push("merlin_knows_wolf");
+    }
+    return out;
+  }
+
   ONW.defineRole("merlin", {
+    achievements,   // 実績
     cpuClaim(k, g, p, r, i, c) { const lie = merlinLie(k, g, p, i); c.co = lie.co; c.result = lie.result; },   // マーリン: 人狼が見えているので、別の村役職を騙る（マーリンCOは禁止）
     cpuInit(g, id, k) { cpuLearn(g, id, k); const mid = g.players.some((q) => k.isLookAll(g.initialRoles[q.id])) ? null : ONW.vote.certainPromotion(g);
       if (mid && mid !== id) k.infoOf(g, id).known[mid] = "werewolf"; },

@@ -84,7 +84,26 @@
   }
   ONW.mindWolf = { canUse, targets, used, targetOf, apply, resultText, coText, coHideText, doneText, specLines };
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "mind_wolf" && (g.mindWolfTarget || {})[id]) out.push("mind_wolf_find_" + teamOfP((g.mindWolfTarget || {})[id]));
+    if (Object.values(g.mindWolfTarget || {}).includes(id)) out.push("seen_by_mind_wolf_" + teamOfP(id));   // 心眼に視られた側（役職ゲートなし）
+    return out;
+  }
+
   ONW.defineRole("mind_wolf", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 68, name: "心眼の人狼", team: ONW.TEAM.WOLF, wakeOrder: 10, sort: 1.56,
       desc: "人狼陣営。他の人狼を確認できます。昼の議論中に、昼能力ボタンから対象1人を選ぶと、その人の最終役職（そのときのカード）が分かります。妖狐を見抜いても呪殺しません。占い・判定・勝利条件は常に人狼として扱われます。" },
     groups: { wolf: 8.7, "transform:dark_avatar": 9.2 },

@@ -58,6 +58,7 @@
     if (cur === M && won) out.push("win_mirage_wolf");
     if (cur === M && !won) out.push("lose_mirage_wolf");   // 蜃気狼で初めて敗北する（初回かどうかは保存側が数える）
     if (((g.mirageInspections || {})[id] || []).length && (ini === M || cur === M)) out.push("mirage_wolf_inspected");
+    if ((ini === M || cur === M) && ((g.mirageInspections || {})[id] || []).includes("fake_seer")) out.push("mirage_wolf_fake_seer");   // 偽占い師に確認された
     return out.filter((x, k) => out.indexOf(x) === k);
   }
   ONW.mirage = { isMirageCard, seerRole, dayRole, noteInspect, achievements, DAY_BLOCKED };

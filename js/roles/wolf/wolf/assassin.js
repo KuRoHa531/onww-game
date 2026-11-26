@@ -1,7 +1,30 @@
 /** アサシン: 追放されたら自分以外から1人を選ぶ(選んだ相手がマーリンなら人狼陣営の逆転勝利) */
 (function (ONW) {
   const K = ONW.wolfKit;
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "assassin") {
+      const mine = (g.assassinResult || []).filter((a) => a && a.by === id);
+      if (mine.some((a) => a.hit)) out.push("assassin_hit_merlin");
+      if (mine.some((a) => !a.hit)) out.push("assassin_miss_merlin");
+      if (mine.length && !players.some((q) => roleOf(q.id) === "merlin")) out.push("assassin_no_merlin");
+    }
+    return out;
+  }
+
   ONW.defineRole("assassin", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult / skipResult が引く): 暗殺者のカードが光り、狙われた相手に照準 → 斬撃 → カードが表になってマーリンかどうかが分かる
     // （選ばれた相手は死なない。当たりは赤い閃光で「暗殺」、外れは静かに「無事」）
     stageResult: {

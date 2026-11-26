@@ -1,6 +1,38 @@
 /** いたずらっ子: 自分以外2人の役職を入れ替える(入れ替えは夜の終わりにまとめて反映) */
 (function (ONW) {
 
+  /** 実績用: 入れ替えの記録（マイクラ版 game.troubleChoice / game.troubleRolePairs 相当）。a, b = 実際に入れ替える2席、roles = 入れ替え前のその2席の役職 */
+  function noteTrouble(g, actorId, a, b, roleA, roleB) {
+    (g.troubleChoice = g.troubleChoice || {})[actorId] = [a, b];
+    (g.troubleRolePairs = g.troubleRolePairs || {})[actorId] = { a: roleA, b: roleB };
+  }
+
+  /** 実績（マイクラ版 troublePairRoles / troubleMadeOnlyWolfTargetDie 判定） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const teamKey = (r) => { const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    if (ini !== "troublemaker" && fin === "troublemaker") out.push("trouble_became_trouble");   // いたずらっ子になった
+    if (ini === "troublemaker" || fin === "troublemaker") {
+      const pair = (g.troubleRolePairs || {})[id], choice = (g.troubleChoice || {})[id];
+      if (pair && pair.a && pair.b) {
+        const n = [pair.a, pair.b].filter((r) => teamKey(r) === "village").length;
+        out.push(n === 2 ? "trouble_village_village" : n === 1 ? "trouble_village_nonvillage" : "trouble_nonvillage_nonvillage");
+        const keys = [teamKey(pair.a), teamKey(pair.b)];
+        if (keys.includes("village") && keys.includes("wolf")) out.push("trouble_swap_sides");   // 村人と人狼を入れ替えた
+      }
+      if (pair && choice) {
+        // 後始末: 入れ替え後の役職で人狼陣営になった側だけが死亡した
+        const after = [pair.b, pair.a];
+        const wolfIdx = after.map((r, i) => (teamKey(r) === "wolf" ? i : -1)).filter((i) => i >= 0);
+        if (wolfIdx.length === 1) {
+          const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set((g.deadIds || []));
+          if (choice.every((tid, i) => dead.has(tid) === (i === wolfIdx[0]))) out.push("trouble_cleanup");
+        }
+      }
+    }
+    return out;
+  }
+
   // ---- CPUの夜の行動(もとは cpu.js の runNight にあったもの。中身は変更なし) ----
   function run(n, p, label, cur, rid) {
     const g = n.g;
@@ -25,6 +57,7 @@
     }
     if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a.id, b.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
     g.tmQueue.push({ id: p.id, a: sp.a, b: sp.b });     // 反映は夜の終わり（net.js）
+    noteTrouble(g, p.id, sp.a, sp.b, g.initialRoles[sp.a], g.initialRoles[sp.b]);   // 実績用（マイクラ版の troubleRolePairs は初期役職ベース）
     i.mode = "tm"; i.pair = [a.id, b.id];
     g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${label} ${p.name}`, (id) => (g.players.find((q) => q.id === id) || {}).name || "?", a.id, b.id, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);   // 静観者にずれたときは「〇〇と△△の役職を入れ替えようとしましたが、〇〇は静観者だったため□□に変わり、…を入れ替えました。」
     n.hold(p.id, `${a.name} と ${b.name} の役職を入れ替えました。`);
@@ -56,6 +89,7 @@
   }
 
   ONW.defineRole("troublemaker", {
+    achievements,   // 実績（入れ替えた2人の陣営と後始末の分を判定）
     // 夜の画面(ui.js の renderOnlineNight / chainBlock が引く): 夜に選ぶときの説明文(action)と、朝/昼の連鎖で「確定」できる条件(chainReady)・「押して」の文言(chainHow)
     uiNight: {
       action(X) {
@@ -115,6 +149,7 @@
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a, b], `${rn(c.eff(p))} ${p.name}`, true)); ONW.watcher.keyFailShown(g, p.id, [a, b], [sp.a, sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
         g.tmQueue.push({ id: p.id, a: sp.a, b: sp.b });
+        noteTrouble(g, p.id, sp.a, sp.b, g.initialRoles[sp.a], g.initialRoles[sp.b]);   // 実績用（マイクラ版の troubleRolePairs は初期役職ベース）
         ONW.observeNote(g, p.id, [a, b], null, "troublemaker");
         ONW.newsNote(g, "troublemaker");
         g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${rn(c.eff(p))} ${p.name}`, nameOf, a, b, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${rn(c.eff(p))} ${p.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
@@ -132,6 +167,7 @@
         const why = ONW.keymaster.gate(g, id, [sp.a, sp.b]);   // 朝のうち・酔い覚めの入れ替えにもロックは効く
         if (why) { const fl = ONW.keymaster.fail(g, id, why, "入れ替え", [a, b], `${c.label} ${c.me.name}`, true); ONW.watcher.keyFailShown(g, id, [a, b], [sp.a, sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
+        noteTrouble(g, id, sp.a, sp.b, g.currentRoles[sp.a], g.currentRoles[sp.b]);   // 実績用（朝の連鎖はその時点の盤面が入れ替え前）
         ONW.swapPlayers(g, sp.a, sp.b);
         g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${c.label} ${c.me.name}`, nameOf, a, b, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${c.label} ${c.me.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         return { lines: [`${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`], reveal: { kind: "tm", a, b }, nextChain: null };

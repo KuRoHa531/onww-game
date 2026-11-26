@@ -3,7 +3,30 @@
   const K = ONW.wolfKit;
   const cpuGraves = (g, id, k) => g.center0.forEach((c, idx) => k.infoOf(g, id).grave.push({ idx, role: c }));
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (has("big_wolf")) {
+      const entry = (g.coBoard || {})[id] || {};
+      const lines = [entry.co || "", ...((entry.results || []).map((r) => (r && (r.text || r.short)) || ""))].join(" ");
+      const centerNames = [...new Set((g.center || []).filter(Boolean))].map((r) => (ONW.ROLE_INFO[r] || {}).name).filter(Boolean);
+      if ((lines.includes("墓地") || lines.includes("中央")) && centerNames.some((n) => lines.includes(n))) out.push("big_wolf_center_role");
+    }
+    return out;
+  }
+
   ONW.defineRole("big_wolf", {
+    achievements,   // 実績
     // 夜の演出(stage.js が g.bigReveal を受け取って 700ms 後に呼ぶ): 夜の始まりに墓地のカードが順に全部開き、赤く光る → 夜時間の間ずっと開いたまま
     stageNight: {
       order: 50, field: "bigReveal",

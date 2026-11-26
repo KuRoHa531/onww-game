@@ -77,7 +77,32 @@
     else { const pl = k.coverLie(g, p, r); c.co = pl.co; c.result = pl.result; }
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "servant") {
+      if ((g.servantSubs || []).some((x) => x && x.servant === id && !x.major)) out.push("servant_substitute");
+      const master = (g.servantMasters || {})[id];
+      if (master) {
+        const mr = roleOf(master);
+        if (["princess", "queen", "mad_queen", "wolf_king", "demon_duke"].includes(mr) || (mr === "mimic_wolf" && ["queen", "mad_queen", "wolf_king"].includes((g.mimicRole || {})[master]))) out.push("servant_authority_master");
+      }
+    }
+    return out;
+  }
+
   ONW.defineRole("servant", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult / skipResult が引く): 従者の身代わり
     //   execExclude: 通常の追放フリップから除く人(身代わりになった従者。二重にめくらない) / intro: ご主人のカードがめくれそうになる(途中まで回って揺れ、また裏のまま戻る) → 従者のカードが表になる。複数あれば1組ずつ順に
     stageResult: {

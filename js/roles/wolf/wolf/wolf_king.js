@@ -73,7 +73,32 @@
     }));
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "wolf_king") {
+      const partners = wolfPartners(id);
+      if (partners.some((pid) => exiled(pid))) out.push("wolf_king_partner_exiled");
+      if (exiled(id) && partners.length <= 0) out.push("wolf_king_exiled_no_partner");
+      let counts = {}; try { counts = ONW.vote.tally(g) || {}; } catch (e) {}
+      const top = Math.max(0, ...players.map((p) => counts[p.id] || 0));
+      if (partners.length > 0 && top > 0 && (counts[id] || 0) === top) out.push("wolf_king_top_with_partner");
+    }
+    return out;
+  }
+
   ONW.defineRole("wolf_king", {
+    achievements,   // 実績
     // CPUの発言: 待機時間に全員へ公開済みなので、本当に人狼王COする(嘘をついても意味がない)
     cpuFirst: (k, g, p) => [{ p, text: `${k.rn("wolf_king")}CO`, co: "wolf_king", claim: null, gap: 3500 }],
     /** 待機時間: CPUは公開された人狼王を知る */

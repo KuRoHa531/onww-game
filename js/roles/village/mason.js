@@ -12,7 +12,26 @@
     c.result = matesResult(others.filter((q) => i.known[q.id] === "mason"));
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (has("mason")) {
+      const n = players.filter((p) => (g.currentRoles || {})[p.id] === "mason").length;
+      if (n >= 2) out.push("mason_has_partner");
+      if (n <= 1) out.push("mason_no_partner");
+    }
+    return out;
+  }
+
   ONW.defineRole("mason", {
+    achievements,   // 実績
     // 昼に酔いが覚めた共有者: 他の共有者のカードがめくれる(stage.js の soberPeek の並び: 共有者 → 処刑人 → 従者 → 女王)
     stageSober: { list: { order: 10, run(sp, list) { (sp.masons || []).forEach((id) => list.push([`p:${id}`, "mason", true])); } } },
     // 結果開示(COボタン)の流れ(co.js が kind で引く): 他の共有者を選んで確定する

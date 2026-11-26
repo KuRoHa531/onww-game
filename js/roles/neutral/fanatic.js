@@ -98,7 +98,25 @@
 
   const NONE_TEXT = "妖狐の気配はありません。待機時間に妖狐（狐憑きを含む）がいなければ狂人になります。";
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "fanatic" && (g.chainKind || {})[id] === "follow" && (g.foxCursed || []).length > 0) out.push("fanatic_follow_curse");
+    return out;
+  }
+
   ONW.defineRole("fanatic", {
+    achievements,   // 実績
     // 夜の演出(stage.js が g.foxReveal を受け取って 700ms 後に呼ぶ): 夜の始まりに妖狐のカードが順に表になり、🦊が出る → 夜時間の間ずっと開いたまま（狂信者の🐺と同じ）
     stageNight: {
       order: 31, field: "foxReveal",

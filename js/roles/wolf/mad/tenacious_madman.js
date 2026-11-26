@@ -19,7 +19,25 @@
  * 実装の進み具合は docs/tenacious-madman.md を参照（1of4=登録 / 2of4=勝敗 / 3of4=周辺 / 4of4=総合・docs）。
  */
 (function (ONW) {
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "tenacious_madman" && (g.winners || []).includes("wolf") && exiled(id)) out.push("tenacious_dead_on_wolf_win");
+    return out;
+  }
+
   ONW.defineRole("tenacious_madman", {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 91, name: "執念の狂人", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 1.695,
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。人狼陣営が勝利していても、自身が死亡していると敗北します（追放・道連れなど死因は問いません）。生き残って最後まで見届けるのが目的です。封印されているときはこの効果がなく、ふつうの狂人と同じです。" },
     groups: { mad: 2.97, "transform:dark_avatar": 21 },

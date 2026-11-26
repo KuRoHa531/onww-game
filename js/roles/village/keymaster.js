@@ -81,7 +81,8 @@
    *  ログは g.nightLogsAll に積む（label = 「怪盗 ○○」のような名乗り） */
   function fail(g, actor, kind, verb, targets, label, two) {
     const line = failLine(kind, verb, two);
-    (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : (targets || []).filter((t) => blocks(g, t)) };   // 弾かれた席（A.A.に弾かれた席も、ロックに弾かれた席と同じ見え方: 🔒に弾かれる）
+    (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : (targets || []).filter((t) => blocks(g, t)) };
+    (g.keyBlockedActors = g.keyBlockedActors || {})[actor] = true;   // 実績用: ロックで役職変化に失敗した人（追加記録のみ）   // 弾かれた席（A.A.に弾かれた席も、ロックに弾かれた席と同じ見え方: 🔒に弾かれる）
     const tn = (targets || []).map((t) => nm(g, t)).join(" と ");
     g.nightLogsAll.push(kind === "self" ? `${label} は 自身の役職がロックされていたため${verb}に失敗しました。` : `${label} は ${tn} の役職がロックされていたため${verb}に失敗しました。`);
     return line;
@@ -140,7 +141,33 @@
     }
     return s;
   }
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const locks = (g.keyLog || []).filter((e) => e && e.action === "lock");
+    const myLock = locks.filter((e) => e.by === id).pop();
+    if (has("keymaster") && myLock) {
+      const t = myLock.target;
+      if (t && ((g.initialRoles || {})[t] === "aa" || (g.currentRoles || {})[t] === "aa")) out.push("keymaster_unlock_aa");
+      if (t === id) out.push("keymaster_lock_self");
+      if (t && t !== id) out.push("keymaster_lock_other");
+      if (t && (g.keyBlockedActors || {})[t]) out.push("keymaster_block_change");
+      if (t && (g.sealedBy || {})[t]) out.push("keymaster_full_lockdown");
+    }
+    if (has("keymaster") && locks.length && Object.keys(g.keyBlockedActors || {}).some((pid) => (g.initialRoles || {})[pid] === "shuffler" || (g.currentRoles || {})[pid] === "shuffler")) out.push("keymaster_stop_shuffler");
+    if ((g.keyBlockedActors || {})[id]) out.push("locked_change_failed");   // ロックで役職変化に失敗した側（役職ゲートなし）
+    return out;
+  }
+
   ONW.defineRole("keymaster", {
+    achievements,   // 実績
     info: { observe: "player", sealTarget: true, deck: 63, name: "鍵師", team: ONW.TEAM.VILLAGE, wakeOrder: 45, sort: 24,
       desc: "村人陣営。夜に自分を含むプレイヤーを1人選び、その人の役職にロック（鍵）をかけます。ロックされた役職は、怪盗・いたずらっ子・墓荒らし・ドッペルゲンガー・シャッフラー・グレムリンなどの役職変化系の影響を受けません。ロックされた人の変化も、ロックされた人が使う変化も、🔒に弾かれて失敗します。鍵師は変化役より先に処理されるので、他の人の夜の画面に影響せず、鍵師がいることは透けません。朝、鍵師から見て選んだ人のカードが🔓から🔑で鍵がかかって🔒になり、ロックされて失敗した人のカードは🔒に弾かれます。同じ人に鍵師が2人かけると、2回目はロック解除になります。A.A.にかけたときだけは見え方が反転し、1回目が「ロック解除」、2回目が「ロック」に見えます（A.A.はロックされると役職変化が通るようになるため）。ご主人のいない背徳者がロックされると、狂人に変化できず発狂して死亡します。" },
     groups: { "transform:light_apostle": 4.5 },   // 光の使徒の変化先（墓荒らしの次・いたずらっ子の前あたり）

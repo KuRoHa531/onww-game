@@ -7,7 +7,22 @@
   const countFor = (g, vid, ids, addSelf) => (ONW.hack ? ONW.hack.pubView(g, vid, ONW.ROLE.BAKER, ids || holders(g), addSelf) : (ids || holders(g))).length;
   const NOOP = { t: "noop" };   // 何も出さない人へ送る空のメッセージ
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "baker" && players.filter((p) => (g.currentRoles || {})[p.id] === "baker").length >= 2) out.push("baker_multiple_bread");
+    return out;
+  }
+
   ONW.defineRole("baker", {
+    achievements,   // 実績
     cpuClaim(k, g, p, r, i, c) { c.co = "baker"; },   // パン屋: パンが焼けたことは全員に知らされるので、必ずパン屋COする
     info: { sealTarget: true, deck: 32, name: "パン屋", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 12,
       desc: "村人陣営。夜の能力はありません。最終盤面にパン屋がいると、昼になって、変化公開・新聞・暴露・麻婆豆腐のあと、昼のタイマーが始まる前に「パンが焼けました」と全員に知らされます（誰がパン屋かは分かりません）。" },

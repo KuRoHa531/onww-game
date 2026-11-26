@@ -55,7 +55,22 @@
     });
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "queen" && exiled(id)) out.push("queen_dies");
+    return out;
+  }
+
   ONW.defineRole("queen", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult が引く): 王国滅亡 — 女王が追放・道連れで倒れたあと、他の村人陣営のカードが全員同時にめくれる
     stageResult: {
       // 先代女王（姫君が昇格して女王でなくなった席。docs/princess.md）: 昼中に継承済み・待機時間の昇格で墓地にいた女王は、最初から「先代女王」の面でめくれる（res.former の direct / graves）

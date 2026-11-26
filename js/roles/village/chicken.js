@@ -1,6 +1,24 @@
 /** チキン */
 (function (ONW) {
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    if (fin === "chicken") {
+      if ((g.shockIds || []).includes(id) && dead.has(id)) out.push("chicken_shock_death");
+      if (g.chickenReverse && !g.chickenReverse.toWolf && (g.chickenReverse.ids || []).includes(id)) out.push("chicken_reverse_village");
+    }
+    return out;
+  }
+
   ONW.defineRole("chicken", {
+    achievements,   // 実績
     // 結果発表の演出(stage.js の startResult が引く): チキンの逆転 — 逆転前の勝敗を先に発表 → チキンが飛び出して覆す
     stageResult: {
       reverse: { order: 10, run(R) {

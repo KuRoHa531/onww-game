@@ -127,7 +127,30 @@
   }
   ONW.cosplayer.cpuClaim = cpuClaim; ONW.cosplayer.cpuRun = cpuRun;
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const cosplayed = ini === "cosplayer" && fin !== "cosplayer" ? fin : null;   // コスプレでなった役職（マイクラ版 cosplayedRoleOf の近似: 初期コスプレイヤーの最終役職）
+    if (cosplayed) {
+      const DAY = ["sense_seer", "sheriff", "dictator", "exchanger", "thief", "libra", "mind_wolf", "psychologist"];
+      const NIGHT = ["seer", "apprentice_seer", "lookout", "whimsical_seer", "fake_seer", "mad_seer", "robber", "relic_robber", "patch", "troublemaker", "visitor", "watchdog", "keymaster", "cosplayer"];
+      const NOTICE = ["baker", "star", "newspaper", "queen", "mad_queen", "poet", "observer_wolf"];
+      if (DAY.includes(cosplayed)) out.push("cosplay_day_role");
+      if (NIGHT.includes(cosplayed)) out.push("cosplay_night_role");
+      if (NOTICE.includes(cosplayed)) out.push("cosplay_notice_role");
+    }
+    return out;
+  }
+
   ONW.defineRole(SELF, {
+    achievements,   // 実績
     info: { sealTarget: true, deck: 99, name: "コスプレイヤー", team: ONW.TEAM.VILLAGE, wakeOrder: 47, sort: 23.4,
       desc: "村人陣営。夜になると山札から3枚のカードがめくれ、1枚選んでその役職になります（朝になるまで何度でも選び直せ、同じカードをもう一度押すと解除。選ばなければコスプレしません）。選ばなかった2枚は山札の一番下に戻ります。コスプレした役職に夜の能力があれば、朝のうちに使えます。鍵師にロックされている・封印されているときは失敗します。村人・スパイ・狼憑き・狐憑き・狼夢人・鍵師・マーリン・共有者などは山札に入っていません。偽占い師は占い師として見えます。" },
     groups: { "transform:light_apostle": 37 },

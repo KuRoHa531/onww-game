@@ -60,7 +60,30 @@
     n.nn(rid);
   }
 
+    /** 実績（マイクラ版 stats.js の判定に合わせる） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    const has = (r) => ini === r || fin === r;
+    const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
+    const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
+    const teamOfP = (pid) => teamKey(roleOf(pid));
+    const exiled = (pid) => (g.executed || []).includes(pid);
+    const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
+    const players = g.players || [];
+    const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
+    const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
+    const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
+    if (fin === "evil_woman") {
+      const keep = (g.akujoKeep || {})[id], honmei = (g.akujoHonmei || {})[id];
+      if (keep && (g.votes || {})[id] === keep) out.push("evil_keep_vote");
+      if (keep && (g.votes || {})[keep] === id) out.push("evil_voted_by_keep");
+      if (honmei && (g.votes || {})[honmei] === id) out.push("evil_voted_by_main");
+    }
+    return out;
+  }
+
   ONW.defineRole("evil_woman", {
+    achievements,   // 実績
     info: { observe: "player", sealTarget: true, deck: 55, name: "悪女", team: ONW.TEAM.THIRD, wakeOrder: 5, sort: 36.6,
       desc: "第三陣営（恋人陣営）。夜に「本命」1人と「キープ」1人を選び、自分と本命が恋人になります。キープは恋人にはなりません。朝、悪女から見て本命のカードは❤、キープのカードは♡でめくれ、選ばれた2人には待機時間に悪女のカードがめくれます。" },
     groups: { "transform:silver_shadow": 15 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）

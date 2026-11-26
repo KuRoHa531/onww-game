@@ -64,6 +64,7 @@
       seenGraves(g, idxs.slice(0, lim), graveNow).forEach((x) => i.grave.push(x));
       i.grave.forEach((x) => { g.nightLogsAll.push(`${label} ${p.name} は 墓地${x.idx + 1} を確認し、${n.rn(x.role)} でした。`); n.hold(p.id, `墓地${x.idx + 1}枚目は「${n.rn(x.role)}」でした。`); });
       n.ob(p.id, [], i.grave.map((x) => x.idx));
+      if (ONW.seerNote) ONW.seerNote(g, p.id, "fake_seer", { mode: "grave", graves: i.grave.map((x) => ({ idx: x.idx, seen: x.role, actualSeen: ONW.mimic.seerSeen(g, graveNow[x.idx], "g:" + x.idx) })) });
     } else {
       const t = fp ? g.players.find((q) => q.id === fp) : n.pick(g.players.filter((q) => q.id !== p.id));
       const seen = seenPlayer(g, rolesNow[t.id], t.id);
@@ -71,11 +72,32 @@
       g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を占い、${n.rn(seen)} でした。`);
       n.hold(p.id, `${t.name} の役職は「${n.rn(seen)}」でした。`);
       n.ob(p.id, [t.id]);
+      if (ONW.seerNote) ONW.seerNote(g, p.id, "fake_seer", { mode: "player", targetId: t.id, seen, actualSeen: ONW.mimic.seerSeen(g, rolesNow[t.id], t.id) });
     }
     n.nn(rid);
   }
 
+  /** 実績（マイクラ版 fakeSeerMatchedReality ほか。見えた結果が「本物の占い師が見たはずの結果（actualSeen）」と一致したかで判定） */
+  function achievements(g, id, won) {
+    const out = [], ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
+    if (ini !== "fake_seer" && fin !== "fake_seer") return out;
+    const data = (g.seerData || {})[id];
+    if (!data || data.role !== "fake_seer") return out;
+    const matched = data.mode === "grave" ? (data.graves || []).some((x) => x.seen === x.actualSeen) : (data.targetId ? data.seen === data.actualSeen : false);
+    if (matched) out.push("fake_seer_lucky");   // たまたま本当
+    const sawFox = data.mode === "grave" ? (data.graves || []).some((x) => x.seen === "fox") : data.seen === "fox";
+    if (sawFox) out.push("fake_seer_fox_result");   // 嘘で妖狐を見た
+    if (data.targetId && (g.votes || {})[id] === data.targetId) {
+      const t = data.seen && ONW.ROLE_INFO[data.seen] && ONW.ROLE_INFO[data.seen].team;
+      if (t === ONW.TEAM.VILLAGE) out.push("fake_seer_vote_village_result");   // 村結果に投票
+      if (matched && (g.executed || []).includes(data.targetId)) out.push("fake_seer_truth_exiled");   // 本当の結果で追放
+    }
+    if (data.mode === "grave" && (data.graves || []).filter((x) => x.seen === x.actualSeen).length >= 2) out.push("fake_seer_twice_correct");   // 2回連続で本当
+    return out;
+  }
+
   ONW.defineRole("fake_seer", {
+    achievements,   // 実績（占い師の定義の継承ではなく、偽占い師専用の判定で上書き）
     like: "seer",   // 夜の画面・選び方・CO・CPUの発言は占い師の定義を土台にする（結果の抽選に関わる night.resolve / morning.run / cpuNight.run は下で差し替え）
     info: { observe: "player", sealTarget: true, deck: 89, count: 0, name: "偽占い師", team: ONW.TEAM.VILLAGE, wakeOrder: 40, sort: 23.1,
       desc: "村人陣営。本人には占い師として表示され、占い師と同じ夜能力（プレイヤー1人か墓地カードを見る）を使えます。ただし結果は配役内からランダムに表示され、妖狐を占っても呪殺しません。" },
@@ -90,6 +112,7 @@
           const t = sel.players[0], r = seenPlayer(g, g.initialRoles[t], t);
           g.nightLogsAll.push(`${label} ${p.name} は ${nameOf(t)} を占い、${rn(r)} でした。`);
           hold(p.id, `${nameOf(t)} の役職は「${rn(r)}」でした。`);
+          if (ONW.seerNote) ONW.seerNote(g, p.id, "fake_seer", { mode: "player", targetId: t, seen: r, actualSeen: ONW.mimic.seerSeen(g, g.initialRoles[t], t) });
           rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
           ONW.observeNote(g, p.id, [t], null, c.eff(p));
           ONW.newsNote(g, c.eff(p));
@@ -97,6 +120,7 @@
           const idxs = sel.graves.slice().sort((x, y) => x - y);
           const items = seenGraves(g, idxs, g.center0).map((x) => ({ k: `g:${x.idx}`, role: x.role }));
           items.forEach((it) => { const i = +it.k.slice(2); g.nightLogsAll.push(`${label} ${p.name} は 墓地${i + 1} を確認し、${rn(it.role)} でした。`); hold(p.id, `墓地${i + 1}枚目は「${rn(it.role)}」でした。`); });
+          if (ONW.seerNote) ONW.seerNote(g, p.id, "fake_seer", { mode: "grave", graves: items.map((it) => ({ idx: +it.k.slice(2), seen: it.role, actualSeen: ONW.mimic.seerSeen(g, g.center0[+it.k.slice(2)], it.k) })) });
           rev[p.id] = { kind: "peek", items };
           ONW.observeNote(g, p.id, [], items.map((it) => +it.k.slice(2)), c.eff(p));
           ONW.newsNote(g, c.eff(p));
@@ -113,11 +137,13 @@
           const seenG = seenGraves(g, graves, g.center);
           lines = seenG.map((x) => `墓地${x.idx + 1}枚目は「${rn(x.role)}」でした。`);
           seenG.forEach((x) => g.nightLogsAll.push(`${label} ${me.name} は 墓地${x.idx + 1} を確認し、${rn(x.role)} でした。`));
+          if (ONW.seerNote) ONW.seerNote(g, me.id, "fake_seer", { mode: "grave", graves: seenG.map((x) => ({ idx: x.idx, seen: x.role, actualSeen: ONW.mimic.seerSeen(g, g.center[x.idx], "g:" + x.idx) })) });
           reveal = { kind: "peek", items: seenG.map((x) => ({ k: `g:${x.idx}`, role: x.role })) };
         } else if (players.length) {
           const t = players[0], r = seenPlayer(g, g.currentRoles[t], t);   // 朝・昼のうちでも妖狐は記録しない
           lines = [`${nameOf(t)} の役職は「${rn(r)}」でした。`];
           g.nightLogsAll.push(`${label} ${me.name} は ${nameOf(t)} を占い、${rn(r)} でした。`);
+          if (ONW.seerNote) ONW.seerNote(g, me.id, "fake_seer", { mode: "player", targetId: t, seen: r, actualSeen: ONW.mimic.seerSeen(g, g.currentRoles[t], t) });
           reveal = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
         }
         return lines ? { lines, reveal, nextChain: null } : null;
