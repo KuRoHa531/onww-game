@@ -447,6 +447,8 @@ body.is-title .credits-link {
 .lobby-chat-card { width: min(480px, 100%); padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(27, 29, 43, .88); box-shadow: 0 10px 40px rgba(0,0,0,.55); backdrop-filter: blur(3px); }
 .lobby-chat-card .lobby-chat-log { height: min(38vh, 260px); }
 .lobby-chat-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; color: var(--gold, #e8c268); margin-bottom: 4px; }
+.lobby-chat-err { color: var(--blood); font-size: 12px; line-height: 1.4; }
+.lobby-chat-err:empty { display: none; }
 .lobby-typing { min-height: 18px; font-size: 12px; font-weight: 700; color: var(--muted, #9aa7c2); padding: 0 4px; text-align: left; }
 #chat-pop { position: fixed; top: 64px; left: 50%; transform: translate(-50%, -14px); opacity: 0; pointer-events: none; z-index: 1200; max-width: min(92vw, 430px); transition: opacity .18s ease, transform .18s ease; }
 #chat-pop.on { opacity: 1; transform: translate(-50%, 0); }
@@ -1061,9 +1063,10 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .chat-log { cursor: pointer; }
 #chat-overlay { position: fixed; left: 0; right: 0; top: 0; bottom: 0; overscroll-behavior: contain; z-index: 900; display: flex; flex-direction: column; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg-night, #12131c); }
 #chat-overlay .co-head { display: flex; align-items: center; justify-content: space-between; color: var(--gold); font-size: 16px; }
-#chat-overlay .chat-timer { font-weight: 700; font-size: 15px; color: var(--paper, #e8eaf2); font-variant-numeric: tabular-nums; }
-#chat-overlay .chat-timer.low { color: var(--blood); animation: chat-timer-pulse 1s ease-in-out infinite; }
-@keyframes chat-timer-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+#chat-overlay .chat-timer { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--paper, #e8eaf2); font-weight: 700; font-size: 14px; }
+#chat-overlay .chat-timer .ph-rem { font-size: 11px; opacity: .75; font-weight: 400; }
+#chat-overlay .chat-timer .ph-time { font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 1.1; letter-spacing: .04em; color: var(--gold); text-shadow: 0 0 14px rgba(217, 196, 143, .3); }
+#chat-overlay .chat-timer.low .ph-time { color: var(--blood); text-shadow: 0 0 14px rgba(201, 70, 61, .55); display: inline-block; animation: ph-pulse 1s ease-in-out infinite; }
 #chat-overlay .chat-log { flex: 1 1 0 !important; height: auto !important; min-height: 0 !important; margin: 0; font-size: 16px; cursor: default; }
 #chat-overlay .chat-input { margin: 0; }
 .vote-now { text-align: center; margin: 4px 0; }

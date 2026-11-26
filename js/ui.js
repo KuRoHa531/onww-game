@@ -39,7 +39,7 @@ window.ONW = window.ONW || {};
   const phaseName = (g) => (g.phase === ONW.PHASE.ONLINE_MORNING && g.settling ? "待機時間" : PHASE_LABEL[g.phase] ?? "―");
 
   ui.render = function render(game) {
-    if (![ONW.PHASE.ONLINE_DAY, ONW.PHASE.ONLINE_VOTE].includes(game.phase)) ui.closeChat();
+    if (game.phase !== ONW.PHASE.ONLINE_DAY) ui.closeChat();   // 投票が始まったらチャットは強制的に閉じる（作者要望 2026-11-26）
     if (game.phase !== ONW.PHASE.ONLINE_DAY) ui.closeInfo();   // 昼以外では情報確認を閉じる   // 昼・投票以外ではチャットの拡大を閉じる
     if (game.phase !== ONW.PHASE.LOBBY) game.viewResult = false;   // ルームに戻ったあとの「前回の結果を見る」は、ロビーにいる間だけ
     const reviewing = ui.isResultReview(game);
@@ -2110,11 +2110,15 @@ window.ONW = window.ONW || {};
     }
     // 全画面チャットを開いているときも、上の空きスペースで残り時間が分かるようにする（作者要望 2026-11-26: チャット中は本画面のタイマーが隠れて投票時間に気づけない）
     const ct = document.getElementById("chat-timer");
-    if (ct) {
-      const has = !(t == null || t < 0);
-      const txt = has ? `${base} 残り ${ONW.utils.formatClock(t)}` : base;
-      if (ct.textContent !== txt) ct.textContent = txt;
-      ct.classList.toggle("low", has && t <= 10);
+    if (ct) {   // 議論画面の #phase-label と同じ形（フェーズ名・「残り」・大きな時間の3分割。作者要望 2026-11-26）
+      if (!has0) { if (ct.textContent !== base || ct.querySelector(".ph-time")) ct.textContent = base; }
+      else {
+        let nm = ct.querySelector(".ph-name"), tm = ct.querySelector(".ph-time");
+        if (!nm || !tm) { ct.innerHTML = `<span class="ph-name"></span> <span class="ph-rem">残り</span> <span class="ph-time"></span>`; nm = ct.querySelector(".ph-name"); tm = ct.querySelector(".ph-time"); }
+        if (nm.textContent !== base) nm.textContent = base;
+        if (tm.textContent !== clock) tm.textContent = clock;
+      }
+      ct.classList.toggle("low", has0 && t <= 10);
     }
   };
 
@@ -2187,6 +2191,7 @@ window.ONW = window.ONW || {};
   }
   // ロビーチャットは常時表示ではなく、💬ボタンで背景透過のオーバーレイとして重ねて出す（作者指定 2026-11-26）
   let lobbyChatOpen = false;
+  let lobbyDraft = "";   // ロビーチャットの下書き: 閉じても消えず、開き直すと途中から書ける（作者要望 2026-11-26）
   ui.toggleLobbyChat = function (force) {
     lobbyChatOpen = typeof force === "boolean" ? force : !lobbyChatOpen;
     ui.syncLobbyChatOverlay();
@@ -2194,6 +2199,8 @@ window.ONW = window.ONW || {};
   };
   ui.closeLobbyChatOverlay = function () {
     lobbyChatOpen = false;
+    const el = document.getElementById("lobby-chat-in");
+    if (el) lobbyDraft = el.value;   // 閉じる前に下書きを残す
     const w = document.getElementById("lobby-chat-overlay");
     if (w) w.remove();
   };
@@ -2208,6 +2215,7 @@ window.ONW = window.ONW || {};
       <div class="lobby-chat-head"><span>チャット</span><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleLobbyChat(false)">×</button></div>
       <div id="lobby-chat-log" class="chat-log lobby-chat-log"></div>
       <div id="lobby-typing" class="lobby-typing"></div>
+      <div id="lobby-chat-err" class="lobby-chat-err"></div>
       <div class="chat-input">
         <input id="lobby-chat-in" class="onw-input" maxlength="100" placeholder="メッセージを入力" oninput="ONW.ui.lobbyChatInput()" onkeydown="if(event.key==='Enter')ONW.ui.sendLobbyChat()">
         <button class="btn" onclick="ONW.ui.sendLobbyChat()">送信</button>
@@ -2215,6 +2223,8 @@ window.ONW = window.ONW || {};
       <p class="night-step__hint">試合が始まるとチャットの履歴は消えます。</p>
     </div>`;
     document.body.appendChild(w);
+    const li = document.getElementById("lobby-chat-in");
+    if (li && lobbyDraft) li.value = lobbyDraft;   // 下書きを復元する
     ui.fitLobbyChat();
   };
   /** ロビーチャットを「見えている範囲」（キーボードを除いた部分）に合わせる。全画面チャットの fitChat と同じ理由: スマホでキーボードが開くと、固定配置のカードがキーボードの裏に隠れて入力欄も「入力中」表示も見えなくなる（作者報告 2026-11-26） */
@@ -2230,13 +2240,24 @@ window.ONW = window.ONW || {};
     el.innerHTML = lobbyChatHtml(ONW.game);
     el.scrollTop = el.scrollHeight;
   };
+  let lobbyChatErrTimer = null;
   ui.sendLobbyChat = function () {
     const el = document.getElementById("lobby-chat-in");
     if (!el) return;
     const v = el.value;
+    if (!String(v || "").trim()) return;
+    const ok = !!(ONW.net && ONW.net.sendLobbyChat && ONW.net.sendLobbyChat(v));
+    if (!ok) {   // たまに送れない問題対策: 無言で消さず、文章を残して理由を知らせる（接続が戻ればそのまま再送できる）
+      const err = document.getElementById("lobby-chat-err");
+      if (err) { err.textContent = "接続が不安定で送れませんでした。文章は残してあるので、少し待ってもう一度「送信」を押してください。"; clearTimeout(lobbyChatErrTimer); lobbyChatErrTimer = setTimeout(() => { err.textContent = ""; }, 5000); }
+      el.focus();
+      return;
+    }
     el.value = "";
+    lobbyDraft = "";
     ui.lobbyTypingOff();
-    if (ONW.net && ONW.net.sendLobbyChat) ONW.net.sendLobbyChat(v);
+    const err = document.getElementById("lobby-chat-err");
+    if (err) err.textContent = "";
     el.focus();
   };
   // 「〇〇が入力中…」（Discord式・ロビーだけ）: 打っている間だけホストへ申告する（送りすぎないよう間引く）
@@ -2247,7 +2268,9 @@ window.ONW = window.ONW || {};
   };
   ui.lobbyChatInput = function () {
     const el = document.getElementById("lobby-chat-in");
-    if (!el || !ONW.net || !ONW.net.sendLobbyTyping) return;
+    if (!el) return;
+    lobbyDraft = el.value;
+    if (!ONW.net || !ONW.net.sendLobbyTyping) return;
     if (!el.value.trim()) { ui.lobbyTypingOff(); return; }
     const now = Date.now();
     if (!typingOn || now - typingSentAt > 2000) { typingOn = true; typingSentAt = now; ONW.net.sendLobbyTyping(true); }
@@ -2272,6 +2295,7 @@ window.ONW = window.ONW || {};
   ui.popChat = function (entry) {
     if (!entry || !entry.name || !entry.at || entry.at <= popSeenAt) return;
     popSeenAt = entry.at;
+    if (document.getElementById("lobby-chat-overlay")) return;   // ロビーチャットを開いているときは上のポップも着信音も出さない（作者要望 2026-11-26）
     if (!ONW.game || ONW.game.phase !== ONW.PHASE.LOBBY) return;
     let el = document.getElementById("chat-pop");
     if (!el) { el = document.createElement("div"); el.id = "chat-pop"; document.body.appendChild(el); }
@@ -2317,7 +2341,7 @@ window.ONW = window.ONW || {};
     ui.updateTimer();                  // 開いた直後からタイマーを出す（次の毎秒更新を待たない）
     ui.updateChat();
     const inp = document.getElementById("chat-in-big");
-    if (inp) { if (document.activeElement && document.activeElement !== inp) document.activeElement.blur(); inp.focus({ preventScroll: true }); }
+    if (inp) { if (chatDraft) inp.value = chatDraft; if (document.activeElement && document.activeElement !== inp) document.activeElement.blur(); inp.focus({ preventScroll: true }); }
   };
   /** 大きいチャットを開いている間、ページ本体のスクロール・ずれを止める */
   ui.lockPage = function (on) {
@@ -2335,7 +2359,8 @@ window.ONW = window.ONW || {};
     if (log) log.scrollTop = log.scrollHeight;
   };
   if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); }); window.visualViewport.addEventListener("scroll", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); }); }
-  ui.closeChat = function () { const w = document.getElementById("chat-overlay"); if (w) w.remove(); ui.lockPage(false); };
+  let chatDraft = "";   // 大きいチャットの下書き: 閉じても消えず、開き直すと途中から書ける（作者要望 2026-11-26）
+  ui.closeChat = function () { const bi = document.getElementById("chat-in-big"); if (bi) chatDraft = bi.value; const w = document.getElementById("chat-overlay"); if (w) w.remove(); ui.lockPage(false); };
 
   /** 朝（墓荒らしの交換後）と、昼（酔いが覚めたあと）に使う能力の操作欄。late=昼 */
   ui.chainBlock = function (game, late) {
