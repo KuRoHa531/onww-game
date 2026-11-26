@@ -86,7 +86,8 @@
     const r = (g.currentRoles || {})[id];
     if (r === ONW.ROLE.WINNER || r === ONW.ROLE.MARTYR) return true;   // 勝ち組・殉職者（マイクラ版は winnerForced = 勝ち組を持っていることも見る。Web版は最終役職で判定する）
     if (ONW.reverser && ONW.reverser.odd(g, id)) return true;          // 反転が奇数回ついている人
-    return false;                                                       // 奇数人・偶数人はWeb版未実装
+    if (r === "odd_one" || r === "even_one") return true;               // 奇数人・偶数人（マイクラ版 protectedFromMentalLoss）
+    return false;
   };
 
   /**

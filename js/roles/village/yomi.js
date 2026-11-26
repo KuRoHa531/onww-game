@@ -36,7 +36,7 @@
     freeter: "フリーターの就職先", servant: "従者の主人", gremlin: "グレムリンの対象", fairy: "妖精さんの対象", seal: "封印", muzzle: "口封じ",
     exchanger: "交換者の対象", goranshin: "御乱心の対象", icarus: "イカロスの対象", forget: "忘却の人狼状態", dream: "狼夢人状態", hack: "ハッキング状態",
     nanoka_love: "羅刹の愛する人", long_night: "長夜",
-    thread_pair: "ペア", thread_pair_owner: "ペア（糸紡ぎ）",
+    thread_pair: "ペア", thread_pair_owner: "ペア（糸紡ぎ）", telepathist: "テレパシー接続", copylist: "コピー",
   };
   /** 使われた人に「断ち切られた」と分かる状態（マイクラ版 tellParticipantById の「黄泉通知」が出るもの）。Web版: 封印の解除・酔いが覚める */
   const TOLD = ["seal", "drunk", "forget", "dream", "hack"];
@@ -100,6 +100,27 @@
     // 役職についた「対象」の記録（持ち主・相手のどちらが target でも消す）
     if (dropPair(g.execTargets, target)) cuts.push("exec");
     if (dropPair(g.avengerTargets, target)) cuts.push("avenger");
+    // テレパシストの接続: 接続のどちらかが切られると接続が消え、テレパシストは追加勝利できなくなる（マイクラ版 yomiCutStates の telepathist 分岐）。両者に「接続が切断されました。」
+    if (ONW.telepathist && g.telepathistTarget) {
+      const holders = Object.keys(g.telepathistTarget).filter((h) => h === target || g.telepathistTarget[h] === target);
+      if (holders.length) {
+        holders.forEach((h) => {
+          const other = g.telepathistTarget[h];
+          delete g.telepathistTarget[h];
+          (g.telepathistDisconnected = g.telepathistDisconnected || {})[h] = true;
+          note(h, "接続が切断されました。");
+          if (other && other !== h) note(other, "接続が切断されました。");
+        });
+        cuts.push("telepathist");
+      }
+    }
+    // コピリストのコピー: 切られた人の「コピー元との繋がり」を断ち切り、現在の役職を本来の役職として固定する（マイクラ版 yomiCutStates の copyist 分岐）。本人に「あなたの正体は完全に{役職名}になりました。」
+    if (ONW.copylist && (g.copylistTarget || {})[target]) {
+      const fixedRole = (g.currentRoles || {})[target];
+      delete g.copylistTarget[target];
+      note(target, `あなたの正体は完全に${((ONW.ROLE_INFO || {})[fixedRole] || {}).name || fixedRole}になりました。`);
+      cuts.push("copylist");
+    }
     if (dropPair(g.loveTargets, target)) cuts.push("love_tanner");
     if (dropPair(g.freeterTargets, target)) cuts.push("freeter");
     if (dropPair(g.servantMasters, target)) cuts.push("servant");

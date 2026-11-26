@@ -59,6 +59,6 @@
       desc: "人狼陣営（狂人系）。夜の能力はなく、人狼が誰かも分かりません。待機時間の時点で現世にいると煙幕を投げ、画面が白い煙に包まれます。変化公開以外の昼の演出・通知が見えなくなります（隠された基本情報は情報確認にも載りません）。封印されているときは発動しません。" },
     groups: { mad: 2.99, "transform:dark_avatar": 23 },
     /** 待機時間の最後（変化・模倣・CPUの後覚者がそろったあと）: 煙幕が焚かれるか決める。net.js の toSettle が、焚かれるなら settle を quiet にして smoke を送る */
-    settlePost: { order: 90, run(c) { ONW.smoke.settle(c.g); } },
+    settlePost: { order: 110, run(c) { ONW.smoke.settle(c.g); } },   // order 110: 関数形式で登録された他役職の settlePost（デフォルト order 100。魔法少女の闇堕ち・ケセドのコーヒー・代行者の指令など）より後に動かし、「煙幕の判定は待機時間の最後」を保証する
   });
 })(window.ONW);

@@ -126,14 +126,18 @@
   // (= ゲームに役職を足せば、辞典側の「ウェブ版」にも自動で反映される)。
   // 単体公開など親が見えない時は js/web-roles.js の一覧を使う。
   function loadWebKeys() {
+    let keys = null;
     try {
       const parentOnw = window.parent && window.parent !== window ? window.parent.ONW : null;
       if (parentOnw && parentOnw.ROLE_INFO) {
-        const keys = Object.keys(parentOnw.ROLE_INFO).map((k) => k.toUpperCase());
-        if (keys.length > 0) return new Set(keys);
+        const list = Object.keys(parentOnw.ROLE_INFO).map((k) => k.toUpperCase());
+        if (list.length > 0) keys = new Set(list);
       }
     } catch (e) { /* 別オリジンなどで親に触れない → 予備の一覧へ */ }
-    return new Set(window.ONW_WEB_ROLE_KEYS || []);
+    if (!keys) keys = new Set(window.ONW_WEB_ROLE_KEYS || []);
+    // 別名対応: ゲーム側の内部IDは copylist だが、wiki のキーは COPYIST（マイクラ版準拠）のため両方引けるようにする
+    if (keys.has("COPYLIST")) keys.add("COPYIST");
+    return keys;
   }
   const WEB_KEYS = loadWebKeys();
   function isWebRole(role) { return WEB_KEYS.has(role.key); }

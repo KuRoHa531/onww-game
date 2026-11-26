@@ -19,7 +19,8 @@
       ONW.watcher.keyFailShown(g, p.id, [t.id], [ta]);
       return;
     }
-    if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);   // モーゼス: 入れ替える「前」に使われた回数 +1（票数はカードについて動く）
+    if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);
+    if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: 入れ替える「前」に使われた回数 +1（票数はカードについて動く）
     ONW.swapPlayers(g, p.id, ta);
     const gotRaw = g.currentRoles[p.id];   // 交換で手にした役職（魔法使いに奪われると自分の役職は村人になるが、怪盗が見た役職は取った役職のまま。マイクラ版 robberSeen）
     if (ONW.magician) ONW.magician.trySteal(g, p.id, gotRaw, "robber", "night");   // 魔法使い: 自分の役職を変えたので、変化後の役職を奪われる（docs/magician.md）
@@ -109,7 +110,8 @@
         if (!ta) { c.hold(p.id, ONW.watcher.noneLine("交換")); return; }   // 移す先がなければ交換できない（新聞・観測にも載らない）
         const why = ONW.keymaster.gate(g, p.id, [ta]);   // 鍵師のロック（鍵師は先の段階で済んでいる）: 自分か相手の席がロック中なら失敗。役職は動かず、新聞・観測にも載らない
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "交換", [t], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [t], [ta]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
-        if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);   // モーゼス: 入れ替える前に数える
+        if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, p.id, ta);
         const got = g.currentRoles[p.id];
         if (ONW.magician) ONW.magician.trySteal(g, p.id, got, "robber", "night");   // 魔法使い: 変化後の役職を奪われる（怪盗が見た役職・演出は取った役職のまま。docs/magician.md）
@@ -129,7 +131,8 @@
         if (!ta) return { lines: [ONW.watcher.noneLine("交換")], reveal: null, nextChain: null, failed: true };
         const why = ONW.keymaster.gate(g, id, [ta]);   // 朝のうち（墓荒らし・ドッペルで手にした怪盗 / 酔い覚め）もロックは効く
         if (why) { const fl = ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [t], [ta]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
-        if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);   // モーゼス: 入れ替える前に数える
+        if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: 入れ替える前に数える
         ONW.swapPlayers(g, id, ta);
         const got = g.currentRoles[id];
         if (ONW.magician) ONW.magician.trySteal(g, id, got, "robber", "auto");   // 魔法使い: 変化後の役職を奪われる（見た役職・演出は取った役職のまま。docs/magician.md）

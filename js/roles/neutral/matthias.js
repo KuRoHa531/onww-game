@@ -94,7 +94,7 @@
       if (g.cards && g.cards.trail) (g.cards.trail[target] = g.cards.trail[target] || []).push(g.cards.at[target]);   // カードは同じ（役職だけが変わる。copyRole と同じ積み方）
       g.promotedWolfIds = (g.promotedWolfIds || []).filter((id) => id !== target);   // 昇格した人狼ではなくなる
       g.mgDarkFallen = (g.mgDarkFallen || []).filter((id) => id !== target);          // 魔法少女の闇堕ち記録は消える
-      ["carmenTarget", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole", "mosesBonus", "matthiasDaughters"].forEach((k) => { if (g[k]) delete g[k][target]; });   // 上書きされた役職の記録は消す（shufflerPlace の並び + 自分がマティアスだった場合の親記録）
+      ["carmenTarget", "akujoHonmei", "akujoKeep", "cupidPair", "breakerTargets", "keyTargets", "avengerTargets", "pranksterPicks", "watchdogOwners", "pureLoverTargets", "loveTargets", "freeterTargets", "visitorTargets", "muzzleTargets", "gremlinPicks", "mimicRole", "sealTargets", "reverserTarget", "lawyerClient", "lawyerClientRole", "mosesBonus", "matthiasDaughters", "copylistTarget"].forEach((k) => { if (g[k]) delete g[k][target]; });   // 上書きされた役職の記録は消す（shufflerPlace の並び + 自分がマティアスだった場合の親記録）
       if (g.shufflerMarks && ONW.cardAt) delete g.shufflerMarks[ONW.cardAt(g, target)];   // 上書きされたカードのシャッフラーの印は消える（copyRole と同じ）
       ONW.fixServants(g); if (ONW.avenger) ONW.avenger.fix(g); if (ONW.prankster) ONW.prankster.fix(g);
       if (ONW.fixExecutioners) ONW.fixExecutioners(g);
@@ -233,6 +233,7 @@
     const g = n.g, f = n.forced(p);
     const t = n.validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : n.pick(g.players.filter((q) => q.id !== p.id));
     if (!t) return;
+    if (ONW.dragonMadman && !(ONW.keymaster && ONW.keymaster.blocks(g, t.id))) ONW.dragonMadman.before(g, p.id, [t.id], [t.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
     if (!act(g, p.id, t.id)) { n.hold(p.id, "対象の役職がロックされていたため、娘ちゃんにできませんでした。"); n.nn(rid); return; }
     g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を娘ちゃんにしました。`);
     n.hold(p.id, `${t.name} を娘ちゃんにしました。`);
@@ -263,6 +264,7 @@
         const t = c.selOf(p).players[0]; if (!t || t === p.id) return;
         const real = ONW.watcher && ONW.watcher.shift ? ONW.watcher.shift(g, p.id, t, g.players.map((q) => q.id).filter((x) => x !== p.id)) : t;   // 静観者を選んだら、実際に娘ちゃんになる席は別の人（選んだ本人には静観者を選んだように見える）
         if (!real || real === p.id) { c.hold(p.id, ONW.watcher ? ONW.watcher.noneLine("娘ちゃんにする") : "娘ちゃんにできる人がいませんでした。"); return; }
+        if (ONW.dragonMadman && !(ONW.keymaster && ONW.keymaster.blocks(g, real))) ONW.dragonMadman.before(g, p.id, [real], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
         if (!act(g, p.id, real)) { c.hold(p.id, "対象の役職がロックされていたため、娘ちゃんにできませんでした。"); c.rev[p.id] = ONW.keymaster ? ONW.keymaster.failRev(g, p.id, p.id) : undefined; return; }   // 鍵師のロック: 失敗（能力は消費される）
         ONW.observeNote(g, p.id, [t], null, "matthias");
         ONW.newsNote(g, "matthias");
@@ -277,6 +279,7 @@
         const g = c.g, nameOf = c.nameOf, id = c.id;
         const t = (c.players || [])[0];
         if (!t || t === id) return null;
+        if (ONW.dragonMadman && !(ONW.keymaster && ONW.keymaster.blocks(g, t))) ONW.dragonMadman.before(g, id, [t], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
         if (!act(g, id, t)) return { lines: ["対象の役職がロックされていたため、娘ちゃんにできませんでした。"], reveal: ONW.keymaster ? ONW.keymaster.failRev(g, id, id) : null, nextChain: null, failed: true };
         g.nightLogsAll.push(`${c.label} ${c.me.name} は ${nameOf(t)} を娘ちゃんにしました。`);
         return { lines: [`${nameOf(t)} を娘ちゃんにしました。`], reveal: { kind: "peek", items: [{ k: `p:${t}`, role: "__daughter" }] }, nextChain: null };

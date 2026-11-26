@@ -63,6 +63,8 @@
   W.touch = function touch(g, actor, targets) {
     if (!g || !actor) return;
     if (ONW.moses) ONW.moses.touch(g, actor, targets);   // モーゼス: 能力を使われた回数 +1（夜・朝のうち・昼の能力の共通の入口。静観者と同じく、実際に使われたときだけここを通る。docs/moses.md）
+    if (ONW.dragonMadman) ONW.dragonMadman.noteTouch(g, actor, targets);   // 龍の狂人: 実際に能力が届いた席で逆鱗を判定する（docs/dragon-madman.md）
+    if (ONW.bellMiko) ONW.bellMiko.noteTouch(g, actor, targets);   // 鈴の巫女: 夜は席ごとに「使われた回数」を貯め、昼は現在の鈴の巫女だけ数える（docs/bell-miko.md）
     const m = g.watcherTouched = g.watcherTouched || {};
     [...new Set(targets || [])].filter(Boolean).forEach((t) => {
       if (!W.isSeat(g, t)) return;

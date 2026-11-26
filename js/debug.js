@@ -15,7 +15,7 @@ window.ONW = window.ONW || {};
   const ui = { open: false, tab: "roles", pick: null, sub: null };   // sub: さらに上に重ねる選択（変化後。"t:" + 席のキー）
 
   /** 設定データ（固定役 / 変化後 / CPU能力先 / CPU発言OFF） */
-  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.trail = d.trail || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle", "hack"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.gw = d.rand.gw || {}; d.rand.hackFake = d.rand.hackFake || {}; d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
+  const data = () => { const g = G(); { const d = (g.dbg = g.dbg || { roles: {}, tf: {}, cpu: {}, cpuTalkOff: false }); d.master = d.master || {}; d.mimic = d.mimic || {}; d.trail = d.trail || {}; d.rand = d.rand || {}; ["cat", "freeter", "visitor", "straw", "exec", "muzzle", "hack", "rabbit"].forEach((k) => { d.rand[k] = d.rand[k] || {}; }); d.rand.gw = d.rand.gw || {}; d.rand.hackFake = d.rand.hackFake || {}; d.rand.drunk = d.rand.drunk || []; d.rand.lover = d.rand.lover || []; return d; } };
 
   // ---------------------------------------------------------
   // ゲーム側から呼ばれるフック
@@ -54,7 +54,7 @@ window.ONW = window.ONW || {};
     if (!game.debugOn || !game.dbg) return null;
     return (game.dbg.master || {})[id] || null;
   };
-  /** ランダムに決まる対象の指定（全プレイヤー対象）。kind: "cat"=猫又・黒猫の道連れ先 / "freeter"=就職先を選べなかったフリーターの就職先 / "straw"=わら人形の自動選択。
+  /** ランダムに決まる対象の指定（全プレイヤー対象）。kind: "cat"=猫又・黒猫・ネコカボチャ・虎の狂人の道連れ先 / "freeter"=就職先を選べなかったフリーターの就職先 / "straw"=わら人形の自動選択。
    *  持ち主のID → 対象のID（指定なしなら null。対象が使えない状況なら、呼び出し側でランダムに戻す） */
   /** 銀狼のハッキングで「何と思い込ませるか」の指定（銀狼のID → 役職ID）。指定なし・デバッグ中でないときは null（墓地からランダム） */
   debug.randHackFake = function (game, id) {
@@ -100,6 +100,17 @@ window.ONW = window.ONW || {};
   debug.cloneRole = function (game, id) {
     if (!game.debugOn || !game.dbg) return null;
     return (game.dbg.clone || {})[id] || null;
+  };
+  /** ペルソナの仮面役職の指定（持ち主のID → 役職ID。指定なしなら null。persona.js の drawMask が見る。仮面の除外リストに入っている役職は persona.js 側で無視される） */
+  debug.personaMask = function (game, id) {
+    if (!game.debugOn || !game.dbg) return null;
+    return (game.dbg.persona || {})[id] || null;
+  };
+  /** 多重人格の初期人格の指定（持ち主のID → "villager" / "madman"。指定なしなら null。multiple_personality.js の register が見る） */
+  debug.mpPersona = function (game, id) {
+    if (!game.debugOn || !game.dbg) return null;
+    const v = (game.dbg.mp || {})[id];
+    return v === "villager" || v === "madman" ? v : null;
   };
   /** 開拓者の運命の指定（持ち主のID → 運命 destruction / preservation / harmony / remembrance / elation。指定なしなら null。4of4-b。trailblazer.js の choose が見る）。
    *  配られた開拓者（最初に自分に配られたカード）だけに効く。墓荒らし・怪盗で手にしたときは、そのカードの運命を引き継ぐ（指定は見ない） */
@@ -263,7 +274,14 @@ window.ONW = window.ONW || {};
       (hasDuke ? `<div class="dbg-h">魔界公爵追放会議${now(dukeNow)}</div><div class="dbg-hint">会議が開かれたとき（人狼判定の死亡など）だけ使われます。会議では生存者だけが投票でき、死んだ人の指定は無視されます。</div>${section("d")}` : "");   // 並び: 妖狐投票 → 通常投票 → 魔界公爵追放会議（実際に行われる順）
   }
 
-  /** 役職ボタンを陣営ごとに見出し付きで並べる。人狼陣営は「変化役 / 人狼系 / 狂人系」に分ける。見出しが1つだけなら見出しは出さない */
+  // ---- 役職の検索（デバッグの役職選択グリッド用。入力しても再描画せず、その場でボタンの表示だけを切り替える＝入力欄のフォーカスが外れない） ----
+  const normQ = (s) => String(s || "").replace(/[\s　]/g, "").replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60)).toLowerCase();   // 空白除去・カタカナ→ひらがな・小文字化（探偵の亡霊の入力正規化と同じ）
+  const roleSearchKey = (r) => { const kana = (ONW.detectiveGhost && ONW.detectiveGhost.kanaOf) ? ONW.detectiveGhost.kanaOf(r) : ""; return normQ(`${rn(r)} ${kana || ""} ${r}`); };   // 役職名＋読み仮名（wiki-data の kana 転記）＋役職IDで引ける
+  const withRq = (html, r) => html.replace("<button ", `<button data-rq="${esc(roleSearchKey(r))}" `);   // ボタンに検索キーを埋める
+  const searchBox = () => `<div class="dbg-searchrow"><input class="dbg-search" type="search" placeholder="役職を検索（名前・読み）" oninput="ONW.debug.roleSearch(this)"></div>`;
+
+  /** 役職ボタンを陣営ごとに見出し付きで並べる。人狼陣営は「変化役 / 人狼系 / 狂人系」に分ける。見出しが1つだけなら見出しは出さない。
+   *  役職が多いとき（10以上）は先頭に検索ボックスを付け、グリッド（.dbg-rolegrid）にまとめる。検索は debug.roleSearch がDOMだけで処理する */
   function groupBtns(list0, mkBtn) {
     const list = ONW.sortByRoleOrder(list0);   // 役職の並びは基準(ONW.ROLE_ORDER)
     const teamOf = (r) => ONW.roles.getInfo(r).team, T = ONW.TEAM;
@@ -276,8 +294,10 @@ window.ONW = window.ONW || {};
       ["人狼陣営 ─ 狂人系", "wolf", wolfSide.filter(isMad)],
       ["第三陣営", "third", list.filter((r) => ![T.VILLAGE, T.WOLF].includes(teamOf(r)))],
     ].filter(([, , l]) => l.length);
-    if (sections.length <= 1) return list.map(mkBtn).join("");
-    return sections.map(([t, c, l]) => `<div class="dbg-grp t-${c}">${t}</div>${l.map(mkBtn).join("")}`).join("");
+    const btns = (l) => l.map((r) => withRq(mkBtn(r), r)).join("");
+    const inner = sections.length <= 1 ? btns(list) : sections.map(([t, c, l]) => `<div class="dbg-grp t-${c}">${t}</div>${btns(l)}`).join("");
+    const grid = `<div class="dbg-rolegrid">${inner}<div class="dbg-noresult" style="display:none">見つかりませんでした</div></div>`;
+    return list.length >= 10 ? searchBox() + grid : grid;
   }
 
   // ---- 固定役 ----
@@ -318,7 +338,7 @@ window.ONW = window.ONW || {};
 
   // ---- CPUの能力先指定 ----
   /** そのCPUに固定した役職から、夜の能力で使える指定の種類を判断する（光の使徒などは「変化後」の指定まで見る） */
-  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one", matthias: "rob", chesed: "tm", elfrinde: "rob", mercenary: "rob", thread_spinner: "tm" };   // mercenary: 護衛対象を1人   // era: 抹消の人狼（抹消する相手を1人）/ matthias: 娘ちゃんにする相手を1人 / chesed: 占い先→コーヒーを渡す相手の2人（tm と同じ2人指定の形）/ thread_spinner: ペアにする2人（tm と同じ2人指定の形）
+  const ABILITY = { cosplayer: "cos", seer: "seer", mad_seer: "seer", fake_seer: "seer", whimsical_seer: "seer", apprentice_seer: "seer", lookout: "rob", agitator: "rob", mad_agitator: "rob", robber: "rob", love_tanner: "rob", pure_lover: "rob", evil_woman: "tm", cupid: "tm", heartbreaker: "rob", keymaster: "rob", seal_madman: "rob", watchdog: "rob", dog_madman: "rob", boar_madman: "rob", shuffler: "rob", freeter: "rob", visitor: "rob", troublemaker: "tm", relic_robber: "rel", doppelganger: "rob", avenger: "rob", jester_ghost: "rob", telepathist: "rob", copylist: "cos", prankster: "rob", gremlin: "gr", eraser_wolf: "era", reverser: "one", exposed_madman: "one", major: "one", finger_reader: "tm", carmen: "one", matthias: "rob", chesed: "tm", elfrinde: "rob", mercenary: "rob", thread_spinner: "tm" };   // mercenary: 護衛対象を1人   // era: 抹消の人狼（抹消する相手を1人）/ matthias: 娘ちゃんにする相手を1人 / chesed: 占い先→コーヒーを渡す相手の2人（tm と同じ2人指定の形）/ thread_spinner: ペアにする2人（tm と同じ2人指定の形）
   function cpuRoles(key) {   // 固定役 → 変化後の指定があればその役職 / 変化後がランダムなら候補すべて / 固定なしなら null
     const d = data(), r = d.roles[key];
     if (!r) return null;
@@ -347,8 +367,9 @@ window.ONW = window.ONW || {};
       const t = d.cpu[s.key] || {}, role = d.roles[s.key], k = cpuKinds(s.key), rs = cpuRoles(s.key);
       const rk = rs ? RAND_KINDS.filter((x) => x.roles.some((r) => rs.includes(r)) && (!x.cpuOnly || s.cpu)) : [];   // 従者のご主人など（人間もCPUも）
       const gwOk = debug.gamblerWeightOk(g, s.key);   // ギャンブラー固定（または光の使徒→ギャンブラー固定）の人だけ票数を指定できる
-      const gwCur = gwOk && Number.isFinite((d.rand.gw || {})[s.key]) ? d.rand.gw[s.key] : null;   // ギャンブラーの票数の指定（0〜3。指定なしは null=抽選）
-      if (!rs && gwCur === null) return "";   // 固定役がなく、票数の指定も無い人は出さない
+      const gwRaw = Number.isFinite((d.rand.gw || {})[s.key]) ? d.rand.gw[s.key] : null;   // 残っている票数の指定（0〜3。固定役を外しても値は残る）
+      const gwCur = gwOk ? gwRaw : null;   // 実際に効く指定（固定役が無い人の残った指定は使われない）
+      if (!rs && gwRaw === null) return "";   // 固定役がなく、票数の指定（残っている分も含む）も無い人は出さない
       const mimicHint = isMimicFixed(s.key) && !(d.mimic || {})[s.key];   // 模倣の人狼で模倣先が未指定
       const parts = [];
       if (t.player) parts.push(esc(nameOfKey(t.player)));
@@ -357,7 +378,7 @@ window.ONW = window.ONW || {};
       if (t.cosRole) parts.push(t.cosRole === "none" ? "コスプレしない" : `${esc(rn(t.cosRole))}にコスプレ`);
       if (t.nanokaMode) parts.push(`${esc(rn(t.nanokaMode))}になる`);
       if (t.hotaruChoice) parts.push(t.hotaruChoice === "sam" ? "サムに変身する" : "変身しない");
-      if (gwCur !== null) parts.push(`ギャンブラー票: ${gwCur}`);
+      if (gwRaw !== null) parts.push(`ギャンブラー票: ${gwRaw}`);
       rk.forEach((x) => { const st = x.kind === "master" ? d.master : d.rand[x.kind], cur = st && st[s.key] && valid.has(st[s.key]) ? st[s.key] : null; if (cur) parts.push(`${esc(x.label)}: ${esc(nameOfKey(cur))}`); });
       if (rk.some((x) => x.kind === "hack") && (d.rand.hackFake || {})[s.key]) parts.push(`思い込ませる役職: ${esc(rn(d.rand.hackFake[s.key]))}`);
       const lab = parts.length ? parts.join(" / ") : "指定なし";
@@ -382,7 +403,7 @@ window.ONW = window.ONW || {};
           if (k.tm) body += sec("プレイヤー2人（入れ替える2人）", pb("cpuPlayers", (id) => (t.players || []).includes(id)));
           if (k.gr) body += sec("プレイヤー2人（コピー元 → コピー先の順に押す）", others.map((o) => { const ix = (t.players || []).indexOf(o.key); return b((ix >= 0 ? (ix === 0 ? "①元 " : "②先 ") : "") + esc(o.name), "cpuPlayers", [s.key, o.key], ix >= 0 ? "dbg-on" : ""); }).join(""));
           if (k.seer || k.rel) body += sec(k.seer ? `墓地（${seerMaxOf(s.key)}枚まで）` : "墓地（交換する1枚）", gb);
-          if (k.cos) body += sec("コスプレする役職（山札の3枚に必ず入れて選ぶ）", ONW.sortByRoleOrder(ONW.cosplayer.pool()).map((r) => b(esc(rn(r)), "cpuCosRole", [s.key, r], t.cosRole === r ? "dbg-on" : "")).join("") + b("コスプレしない", "cpuCosRole", [s.key, "none"], t.cosRole === "none" ? "dbg-on" : ""));   // 山札(ELIGIBLE)の役職から。指定なしはランダム（夜に能力がある役職を好む）
+          if (k.cos) body += sec("コスプレする役職（山札の3枚に必ず入れて選ぶ）", searchBox() + `<div class="dbg-rolegrid">${ONW.sortByRoleOrder(ONW.cosplayer.pool()).map((r) => withRq(b(esc(rn(r)), "cpuCosRole", [s.key, r], t.cosRole === r ? "dbg-on" : ""), r)).join("")}<div class="dbg-noresult" style="display:none">見つかりませんでした</div></div>` + b("コスプレしない", "cpuCosRole", [s.key, "none"], t.cosRole === "none" ? "dbg-on" : ""));   // 山札(ELIGIBLE)の役職から。指定なしはランダム（夜に能力がある役職を好む）。役職グリッドは固定役と同じ検索が効く
           if (rs.includes("nanoka")) body += sec("なのかの形態（変化する形態。指定なしはランダム）", ["long_night_moon", "mitsuki_nanoka", "rasetsu"].map((r) => b(esc(rn(r)), "cpuNanokaMode", [s.key, r], t.nanokaMode === r ? "dbg-on" : "")).join(""));
           if (rs.includes("hotaru")) body += sec("ホタルの変身（指定なしはランダム）", [["sam", "サムに変身する"], ["hotaru", "変身しない"]].map(([v, lab]) => b(lab, "cpuHotaruChoice", [s.key, v], t.hotaruChoice === v ? "dbg-on" : "")).join(""));
         }
@@ -395,8 +416,8 @@ window.ONW = window.ONW || {};
           const fl = ONW.sortByRoleOrder(Object.keys(ONW.ROLE_INFO).filter((r) => !noFake.includes(r)));
           body += sec("思い込ませる役職（指定なし＝墓地からランダム）", `<select onchange="ONW.debug.hackFakeSet(${attr(s.key)}, this.value)"><option value="">指定なし（墓地からランダム）</option>${fl.map((r) => `<option value="${r}"${r === fk ? " selected" : ""}>${esc(rn(r))}</option>`).join("")}</select>`);
         }
-        // ギャンブラーの票数: その人がギャンブラー固定、または光の使徒固定で変化先がギャンブラーのときだけ出す（gwOk）
-        if (gwOk) body += sec("ギャンブラーの票数（抽選＝ふつうの確率で0〜3票）", b("抽選", "gwSet", [s.key, ""], gwCur === null ? "dbg-on" : "") + [0, 1, 2, 3].map((n) => b(`${n}票`, "gwSet", [s.key, String(n)], gwCur === n ? "dbg-on" : "")).join(""));
+        // ギャンブラーの票数: その人がギャンブラー固定、または光の使徒固定で変化先がギャンブラーのときだけ出す（gwOk）。固定を外しても指定が残っている人にも出して、パネルから解除できるようにする
+        if (gwOk || gwRaw !== null) body += sec("ギャンブラーの票数（抽選＝ふつうの確率で0〜3票）", b("抽選", "gwSet", [s.key, ""], gwRaw === null ? "dbg-on" : "") + [0, 1, 2, 3].map((n) => b(`${n}票`, "gwSet", [s.key, String(n)], gwRaw === n ? "dbg-on" : "")).join(""));
         h += ovl(`${esc(s.name)}${s.cpu ? cpuBadge : ""} <small class="dbg-dim">の能力先</small>`, "pick", ["c:" + s.key], `${body}${s.cpu ? b("能力先を全て解除", "cpuClear", [s.key], "dbg-clear") : ""}`);
       }
       return h;
@@ -434,11 +455,14 @@ window.ONW = window.ONW || {};
     { kind: "master", roles: ["servant"], label: "ご主人" },
     { kind: "freeter", roles: ["freeter"], label: "就職先（自動で決まるとき）" },
     { kind: "visitor", roles: ["visitor"], label: "訪問先（自動で決まるとき）" },
-    { kind: "cat", roles: ["cat_sidhe", "black_cat", "cat_pumpkin"], label: "道連れ先" },
+    { kind: "cat", roles: ["cat_sidhe", "black_cat", "cat_pumpkin", "tiger_madman"], label: "道連れ先" },
     { kind: "straw", roles: ["straw_doll"], label: "道連れ先（自動で選ぶとき）" },
+    { kind: "hunter", roles: ["hunter"], label: "道連れ先（自動で選ぶとき）" },
+    { kind: "detective_ghost", roles: ["detective_ghost"], label: "推理する相手（自動で決まるとき）" },
     { kind: "exec", roles: ["executioner"], label: "ターゲット" },
     { kind: "muzzle", roles: ["muzzle_madman"], label: "口封じ先", self: true },
     { kind: "hack", roles: ["silver_wolf"], label: "ハッキングする相手", self: false },   // 自分は対象外（ALLOW_SELF）。思い込ませる役職は墓地からランダム   // 自分自身も口封じ先になれる
+    { kind: "rabbit", roles: ["rabbit_madman"], label: "隠れる相手", self: true },   // 兎の狂人: 草むらに隠れる人（自分も含む全員が対象）
   ];
   function tabCpu() {
     if (!inLobby()) return hint("能力先・ランダム対象はルーム（ロビー）で設定します。次の試合に反映されます。");
@@ -455,6 +479,11 @@ window.ONW = window.ONW || {};
     { kind: "sheriff", role: "vanity", label: "撃つ", can: (g, id) => ONW.vanity.canUse(g, id), targets: (g, id) => ONW.vanity.targets(g, id) },   // ヴァニティ: 保安官と同じ「撃つ」。debugDayAbility の sheriff 分岐が hostVanity を先に試す
     { kind: "steal", role: "thief", label: "盗む", can: (g, id) => ONW.thief.canUse(g, id), targets: (g, id) => ONW.thief.targets(g, id) },
     { kind: "barrier", role: "fairy", label: "バリア", can: (g, id) => ONW.fairy.canUse(g, id), targets: (g, id) => ONW.fairy.targets(g, id) },
+    { kind: "hide", role: "rat_madman", label: "逃げ込む", can: (g, id) => ONW.ratMadman && ONW.ratMadman.canUse(g, id), targets: (g, id) => ONW.ratMadman.targets(g, id) },
+    { kind: "sheep", role: "sheep_madman", label: "迷える子羊", can: (g, id) => ONW.sheepMadman && ONW.sheepMadman.canUse(g, id), targets: (g, id) => ONW.sheepMadman.targets(g, id) },
+    { kind: "medium", role: "medium", label: "霊媒", can: (g, id) => ONW.medium && ONW.medium.canUse(g, id), targets: (g, id) => ONW.medium.targets(g, id) },
+    { kind: "counsel", role: "counselor", label: "更生", can: (g, id) => ONW.counselor && ONW.counselor.canUse(g, id), targets: (g, id) => ONW.counselor.targets(g, id) },
+    { kind: "ren", role: "ren", label: "変化調査", can: (g, id) => ONW.ren && ONW.ren.canUse(g, id), targets: (g, id) => ONW.ren.targets(g, id) },
     { kind: "yomi", role: "yomi", label: "断ち切る", can: (g, id) => ONW.yomi.canUse(g, id), targets: (g, id) => ONW.yomi.targets(g, id) },
     { kind: "icarus", role: "icarus", label: "票を分け与える", can: (g, id) => ONW.icarus.canUse(g, id), targets: (g, id) => ONW.icarus.targets(g, id) },
     { kind: "goranshin", role: "goranshin", label: "投票先ランダム", can: (g, id) => ONW.goranshin.canUse(g, id), targets: (g, id) => ONW.goranshin.targets(g, id) },
@@ -466,6 +495,7 @@ window.ONW = window.ONW || {};
     { kind: "photo", role: "mitsuki_nanoka", label: "写真撮影", can: (g, id) => !!(ONW.nanoka && ONW.nanoka.photoCanUse(g, id)), targets: (g, id) => ONW.nanoka.photoTargets(g, id) },   // 三月なのか: 写真撮影（debugDayAbility の photo 分岐 → hostMind）
     { kind: "libra", role: "libra", label: "天秤", two: true, can: (g, id) => ONW.libra.canUse(g, id), targets: (g, id) => ONW.libra.targets(g) },
     { kind: "predict", role: "predictor", label: "予想", multi: true, can: (g, id) => ONW.predictor.canUse(g, id), targets: (g, id) => ONW.predictor.targets(g) },   // 予想屋: 死ぬと思う人を何人でも選んで「予想を決定」（multi）
+    { kind: "wagerer", role: "wagerer", label: "予想", opts: true, can: (g, id) => ONW.wagerer && ONW.wagerer.canUse(g, id), targets: (g, id) => ONW.wagerer.options(g).map((o) => o.key), optLabel: (key) => ONW.wagerer.labelOf(key) + "の勝利" },   // 勝負師: 勝利する陣営の選択肢から1つ選ぶと、すぐに予想が決まる（opts。何度でも選び直せる）
   ];
   function tabDay() {
     const g = G();
@@ -485,6 +515,11 @@ window.ONW = window.ONW || {};
         }
         if (k.none) {   // ホクマー: 対象を選ばず、その場で使う
           h += ovl(`${esc(p.name)}${cpuBadge} <small class="dbg-dim">${esc(k.label)}</small>`, "dayCancel", [], `<div class="dbg-sub">対象はありません。押すとすぐに昼時間が10秒短くなります（何度でも使えます）</div>${b("今すぐ使う", "dayUse", [p.id, k.kind, null])}`);
+          return h;
+        }
+        if (k.opts) {   // 勝負師: 勝利する陣営の選択肢を選ぶと、すぐに発動する（選んだあともう一度開いて選び直せる）
+          const cur = ONW.wagerer.predictionOf(g, p.id);
+          h += ovl(`${esc(p.name)}${cpuBadge} <small class="dbg-dim">${esc(k.label)}</small>`, "dayCancel", [], `<div class="dbg-sub">勝利すると予想する陣営を選ぶと、すぐに発動します（選択中: ${cur ? esc(ONW.wagerer.labelOf(cur)) : "まだ選んでいません"}）</div>${k.targets(g, p.id).map((t) => b((cur === t ? "✓ " : "") + esc(k.optLabel(t)), "dayUse", [p.id, k.kind, t])).join("")}`);
           return h;
         }
         const lab = k.two ? (first ? `2人目（1人目: ${esc(nm(first))}）` : "1人目") : "対象";
@@ -576,6 +611,26 @@ window.ONW = window.ONW || {};
   debug.tab = (t) => { ui.tab = t; ui.pick = null; ui.sub = null; refresh(); liveTick(); };
   debug.pick = (k) => { ui.pick = ui.pick === k ? null : k; ui.sub = null; refresh(); };
   debug.tfOpen = (key) => { ui.sub = "t:" + key; refresh(); };      // 変化後の選択（さらに上に重ねる）
+  /** 役職グリッドの検索: 入力欄と同じ選択パネル内の .dbg-rolegrid だけを対象に、検索キー（data-rq）に一致するボタンだけを出す。
+   *  陣営見出し（.dbg-grp）は、その陣営に表示中のボタンが1つも無ければ隠す。空欄に戻せば全件表示に戻る。再描画はしない（入力のフォーカス維持） */
+  debug.roleSearch = (input) => {
+    const body = input && input.closest ? input.closest(".dbg-ovl__body") : null;
+    const grid = body && body.querySelector(".dbg-rolegrid");
+    if (!grid) return;
+    const q = normQ(input.value);
+    let any = false, head = null, headHit = false;
+    const flush = () => { if (head) head.style.display = headHit ? "" : "none"; };
+    [...grid.children].forEach((ch) => {
+      if (ch.classList && ch.classList.contains("dbg-grp")) { flush(); head = ch; headHit = false; return; }
+      if (ch.tagName !== "BUTTON") return;
+      const hit = !q || (ch.getAttribute("data-rq") || "").indexOf(q) >= 0;
+      ch.style.display = hit ? "" : "none";
+      if (hit) { headHit = true; any = true; }
+    });
+    flush();
+    const nr = grid.querySelector(".dbg-noresult");
+    if (nr) nr.style.display = q && !any ? "" : "none";
+  };
   debug.subClose = () => { ui.sub = null; refresh(); };
   debug.talkToggle = () => { const d = data(); d.cpuTalkOff = !d.cpuTalkOff; refresh(); };
   debug.aiReset = () => { if (ONW.cpuAi) ONW.cpuAi.clearStats(); refresh(); };

@@ -90,6 +90,7 @@
   /** 占い師に占われたとき、カード role（席キー key = p の持ち主ID / "g:墓地番号"）が見える役職。模倣の人狼でなければ ONW.seerSees(role) と同じ */
   function seerSeen(g, role, key) {
     if (ONW.mirage && ONW.mirage.isMirageCard(g, role, key)) { ONW.mirage.noteInspect(g, key, "seer"); return ONW.mirage.seerRole(g); }   // 蜃気狼（模倣先が蜃気狼の模倣の人狼も）: 盤面にあり得るランダムな役職（1回の占いで1回だけ呼ぶこと）
+    if (role === "persona" && ONW.persona) { const d = ONW.persona.displayFor(g, key); if (d) { if (d === "mirage_wolf") return ONW.mirage.seerRole(g); return ONW.seerSees(d); } }   // ペルソナ: 仮面の表示役職として見える（マイクラ版 roleForPlayerSeerResult。仮面が蜃気狼ならランダムな役職。蜃気狼本人への確認記録は付けない）
     if (role !== R_().MIMIC_WOLF) return ONW.seerSees(role);
     const mr = roleOf(g, key);
     if (mr === "wolf_dreamer") return "werewolf";                          // 狼夢人を模倣 → 占いは人狼

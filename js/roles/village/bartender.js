@@ -85,7 +85,7 @@ function isCocktailDrunk(g, id) { return!!((g && g.cocktailDrunk) || {})[id];}
 
 /** カクテルの候補（マイクラ版 ensureBartenderTargetForMimic の候補条件） */
 function candidates(g, selfId, perceived) {
-return (g.players || []).filter((p) => p.id!== selfId &&!perceived.includes(p.id) &&!(g.drunkOverlay && g.drunkOverlay[p.id])).map((p) => p.id);
+return (g.players || []).filter((p) => p.id!== selfId &&!perceived.includes(p.id) &&!(g.drunkOverlay && g.drunkOverlay[p.id]) &&!(ONW.rabbitMadman && ONW.rabbitMadman.isHidden(g, p.id))).map((p) => p.id);   // 兎の狂人: 草むらに隠れた人はカクテルの対象にならない（マイクラ版 excludeRabbitHiddenParticipants）
 }
 /**
 * 対象を確定させる（無ければランダムに1人選んで酔わせる）。戻り値は対象のID（選べなければ null）。

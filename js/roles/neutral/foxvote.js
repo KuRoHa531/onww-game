@@ -107,11 +107,13 @@
     first.forEach((c, i) => R.later(() => { R.badge[`p:${c.id}`] = `${c.c}票`; R.paint(R.G()); }, i * SHOW_MS));
     R.t = first.length * SHOW_MS + HOLD_MS;
     if (fx.go && ONW.goranshin) ONW.goranshin.run2(R, fx.go, false);   // 御乱心: 一番先（本投票の結果発表と同じ順。字幕は出さない）
+    if (fx.sh && ONW.sheepMadman) ONW.sheepMadman.run2(R, fx.sh, false);   // 羊の狂人: 御乱心の直後（本投票の結果発表と同じ順。字幕は出さない）
     if (fx.pg) ONW.penguin.run(R, fx.pg.slides || [], fx.pg.steps || [], false);
     if (fx.ex) ONW.exchanger.run(R, fx.ex.exchanges || [], fx.ex.steps || [], false);
     if (fx.fa && ONW.fairy) ONW.fairy.run(R, fx.fa, false);   // 妖精さん: 交換者のあと（本投票の結果発表と同じ順。字幕は出さない）
     const ids = new Set();
     if (fx.go) (fx.go.steps || []).forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));   // 御乱心で増えた票数の札も外す
+    if (fx.sh) (fx.sh.steps || []).forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));   // 羊の狂人で増えた票数の札も外す
     [fx.first || [], ...((fx.pg && fx.pg.steps) || []), ...((fx.ex && fx.ex.steps) || [])].forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));
     if (fx.pg) (fx.pg.steps || []).forEach((st) => st.forEach((c) => ids.add(c.id)));
     if (fx.fa) (fx.fa.steps || []).forEach((st) => (Array.isArray(st) ? st : []).forEach((c) => ids.add(c.id)));   // バリアで減った票数の札も外す
@@ -119,6 +121,6 @@
     return R.t + END_MS;
   }
   /** playCounts にかかる時間(ms。動きを減らさない場合)。ホストが追放までの待ち時間に足す */
-  const countsMs = (fx) => (fx.first || []).filter((c) => c.c > 0).length * SHOW_MS + HOLD_MS + (fx.go && ONW.goranshin ? ONW.goranshin.ms(fx.go) : 0) + (fx.pg ? ONW.penguin.ms(fx.pg.slides) : 0) + (fx.ex ? ONW.exchanger.ms(fx.ex.exchanges) : 0) + (fx.fa && ONW.fairy ? ONW.fairy.ms(fx.fa) : 0) + END_MS;
+  const countsMs = (fx) => (fx.first || []).filter((c) => c.c > 0).length * SHOW_MS + HOLD_MS + (fx.go && ONW.goranshin ? ONW.goranshin.ms(fx.go) : 0) + (fx.sh && ONW.sheepMadman ? ONW.sheepMadman.ms(fx.sh) : 0) + (fx.pg ? ONW.penguin.ms(fx.pg.slides) : 0) + (fx.ex ? ONW.exchanger.ms(fx.ex.exchanges) : 0) + (fx.fa && ONW.fairy ? ONW.fairy.ms(fx.fa) : 0) + END_MS;
   ONW.foxVote = { living, needed, resolve, view, cpuTarget, labelOf, plan, execute, play, playCounts, countsMs };
 })(window.ONW);

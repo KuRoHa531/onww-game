@@ -31,6 +31,7 @@
       return;
     }
     if (ONW.moses) ONW.moses.before(g, p.id, [sp.a], [a, b]);   // モーゼス: コピー元に使われた回数 +1 してからコピー
+    if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（コピー元・コピー先の両方）
     const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b), shown = ONW.shownRole(got), sa = ONW.shownRole(seen);
     ONW.setRoleBound(g, "gremlinPicks", p.id, [a, b]);
     i.mode = "gremlin"; i.gremlin = { from: a, to: b, role: sa };
@@ -110,6 +111,7 @@
         if (!sp.ok) { c.hold(p.id, ONW.watcher.noneLine("入れ替え")); return; }   // 移す先が足りなければコピーしない（新聞・観測にも載らない）
         if (ONW.keymaster.blocks(g, sp.b)) { c.hold(p.id, ONW.keymaster.fail(g, p.id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [b], [sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: コピー先の席がロック中なら失敗。コピーせず、追加勝利の記録・新聞・観測にも載らない
         if (ONW.moses) ONW.moses.before(g, p.id, [sp.a], [a, b]);   // モーゼス: コピー元に +1 してからコピー
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（コピー元・コピー先の両方）
         const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b);
         ONW.setRoleBound(g, "gremlinPicks", p.id, [a, b]);   // 選択は役職の持ち主に記録（カードについていく）
         ONW.observeNote(g, p.id, [a, b], null, "gremlin");
@@ -128,6 +130,7 @@
         if (!sp.ok) return { lines: [ONW.watcher.noneLine("入れ替え")], reveal: null, nextChain: null, failed: true };
         if (ONW.keymaster.blocks(g, sp.b)) { const fl = ONW.keymaster.fail(g, id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [b], [sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }   // 朝のうち・酔い覚めにもロックは効く
         if (ONW.moses) ONW.moses.before(g, id, [sp.a], [a, b]);   // モーゼス: コピー元に +1 してからコピー
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（コピー元・コピー先の両方）
         const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b);   // 朝の時点のコピー元の役職を、コピー先にコピー
         ONW.setRoleBound(g, "gremlinPicks", id, [a, b]);
         const lines = [`${nameOf(a)} の役職「${rn(ONW.shownRole(seen))}」を ${nameOf(b)} にコピーしました。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];

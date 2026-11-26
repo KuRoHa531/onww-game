@@ -62,6 +62,7 @@
     const g = c.g;
     if (!canUse(g, id) || !targets(g, id).includes(target)) return null;
     let role = g.currentRoles[target];
+    if (role === "persona" && ONW.persona) { const d = ONW.persona.displayFor(g, target); if (d) role = d === "mirage_wolf" ? ONW.mirage.dayRole(g) : d; }   // ペルソナ: 見抜く最終役職は仮面の表示役職（マイクラ版 main.js。仮面が蜃気狼ならランダムな役職）
     if (ONW.mirage && ONW.mirage.isMirageCard(g, role, target)) { ONW.mirage.noteInspect(g, target, "mind_wolf"); role = ONW.mirage.dayRole(g); }   // 蜃気狼（模倣先が蜃気狼の模倣の人狼も）は、盤面にあり得るランダムな役職に見える
     g.mindWolfTarget = g.mindWolfTarget || {}; g.mindWolfSeen = g.mindWolfSeen || {};
     g.mindWolfTarget[id] = target; g.mindWolfSeen[id] = role;

@@ -118,8 +118,9 @@ if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false; // 封印の狂人に�
 if (ONW.hiddenDrunk(g, id) || (g.deadIds || []).includes(id) || photoUsed(g, id)) return false;
 return photoTargets(g, id).length > 0;
 }
-/** 写真に写る気配（マイクラ版 baseTeamOf(currentDayActionRole(target))）: その日の昼能力で見た最終役職の陣営そのもの（3種だけ。狂人系は人狼陣営に含まれる） */
-const photoTeamKey = (g, target) => { const t = (ONW.roles.getInfo(eff(g, target)) || {}).team; return t === ONW.TEAM.WOLF? "wolf": t === ONW.TEAM.THIRD? "third": "village";};
+/** 写真に写る気配（マイクラ版 baseTeamOf(currentDayActionRole(target))）: その日の昼能力で見た最終役職の陣営そのもの（3種だけ。狂人系は人狼陣営に含まれる）。
+ *  ペルソナは仮面の表示役職の陣営で写る（マイクラ版 main.js の写真判定。勝利判定は下の finalTeamKey のまま素の最終役職） */
+const photoTeamKey = (g, target) => { const er = eff(g, target); if (er === "persona" && ONW.persona) { const d = ONW.persona.displayFor(g, target); if (d) { const t = (ONW.roles.getInfo(d) || {}).team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; } } const t = (ONW.roles.getInfo(er) || {}).team; return t === ONW.TEAM.WOLF? "wolf": t === ONW.TEAM.THIRD? "third": "village";};
 /** 勝利判定の陣営（マイクラ版 baseTeamOf(finalRoles[target])）: 模倣などの解決をしない、素の最終役職の陣営 */
 const finalTeamKey = (g, target) => { const t = (ONW.roles.getInfo((g.currentRoles || {})[target]) || {}).team; return t === ONW.TEAM.WOLF? "wolf": t === ONW.TEAM.THIRD? "third": "village";};
 const photoText = (g, id) => { const t = (g.nanokaPhotoTarget || {})[id]; return t? `写真: ${nm(g, t)} は${TEAM_LABEL[(g.nanokaPhotoSeen || {})[id] || "village"]}の気配でした。`: null;};

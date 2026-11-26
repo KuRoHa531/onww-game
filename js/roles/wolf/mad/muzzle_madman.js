@@ -22,7 +22,9 @@
       if (!force && cur && g.players.some((q) => q.id === cur)) return cur;
       if (!g.players.length) return null;
       const f = ONW.debug && ONW.debug.randTarget ? ONW.debug.randTarget(g, "muzzle", id) : null;   // デバッグ: 口封じ先の指定（自分自身も可。いなければランダムに戻す）
-      const t = f && g.players.some((q) => q.id === f) ? f : g.players[Math.floor(Math.random() * g.players.length)].id;
+      const cand = (ONW.rabbitMadman && ONW.rabbitMadman.hiddenOf(g)) ? g.players.filter((q) => !ONW.rabbitMadman.isHidden(g, q.id)) : g.players;   // 兎の狂人: 草むらに隠れた人は口封じの対象にならない（マイクラ版 excludeRabbitHiddenParticipants）
+      const list = cand.length ? cand : g.players;
+      const t = f && g.players.some((q) => q.id === f) ? f : list[Math.floor(Math.random() * list.length)].id;
       g.muzzleTargets[id] = t;
       if (ONW.watcher) ONW.watcher.touch(g, id, [t]);   // 静観者: 口封じの対象に決まったら「能力を使われた」（マイクラ版 assignMuzzleTarget）
       return t;

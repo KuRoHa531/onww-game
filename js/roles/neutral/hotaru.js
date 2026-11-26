@@ -16,6 +16,9 @@
  *   運命（模倣先）は分からない＝カードは開拓者の素の面で出す）。開拓者がいなければ「開拓者はいません。」と届く。
  * ・盤面にサムがいると、本物の銀狼（実効役職が銀狼・酔っ払い中／封印／ハッキングを除く）に待機時間に
  *   「この中にサムがいるようです。」と通知される（マイクラ版 announceHotaruAndSamNotificationsAtDayStart）。
+ *   作者決定（2026-11-26）: 文の通知に加えて、サム（に変身した人全員）のカードが銀狼本人の画面でだけ
+ *   サムの面でめくれる（数秒後に裏に戻る。settleMsg の hotaruSam → サム役職の stageSettle "settleHotaruSam"。
+ *   酔い覚めで遅れて届く経路でも hotarunews の sam で同じくめくれる）。MC準拠（文だけ）より作者決定が優先。
  * ・封印されている場合は変身できず、開拓者も知ることができない（マイクラ版 ROLE_INFO どおり。Web版は共通の
  *   failIfSealed が夜・朝の連鎖とも先に失敗させる）。鍵師に自分の役職をロックされている場合も変身に失敗する
  *   （マイクラ版 isRoleLocked → hotaruChoice = "hotaru" ＋失敗文。YAMINABE_KEYMASTER_TARGET_ROLES に HOTARU が入る）。
@@ -74,15 +77,17 @@
   function trailblazers(g) {
     return (g.players || []).filter((p) => eff(g, p.id) === "trailblazer" && !ONW.hiddenDrunk(g, p.id) && !(g.hackRole || {})[p.id]).map((p) => p.id);
   }
-  /** サムがいるかどうか（マイクラ版の通知の対象決め: 実効役職がサムで、酔っ払い中・ハッキングされている人を除く） */
-  function samExists(g) {
-    return (g.players || []).some((p) => eff(g, p.id) === SAM && !ONW.hiddenDrunk(g, p.id) && !(g.hackRole || {})[p.id]);
+  /** サムとして銀狼に知らせる人（マイクラ版の通知の対象決め: 実効役職がサムで、酔っ払い中・ハッキングされている人を除く） */
+  function samTargets(g) {
+    return (g.players || []).filter((p) => eff(g, p.id) === SAM && !ONW.hiddenDrunk(g, p.id) && !(g.hackRole || {})[p.id]).map((p) => p.id);
   }
+  /** サムがいるかどうか */
+  function samExists(g) { return samTargets(g).length > 0; }
   /** 開拓者の通知文（マイクラ版 game.js の昼通知どおり） */
   const tbText = (g) => { const tb = trailblazers(g); return tb.length ? `開拓者は${tb.map((x) => nm(g, x)).join("、")}です。` : "開拓者はいません。"; };
 
   const H = (ONW.hotaru = {
-    ID, SAM, CARDS, holders, samHolders, choiceOf, teamOf, trailblazers, samExists,
+    ID, SAM, CARDS, holders, samHolders, choiceOf, teamOf, trailblazers, samTargets, samExists,
     /** 実績（最終盤面でホタル／サムを持っている人。サムの実績はホタルから変身した人だけ） */
     achievements(g, id, won) {
       const r = (g.currentRoles || {})[id];
@@ -210,7 +215,7 @@
     },
     cpuNight: { order: 92, stage: "gremlin", chain: true, run: cpuRun },   // グレムリン(80)・マティアス(90)のあと・なのか(95)の前
     cpuChainResult,
-    /** 待機時間の知らせ: ホタルのままの人には開拓者を（カードのめくり＋文）、本物の銀狼にはサムの存在を（文だけ） */
+    /** 待機時間の知らせ: ホタルのままの人には開拓者を（カードのめくり＋文）、本物の銀狼にはサムの存在を（文＋サムのカードのめくり。作者決定 2026-11-26） */
     settleMsg(c, p) {
       const g = c.g, out = { logs: [] };
       const role = eff(g, p.id);
@@ -228,9 +233,13 @@
       if (role === "silver_wolf") {
         if (ONW.hiddenDrunk(g, p.id) || (g.hackRole || {})[p.id]) return out;
         if (ONW.seal && ONW.seal.is(g, p.id)) return out;
-        if ((g.hotaruSamTold || {})[p.id] || !samExists(g)) return out;
-        (g.hotaruSamTold = g.hotaruSamTold || {})[p.id] = true;
-        out.logs.push("この中にサムがいるようです。");
+        const sams = samTargets(g);
+        if (!sams.length) return out;
+        out.hotaruSam = sams;   // 銀狼本人の画面でだけサムのカードがサムの面でめくれる（サム役職の stageSettle "settleHotaruSam"。作者決定 2026-11-26）。文と違い、再入室の再送でも開拓者のめくりと同じく届く（クライアント側は quiet / shown で再演を抑える）
+        if (!(g.hotaruSamTold || {})[p.id]) {
+          (g.hotaruSamTold = g.hotaruSamTold || {})[p.id] = true;
+          out.logs.push("この中にサムがいるようです。");
+        }
         return out;
       }
       return out;
@@ -241,7 +250,7 @@
       run: { order: 26, run(ids, SK) { SK.later(() => { ids.forEach((id) => SK.show(`p:${id}`, "trailblazer")); }, 300); } },
       end(SK) { const g = SK.G(); (g.settleHotaruTb || []).forEach((id) => { const k = `p:${id}`; if (SK.up[k] === "trailblazer") delete SK.up[k]; }); },
     },
-    /** 酔いが覚めたホタル／銀狼へ: 保留していた通知を届ける（本人だけ。ホタルには開拓者のカードのめくり付き） */
+    /** 酔いが覚めたホタル／銀狼へ: 保留していた通知を届ける（本人だけ。ホタルには開拓者のカードのめくり付き、銀狼にはサムのカードのめくり付き） */
     soberReveal: { order: 54, run(c, ids) {
       const g = c.g;
       ids.forEach((id) => {
@@ -253,12 +262,12 @@
         } else if (role === "silver_wolf") {
           if ((g.hotaruSamTold || {})[id] || (g.hackRole || {})[id] || (ONW.seal && ONW.seal.is(g, id)) || !samExists(g)) return;
           (g.hotaruSamTold = g.hotaruSamTold || {})[id] = true;
-          c.send(id, { t: "hotarunews", text: "この中にサムがいるようです。" });
+          c.send(id, { t: "hotarunews", text: "この中にサムがいるようです。", sam: samTargets(g) });   // sam: 銀狼本人の画面でサムのカードがめくれる（net.js の hotarunews が stageFlash "hotaruFlash" に role "sam" で積む。作者決定 2026-11-26）
         }
       });
     } },
-    /** 酔い覚めで届いた開拓者通知の演出（stage.js の flashes が g.hotaruFlash を渡す。本人だけに届く "hotarunews" で積まれる）:
-     *  開拓者のカードが開拓者の面でめくれ、数秒後に裏に戻る */
+    /** 酔い覚めで届いた開拓者／サム通知の演出（stage.js の flashes が g.hotaruFlash を渡す。本人だけに届く "hotarunews" で積まれる）:
+     *  開拓者のカードが開拓者の面で、サムのカードがサムの面でめくれ、数秒後に裏に戻る */
     stageFlash: {
       field: "hotaruFlash", when: "late",
       run(list, SK) {
@@ -291,6 +300,17 @@
     info: { deck: 136, name: "サム", team: ONW.TEAM.WOLF, wakeOrder: null, sort: 54.1,
       desc: "ホタルが変身した姿です（内部専用役職。直接配役はできません）。人狼陣営として勝利します。盤面に本物の銀狼がいる場合、銀狼にはサムの存在が通知されます。" },
     groups: { wolf: 8.97 },   // 本物の人狼扱い（人狼判定・乞食の取れない対象・魔法少女の闇堕ち判定などに数える）
+    /** 待機時間の演出（作者決定 2026-11-26）: 銀狼本人の画面でだけ、サムのカードがサムの面でめくれて数秒後に裏に戻る。
+     *  settleMsg（ホタル役職）の hotaruSam が届いた画面でだけ g.settleHotaruSam が積まれる（他の人の画面には届かない）。
+     *  再入室復元は net.js が quiet のとき shown を立てて抑える（開拓者の待機時間 peek と同じ慣例） */
+    stageSettle: {
+      field: "settleHotaruSam", shown: "settleHotaruSamShown",
+      run: { order: 27, run(ids, SK) {
+        ids.forEach((id, i) => SK.later(() => { const k = `p:${id}`; SK.up[k] = SAM; SK.glow[k] = true; SK.paint(SK.G()); }, 300 + i * 380));
+        SK.later(() => { ids.forEach((id) => { const k = `p:${id}`; if (!SK.held[k] && SK.up[k] === SAM) delete SK.up[k]; delete SK.glow[k]; }); SK.paint(SK.G()); }, 300 + ids.length * 380 + 3200);
+      } },
+      end(SK) { const g = SK.G(); if (g.phase !== ONW.PHASE.ONLINE_DAY) return; (g.settleHotaruSam || []).forEach((id) => { const k = `p:${id}`; if (SK.up[k] === SAM) delete SK.up[k]; delete SK.glow[k]; }); },   // 昼になったら伏せる（保険。通常は run のタイマーで裏に戻っている）
+    },
     // 結果開示(COボタン)の流れ: 対象を選ばず「サムに変身していました。」の1択（マイクラ版のサムCOと同じ）
     coResult: { kind: "sam", fixedText: "サムに変身していました。", fixedShort: "サムに変身" },
     /** CPUの発言（マイクラ版 cpu.js）: 五分五分でホタルCO（開拓者は嘘の開示）。外れたら通常の騙り */

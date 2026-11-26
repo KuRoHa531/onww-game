@@ -62,10 +62,11 @@ window.ONW = window.ONW || {};
     });
     // 昼に酔いが覚めたCPUの能力: すでに死んでいる人(g.deadIds)は選ばない。役職ファイルは n.g.players から相手を選ぶので、死んでいる人を除いた見え方の g を渡す（夜・朝は deadIds が空なのでそのまま）
     const deadSet = new Set(g.deadIds || []);
-    const gv = deadSet.size ? new Proxy(g, { get: (t, k) => (k === "players" ? t.players.filter((q) => !deadSet.has(q.id)) : Reflect.get(t, k, t)) }) : g;
+    const rabbitHidden = (ONW.rabbitMadman && ONW.rabbitMadman.hiddenOf(g)) || null;   // 兎の狂人: 草むらに隠れた人はCPUの対象候補から外す（マイクラ版CPUは選ぶと失敗する。Web版は「能力が発動しない」結果だけを一致させる解釈。docs/rabbit-madman.md）
+    const gv = (deadSet.size || rabbitHidden) ? new Proxy(g, { get: (t, k) => (k === "players" ? t.players.filter((q) => !deadSet.has(q.id) && q.id !== rabbitHidden) : Reflect.get(t, k, t)) }) : g;
     const noTarget = (p) => deadSet.size > 0 && gv.players.filter((q) => q.id !== p.id).length === 0;   // 選べる生きている人がいなければ、能力は使わない
     const forced = (p) => (ONW.debug ? ONW.debug.cpuTarget(g, p.id) : null) || {};   // デバッグ: 能力先の指定
-    const validPlayer = (p, id) => id && id !== p.id && !deadSet.has(id) && g.players.some((q) => q.id === id);
+    const validPlayer = (p, id) => id && id !== p.id && id !== rabbitHidden && !deadSet.has(id) && g.players.some((q) => q.id === id);
     const nn = (rid) => { if (stage !== "late") ONW.newsNote(g, rid); };   // 新聞配達員の新聞: 夜に能力を使った役職を記録（昼に酔いが覚めてからの能力は、新聞には載らない）
     // 役職ファイルの cpuNight.run に渡す道具
     const ob = (from, players, graves) => { if (stage !== "late") ONW.observeNote(g, from, players, graves, n.cur); else if (ONW.watcher) ONW.watcher.touch(g, from, players); };   // 昼の酔い覚めは詩人・観測には載らないが、静観者の「能力を使われた」には数える   // n.cur = いま能力を使っている役職（詩人の通知に載る。模倣の人狼は模倣先）
@@ -77,8 +78,9 @@ window.ONW = window.ONW || {};
     nightSteps().forEach((s) => {
       if (!on(s.nd.stage)) return;
       const exec = (p) => {
-        if (s.nd.stage !== "seal" && ONW.seal.failIfSealed(g, p.id, act(p), { hold, mimic: ONW.mimic.cardRole(g, p.id, role(p)) || false })) return;   // 封印されているCPUの夜の能力は失敗（行動しない）
-        const go = () => { n.cur = act(p); s.nd.run(n, p, rn(role(p)), false, act(p)); }; if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id, role(p)); else go(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
+        const mpFlip = () => { if (ONW.multiPersona) ONW.multiPersona.onAbility(g, p.id, act(p), "night"); };   // 多重人格: 能力が完了したら反転（封印で失敗してもマイクラ版は actionDone が立つ）
+        if (s.nd.stage !== "seal" && ONW.seal.failIfSealed(g, p.id, act(p), { hold, mimic: ONW.mimic.cardRole(g, p.id, role(p)) || false })) { mpFlip(); return; }   // 封印されているCPUの夜の能力は失敗（行動しない）
+        const go = () => { n.cur = act(p); s.nd.run(n, p, rn(role(p)), false, act(p)); }; if (ONW.mimic.isMimic(g, p.id, role(p))) ONW.mimic.quiet(g, go, p.id, role(p)); else go(); mpFlip(); };   // 模倣の人狼が使った能力は、夜行動結果に「模倣の人狼」の名乗りで残り、新聞には「模倣の人狼」
       const actors = cpus.filter((p) => s.roles.includes(act(p)) && !noTarget(p) && !deadSet.has(p.id));
       if (plan) plan.push({ roles: s.roles, order: s.order, idx: s.idx, actors, exec }); else actors.forEach(exec);
     });
@@ -90,7 +92,8 @@ window.ONW = window.ONW || {};
       const label = rn(got), keep = i.relic ? { ...i.relic } : null;
       const nd = (ONW.roleDef(got) || {}).cpuNight;
       const asMimic = ONW.mimic.isMimic(g, p.id, g.currentRoles[p.id]) && ONW.mimic.roleOf(g, p.id) === got;
-      if (ONW.seal.failIfSealed(g, p.id, got, { hold, mimic: asMimic ? g.currentRoles[p.id] : false })) return;   // 封印されているCPUの朝の連鎖・昼の酔い覚めの能力は失敗   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
+      const mpFlip = () => { if (ONW.multiPersona) ONW.multiPersona.onAbility(g, p.id, got, "day"); };   // 多重人格: 朝の連鎖・酔い覚めの能力も反転トリガー（リアルタイム演出。呼び出し側が flush する）
+      if (ONW.seal.failIfSealed(g, p.id, got, { hold, mimic: asMimic ? g.currentRoles[p.id] : false })) { mpFlip(); return; }   // 封印されているCPUの朝の連鎖・昼の酔い覚めの能力は失敗   // 墓荒らし・ドッペルで手にした模倣の人狼が、模倣先の能力を使う（夜ログは出さず、新聞には「模倣の人狼」）
       const exec = () => {
         n.cur = got;
       if (nd && nd.chainEnd) { nd.run(n, p, label, true, got); return; }   // 墓荒らし・ドッペルゲンガー: 次の pendingChain は自分で立てる
@@ -98,6 +101,7 @@ window.ONW = window.ONW || {};
         i.relic = keep;
       };
       if (asMimic) ONW.mimic.quiet(g, exec, p.id, g.currentRoles[p.id]); else exec();
+      mpFlip();
     });
   };
 

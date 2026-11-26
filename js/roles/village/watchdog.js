@@ -178,14 +178,16 @@
       intro: { order: 20, run(R) {
         const { res, P, later, setCap, esc, paint, G, alm } = R;
         const seen = new Set();
-        const gs = (res.watchdogs || []).filter((x) => x.votes > 0 && x.hang && !x.bite && !x.steveBite && !seen.has(x.ownerId) && seen.add(x.ownerId));   // 守られていなければ追放されていた(最多得票だった)ときだけ。そうでない飼い主は、ただ「N票」が出るだけ
+        const gs = (res.watchdogs || []).filter((x) => (x.role === "dog_madman" || x.votes > 0) && x.hang && !x.bite && !x.steveBite && !seen.has(x.ownerId) && seen.add(x.ownerId));   // 守られていなければ追放されていた(最多得票だった)ときだけ。そうでない飼い主は、ただ「N票」が出るだけ。犬の狂人（role: "dog_madman"）の hang は「吊られないように守った」記録（dogMadmanSaved）そのものなので票数は見ない
         gs.forEach((x) => {
           const mk = P(x.ownerId);
-          later(() => { setCap(`<div class="res-cap__t t-village">番犬の飼い主</div><div>${esc(x.owner)} が追放されそうになりました…</div>`); R.alm[mk] = true; paint(G()); }, R.t);
+          const dog = x.role === "dog_madman";   // 犬の狂人と共用: 字幕のタイトル・陣営色・守った文だけが違う（🦴の演出は共通）
+          const ttl = dog ? "犬の狂人の飼い主" : "番犬の飼い主", cls = dog ? "t-wolf" : "t-village";
+          later(() => { setCap(`<div class="res-cap__t ${cls}">${ttl}</div><div>${esc(x.owner)} が追放されそうになりました…</div>`); R.alm[mk] = true; paint(G()); }, R.t);
           later(() => {
             delete R.alm[mk];
             const c = dogCard(R, mk); if (c) c.classList.add("guard");   // 🦴が出てきて守る
-            setCap(`<div class="res-cap__t t-village">番犬の飼い主</div><div>${esc(x.owner)} は番犬に守られました</div>`);
+            setCap(`<div class="res-cap__t ${cls}">${ttl}</div><div>${esc(x.owner)} は${dog ? "犬の狂人に" : "番犬に"}守られました</div>`);
             paint(G());
           }, R.t + 1900);
           later(() => { const c = dogCard(R, mk); if (c) c.classList.add("out"); }, R.t + 3300);                        // 守り終わったら🦴は消える（ふわっと消す）

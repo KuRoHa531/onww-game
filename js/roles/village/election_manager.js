@@ -46,6 +46,7 @@
     if (ONW.hiddenDrunk(g, id) || isDead(g, id)) return false;                                  // 酔いが覚めるまでは見えない / 死亡者は見えない
     if (ONW.seal && ONW.seal.dayBlocked(g, id)) return false;                                  // 封印の狂人に封印されている
     if (ONW.fanatic && ONW.fanatic.lostBy && ONW.fanatic.lostBy(g, id)) return false;           // 投票権を失った人（鍵師のロックで狂人になれなかった背徳者）
+    if (ONW.trapMaster && ONW.trapMaster.noVote && ONW.trapMaster.noVote(g, id)) return false;   // 投票権を失った人（罠師の罠を踏んだ人）
     return true;
   }
 

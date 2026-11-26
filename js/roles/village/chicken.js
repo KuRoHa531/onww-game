@@ -15,12 +15,12 @@
         later(() => { if (ONW.sound) ONW.sound.se("chicken_reverse"); }, R.t);   // SE: チキン逆転（「！」が出る瞬間）
         R.t += 1500;
         later(() => {
-          rv.ids.forEach((id) => { gx[P(id)] = "chicken"; });
+          rv.ids.forEach((id) => { gx[P(id)] = (rv.roosterIds || []).includes(id) ? "rooster" : "chicken"; });   // 鶏の狂人が逆転させたカードは 🐔 ではなく 🐓（作者メモ）
           setCap("");
           paint(G());
         }, R.t);
         R.t += 2800;
-        later(() => { rv.ids.forEach((id) => { delete gx[P(id)]; }); setCap(`<div class="res-cap__t t-village">チキンが勝利を逆転させた！</div>`); paint(G()); }, R.t);
+        later(() => { rv.ids.forEach((id) => { delete gx[P(id)]; }); const hasR = (rv.roosterIds || []).length > 0, hasC = rv.ids.some((id) => !(rv.roosterIds || []).includes(id)); setCap(`<div class="res-cap__t ${hasR && toWolf ? "t-wolf" : "t-village"}">${hasR && hasC ? "チキンと鶏の狂人が勝利を逆転させた！" : hasR ? "鶏の狂人が勝利を逆転させた！" : "チキンが勝利を逆転させた！"}</div>`); paint(G()); }, R.t);
         R.t += 1800;
       } },
     },

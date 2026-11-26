@@ -96,6 +96,7 @@
     if (!(g.deadIds || []).includes(id) || (g.deadKind || {})[id] !== "shot") return false;
     if (!ONW.sheriff || ONW.sheriff.labelOf(g, id) !== "執行") return false;
     g.deadIds = g.deadIds.filter((x) => x !== id);
+    if (g.dayDeathIds) g.dayDeathIds = g.dayDeathIds.filter((x) => x !== id);   // 霊媒師: 復活した人は霊媒の対象からも外れる（マイクラ版も preVoteDeadIds から外す）
     if (g.deadKind) delete g.deadKind[id];
     if (g.deadBy) delete g.deadBy[id];
     if (g.deadStep) delete g.deadStep[id];

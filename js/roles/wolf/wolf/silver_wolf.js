@@ -6,6 +6,9 @@
  *     対象が相方（見えている仲間の人狼）のときは、🐺マークが出たあと、いったん裏面に戻ってから⚠️マークが出る。
  *   ・酔っ払いの銀狼は、酔い覚めのときに同じ情報と演出が出る。
  *   ・ハッキングは「対象を選ぶ能力」として観測（ONW.observeNote）に残る。
+ *   ・スクリューガムが盤面にいる場合、村人陣営（配布時点で恋人になっていない人）へのハッキングは失敗する
+ *     （再抽選なし。失敗した対象は g.hackScrewFail に残り、夜の情報は「{対象}へのハッキングに失敗しました。」、
+ *     演出は USB が読み込み途中で止まって「！」が出る失敗版になる。screw_gum.js の ONW.screwGum が判定）。
  */
 (function (ONW) {
   const K = ONW.wolfKit;
@@ -14,8 +17,8 @@
   const ALLOW_SELF = false;
   /** ハッキングされない役職（Web版にまだ無い役職。入ったら自動で対象外）。候補の除外は初期役職だけでなく、その時点の役職でも見る（マイクラ版 assignSilverWolfHackFromSource が initialRoles と finalRoles の両方でヴァニティ・ホタルを除くのと同じ） */
   const NO_HACK = ["vanity", "hotaru"];
-  /** 思い込み先にならない役職 */
-  const NO_FAKE = ["light_apostle", "dark_avatar", "silver_shadow", "daughter"];
+  /** 思い込み先にならない役職（スクリューガムはハッキングで思い込むことがない。マイクラ版 silverWolfFakeRolePool の除外どおり） */
+  const NO_FAKE = ["light_apostle", "dark_avatar", "silver_shadow", "daughter", "screw_gum"];
 
   const nameOf = (g, id) => ((g.players || []).find((q) => q.id === id) || {}).name || "?";
   const roleName = (r) => ((ONW.ROLE_INFO || {})[r] || {}).name || "?";
@@ -39,16 +42,18 @@
     isHacked: (g, id) => !!(g.hackRole || {})[id],
     /** 配役直後に全銀狼のハッキングを決める（net.js の startGame から。模倣の割り当てのあとに呼ぶ） */
     assignAll(g) {
-      g.hackRole = {}; g.hackSource = {}; g.hackTarget = {}; g.hackFailed = {}; g.hackFrom = {}; g.hackChain = {}; g.hackDayUsed = {}; g.hackPred = {}; g.hackIcarus = {}; g.hackCut = {}; g.hackCutRole = {}; g.hackDayLog = {}; g.hackCos = {}; g.hackSub = {}; g.hackDepth = {};
+      g.hackRole = {}; g.hackSource = {}; g.hackTarget = {}; g.hackFailed = {}; g.hackScrewFail = {}; g.hackFrom = {}; g.hackChain = {}; g.hackDayUsed = {}; g.hackPred = {}; g.hackIcarus = {}; g.hackCut = {}; g.hackCutRole = {}; g.hackDayLog = {}; g.hackCos = {}; g.hackSub = {}; g.hackDepth = {};
       (g.players || []).forEach((p) => { if (isHacker(g, p.id)) H.assign(g, p.id); });
     },
     /** 銀狼 wolfId のハッキングを1回だけ決める。戻り値は対象のID（決まらなければ null） */
     assign(g, wolfId) {
       if ((g.hackTarget || {})[wolfId]) return g.hackTarget[wolfId];
-      const cands = (g.players || []).filter((q) => (ALLOW_SELF || q.id !== wolfId) && !NO_HACK.includes((g.initialRoles || {})[q.id]) && !NO_HACK.includes((g.currentRoles || {})[q.id]));   // 初期役職・その時点の役職のどちらがヴァニティ/ホタルでも対象外（マイクラ版の finalRoles 除外に相当。Web版の割り当ては配役直後の一度きりで、その時点では currentRoles = 初期役職）
+      const cands = (g.players || []).filter((q) => (ALLOW_SELF || q.id !== wolfId) && !NO_HACK.includes((g.initialRoles || {})[q.id]) && !NO_HACK.includes((g.currentRoles || {})[q.id]) && !(ONW.rabbitMadman && ONW.rabbitMadman.isHidden(g, q.id)));   // 初期役職・その時点の役職のどちらがヴァニティ/ホタルでも対象外（マイクラ版の finalRoles 除外に相当。Web版の割り当ては配役直後の一度きりで、その時点では currentRoles = 初期役職）。兎の狂人: 草むらに隠れた人はハッキング対象にならない（マイクラ版 excludeRabbitHiddenParticipants。兎の対象決定は assignAll より前に済んでいる）
       if (!cands.length) { g.hackFailed[wolfId] = true; return null; }
       let t = ONW.debug && ONW.debug.randTarget ? ONW.debug.randTarget(g, "hack", wolfId) : null;   // デバッグで対象を指定している場合
       if (!t || !cands.some((q) => q.id === t)) t = pick(cands).id;
+      // スクリューガム: 盤面にスクリューガムがいて、対象が村人陣営（配布時点で恋人になっていない）ならハッキングは失敗する（マイクラ版 assignSilverWolfHackFromSource。再抽選はせず、その銀狼はハッキングできない。失敗は観測にも残らない）
+      if (ONW.screwGum && ONW.screwGum.present(g) && ONW.screwGum.blocksHack(g, t)) { g.hackFailed[wolfId] = true; (g.hackScrewFail = g.hackScrewFail || {})[wolfId] = t; return null; }
       const c0 = g.center0 || g.center || [], tfc = g.centerTransformFrom || {};
       const idx = c0.map((r, i) => i).filter((i) => c0[i] && !NO_FAKE.includes(c0[i]));
       let fake = ONW.debug && ONW.debug.randHackFake ? ONW.debug.randHackFake(g, wolfId) : null;   // デバッグで思い込ませる役職を指定している場合
@@ -72,6 +77,16 @@
       const w = wolves || [];
       return { id: t, mate: w.includes(t), n: w.length };
     },
+    /** スクリューガムでハッキングに失敗した相手（いなければ null） */
+    screwFailTarget: (g, id) => (g.hackScrewFail || {})[id] || null,
+    /** 失敗の夜の情報の文（マイクラ版 roles.js の銀狼情報どおり） */
+    screwFailLine: (g, wolfId) => { const t = H.screwFailTarget(g, wolfId); return t ? nameOf(g, t) + " へのハッキングに失敗しました。" : null; },
+    /** 失敗の演出用データ（reveal と同じ形に fail: true を付けたもの） */
+    screwFailReveal(g, wolfId, wolves) {
+      const t = H.screwFailTarget(g, wolfId); if (!t) return null;
+      const w = wolves || [];
+      return { id: t, fail: true, mate: w.includes(t), n: w.length };
+    },
     /** 結果画面用: [[銀狼のID, 対象のID, 思い込ませた役職]] */
     pairs: (g) => Object.keys(g.hackTarget || {}).map((a) => [a, g.hackTarget[a], (g.hackRole || {})[g.hackTarget[a]] || (g.hackCutRole || {})[g.hackTarget[a]] || null]),
   });
@@ -84,7 +99,7 @@
    *  ・思い込み役職が コスプレイヤー・模倣の人狼・開拓者 のときも、偽の操作画面・偽の演出が出る（コスプレ=山札から偽の3枚 / 模倣の人狼=偽の模倣先の役職 / 開拓者=偽の運命の役職。hackfix_11）。 */
   const UNSUP_UI = [];   // 以前は コスプレイヤー・模倣の人狼・開拓者 だけ操作画面を出さなかった。いまは3役職とも偽の画面・演出が出るので空（互換のために残す）
   const AUTO_SKIP = ["robber", "troublemaker"];
-  const WOLFVIEW = ["werewolf", "big_wolf", "white_wolf", "tofu_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "command_wolf", "curse_wolf", "negi_wolf", "cultist", "merlin", "demon_duke", "yokai_tanuki"];
+  const WOLFVIEW = ["werewolf", "big_wolf", "white_wolf", "tofu_wolf", "assassin", "wolf_king", "mapo_wolf", "cat_pumpkin", "observer_wolf", "mind_wolf", "mimic_wolf", "eraser_wolf", "mirage_wolf", "silver_wolf", "command_wolf", "curse_wolf", "negi_wolf", "patch", "cultist", "merlin", "demon_duke", "yokai_tanuki"];
   const pool = (g) => [...Object.values(g.initialRoles || {}), ...(g.center0 || g.center || [])].filter((r) => r && !NO_FAKE.includes(r));
   const rnd = (g) => { const p = pool(g); return p.length ? pick(p) : "villager"; };
   const shuf = (a) => a.slice().sort(() => Math.random() - 0.5);
@@ -160,8 +175,11 @@
       else if (fake === "servant") { m.text = V.master ? `あなたのご主人は ${nm(V.master)} です。` : "ご主人が見つかりませんでした。"; m.master = V.master ? { id: V.master } : null; }   // ご主人のカードが「👑ご主人」でめくれる
       else if (fake === "executioner") { m.text = V.target ? `あなたのターゲットは ${nm(V.target)} です。` : "ターゲットが見つかりませんでした。"; m.master = V.target ? { id: V.target, mark: "__target" } : null; }   // ターゲットのカードに🎯
       else if (fake === "cosplayer") { m.cosplay = { cards: shownList(H.cosDraw(g, p.id)) }; }   // 山札から偽の3枚がめくれる（選ぶと朝にコスプレの演出が出る）
+      else if (fake === "copylist") { m.cosplay = { cards: H.copyDraw(g, p.id).roles.slice() }; }   // 場にある役職の偽の候補カードがめくれる（コピーできない役職にはバツマーク。選ぶと朝にコピーの演出が出る）
       else if (fake === "hotaru") { m.cosplay = { cards: ["hotaru", "sam"] }; }   // 変身するかどうかの偽の2枚がめくれる（選ぶと朝にホタルの演出が出る。本物のホタルはハッキング対象外だが、思い込み先にはなる）
       else if (fake === "bartender") { m.text = V.master ? `カクテルを${nm(V.master)}に渡しました。` : ""; }   // バーテンダーと思い込んだ人: 偽のカクテル通知（マイクラ版 showSilverWolfFakeNightInfo の BARTENDER。本物の対象・酔いには影響しない。相手は銀狼側の安定したランダムな相手）
+      else if (fake === "rabbit_madman") { m.text = V.master ? `${nm(V.master)}が警戒して草むらに隠れたようです。` : ""; }   // 兎の狂人と思い込んだ人: 偽の隠れ通知（マイクラ版 openSilverWolfFakeNightAction の RABBIT_MADMAN。本物の隠れた人は漏らさない。相手は銀狼側の安定したランダムな相手）
+      else if (fake === "persona" && ONW.persona) { const fm = ONW.persona.fakeMask(g, p.id); m.text = fm ? `あなたは${c.rn(fm)}の仮面を被りました。` : "仮面を見つけられませんでした。"; }   // ペルソナと思い込んだ人: 偽の仮面の通知（マイクラ版 showSilverWolfFakeNightInfo の PERSONA。偽の仮面は1回だけ決めて配布カードの仮面表示と一致させる）
       return m;
     },
     /** 偽の夜の表示（夜の始まり）。本当の情報は出さない。模倣の人狼・開拓者は、偽の模倣先 / 偽の運命の役職の表示を合流させる（本物の mimic_wolf.js / trailblazer.js と同じ形） */
@@ -186,6 +204,32 @@
       const P = sel.players || [], G_ = sel.graves || [], a = P[0], b = P[1], A = a ? nameOf(g, a) : "誰か", B = b ? nameOf(g, b) : "誰か";
       const rn = (r) => roleName(r), R = () => rn(rnd(g)), t = (x) => ({ text: x, rev: null });
       const sh = (r) => (ONW.shownRole ? ONW.shownRole(r) : r);   // 朝のカード演出（rev）に渡す役職の見せ方（本物の演出と同じ）。rev の形は各役職の本物と同じにして、思い込んでいる人にも同じ演出を出す
+      if (fake === "lookout") {   // 見張り番と思い込んだ人: 選んだ相手を見張ることにしたという文だけ（結果は待機時間に偽の通知が来る。lookout.js の settleMsg。本物の盤面には影響しない）
+        if (a) return t(`あなたは ${A} を見張ることにしました。結果は昼開始時に通知されます。`);
+        return t(null);
+      }
+      if (fake === "agitator" || fake === "mad_agitator") {   // 煽動者・狂った煽動者と思い込んだ人: 選んだ相手を煽ったという文＋朝に 📢 の面でめくれる（本物の煽動者・狂った煽動者と同じ演出。本物の盤面・投票には影響しない）
+        if (a) return { text: `${A} を煽りました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__agit" }] } };
+        return t(null);
+      }
+      if (fake === "trap_master") {   // 罠師と思い込んだ人: 選んだ相手に罠を仕掛けたという文＋朝にトラバサミの面でめくれる（本物の罠師と同じ演出。本物の盤面・罠には影響しない）
+        if (a) return { text: `${A} に罠を仕掛けました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__trap" }] } };
+        return t(null);
+      }
+      if (fake === "apprentice_seer") {   // 見習いの占い師と思い込んだ人: 1/2で「人狼だった」という偽の結果（文＋白丸/黒丸の面でめくれる。マイクラ版の偽見習い占いと同じ。本物の盤面には影響しない）
+        if (a) { const w = Math.random() < 0.5; return { text: `${A} は${w ? "人狼でした" : "人狼ではありませんでした"}。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: w ? "__appblack" : "__appwhite" }] } }; }
+        return t(null);
+      }
+      if (fake === "whimsical_seer") {   // 気まぐれな占い師と思い込んだ人: 1/2で偽の失敗（文＋「失敗」の面でめくれる）、残りは占い師と同じ偽の結果（マイクラ版の偽気まぐれ占いと同じ。本物の盤面・呪殺には影響しない）
+        if (Math.random() < 0.5) {
+          if (a) return { text: `${A} の占いに失敗し、役職を確認できませんでした。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__seerfail" }] } };
+          if (G_.length) { const items = G_.slice().sort((x, y) => x - y).map((i) => ({ k: "g:" + i, role: "__seerfail" })); return { text: "占いに失敗し、墓地の役職を確認できませんでした。", rev: { kind: "peek", items } }; }
+          return t(null);
+        }
+        if (a) { const r = rnd(g); return { text: `${A} の役職は「${rn(r)}」でした。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: r }] } }; }
+        if (G_.length) { const items = G_.slice().sort((x, y) => x - y).map((i) => ({ k: "g:" + i, role: rnd(g) })); return { text: items.map((it) => `墓地${+it.k.slice(2) + 1}枚目は「${rn(it.role)}」でした。`).join("\n"), rev: { kind: "peek", items } }; }
+        return t(null);
+      }
       if (["seer", "mad_seer", "fake_seer"].includes(fake)) {
         if (a) { const r = rnd(g); return { text: `${A} の役職は「${rn(r)}」でした。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: r }] } }; }
         if (G_.length) { const items = G_.slice().sort((x, y) => x - y).map((i) => ({ k: "g:" + i, role: rnd(g) })); return { text: items.map((it) => `墓地${+it.k.slice(2) + 1}枚目は「${rn(it.role)}」でした。`).join("\n"), rev: { kind: "peek", items } }; }
@@ -194,6 +238,12 @@
       if (fake === "finger_reader") return t(`${A} を占って ${R()} でした。`);
       if (fake === "robber") { const r = rnd(g); return { text: `${A} と役職を交換しました。あなたの新しい役職は「${rn(r)}」です。`, rev: a ? { kind: "swap", target: a, role: sh(r) } : null }; }
       if (fake === "relic_robber") { const r = rnd(g); return { text: `墓地${(G_[0] || 0) + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(r)}」です。`, rev: { kind: "relic", target: G_[0] || 0, role: sh(r) }, newRole: r }; }   // newRole: 偽の新しい役職（朝の連鎖の偽の画面に使う）。rev: 墓地と入れ替わる演出
+      if (fake === "patch") {   // パッチと思い込んだ人: 偽の相方が見えていれば「相方がいるため発動しなかった」、いなければ墓地から奪ったことにする（墓荒らしと同じ入れ替わり演出＋偽の連鎖。本物の盤面・記録には影響しない）
+        const V = H.view(g, id);
+        if (V.wolves.length) return t("相方がいるため、能力は発動しませんでした。");
+        const cs = g.center0 || g.center || [], gi = cs.length ? Math.floor(Math.random() * cs.length) : 0, r = rnd(g);
+        return { text: `あなたは能力を発動し、墓地${gi + 1}の${rn(r)}を奪いました。`, rev: { kind: "relic", target: gi, role: sh(r) }, newRole: r };
+      }
       if (fake === "doppelganger") { const r = rnd(g); return { text: `${A} をコピーしました。あなたの新しい役職は「${rn(r)}」です。`, rev: a ? { kind: "doppel", target: a, seen: sh(rnd(g)), role: sh(r) } : null, newRole: r }; }
       if (fake === "troublemaker") return { text: `${A} と ${B} の役職を入れ替えました。`, rev: a && b ? { kind: "tm", a, b } : null };
       if (fake === "gremlin") { const r = rnd(g); return { text: `${A} の役職「${rn(r)}」を ${B} にコピーしました。`, rev: a && b ? { kind: "gremlin", from: a, to: b, role: sh(r), copied: sh(r) } : null }; }
@@ -202,6 +252,8 @@
       if (fake === "cupid") return t(`${A} と ${B} を恋人にしました。`);
       if (fake === "evil_woman") return t(`本命は ${A}、キープは ${B} です。`);
       if (fake === "avenger") return t(`${A} を復讐対象にしました。`);
+      if (fake === "jester_ghost") return t(`${A}を恨みました。`);   // 道化の怨霊と思い込んだ人（マイクラ版 night.js の fakeRole 分岐の文そのまま）
+      if (fake === "telepathist") return t(`${A}に接続しました。`);   // テレパシストと思い込んだ人（文だけ。チャット・後追い・追加勝利は本物だけ）   // 道化の怨霊と思い込んだ人（マイクラ版 night.js の fakeRole 分岐の文そのまま）
       if (fake === "heartbreaker") return t(`${A} を破局対象に選びました。`);
       if (fake === "love_tanner") return t(`${A} に一目惚れしました。`);
       if (fake === "prankster") return t(`${A} を対象に選びました。`);
@@ -211,6 +263,8 @@
       if (fake === "eraser_wolf") return t(`${A} を抹消対象にしました。`);
       if (fake === "visitor") return t(`${A} を訪問しました。`);
       if (fake === "watchdog") return t(`${A} を飼い主にしました。`);
+      if (fake === "dog_madman") return t(`${A} を飼い主にしました。`);
+      if (fake === "boar_madman") return t(`あなたは${A}にしか投票できません。`);   // 猪の狂人と思い込んだ人（マイクラ版の偽の夜結果文と同じ。本物の記録・投票の強制には影響しない）
       if (fake === "keymaster") { const lock = Math.random() < 0.5; return { text: lock ? `${A} の役職をロックしました。` : `${A} の役職のロックを解除しました。`, rev: a ? { kind: "key", mode: lock ? "lock" : "unlock", ids: [a] } : null }; }
       if (fake === "major") return t(`${A} を救済しようとしました。`);
       if (fake === "carmen") return t(`${A} に囁きました。`);
@@ -227,6 +281,17 @@
         if (!H.cosValid(g, id, pk, d)) return { text: null, rev: { kind: "cosplay", cards, pick: null, role: null } };
         const role = d.roles[pk], s = sh(role);
         return { text: `山札から3枚めくり、「${rn(s)}」にコスプレしました。あなたの新しい役職は「${rn(s)}」です。`, rev: { kind: "cosplay", cards, pick: pk, role: s }, newRole: role };
+      }
+      if (fake === "copylist") {   // コピリストと思い込んだ人: 候補カードから選んだ役職をコピーしたことにする（選んでいなければランダム。朝の演出は本物と同じ rev.kind "copylist"。本物の盤面・記録には影響しない）
+        const d = id ? H.copyDraw(g, id) : null;
+        if (!d) return t(null);
+        const cards = d.roles.slice(); d.used = true;
+        const usable = cards.map((r, i) => i).filter((i) => !(ONW.copylist && ONW.copylist.BLOCKED.includes(cards[i])));
+        let pk = sel.pick;
+        if (!Number.isInteger(pk) || !usable.includes(pk)) pk = usable.length ? usable[Math.floor(Math.random() * usable.length)] : null;
+        if (pk === null) return { text: "コピーできる役職が見つかりませんでした。", rev: { kind: "copylist", cards, pick: null, role: null } };
+        const role = cards[pk];
+        return { text: `あなたは${rn(role)}をコピーしました。`, rev: { kind: "copylist", cards, pick: pk, role }, newRole: role };
       }
       if (fake === "chesed") return t(`${A}を占い、${B}にコーヒーを渡しました。`);   // ケセドと思い込んだ人（マイクラ版の偽ケセド文と同じ。本物の記録・コーヒータイムには影響しない）
       if (fake === "nanoka") {   // なのかと思い込んだ人: 選んだ形態に「なった」ことにする（マイクラ版の偽なのか文「○○になりました。」と同じ。朝の演出も本物と同じ rev.kind "nanoka"。本物の盤面・記録には影響しない）
@@ -289,7 +354,7 @@
         const ui = H.uiRole(g, p.id, null);   // 夜の操作画面の役職（模倣の人狼・開拓者は偽の模倣先 / 偽の運命の役職）
         if (!ui || !ONW.roleIsActive(ui)) return;
         const sel = (g.nightSels || {})[p.id] || { players: [], graves: [] };
-        if (!h.done(p.id)) {
+        if (!h.done(p.id) && ui !== "copylist") {   // コピリストだけは、選んでいなくてもランダムにコピーしたことにする（本物と同じ）
           if (ui === "cosplayer") { const d = H.cosDraw(g, p.id); d.used = true; h.rev[p.id] = { kind: "cosplay", cards: shownList(d), pick: null, role: null }; }   // 選ばなかった: 3枚とも裏返って山札へ戻る
           h.hold(p.id, "夜の行動をしませんでした。"); return;
         }
@@ -361,8 +426,19 @@
     cosValid(g, id, pick, d) { const x = d || (g.hackCos || {})[id]; return !!x && Number.isInteger(pick) && pick >= 0 && pick < x.roles.length; },
     /** 偽のコスプレの夜の選択（net.js の sel）。3枚の範囲外は選んでいない扱い */
     cosNormalize(g, id, sel) { const pk = sel && sel.pick; return { players: [], graves: [], pick: H.cosValid(g, id, pk) ? pk : null }; },
+    /** 偽のコピリストの候補カード（本物と同じ候補: 自分以外の参加者の役職＋墓地。コピーできない役職も含む。1回だけ決めて保存） */
+    copyDraw(g, id, renew) {
+      g.hackCopy = g.hackCopy || {};
+      const cur = g.hackCopy[id];
+      if (cur && !cur.used && !renew) return cur;
+      const roles = ONW.copylist ? ONW.copylist.candidates(g, id) : [];
+      return (g.hackCopy[id] = { roles, used: false });
+    },
+    copyValid(g, id, pick, d) { const x = d || (g.hackCopy || {})[id]; return !!x && Number.isInteger(pick) && pick >= 0 && pick < x.roles.length && !(ONW.copylist && ONW.copylist.BLOCKED.includes(x.roles[pick])); },
+    /** 偽のコピリストの夜の選択（net.js の sel）。バツマークの役職・範囲外は選んでいない扱い */
+    copyNormalize(g, id, sel) { const pk = sel && sel.pick; return { players: [], graves: [], pick: H.copyValid(g, id, pk) ? pk : null }; },
     /** 偽の連鎖がコスプレイヤーのとき、画面に出す偽の3枚（なければ null） */
-    chainDraw(g, id, role) { const d = (g.hackCos || {})[id]; return role === "cosplayer" && d && !d.used ? shownList(d) : null; },
+    chainDraw(g, id, role) { const d = (g.hackCos || {})[id]; if (role === "copylist") { const cd = (g.hackCopy || {})[id]; return cd && !cd.used ? cd.roles.slice() : null; } return role === "cosplayer" && d && !d.used ? shownList(d) : null; },
     /** 手にした偽の役職 role の「手にした直後の情報」の文と、朝にめくれるカード（本物の got と同じ形）。asSub: 模倣の人狼・開拓者が借りている役職（仲間の人狼の文は二重にしない） */
     gotParts(g, id, role, rev, asSub) {
       const V = H.view(g, id), nm = (x) => nameOf(g, x), out = { lines: [], peek: [], both: false };
@@ -433,6 +509,11 @@
     fairy: { kinds: ["barrier"], n: 1, ok: () => ({ t: "fairyok", on: true }), text: (g, A) => `${A} にバリアを付与しました。` },
     icarus: { kinds: ["icarus"], n: 1, repeat: true, ok: () => ({ t: "icarusok", on: true, max: 1 }), text: (g, A) => `${A} に票を分け与えました。` },
     goranshin: { kinds: ["goranshin"], n: 1, ok: () => ({ t: "goranshinok", on: true }), text: (g, A) => `${A} の投票先をランダムにしました。` },
+    rat_madman: { kinds: ["hide"], n: 1, ok: () => ({ t: "ratok", on: true }), text: (g, A) => `${A} に逃げ込みました。` },   // 鼠の狂人を思い込んだ人: 逃げ込む相手を1人選ぶ（マイクラ版の偽の通知「鼠の狂人通知: 〇〇に逃げ込みました。」）
+    sheep_madman: { kinds: ["sheep"], n: 1, ok: () => ({ t: "sheepok", on: true }), text: (g, A) => `${A}を迷える子羊状態にしました。` },   // 羊の狂人を思い込んだ人: 迷える子羊にする相手を1人選ぶ（マイクラ版の偽の通知「羊の狂人通知: 〇〇を迷える子羊状態にしました。」）
+    medium: { kinds: ["medium"], n: 1, ok: (f, g, id) => ({ t: "mediumok", on: true, targets: ONW.medium ? ONW.medium.targetList(g, id) : [] }), text: (g, A) => `${A}の役職は${roleName(rnd(g))}でした。` },   // 霊媒師を思い込んだ人: 霊媒する死亡者を1人選ぶ（対象は本物と同じ死亡者。マイクラ版の偽の通知「霊媒通知: 〇〇の役職は△△でした。」。対象が死亡者なので dayAct は専用分岐で検証する）
+    counselor: { kinds: ["counsel"], n: 1, ok: () => ({ t: "counselok", on: true }), text: (g, A) => `${A}を選びました。` },
+    ren: { kinds: ["ren"], n: 1, ok: () => ({ t: "renok", on: true }), text: (g, A) => `${A}を選びました。` },   // カウンセラーを思い込んだ人: 更生させる相手を1人選ぶ（対象は本物と同じ生きている自分以外の1人。マイクラ版にカウンセラー専用の偽文は無く、既定の偽文「〇〇を選びました。」）
     freeter: { kinds: ["rejob"], n: 1, ok: () => ({ t: "rejobok", on: true }), text: (g, A) => `${A} に再就職しました。` },
     mind_wolf: { kinds: ["mind"], n: 1, ok: () => ({ t: "mindok", on: true, role: "mind_wolf" }), text: (g, A) => (ONW.mindWolf && ONW.mindWolf.resultText ? ONW.mindWolf.resultText(A, roleName(rnd(g))) : `${A} の最終役職は「${roleName(rnd(g))}」でした。`) },
     sense_seer: { kinds: ["mind"], n: 1, ok: () => ({ t: "mindok", on: true, role: "sense_seer" }), text: (g, A) => { const ks = Object.keys((ONW.senseSeer && ONW.senseSeer.FEEL) || { village: 1, wolf: 1, third: 1 }); return ONW.senseSeer && ONW.senseSeer.resultText ? ONW.senseSeer.resultText(A, pick(ks)) : `${A} から村人の気配を感じました。`; } },
@@ -440,6 +521,7 @@
     predictor: { kinds: ["predict"], n: 0, repeat: true, ok: (f, g, id) => ({ t: "predok", on: true, sel: ((g.hackPred || {})[id] || []).slice() }) },
     hokma: { kinds: ["hokma"], n: 0, ok: () => ({ t: "hokmaok", on: true }), text: () => "昼時間を10秒縮めました。" },   // ホクマーを思い込んだ人: 対象なし。偽は1回だけ（マイクラ版 openSilverWolfFakeDayAction の繰り返しガードに HOKMA は入っていない。本物は何度でも使える）
     agent: { kinds: ["agent"], n: 1, ok: () => ({ t: "agentok", on: true, pick: true }), text: (g, A) => `${A}を守る対象にしました。` },   // 代行者を思い込んだ人: 守る対象を1人選ぶ（マイクラ版の偽の昼アクション。通知のタイトルは「代行者通知」）
+    wagerer: { kinds: ["wagerer"], n: 0, repeat: true, ok: (f, g, id) => ({ t: "wagererok", on: true, fake: true, options: ONW.wagerer ? ONW.wagerer.options(g) : [], cur: ((g.hackWagerer || {})[id]) || null }) },   // 勝負師を思い込んだ人: 勝利する陣営を選ぶ偽の画面（本物と同じ選択肢。何度でも選び直せる。マイクラ版の偽通知は「{選択肢}勝利を予想しました。」）
     yomi: { kinds: ["yomi"], n: 1, self: true, ok: () => ({ t: "yomiok", on: true }), text: (g, A) => `${A} を断ち切りました。` },
   };
   Object.assign(H, {
@@ -449,13 +531,14 @@
     /** 偽の連鎖を仕込む（resolveFake・酔い覚め・偽の連鎖の続きから）。戻り値: 仕込んだ役職（なければ null） */
     fakeChain(g, id, fake, newRole, chainRole) {
       const ar = chainRole || newRole;   // 模倣の人狼・開拓者を手にしたら、偽の模倣先 / 偽の運命の役職の能力が続く
-      if (!ar || !["relic_robber", "doppelganger", "cosplayer"].includes(fake) || !H.chainable(ar, fake)) return null;
+      if (!ar || !["relic_robber", "doppelganger", "cosplayer", "copylist"].includes(fake) || !H.chainable(ar, fake)) return null;   // コピリスト: コピーした（つもりの）役職に能力があれば続けて使える（本物と同じ）
       g.hackDepth = g.hackDepth || {};
       if ((g.hackDepth[id] || 0) >= 6) return null;   // 連鎖が延々と続かないように（偽の墓荒らし→ドッペル→コスプレ…）
       g.hackDepth[id] = (g.hackDepth[id] || 0) + 1;
       g.morningAct = g.morningAct || {}; g.hackChain = g.hackChain || {};
       g.morningAct[id] = ar; g.hackChain[id] = ar;
       if (ar === "cosplayer") H.cosDraw(g, id, true);   // コスプレイヤーを手にしたら、自動で山札から偽の3枚がめくれる
+      if (ar === "copylist") H.copyDraw(g, id, true);   // コピリストを手にしたら、自動で偽の候補カードがめくれる
       return ar;
     },
     /** 偽の連鎖の途中か（まだ使っていない / 使ったあと）。net.js の mchain はこれが true なら本物の処理を通さない */
@@ -489,6 +572,24 @@
         if (g.hackDayUsed[id]) return null;
         g.hackDayUsed[id] = true;
         const text = e.text(g);
+        ((g.hackDayLog = g.hackDayLog || {})[id] = g.hackDayLog[id] || []).push(text);
+        return { text };
+      }
+      if (f === "medium") {   // 対象は死亡した人（本物と同じ候補: 昼議論中に死んだ自分以外の人・呪殺で死んだ人は除く）。1回だけ。効果はない（文はマイクラ版の偽通知「霊媒通知: 〇〇の役職は△△でした。」から通知名を除いた形）
+        if (g.hackDayUsed[id]) return null;
+        const t = d.target;
+        const okT = typeof t === "string" && t !== id && (g.deadIds || []).includes(t) && (g.dayDeathIds || []).includes(t) && !(ONW.medium && ONW.medium.isCurseDeath && ONW.medium.isCurseDeath(g, t));
+        if (!okT) return null;
+        g.hackDayUsed[id] = true;
+        const text = e.text(g, nameOf(g, t));
+        ((g.hackDayLog = g.hackDayLog || {})[id] = g.hackDayLog[id] || []).push(text);
+        return { text };
+      }
+      if (f === "wagerer") {   // 対象なし（選択肢キー key）: 何度でも選び直せる。効果はない（本物の予想にはならない）。文はマイクラ版の偽通知「{選択肢}勝利を予想しました。」
+        const opts = ONW.wagerer ? ONW.wagerer.options(g) : [];
+        if (!opts.some((o) => o.key === d.key)) return null;
+        (g.hackWagerer = g.hackWagerer || {})[id] = d.key;
+        const text = `${ONW.wagerer.labelOf(d.key)}勝利を予想しました。`;
         ((g.hackDayLog = g.hackDayLog || {})[id] = g.hackDayLog[id] || []).push(text);
         return { text };
       }
@@ -546,23 +647,24 @@
       const m = K.nightMsg(c, p, r), g = c.g;
       const l = H.line(g, p.id);
       if (l) { m.text2 = l; m.hack = H.reveal(g, p.id, m.cultWolves); }
+      else { const fl = H.screwFailLine(g, p.id); if (fl) { m.text2 = fl; m.hack = H.screwFailReveal(g, p.id, m.cultWolves); } }   // スクリューガムで失敗: 失敗の文と失敗演出
       return m;
     },
     /** 模倣の人狼が銀狼を模倣したとき（ハッキングの情報と演出だけを足す） */
     nightMsgAct(c, p, ar) {
       if (ar !== ID) return null;
-      const l = H.line(c.g, p.id); if (!l) return null;
+      const l = H.line(c.g, p.id), fl = l ? null : H.screwFailLine(c.g, p.id); if (!l && !fl) return null;
       const w = c.g.initialRoles ? (c.g.players || []).filter((q) => q.id !== p.id && ONW.WOLF_LOOK.includes(c.g.initialRoles[q.id])).map((q) => q.id) : [];
-      return { text2: l, hack: H.reveal(c.g, p.id, w) };
+      return { text2: l || fl, hack: l ? H.reveal(c.g, p.id, w) : H.screwFailReveal(c.g, p.id, w) };
     },
     soberLines(c, id, fin) {
       const a = K.soberLines ? K.soberLines(c, id, fin) : [];
-      const l = fin === ID ? H.line(c.g, id) : null;
+      const l = fin === ID ? (H.line(c.g, id) || H.screwFailLine(c.g, id)) : null;
       return l ? (a || []).concat(l) : a;
     },
     soberPeek(c, id, fin) {
       const pk = K.soberPeek ? K.soberPeek(c, id, fin) : {};
-      if (fin === ID) { const h = H.reveal(c.g, id, (pk && pk.wolves) || []); if (h) pk.hack = h; }
+      if (fin === ID) { const h = H.reveal(c.g, id, (pk && pk.wolves) || []) || H.screwFailReveal(c.g, id, (pk && pk.wolves) || []); if (h) pk.hack = h; }
       return pk;
     },
     /** 結果開示(COボタン)の流れ（co.js が kind で引く）: ハッキングした相手を選ぶ →「〇〇 をハッキングしました。」（マイクラ版 main.js と同じ） */
@@ -579,27 +681,28 @@
         SK.later(() => SK.shake(k), 300);
       },
     },
-    /** 夜の演出: 相方なら🐺→裏面。そのあと、USBメモリが対象のカードに刺さり、ウイルスをインストール → ⚠️ */
+    /** 夜の演出: 相方なら🐺→裏面。そのあと、USBメモリが対象のカードに刺さり、ウイルスをインストール → ⚠️
+     *  スクリューガムで失敗したとき（r.fail）は、読み込み途中で止まって「！」が出る失敗演出（hackUsbFail）になる */
     stageNight: {
       order: 35, field: "hackReveal",
       run(r, SK) {
         const k = "p:" + r.id, n = r.n || 0;
         const on = () => SK.G().phase === ONW.PHASE.ONLINE_NIGHT;
         const show = () => { if (!on()) return; SK.up[k] = SK.HACK_MARK; SK.glow[k] = true; if (!SK.nightKeys.includes(k)) SK.nightKeys.push(k); SK.paint(SK.G()); };
-        const usb = () => { if (!on()) return; if (SK.hackUsb) SK.hackUsb(k, show); else show(); };
+        const usb = () => { if (!on()) return; if (r.fail) { if (SK.hackUsbFail) SK.hackUsbFail(k, null); } else if (SK.hackUsb) SK.hackUsb(k, show); else show(); };
         if (r.mate) {
           SK.later(() => { if (!on()) return; delete SK.up[k]; delete SK.glow[k]; SK.paint(SK.G()); }, n * 380 + 1300);
           SK.later(usb, n * 380 + 2200);   // 🐺が裏面に戻ってから
         } else SK.later(usb, n * 380 + 700);   // 仲間の🐺が出終わってから
       },
     },
-    /** 酔い覚めの演出（酔っ払いの銀狼）: 夜と同じくUSBメモリ → ⚠️。相方なら🐺→裏面→USB→⚠️ */
+    /** 酔い覚めの演出（酔っ払いの銀狼）: 夜と同じくUSBメモリ → ⚠️。相方なら🐺→裏面→USB→⚠️。失敗したときは失敗演出 */
     stageSober: {
       list(sp, list, SK) {
         const h = sp && sp.hack; if (!h) return;
         const k = "p:" + h.id, n = (sp.wolves || []).length;
         const show = () => { SK.up[k] = SK.HACK_MARK; SK.glow[k] = true; SK.paint(SK.G()); };
-        const usb = () => { if (SK.hackUsb) SK.hackUsb(k, show); else show(); };
+        const usb = () => { if (h.fail) { if (SK.hackUsbFail) SK.hackUsbFail(k, null); } else if (SK.hackUsb) SK.hackUsb(k, show); else show(); };
         if (h.mate) {
           SK.later(() => { if (SK.held && SK.held[k]) return; delete SK.up[k]; delete SK.glow[k]; SK.paint(SK.G()); }, 300 + n * 380 + 1100);
           SK.later(usb, 300 + n * 380 + 1900);

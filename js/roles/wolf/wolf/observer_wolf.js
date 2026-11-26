@@ -24,7 +24,7 @@
     g.cpuInfo = g.cpuInfo || {};
     const i = ONW.cpu && ONW.cpu.kit && ONW.cpu.kit.infoOf ? ONW.cpu.kit.infoOf(g, id) : null;
     if (!i) return;
-    i.observed = (g.observeLog || []).map((e) => ({ from: e.from, players: e.players.slice(), graves: e.graves.slice() }));
+    i.observed = (g.observeLog || []).filter((e) => !e.poetOnly).map((e) => ({ from: e.from, players: e.players.slice(), graves: e.graves.slice() }));   // poetOnly（ドーナツ配達）は観測できない
     i.observedAt = Date.now();
   }
 

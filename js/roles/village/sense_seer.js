@@ -67,6 +67,14 @@
    */
   function judge(g, target) {
     const role = (g.currentRoles || {})[target];
+    if (role === "persona" && ONW.persona) {   // ペルソナ: 仮面の表示役職の気配（マイクラ版 senseSeerMessage はペルソナを恋人・蜃気狼より先に見る）。分類はマイクラ版の分岐どおり陣営基準（魔法少女・エルフリンデ・ホタル等の特殊な気配は仮面には適用しない）
+      const d = ONW.persona.displayFor(g, target);
+      if (d) {
+        if (d === "mirage_wolf") return { key: classify(g, ONW.mirage.dayRole(g), null), mirage: false };
+        const key = WOLF_ROLES.has(d) ? "wolf" : MAD_ROLES.has(d) ? "mad" : ((ONW.ROLE_INFO[d] || {}).team === ONW.TEAM.THIRD ? "third" : "village");
+        return { key, mirage: false };
+      }
+    }
     if (ONW.mirage && ONW.mirage.isMirageCard(g, role, target)) {
       ONW.mirage.noteInspect(g, target, "sense_seer");   // 蜃気狼に確認された記録（実績 mirage_wolf_inspected 用）
       return { key: classify(g, ONW.mirage.dayRole(g), null), mirage: true };

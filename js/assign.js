@@ -124,6 +124,7 @@ window.ONW = window.ONW || {};
     const out = [];
     Object.entries(g.roleCounts || {}).forEach(([role, n]) => {
       if (role === "daughter") return;   // 娘ちゃんは内部専用役職（マティアスに選ばれた人だけがなる）: 候補の札に入れない
+      if (role === "wraith") return;   // 死霊は内部専用役職（ネクロマンサーに死霊化された人だけがなる）: 候補の札に入れない
       for (let k = 0; k < (n || 0); k++) out.push({ role, k, team: A.teamOf(role), p: A.chance(g, role, k) });
     });
     return out;

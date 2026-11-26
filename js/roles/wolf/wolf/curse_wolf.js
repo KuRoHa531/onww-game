@@ -81,6 +81,7 @@
       if (!t || !top.has(t) || gone.has(t)) return;
       const tr = eff(g, t);
       if (tr === ONW.ROLE.CHICKEN || tr === ONW.ROLE.TOFU_WOLF) return;   // チキン・豆腐の人狼は対象外（マイクラ版どおり）
+      if ((g.parityRejectIds || []).includes(t)) return;   // 奇数人・偶数人がパリティ判定で既に「拒絶」で死亡確定している相手は対象外（死因は拒絶のまま。マイクラ版 applyCurseWolfExecution）
       g.curseWolfKills[p.id] = t;
       if (!g.curseKillIds.includes(t)) g.curseKillIds.push(t);
       if (!(g.eliminated || []).includes(t)) (g.eliminated = g.eliminated || []).push(t);   // 追放を免れていても呪殺で死ぬ

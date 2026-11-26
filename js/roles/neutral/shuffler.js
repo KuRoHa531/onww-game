@@ -46,6 +46,20 @@
     "sam",   // サム（マイクラ版 shufflerEligibleRoles の除外どおり。ホタルが変身した姿の内部専用役職。ホタル自体は山札に入る）
     "mercenary",   // 傭兵（マイクラ版 shufflerEligibleRoles の除外どおり。夜に護衛対象を選ぶ役職）
     "magician",   // 魔法使い（マイクラ版 shufflerEligibleRoles の除外どおり）
+    "wagerer",   // 勝負師（マイクラ版 shufflerEligibleRoles の除外どおり）
+    "apprentice_seer",   // 見習いの占い師（マイクラ版 shufflerEligibleRoles の除外どおり）
+    "lookout",   // 見張り番（マイクラ版 shufflerEligibleRoles の除外どおり）
+    "agitator",   // 煽動者（マイクラ版 shufflerEligibleRoles の除外どおり。夜に煽る相手を選ぶ役職）
+    "mad_agitator",   // 狂った煽動者（マイクラ版 shufflerEligibleRoles の除外どおり。煽動者と同じ）
+    "rabbit_madman",   // 兎の狂人（マイクラ版 shufflerEligibleRoles の除外どおり。干支狂人のうち兎・龍・犬が除外）
+    "dragon_madman",   // 龍の狂人（同上）
+    "dog_madman",   // 犬の狂人（同上）
+    "screw_gum",   // スクリューガム（マイクラ版 shufflerEligibleRoles の除外どおり）
+    "trap_master",   // 罠師（マイクラ版 shufflerEligibleRoles の除外どおり。夜に罠を仕掛ける相手を選ぶ役職）
+    "patch",   // パッチ（マイクラ版 shufflerEligibleRoles の除外どおり。夜に自動で墓地と交換する役職）
+    "jester_ghost",   // 道化の怨霊（マイクラ版 shufflerEligibleRoles の除外どおり。夜に恨み対象を選ぶ役職）
+    "telepathist",   // テレパシスト（マイクラ版 shufflerEligibleRoles の除外どおり。夜に接続先を選ぶ役職）
+    "copylist",   // コピリスト（マイクラ版 shufflerEligibleRoles の除外どおり。夜にコピー先を選ぶ役職）
   ];
   /** 山札（引ける役職の一覧）。重複役職（酔っ払い・恋人）は役職ではないので入らない */
   function pool() {
@@ -205,6 +219,7 @@
       return;
     }
     if (ONW.moses) ONW.moses.before(g, p.id, [], [t]);   // モーゼス: 置かれた新しいモーゼスは0票から（touch で+1しない）
+    if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（変化前の役職で判定）
     const r = shuffle(g, holderOf(g, p.id), ta), shown = ONW.shownRole(r.role);
     i.shuffle = { target: t, role: shown };   // 発言(cpuClaim)・投票(cpuVoteScore)が使う。朝に墓荒らし・ドッペルで手にした連鎖(cur)でも、本人の怪盗などの記録(mode / target)は上書きしない
     if (!cur) { i.mode = "shuffler"; i.target = t; }
@@ -264,6 +279,7 @@
         const why = ONW.keymaster.gate(g, holderOf(g, p.id), [ta]);   // 鍵師のロック: 自分の席か選んだ人の席がロック中なら失敗。山札から引かず、新聞・観測にも載らない
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, holderOf(g, p.id), why, "交換", [t], `${c.rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, holderOf(g, p.id), [t], [ta]); c.rev[p.id] = ONW.keymaster.failRev(g, holderOf(g, p.id), p.id); return; }
         if (ONW.moses) ONW.moses.before(g, p.id, [], [t]);   // モーゼス: 置かれた新しいモーゼスは0票から
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（変化前の役職で判定）
         const r = shuffle(g, holderOf(g, p.id), ta);
         g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.rn(c.eff(p))} ${p.name}`, nameOf, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${c.rn(r.role)}」に変化させました。`) || `${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         c.hold(p.id, `${nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`);
@@ -282,6 +298,7 @@
         const why = ONW.keymaster.gate(g, id, [ta]);   // 朝のうち(墓荒らし・ドッペル経由)・酔い覚めにもロックは効く
         if (why) { const fl = ONW.keymaster.fail(g, id, why, "交換", [t], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [t], [ta]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
         if (ONW.moses) ONW.moses.before(g, id, [], [t]);   // モーゼス: 置かれた新しいモーゼスは0票から
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（変化前の役職で判定）
         const r = shuffle(g, id, ta);
         g.nightLogsAll.push(ONW.watcher.hopLine(ch, `${c.label} ${c.me.name}`, c.nameOf, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職に変化させよう`, (x) => `${x} をランダムな役職「${c.rn(r.role)}」に変化させました。`) || `${c.label} ${c.me.name} は ${c.nameOf(t)} をランダムな役職「${c.rn(r.role)}」に変化させました。`);
         const lines = [`${c.nameOf(t)} をランダムな役職「${c.rn(ONW.shownRole(r.role))}」に変化させました。`];

@@ -245,7 +245,7 @@
         });
         if (gs.length && !R.exec.length) R.t -= 600;   // 通常の追放がなければ、すぐ次へ（騎士と同じ）
       } },
-      skip: { order: 200, run(R) { (R.res.mercGuards || []).forEach((x) => { R.badge[`p:${x.id}`] = "🛡️"; }); } },
+      skip: { order: 201, run(R) { (R.res.mercGuards || []).forEach((x) => { R.badge[`p:${x.id}`] = "🛡️"; }); } },   // order 201: 騎士の skip(order 200) と同居せず、騎士→傭兵の順を一意に保つ（従来は登録順で同じ実効順だった）
       clear(R) { document.querySelectorAll(".kn-burst").forEach((e) => e.remove()); if (R && R.gx) Object.keys(R.gx).forEach((k) => { if (R.gx[k] === "knightguard") delete R.gx[k]; }); },
     },
     achievements(g, id, won) { return M.achievements(g, id, won); },

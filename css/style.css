@@ -933,6 +933,10 @@ body.chat-mode .tb-name .av { display: none; }
 .tb-seat.pick .tb-card { cursor: pointer; animation: tb-pulse 1.5s ease-in-out infinite; }
 .tb-seat.pick:hover .tb-card { transform: translateY(-4px); }
 @keyframes tb-pulse { 0%, 100% { filter: drop-shadow(0 0 0 rgba(217,196,143,0)); } 50% { filter: drop-shadow(0 0 7px rgba(217,196,143,.85)); } }
+
+/* 見張り番: 待機時間に「動いていた」対象のカードが踊る（見張り番本人の画面だけ。約3秒で止まる） */
+.tb-dance { animation: tb-dance .5s ease-in-out 6; }
+@keyframes tb-dance { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-7px) rotate(-5deg); } 50% { transform: translateY(0) rotate(0deg); } 75% { transform: translateY(-7px) rotate(5deg); } }
 .tb-seat.sel .tb-card { transform: translateY(-9px); animation: none; filter: drop-shadow(0 0 9px rgba(201,70,61,.95)); }
 .tb-seat.sel .tb-back { border-color: var(--blood); }
 .tb-seat.dead .tb-front { border-color: var(--blood); box-shadow: 0 0 16px rgba(201,70,61,.85); }
@@ -984,6 +988,19 @@ body.chat-mode .tb-badge { font-size: 9px; top: -7px; right: -8px; }
 .tfp-title span, .tfp-line span { display: inline-block; padding-right: .12em; clip-path: inset(-6px 100% -6px -2px); text-shadow: 0 0 1px rgba(45, 26, 11, .7), .6px .6px 0 rgba(45, 26, 11, .35); animation: tfp-write var(--dur) steps(var(--n)) var(--d) forwards; }
 @keyframes tfp-write { to { clip-path: inset(-12px -80px -12px -12px); } }   /* 書き終わりは箱の外まで広く開ける（フォントの太字・入れ替わりで字が箱からはみ出しても、最後の字が途切れないように） */
 .tfp-hint { margin-top: calc(var(--tfp-fs, 26px) * .5); font-family: var(--font-body); font-size: 11px; color: rgba(60, 34, 12, .55); }
+
+/* ---- 勝負師: 結果発表の紙（全員がめくれたあと・勝利陣営が出る前に、予想した勝負師の分だけ横に並ぶ。文字は全紙同時に1文字ずつ出る） ---- */
+.wgr-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.wgr-wrap.wgr-out { opacity: 0; transition: opacity .6s ease; }
+.wgr-dim { position: absolute; inset: 0; background: rgba(10, 8, 20, .45); animation: tfp-dim-in .2s ease both; }
+.wgr-papers { position: relative; display: flex; gap: 14px; align-items: stretch; justify-content: center; flex-wrap: wrap; max-width: min(96vw, 920px); padding: 12px; }
+.wgr-paper { position: relative; width: auto; flex: 1 1 190px; max-width: 300px; min-height: 128px; padding: 18px 20px; }
+.wgr-paper:nth-child(2) { transform: rotate(.6deg); }
+.wgr-paper:nth-child(3) { transform: rotate(-.7deg); }
+.wgr-paper__h { font-size: 12px; letter-spacing: .35em; color: rgba(60, 34, 12, .6); margin-bottom: 8px; }
+.wgr-paper__t { font-size: 17px; font-weight: 700; line-height: 1.75; white-space: normal; overflow-wrap: anywhere; min-height: 3.5em; text-shadow: 0 0 1px rgba(45, 26, 11, .7), .6px .6px 0 rgba(45, 26, 11, .35); }
+/* 勝負師の操作欄: いま選んでいる予想のボタン */
+.btn--on { background: var(--acc, #b8860b); color: #fff; border-color: transparent; }
 
 /* 固定欄に収まった変化公開（古紙の見た目のまま小さくなる） */
 .cb-tf--paper { margin-top: calc(6px * var(--cb-s, 1)); padding: calc(6px * var(--cb-s, 1)) calc(12px * var(--cb-s, 1)); border: 0; border-radius: 3px; background: linear-gradient(160deg, #dcc48f, #c8a869); box-shadow: inset 0 0 14px rgba(105, 62, 18, .55); color: #2d1a0b; font-family: var(--font-display); }
@@ -1590,6 +1607,17 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* ---- パン屋: 昼タイマー開始時のバナー ---- */
 .bread-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(60,38,12,.94); border: 2px solid #e8b04a; color: #ffe9bf; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
 .bread-banner__icon { font-size: 1.5em; }
+.donut-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(74,36,52,.94); border: 2px solid #f2a7c3; color: #ffe3ef; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
+.donut-banner__icon { font-size: 1.5em; }
+/* スクリューガム: 銀狼の気配の通知バナー（スクリューガム本人の画面だけ。パン屋のバナーと同型、銀狼らしい青銀の配色） */
+.screw-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(16,26,48,.94); border: 2px solid #9db8dd; color: #dbe9ff; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; animation: bread-in 3.6s ease both; }
+.screw-banner__icon { font-size: 1.5em; }
+/* 鈴の巫女: 鈴の通知バナー（パン屋のバナーと同型）。回数ぶん繰り返し出るので1回は短め（約0.85秒）。巫女らしい白×朱×金の配色 */
+.bell-banner { position: fixed; left: 50%; top: 18%; z-index: 1001; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px 26px; border-radius: 999px; background: rgba(250,246,238,.96); border: 2px solid #c9372c; color: #7a1d14; font-weight: 800; font-size: clamp(18px, 4.6vw, 28px); letter-spacing: .06em; white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,.45); pointer-events: none; animation: bell-in .85s ease both; }
+.bell-banner__ic { font-size: 1.5em; animation: bell-sway .5s ease-in-out infinite alternate; transform-origin: 50% 0; }
+.bell-banner__tx { color: #7a1d14; }
+@keyframes bell-in { 0% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(.92); } 12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.97); } }
+@keyframes bell-sway { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 @keyframes bread-in { 0% { opacity: 0; transform: translate(-50%, -14px) scale(.9); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1.04); } 16% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -8px) scale(1); } }
 
 /* ---- ロビー: 名前を押したときの操作メニュー（ホストのみ） ---- */
@@ -1693,6 +1721,26 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-front .tb-wolfmark.tb-master.tb-love small { color: #ffb3d4; }
 .tb-front .tb-wolfmark.tb-bone { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,214,150,.9)); }   /* 番犬: 飼い主の🦴 */
 .tb-front .tb-wolfmark.tb-bone small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffe2b0; line-height: 1.1; letter-spacing: -.02em; }
+.tb-front .tb-wolfmark.tb-boar { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,120,110,.9)); }   /* 猪の狂人: 突進先の🐗 */
+.tb-front .tb-wolfmark.tb-boar small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffc4bd; line-height: 1.1; letter-spacing: -.02em; }
+.tb-front .tb-wolfmark.tb-agit { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255, 210, 63, .9)); }   /* 煽動者: 煽った相手の📢 */
+.tb-front .tb-wolfmark.tb-trap { flex-direction: column; justify-content: space-evenly; filter: drop-shadow(0 0 7px rgba(190, 200, 210, .9)); }   /* 罠師: 罠を仕掛けた相手のトラバサミ（図形） */
+.tb-front .tb-wolfmark.tb-trap svg { width: calc(var(--cw) * .52); height: calc(var(--cw) * .52); }
+.tb-front .tb-wolfmark.tb-trap .tb-trap-ring { fill: none; stroke: #aeb9c4; stroke-width: 6; }
+.tb-front .tb-wolfmark.tb-trap .tb-trap-teeth polygon { fill: #cfd8e0; stroke: #7e8a96; stroke-width: 1.5; }
+.tb-front .tb-wolfmark.tb-trap .tb-trap-pan { fill: #8b96a1; stroke: #5f6a74; stroke-width: 2; }
+.tb-front .tb-wolfmark.tb-trap .tb-trap-dot { fill: #4c565f; }
+.tb-front .tb-wolfmark.tb-trap small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #dfe7ee; line-height: 1.1; letter-spacing: -.02em; }
+.tb-front .tb-wolfmark.tb-trap--sprung { animation: trapSprungShake .5s ease-in-out 2; }   /* 罠師: 罠が発動した瞬間、ガシャンと閉じて震える */
+.tb-front .tb-wolfmark.tb-trap--sprung small { color: #ffb3ab; }
+@keyframes trapSprungShake { 0%, 100% { transform: translateX(0) rotate(0); } 20% { transform: translateX(-3px) rotate(-2deg); } 40% { transform: translateX(3px) rotate(2deg); } 60% { transform: translateX(-2px) rotate(-1deg); } 80% { transform: translateX(2px) rotate(1deg); } }
+.tb-front .tb-wolfmark.tb-counsel { font-weight: 900; font-size: calc(var(--cw) * .32); letter-spacing: .06em; white-space: nowrap; color: #1e7a46; text-shadow: 0 1px 0 rgba(255,255,255,.7), 0 0 10px rgba(64, 199, 120, .55); }   /* カウンセラー: 更生の面（緑の大きな「更生」） */
+.tb-front .tb-wolfmark.tb-counselfail { font-weight: 900; font-size: calc(var(--cw) * .32); letter-spacing: .06em; white-space: nowrap; color: #8a5a1d; text-shadow: 0 1px 0 rgba(255,255,255,.65), 0 0 9px rgba(190, 130, 50, .4); }   /* カウンセラー: 失敗の面（茶色の大きな「失敗」。気まぐれな占い師のひび割れとは別） */
+.tb-front .tb-wolfmark.tb-renmaru, .tb-front .tb-wolfmark.tb-renbatsu { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .38); }   /* レン: 変化していたら ⭕・していなかったら ❌ */
+.tb-front .tb-wolfmark.tb-renmaru { filter: drop-shadow(0 0 7px rgba(64, 199, 120, .9)); }
+.tb-front .tb-wolfmark.tb-renbatsu { filter: drop-shadow(0 0 7px rgba(230, 80, 80, .85)); }
+.tb-front .tb-wolfmark.tb-renmaru small, .tb-front .tb-wolfmark.tb-renbatsu small { font-size: max(8px, calc(var(--cw) * .19)); font-weight: 700; color: #1e7a46; line-height: 1.1; letter-spacing: -.02em; }   /* レン: モーゼスのときに印の下に出る「モーゼス」 */
+.tb-front .tb-wolfmark.tb-agit small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffe9a8; line-height: 1.1; letter-spacing: -.02em; }
 .tb-seat.glow.glow-master .tb-card { filter: drop-shadow(0 0 10px rgba(197,139,255,.95)); }
 /* 結果発表: カードの左上から下へ縦に増えていく丸いマーク（上から 🐺昇格した狂人 / ❤恋人(組ごと) / ♡キープ / 🔀シャッフラー）。
    札(.tb-badge)は右上なのでぶつからない。2つ以上同時に付くときは .mk2 で全部を小さくする */
@@ -1745,6 +1793,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .result-sheet .rs-tag-hackvillage { color: #55ff55; }   /* 銀狼のハッキング: 思い込んでいた役職「(+メイヤー)」を、その役職の陣営の色で */
 .result-sheet .rs-tag-hackwolf { color: #ff5555; }
 .result-sheet .rs-tag-hackthird { color: #aaaaaa; }
+.result-sheet .rs-tag-personavillage { color: #55ff55; }   /* ペルソナ: 仮面役職「(+役職名)」を、仮面役職の陣営の色で（マイクラ版の状態ラベルと同じ） */
+.result-sheet .rs-tag-personawolf { color: #ff5555; }
+.result-sheet .rs-tag-personathird { color: #aaaaaa; }
 .result-sheet .rs-tag-cat { color: #aaaaaa; }   /* シュレディンガーの猫: 参照先が第三陣営の役職のときの「(+役職名)」 */
 .result-sheet .rs-tag-mgdark { color: #ff5555; }   /* 魔法少女: 闇堕ちした人の「(+人狼)」 */
 .result-sheet .rs-tag-mgvillage { color: #55ff55; }   /* 魔法少女: 闇堕ちしていない人の「(+村人)」 */
@@ -1759,6 +1810,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-front.tb-team-avenger { border-color: #e0455a; }
 .tb-front .tb-wolfmark.tb-avenger { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(224,69,90,.95)); }
 .tb-front .tb-wolfmark.tb-avenger small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffb3bd; line-height: 1.1; letter-spacing: -.02em; }
+.tb-front.tb-team-jester { border-color: #9aa7e8; }
+.tb-front .tb-wolfmark.tb-jester { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 7px rgba(255,196,86,.95)); }
+.tb-front .tb-wolfmark.tb-jester small { font-size: max(8px, calc(var(--cw) * .2)); font-weight: 700; color: #ffe1a8; line-height: 1.1; letter-spacing: -.02em; }
 
 /* ---- 処刑人: ターゲットが追放されたとき、揺れる → ギロチンの刃 → カードが真っ二つ ---- */
 .tb-seat.gl-shake .tb-card { animation: gl-shake .9s linear both; }
@@ -1817,6 +1871,9 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .tb-seat.gx-chicken { z-index: 8; }
 .tb-seat.gx-chicken::before { content: "\1F414"; position: absolute; left: 50%; top: 8%; font-size: calc(var(--cw) * .9); line-height: 1; transform: translateX(-50%); z-index: 9; pointer-events: none; animation: gx-chicken-pop 2.6s ease-out both; }
 .tb-seat.gx-chicken .tb-card { animation: gx-chicken-hop .45s ease-in-out 5 alternate; filter: drop-shadow(0 0 12px rgba(255,214,102,.95)); }
+.tb-seat.gx-rooster { z-index: 8; }
+.tb-seat.gx-rooster::before { content: "\1F413"; position: absolute; left: 50%; top: 8%; font-size: calc(var(--cw) * .9); line-height: 1; transform: translateX(-50%); z-index: 9; pointer-events: none; animation: gx-chicken-pop 2.6s ease-out both; }
+.tb-seat.gx-rooster .tb-card { animation: gx-chicken-hop .45s ease-in-out 5 alternate; filter: drop-shadow(0 0 12px rgba(255,160,60,.95)); }
 @keyframes gx-chicken-pop { 0% { transform: translate(-50%, 120%) scale(.2); opacity: 0; } 25% { transform: translate(-50%, -40%) scale(1.3); opacity: 1; } 45% { transform: translate(-50%, -10%) scale(1); } 85% { transform: translate(-50%, -10%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -30%) scale(1); opacity: 0; } }
 @keyframes gx-chicken-hop { from { transform: translateY(0); } to { transform: translateY(-14%); } }
 
@@ -2036,6 +2093,11 @@ body:has(.gx-blow) { overflow-x: hidden; }   /* 画面の外へ飛ぶあいだ�
 .tb-usb.is-done .tb-usb__term { border-color: #e0b341; box-shadow: 0 0 8px rgba(224,179,65,.6); }
 .tb-usb.is-done .tb-usb__term small { color: #ffd76a; }
 .tb-usb.is-done .tb-usb__bar { border-color: #e0b341; } .tb-usb.is-done .tb-usb__bar i { background: #e0b341; }
+/* 銀狼のハッキング失敗（スクリューガム）: ターミナルが赤くなり、大きな「！」が出る */
+.tb-usb.is-fail .tb-usb__term { border-color: #ff5252; box-shadow: 0 0 8px rgba(255,82,82,.65); }
+.tb-usb.is-fail .tb-usb__term small { color: #ff7b7b; }
+.tb-usb.is-fail .tb-usb__bar { border-color: #ff5252; } .tb-usb.is-fail .tb-usb__bar i { background: #ff5252; }
+.tb-usb__bang { position: absolute; left: 50%; top: 40%; z-index: 7; transform: translate(-50%,-50%) scale(.2); opacity: 0; font-size: calc(var(--cw) * .95); font-weight: 900; line-height: 1; color: #ff3b30; text-shadow: 0 0 12px rgba(255,59,48,.85), 0 2px 0 rgba(255,255,255,.9); pointer-events: none; }
 .tb-front.tb-team-hack { border-color: #e0b341; }
 .tb-front .tb-wolfmark.tb-hack { flex-direction: column; justify-content: space-evenly; font-size: calc(var(--cw) * .36); filter: drop-shadow(0 0 8px rgba(255,200,60,.95)); }
 .tb-front .tb-wolfmark.tb-hack small { font-size: max(8px, calc(var(--cw) * .17)); font-weight: 700; color: #ffe9a8; line-height: 1.1; letter-spacing: -.02em; }
@@ -2238,6 +2300,29 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .tb-front .tb-wolfmark.tb-seal .tb-ofuda s::after { transform: rotate(-45deg); }
 @keyframes sealSlap { 0% { transform: rotate(-6deg) scale(2.2); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(-6deg) scale(1); opacity: 1; } }
 
+/* ---- 兎の狂人: 草むら（隠れた人のカード。兎本人の朝のめくり／隠れた人に能力を使って失敗した人の朝のめくり）---- */
+.tb-front.tb-team-village:has(.tb-grass) { border-color: #3f7a2e; box-shadow: 0 0 14px rgba(90,180,60,.45), inset 0 0 18px rgba(30,80,20,.35); }
+.tb-front .tb-wolfmark.tb-grass { position: relative; display: flex; align-items: flex-end; justify-content: center; filter: drop-shadow(0 0 8px rgba(90,200,70,.85)); }
+.tb-front .tb-wolfmark.tb-grass span { display: inline-block; transform-origin: 50% 100%; animation: grassGrow .9s cubic-bezier(.3,1.4,.5,1) both; }
+.tb-front .tb-wolfmark.tb-grass .tb-grass-a { font-size: calc(var(--cw) * .52); animation-delay: .05s; }
+.tb-front .tb-wolfmark.tb-grass .tb-grass-b { font-size: calc(var(--cw) * .38); margin: 0 calc(var(--cw) * -.08); animation-delay: .3s; }
+.tb-front .tb-wolfmark.tb-grass .tb-grass-c { font-size: calc(var(--cw) * .52); animation-delay: .18s; }
+@keyframes grassGrow { 0% { transform: scale(.1) translateY(30%); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+
+/* ---- 気まぐれな占い師: 失敗の面（占いに失敗したとき、対象のカードがパリンと割れて「失敗」の文字でめくれる。SEは stage.js が glass_break を鳴らす）---- */
+.tb-front .tb-wolfmark.tb-seerfail { position: relative; animation: seerfailShake .38s ease-out both; }
+.tb-front .tb-wolfmark.tb-seerfail .tb-seerfail-t { font-weight: 900; font-size: calc(var(--cw) * .34); letter-spacing: .02em; white-space: nowrap; color: #5a2020; text-shadow: 0 1px 0 rgba(255,255,255,.65), 0 0 9px rgba(160,40,40,.35); }
+.tb-front .tb-wolfmark.tb-seerfail .tb-seerfail-crack { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: rgba(40,30,35,.78); stroke-width: 1.6; stroke-linecap: round; opacity: 0; animation: seerfailCrack .3s ease-out .05s both; pointer-events: none; }
+@keyframes seerfailShake { 0% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-2.5px) rotate(-1.6deg); } 55% { transform: translateX(2px) rotate(1.2deg); } 80% { transform: translateX(-1px) rotate(-.5deg); } 100% { transform: translateX(0) rotate(0); } }
+@keyframes seerfailCrack { 0% { opacity: 0; transform: scale(.55); } 100% { opacity: 1; transform: scale(1); } }
+
+/* ---- 見習いの占い師: 白丸/黒丸の面（占った相手のカードが、村人側なら白丸・人狼側なら黒丸でめくれる。役職名は出さない）---- */
+.tb-front .tb-wolfmark.tb-appmaru { filter: none; }
+.tb-front .tb-wolfmark.tb-appmaru .tb-appmaru-c { display: block; width: calc(var(--cw) * .58); height: calc(var(--cw) * .58); border-radius: 50%; animation: appmaruPop .3s ease-out both; }
+.tb-front .tb-wolfmark.tb-appmaru .tb-appmaru--w { background: #fff; border: calc(var(--cw) * .045) solid #2b2b33; box-shadow: 0 0 10px rgba(255,255,255,.55), inset 0 0 0 calc(var(--cw) * .02) rgba(0,0,0,.08); }
+.tb-front .tb-wolfmark.tb-appmaru .tb-appmaru--b { background: #191920; border: calc(var(--cw) * .045) solid #d8d8e2; box-shadow: 0 0 10px rgba(10,10,16,.8), inset 0 0 calc(var(--cw) * .1) rgba(255,255,255,.14); }
+@keyframes appmaruPop { 0% { transform: scale(.4); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
 /* ---- エルフリンデ: 封印の鎖と魔法陣（失敗の演出 / 待機時間の封印マーク / 封印した相手のカード。御札とは別の見た目）---- */
 .tb-front.tb-team-elfseal { border-color: #7d5ba6; background: #1d1430; box-shadow: 0 0 14px rgba(150,110,255,.45), inset 0 0 18px rgba(60,30,110,.65); }
 .tb-front .tb-wolfmark.tb-elfseal { position: relative; filter: drop-shadow(0 0 8px rgba(160,120,255,.9)); }
@@ -2375,6 +2460,32 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .dt-ask__ok { flex: 0 0 auto; display: block; margin: 12px auto 2px; min-width: 160px; }
 .dt-ask__ok:disabled { opacity: .5; }
 
+/* 探偵の亡霊: 推理の画面（死亡した本人だけ。相手を1人選んで役職名をキーボードで入力する。js/roles/neutral/detective_ghost.js の openAsk） */
+.dg-ask { position: fixed; inset: 0; z-index: 900; background: rgba(8,9,16,.88); display: flex; align-items: center; justify-content: center; padding: 10px; }
+.dg-ask__box { display: flex; flex-direction: column; gap: 10px; background: #1d1f2b; color: #eee; border: 1px solid #3a3d52; border-radius: 12px; padding: 16px 14px; max-width: 560px; width: 100%; max-height: 94vh; max-height: 94dvh; overflow-y: auto; box-sizing: border-box; }
+.dg-ask__box h2 { margin: 0; font-size: 1.1em; }
+.dg-hint { margin: 0; font-size: .88em; line-height: 1.6; color: #c9cbda; }
+.dg-cands { display: flex; flex-wrap: wrap; gap: 8px; }
+.dg-cand { padding: 8px 14px; border-radius: 999px; border: 1px solid #4a4e66; background: #262838; color: #eee; font: inherit; cursor: pointer; }
+.dg-cand--on { background: #5b2333; border-color: #c0455e; color: #ffd9de; }
+.dg-input { font: inherit; font-size: 1.05em; padding: 10px 12px; border-radius: 8px; border: 1px solid #4a4e66; background: #12131d; color: #fff; box-sizing: border-box; width: 100%; }
+.dg-input:disabled { opacity: .45; }
+.dg-ask__ok { display: block; margin: 2px auto 0; min-width: 160px; }
+.dg-ask__ok:disabled { opacity: .5; }
+
+/* 探偵の亡霊: 結果発表の血文字の紙（全員がめくれたあと・吹っ飛ぶ前。ダイニングメッセージ風。js/roles/neutral/detective_ghost.js の runPapers） */
+.dgp-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.dgp-wrap.dgp-out { opacity: 0; transition: opacity .6s ease; }
+.dgp-dim { position: absolute; inset: 0; background: rgba(12, 4, 6, .55); animation: tfp-dim-in .2s ease both; }
+.dgp-papers { position: relative; display: flex; gap: 14px; align-items: stretch; justify-content: center; flex-wrap: wrap; max-width: min(96vw, 920px); padding: 12px; }
+.dgp-paper { width: auto; flex: 1 1 220px; max-width: 340px; min-height: 150px; padding: 20px 22px; }
+.dgp-paper__h { font-size: 13px; font-weight: 800; letter-spacing: .3em; color: #6d1420; border-bottom: 1px solid rgba(109, 20, 32, .4); padding-bottom: 6px; margin-bottom: 10px; text-align: center; }
+.dgp-paper__t { font-size: 19px; font-weight: 700; line-height: 1.7; color: #8f1020; text-shadow: 0 0 2px rgba(143, 16, 32, .55), 1px 1px 0 rgba(90, 5, 16, .35); min-height: 3.4em; text-align: left; word-break: break-all; }
+.dgp-stamp { position: absolute; right: 12px; bottom: 10px; font-family: var(--font-display); font-weight: 900; font-size: 26px; letter-spacing: .1em; padding: 2px 10px; border: 3px solid currentColor; border-radius: 8px; transform: rotate(-10deg) scale(2.2); opacity: 0; }
+.dgp-stamp--hit { color: #b3122a; }
+.dgp-stamp--miss { color: rgba(96, 74, 74, .85); border-style: dashed; }
+.dgp-stamp--on { opacity: 1; transform: rotate(-10deg) scale(1); transition: transform .18s cubic-bezier(.2,1.6,.4,1), opacity .12s ease; }
+
 /* 名探偵の盤面（結果発表。js/roles/neutral/detective.js の runBoards） */
 .dtr-fx { position: fixed; inset: 0; z-index: 880; background: rgba(8,9,16,.9); display: flex; align-items: center; justify-content: center; padding: 10px; opacity: 0; animation: dtrIn .45s ease forwards; overflow: auto; }
 @keyframes dtrIn { to { opacity: 1; } }
@@ -2439,6 +2550,47 @@ body.ovl-open .dbg-fab--float, body:has(.dbg-sheet) .dbg-fab--float { visibility
 @keyframes gx-curse-darken { 0% { filter: none; } 35% { filter: brightness(.82) saturate(.8) contrast(1.08); } 100% { filter: brightness(.52) saturate(.5) contrast(1.12); } }
 @keyframes gx-curse-shiver { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-1.5px, .5px) rotate(-.6deg); } 50% { transform: translate(1.5px, -.5px) rotate(.6deg); } 75% { transform: translate(-1px, -1px) rotate(-.4deg); } 100% { transform: translate(1px, 1px) rotate(.4deg); } }
 @keyframes gx-curse-in { 0% { opacity: 0; transform: scale(.3) rotate(-7deg); } 45% { opacity: .8; } 100% { opacity: .97; transform: scale(1) rotate(0deg); } }
+
+/* 奇数人・偶数人: 拒絶の演出。大きな赤い「拒絶」の判子が斜めに叩きつけられ、衝撃でカードが震える。判子は押されたまま残る */
+.tb-seat.gx-reject, .tb-seat.gx-rejected { z-index: 8; }
+.tb-seat.gx-reject .tb-card { animation: gx-reject-shake .45s linear both; }
+.tb-seat.gx-reject::after, .tb-seat.gx-rejected::after { content: "拒絶"; position: absolute; inset: 16% 4%; border-radius: 8px; pointer-events: none; z-index: 9;
+  display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: calc(var(--cw) * .52); letter-spacing: .08em; line-height: 1;
+  color: rgba(239, 68, 68, .96); text-shadow: 0 0 3px rgba(127, 29, 29, .9), 0 2px 5px rgba(0, 0, 0, .55);
+  border: calc(var(--cw) * .07) solid rgba(220, 38, 38, .92); outline: 2px solid rgba(220, 38, 38, .55); outline-offset: 3px;
+  background: radial-gradient(circle at 50% 50%, rgba(69, 10, 10, .30), rgba(69, 10, 10, .12) 75%);
+  transform: rotate(-12deg); }
+.tb-seat.gx-reject::after { transform-origin: 50% 50%; animation: gx-reject-in .38s cubic-bezier(.2, 2.4, .45, 1) both; }
+.tb-seat.gx-rejected::after { opacity: .97; }
+.tb-seat.gx-rejected .tb-card { filter: brightness(.74) saturate(.62); }
+@keyframes gx-reject-in { 0% { opacity: 0; transform: scale(2.6) rotate(-26deg); } 55% { opacity: 1; transform: scale(.93) rotate(-10.5deg); } 100% { opacity: .97; transform: scale(1) rotate(-12deg); } }
+@keyframes gx-reject-shake { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 18% { transform: translate(-2.5px, 1px) rotate(-.9deg); } 38% { transform: translate(2.5px, -1px) rotate(.9deg); } 58% { transform: translate(-1.8px, -1.2px) rotate(-.5deg); } 78% { transform: translate(1.6px, 1px) rotate(.4deg); } }
+
+/* ネクロマンサー: 死霊化の演出。幽霊の気配（青白い靄）がカードに漂い、カードがふわりと浮く */
+.tb-seat.gx-wraith { z-index: 8; }
+.tb-seat.gx-wraith .tb-card { animation: gx-wraith-float 1.5s ease-in-out both; }
+.tb-seat.gx-wraith::after { content: "👻"; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9;
+  display: flex; align-items: center; justify-content: center; font-size: calc(var(--cw) * .95); line-height: 1;
+  text-shadow: 0 0 10px rgba(186, 230, 253, .95), 0 0 26px rgba(125, 211, 252, .8);
+  background: radial-gradient(circle at 50% 42%, rgba(224, 242, 254, .34), rgba(56, 89, 140, .28) 62%, rgba(10, 16, 34, .38) 88%);
+  animation: gx-wraith-in 1.5s ease-out both; }
+@keyframes gx-wraith-float { 0% { transform: translateY(0); filter: none; } 40% { transform: translateY(-7px); filter: brightness(1.18) saturate(.72); } 100% { transform: translateY(-3px); filter: brightness(1.1) saturate(.8); } }
+@keyframes gx-wraith-in { 0% { opacity: 0; transform: translateY(10px) scale(.8); } 55% { opacity: .92; } 100% { opacity: .96; transform: translateY(-2px) scale(1); } }
+/* 死霊の面: 役職名の横に幽霊がふわりと浮かぶ */
+.tb-wraith-ghost { display: inline-block; margin-left: .18em; font-size: .92em; vertical-align: -.08em; animation: tb-wraith-bob 2.6s ease-in-out infinite; text-shadow: 0 0 7px rgba(186, 230, 253, .9); }
+@keyframes tb-wraith-bob { 0%, 100% { transform: translateY(0); opacity: .82; } 50% { transform: translateY(-3px); opacity: 1; } }
+
+/* 蛇の狂人の毒殺: 毒の侵食演出（紫と緑の毒がカードの下から這い上がり、全体を侵食してそのまま残る）
+   かつて呪術の人狼に誤って付けた演出を、作者指定どおり蛇の狂人用に作り直したもの（2026-11-25） */
+.tb-seat.gx-poison, .tb-seat.gx-poisoned { z-index: 8; }
+.tb-seat.gx-poison .tb-card { animation: gx-poison-darken 1.7s ease-in both; }
+.tb-seat.gx-poison::after, .tb-seat.gx-poisoned::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 9;
+  background: linear-gradient(to top, rgba(74, 4, 110, .92) 0%, rgba(88, 28, 135, .82) 34%, rgba(65, 117, 5, .68) 62%, rgba(132, 204, 22, .38) 84%, rgba(217, 249, 157, .12) 97%, transparent 100%); }
+.tb-seat.gx-poison::after { animation: gx-poison-rise 1.7s ease-in both; }
+.tb-seat.gx-poisoned::after { opacity: .96; }
+.tb-seat.gx-poisoned .tb-card { filter: brightness(.58) saturate(.72) hue-rotate(42deg) contrast(1.1); }
+@keyframes gx-poison-rise { 0% { clip-path: inset(100% 0 0 0); opacity: 0; } 10% { opacity: 1; } 55% { clip-path: inset(38% 0 0 0); } 78% { clip-path: inset(16% 0 0 0); } 100% { clip-path: inset(0 0 0 0); opacity: .96; } }
+@keyframes gx-poison-darken { 0% { filter: none; } 40% { filter: brightness(.8) saturate(.85) hue-rotate(18deg); } 100% { filter: brightness(.58) saturate(.72) hue-rotate(42deg) contrast(1.1); } }
 
 /* =========================================================
    上皿天秤（js/stage.js の libraSync）— 天秤で投票が制限されているとき、選ばれた2人のカードを皿に載せる。
@@ -2585,6 +2737,9 @@ body.duke-meeting::before, body.dk-result::before { content: ""; position: fixed
 /* ---- コスプレイヤー: 山札から出た3枚（テーブルの山札・墓地の下） ---- */
 .tb-cosplay { margin-bottom: 6px; padding: 4px 8px 2px; border-radius: 10px; background: rgba(201,170,92,.07); box-shadow: inset 0 0 0 1px rgba(201,170,92,.25); }
 .tb-cosplay .tb-seat .tb-name { color: var(--gold-dim); font-size: .72em; }
+/* コピリスト: コピーできない候補のバツマーク（js/stage.js の cosMarkBlocked） */
+.tb-seat.tb-cos-blocked .tb-card { filter: saturate(.5) brightness(.7); }
+.tb-cos-x { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 900; line-height: 1; color: #ff4757; text-shadow: 0 0 7px rgba(0,0,0,.7), 0 2px 3px rgba(0,0,0,.55); z-index: 6; pointer-events: none; }
 
 /* =========================================================
    煙幕の狂人（js/stage.js の stage.smoke / smokeSync）
@@ -2743,6 +2898,21 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 @keyframes mgCircleOut { from { opacity: .95; transform: scale(1); } to { opacity: 0; transform: scale(.6); } }
 
 .th-arrows { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 6; }
+.horse-run { position: absolute; z-index: 7; pointer-events: none; font-size: 34px; line-height: 1; transform: translate(-50%,-50%); filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)); }   /* 馬の狂人: 投票した人の画面でだけ、馬の狂人のカードから投票者へ走る🐎 */
+/* 道化の怨霊: 恨殺のとき、怨霊の席から恨み対象の席へ漂うゴースト（Feign のゴースト風の白い亡霊を CSS で描く。本体は <i>、目と裾の波は擬似要素） */
+.ghost-drag { position: absolute; z-index: 8; pointer-events: none; width: 42px; height: 50px; transform: translate(-50%,-50%); filter: drop-shadow(0 0 10px rgba(190,200,255,.85)); }
+.ghost-drag i { position: absolute; inset: 0; display: block; background: linear-gradient(180deg, rgba(252,253,255,.96), rgba(203,214,250,.82)); border-radius: 50% 50% 46% 46% / 62% 62% 34% 34%; animation: ghost-sway .9s ease-in-out infinite alternate; }
+.ghost-drag i::before { content: ""; position: absolute; left: 28%; top: 33%; width: 6px; height: 9px; border-radius: 50%; background: rgba(38,42,74,.9); box-shadow: 13px 0 0 rgba(38,42,74,.9); }
+.ghost-drag i::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 9px; background: radial-gradient(circle at 6px 0, transparent 6px, rgba(212,222,252,.85) 6.5px); background-size: 12px 9px; background-repeat: repeat-x; }
+@keyframes ghost-sway { from { transform: rotate(-4deg) translateY(0); } to { transform: rotate(4deg) translateY(-3px); } }
+/* 道化の怨霊: ゴーストに取り憑かれたカード（震えて蒼白くなる → めくれたあとも蒼白い気配が残る） */
+.tb-seat.gx-grudge { z-index: 8; }
+.tb-seat.gx-grudge::before { content: ""; position: absolute; left: 50%; top: 40%; width: calc(var(--cw) * 1.25); height: calc(var(--cw) * 1.25); margin: calc(var(--cw) * -.62) 0 0 calc(var(--cw) * -.62); border-radius: 50%; pointer-events: none; z-index: 9; background: radial-gradient(circle, rgba(226,232,255,.8) 0%, rgba(178,190,245,.45) 40%, rgba(178,190,245,0) 70%); animation: gx-grudge-mist 1s ease-out both; }
+.tb-seat.gx-grudge .tb-card { animation: gx-grudge-shiver .18s linear infinite; filter: brightness(1.3) saturate(.35) drop-shadow(0 0 10px rgba(180,190,255,.9)); }
+@keyframes gx-grudge-mist { 0% { transform: scale(.3); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1.5); opacity: .55; } }
+@keyframes gx-grudge-shiver { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px) rotate(-1deg); } 75% { transform: translateX(2px) rotate(1deg); } }
+.tb-seat.gx-grudged .tb-card { filter: saturate(.5) brightness(1.1) drop-shadow(0 0 8px rgba(170,180,240,.8)); }
+.boar-run { position: absolute; z-index: 7; pointer-events: none; font-size: 36px; line-height: 1; transform: translate(-50%,-50%); filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)); }   /* 猪の狂人: 結果発表で票数が出る前に、全員の画面で猪の狂人のカードから突進先へ突っ込む🐗 */
 .th-line { fill: none; stroke: #ffffff; stroke-width: 2.6; stroke-linecap: round; opacity: .95; stroke-dasharray: 1 1; filter: drop-shadow(0 0 4px rgba(255,255,255,.75)); }
 .th-line--bg { stroke: rgba(8,10,24,.55); stroke-width: 5; opacity: .6; filter: none; }
 .th-in { animation: thLineIn .7s cubic-bezier(.3,.6,.3,1) both; }
@@ -2832,6 +3002,17 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .tb-front .tb-mimic.tb-clone { border-color: #57b7ff; background: rgba(87,183,255,.12); color: #cfe9ff; }   /* クローン: 思い込んでいる役職の枠（村人陣営の青） */
 .dl-face .tb-mimic.dl-mimic.tb-fate { border-color: #4fd18b; background: rgba(79,209,139,.12); color: #d4f7e3; }
 
+/* ペルソナ: 仮面をかぶる役職名が書かれた仮面が、ペルソナの役職名のところに被る（作者メモ）。
+   配布画面(.dl-mask)は、カードがペルソナとしてめくれたあとに上から落ちてきて被る（animation-delay は面ごとに指定）。
+   テーブルの面(.tb-mask)は同じ見た目で静止表示（結果発表・観戦・本人の席） */
+.dl-mask, .tb-mask { position: absolute; left: 50%; top: 57%; z-index: 3; display: flex; align-items: center; gap: 2px; max-width: 94%; padding: 1px 7px 2px; border: 1px solid #c9a2ff; border-radius: 999px 999px 999px 999px / 999px 999px 999px 999px; background: linear-gradient(160deg, #4b3670 0%, #2c2145 55%, #1d1730 100%); color: #efe6ff; font-weight: 700; line-height: 1.25; text-align: center; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.25); transform: translate(-50%,-50%) rotate(-4deg); pointer-events: none; }
+.dl-mask { font-size: .8em; animation: dl-mask-in .5s cubic-bezier(.2,1.35,.4,1) both; }
+.tb-mask { font-size: max(6px, calc(var(--cw) * .13)); }
+.dl-mask-ic, .tb-mask-ic { font-size: .95em; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+.dl-mask b, .tb-mask b { overflow-wrap: anywhere; white-space: normal; }
+@keyframes dl-mask-in { 0% { opacity: 0; transform: translate(-50%,-190%) scale(.55) rotate(-16deg); } 60% { opacity: 1; transform: translate(-50%,-38%) scale(1.06) rotate(-2deg); } 100% { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .dl-mask { animation: none; } }
+
 /* 役職確認(📕): 開拓者の運命の欄（開いた説明の下）。運命の枠(tb-fate)と同じ緑 */
 .rb-role .gd-desc.rb-fate { margin-top: 0; border-left: 3px solid #4fd18b; color: var(--ink); }
 .rb-fate__h { margin-bottom: 2px; font-size: 13px; font-weight: 700; color: #4fd18b; letter-spacing: .04em; }
@@ -2865,3 +3046,38 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 #rb-body .rb-arrow { margin: calc(6px * var(--rbs)) 0; font-size: calc(24px * var(--rbs)); }
 #rb-body .rb-role .gd-name { padding: calc(10px * var(--rbs)) calc(20px * var(--rbs)); font-size: calc(20px * var(--rbs)); }
 #rb-body .night-step__hint { margin: calc(6px * var(--rbs)) 0; font-size: calc(13px * var(--rbs)); }
+
+/* 霊媒師の演出: 死んだ人のカードから幽霊が木の札を持って現れる（霊媒師本人の画面だけ。js/roles/village/medium.js の play） */
+.md-fx { position: fixed; z-index: 940; pointer-events: none; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, 10px); opacity: 0; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); }
+.md-ghost { font-size: 36px; line-height: 1; opacity: .92; animation: mdSway 1.6s ease-in-out infinite alternate; }
+@keyframes mdSway { from { transform: translateX(-3px) rotate(-4deg); } to { transform: translateX(3px) rotate(4deg); } }
+.md-tag { margin-top: 2px; min-width: 58px; max-width: 96px; padding: 7px 8px 6px; text-align: center; background: linear-gradient(180deg, #d9b078, #c49a5c 55%, #b08247); border: 2px solid #7d5527; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(255, 240, 200, .35), 0 2px 5px rgba(0, 0, 0, .35); }
+.md-tag-hole { display: block; width: 7px; height: 7px; margin: 0 auto 3px; border-radius: 50%; background: #6e4a20; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); }
+.md-tag-name { display: block; font-size: 13px; line-height: 1.25; color: #42290e; letter-spacing: .02em; }
+
+/* 情報確認の見やすさ改善（2026-11-26）: 役職チップ・セクション見出し・ログ行の区切り。文言は変えず、構造と見た目だけ */
+/* 役職名のチップ（陣営色）: 結果シートの役職情報グループ・情報確認の見出しに付ける */
+.rs-chip { display: inline-block; padding: 0 8px; border: 1px solid currentColor; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 11.5px; font-weight: 700; line-height: 1.9; vertical-align: middle; white-space: nowrap; }
+.rs-chip--village { color: #55ff55; }
+.rs-chip--wolf { color: #ff5555; }
+.rs-chip--third { color: #cfcfd6; }
+/* 結果シート「役職情報」: 役職ごとのグループ枠 */
+.rs-group { margin: 8px 0; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0, 0, 0, .15); min-width: 0; }
+.rs-group__head { margin: 1px 0 3px; }
+.rs-group .rs-line { padding-left: 2px; }
+/* 結果シート「夜行動結果」「昼行動結果」: 1行ごとに左バーと薄い地で区切って読み飛ばしやすく */
+.rs-logbox .rs-line { margin: 4px 0; padding: 3px 8px; border-left: 3px solid rgba(232, 211, 106, .4); border-radius: 0 6px 6px 0; background: rgba(255, 255, 255, .03); }
+/* 対局中の情報確認: セクション見出し・自分の役職の枠・ログ行 */
+.info-h { margin: 10px 0 4px; color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: .06em; }
+.info-rolebox { margin-bottom: 4px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0, 0, 0, .18); }
+.info-rolebox .night-step__hint { margin: 2px 0; }
+.info-body p.info-log { margin: 5px 0; padding: 4px 8px; border-left: 3px solid rgba(111, 211, 224, .45); border-radius: 0 6px 6px 0; background: rgba(255, 255, 255, .04); }
+/* 結果の情報確認（全員）: 見出しの役職チップとログ行 */
+.rinfo-name .rs-chip { margin-left: 8px; }
+#rinfo-overlay p.rinfo-log, .dbg-rinfo p.rinfo-log { margin: 5px 0; padding: 4px 8px; border-left: 3px solid rgba(111, 211, 224, .45); border-radius: 0 6px 6px 0; background: rgba(255, 255, 255, .04); }
+/* ===== デバッグ: 役職選択グリッドの検索（2026-11-26 追加） =====
+   .dbg-rolegrid は選択パネル（flex-wrap）の流れをそのまま受ける包み。検索は debug.roleSearch が表示だけを切り替える */
+.dbg-searchrow { width: 100%; margin: 2px 2px 6px; }
+.dbg-search { width: 100%; box-sizing: border-box; padding: 7px 10px; font-size: 14px; border-radius: 8px; border: 1px solid var(--gold-dim); background: rgba(0, 0, 0, .35); color: var(--paper, #f3ead2); }
+.dbg-rolegrid { width: 100%; display: flex; flex-wrap: wrap; align-content: flex-start; }
+.dbg-noresult { width: 100%; font-size: 12px; opacity: .75; padding: 6px 2px; }

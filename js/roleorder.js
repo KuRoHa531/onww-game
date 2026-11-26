@@ -34,7 +34,7 @@
     "reverser", "lawyer", "watcher", "vanity", "beggar", "magical_girl", "matthias", "daughter",
     "yokai_tanuki", "chesed", "nanoka", "mitsuki_nanoka", "long_night_moon", "rasetsu", "agent", "elfrinde",
     "hotaru", "sam", "mercenary", "thread_spinner", "magician", "wagerer", "persona", "multi_personality",
-    "odd_one", "even_one", "jester_ghost", "telepathist", "copyist", "detective_ghost",
+    "odd_one", "even_one", "jester_ghost", "telepathist", "copylist", "detective_ghost",
   ];
   const rank = new Map(); ONW.ROLE_ORDER.forEach((id, i) => rank.set(id, i));
   // 役職IDの並び順の番号(wiki に無い役職は大きい数=末尾)

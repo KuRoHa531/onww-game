@@ -23,6 +23,7 @@
       ONW.watcher.keyFailShown(g, p.id, [a.id, b.id], [sp.a, sp.b]);
       return;
     }
+    if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a.id, b.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
     g.tmQueue.push({ id: p.id, a: sp.a, b: sp.b });     // 反映は夜の終わり（net.js）
     i.mode = "tm"; i.pair = [a.id, b.id];
     g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${label} ${p.name}`, (id) => (g.players.find((q) => q.id === id) || {}).name || "?", a.id, b.id, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${label} ${p.name} は ${a.name} と ${b.name} の役職を入れ替えました。`);   // 静観者にずれたときは「〇〇と△△の役職を入れ替えようとしましたが、〇〇は静観者だったため□□に変わり、…を入れ替えました。」
@@ -112,6 +113,7 @@
         if (!sp.ok) { c.hold(p.id, ONW.watcher.noneLine("入れ替え")); return; }   // 入れ替える相手が足りなければ入れ替わらない（新聞・観測にも載らない）
         const why = ONW.keymaster.gate(g, p.id, [sp.a, sp.b]);   // 鍵師のロック（先の段階で済んでいる）: 自分かどちらかの席がロック中なら失敗。入れ替えず、新聞・観測にも載らない
         if (why) { c.hold(p.id, ONW.keymaster.fail(g, p.id, why, "入れ替え", [a, b], `${rn(c.eff(p))} ${p.name}`, true)); ONW.watcher.keyFailShown(g, p.id, [a, b], [sp.a, sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
         g.tmQueue.push({ id: p.id, a: sp.a, b: sp.b });
         ONW.observeNote(g, p.id, [a, b], null, "troublemaker");
         ONW.newsNote(g, "troublemaker");
@@ -129,6 +131,7 @@
         if (!sp.ok) return { lines: [ONW.watcher.noneLine("入れ替え")], reveal: null, nextChain: null, failed: true };
         const why = ONW.keymaster.gate(g, id, [sp.a, sp.b]);   // 朝のうち・酔い覚めの入れ替えにもロックは効く
         if (why) { const fl = ONW.keymaster.fail(g, id, why, "入れ替え", [a, b], `${c.label} ${c.me.name}`, true); ONW.watcher.keyFailShown(g, id, [a, b], [sp.a, sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する
         ONW.swapPlayers(g, sp.a, sp.b);
         g.nightLogsAll.push(ONW.watcher.pairLine(sp, `${c.label} ${c.me.name}`, nameOf, a, b, (x, y) => `${x} と ${y} の役職を入れ替えよう`, (x, y) => `${x} と ${y} の役職を入れ替えました。`) || `${c.label} ${c.me.name} は ${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`);
         return { lines: [`${nameOf(a)} と ${nameOf(b)} の役職を入れ替えました。`], reveal: { kind: "tm", a, b }, nextChain: null };

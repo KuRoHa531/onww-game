@@ -98,7 +98,7 @@
     if (!u.length) return "あなたは誰も死亡しないと予想しました。";
     if (u.length === (g.players || []).length) return "あなたは全員死亡すると予想しました。";
     const names = u.map(nm);
-    return names.length === 1 ? `あなたは${names[0]}だけが死亡すると予想していました。` : `あなたは${names.join("と")}が死亡すると予想していました。`;
+    return names.length === 1 ? `あなたは${names[0]}だけが死亡すると予想しました。` : `あなたは${names.join("と")}が死亡すると予想しました。`;
   };
   /** 結果発表の「予想屋情報」に出す、予想の言い方: 「全員死亡する」「Aだけが死亡する」「AとBが死亡する」「誰も死亡しない」 */
   P.resultText = function resultText(g, ids, nm) {

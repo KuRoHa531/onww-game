@@ -29,7 +29,8 @@
       n.hold(p.id, ONW.hack.fail(g, "doppel", `${label} ${p.name}`, t.name));
       return;
     }
-    if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);   // モーゼス: コピー元に使われた回数 +1 してからコピー（コピー先にもその票数が入る）
+    if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t.id]);
+    if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t.id]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: コピー元に使われた回数 +1 してからコピー（コピー先にもその票数が入る）
     const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id), shown = ONW.shownRole(got);
     const stolen = ONW.magician ? ONW.magician.trySteal(g, p.id, got, "doppelganger", "night") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら連鎖能力は使えない。見た役職はコピーした役職のまま。docs/magician.md）
     i.mode = "doppel"; i.target = t.id; i.newRole = shown; i.known[p.id] = shown; i.known[t.id] = ONW.shownRole(seen);
@@ -137,7 +138,8 @@
         const ch = ONW.watcher.shiftChain(g, p.id, t), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。選んだ本人には静観者を選んだように見える。文章・演出は選んだ席 t で出す。ログだけ「静観者だったため」を書く。docs/watcher.md）
         if (!ta) { c.hold(p.id, ONW.watcher.noneLine("コピー")); return; }   // 移す先がなければコピーできない（新聞・観測にも載らない）
         if (ONW.hack && ONW.hack.blocks(g.currentRoles[ta])) { c.hold(p.id, ONW.hack.fail(g, "doppel", `${rn(c.eff(p))} ${p.name}`, nameOf(t))); c.rev[p.id] = ONW.hack.failRev("p:" + t); return; }   // 銀狼のハッキングに阻まれてコピーできない。新聞・観測にも載らない
-        if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);   // モーゼス: コピー元に +1 してからコピー
+        if (ONW.moses) ONW.moses.before(g, p.id, [ta], [t]);
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: コピー元に +1 してからコピー
         const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, p.id);   // コピーするのはその時点の役職（墓荒らしの後・怪盗の前）
         const stolen = ONW.magician ? ONW.magician.trySteal(g, p.id, got, "doppelganger", "night") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら朝の連鎖能力は使えない。見た役職・演出はコピーした役職のまま。docs/magician.md）
         ONW.observeNote(g, p.id, [t], null, "doppelganger");
@@ -159,7 +161,8 @@
         const ch = ONW.watcher.shiftChain(g, id, t), ta = ch.to;   // 静観者を選んだら、実際にコピーする相手は別の人（ずれた先がまた静観者ならさらに別の人。墓荒らしが引いたドッペル・酔い覚めでも同じ）
         if (!ta) return { lines: [ONW.watcher.noneLine("コピー")], reveal: null, nextChain: null, failed: true };
         if (ONW.hack && ONW.hack.blocks(g.currentRoles[ta])) return { lines: [ONW.hack.fail(g, "doppel", `${c.label} ${c.me.name}`, c.nameOf(t))], reveal: ONW.hack.failRev("p:" + t), nextChain: null, failed: true };   // 銀狼のハッキングに阻まれてコピーできない（墓荒らしが引いたドッペル・酔い覚めでも同じ）
-        if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);   // モーゼス: コピー元に +1 してからコピー
+        if (ONW.moses) ONW.moses.before(g, id, [ta], [t]);
+        if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [ta], [t]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する   // モーゼス: コピー元に +1 してからコピー
         const seen = g.currentRoles[ta], got = ONW.copyRole(g, ta, id);
         const stolen = ONW.magician ? ONW.magician.trySteal(g, id, got, "doppelganger", "auto") : false;   // 魔法使い: 変化後の役職を奪われる（奪われたら連鎖能力は使えない。docs/magician.md）
         const lines = [`${c.nameOf(t)} をコピーしました。あなたの新しい役職は「${rn(ONW.shownRole(got))}」です。${seen === "doppelganger" ? "（ドッペルゲンガーをコピーしたので村人になります）" : ""}`];
