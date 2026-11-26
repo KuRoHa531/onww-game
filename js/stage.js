@@ -135,6 +135,20 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   const CHAIN_STEP_MS = 1700;   // 連鎖の1段ぶんの間（撃たれた瞬間の演出 約1秒 + 余韻）
   const later = (fn, ms) => { const h = setTimeout(fn, ms); timers.push(h); return h; };
   const clearAll = () => { timers.forEach(clearTimeout); timers = []; document.querySelectorAll(".gx-screen").forEach((n) => n.remove()); };
+  // 結果演出のウォッチドッグ: 演出タイマー（timers）は clearAll で消えたり、タブの凍結・スロットリングで届かなかったりしうる。
+  //   素の setTimeout（clearAll の対象外）で別に張り、制限時間を過ぎても最終結果（シート）に届いていなければ最終形（skipResult）へ倒す。
+  let resultWatchdog = null;
+  function armResultWatchdog(ms) {
+    disarmResultWatchdog();
+    resultWatchdog = setTimeout(() => {
+      resultWatchdog = null;
+      const g = G();
+      if (g && g.phase === ONW.PHASE.ONLINE_RESULT && g.result && g.resultStage !== "sheet") {
+        try { stage.skipResult(); } catch (e) { try { g.resultStage = "sheet"; ONW.ui.render(g); } catch (e2) { /* 描画が壊れても状態だけは進める */ } }
+      }
+    }, Math.max(5000, ms || 0));
+  }
+  function disarmResultWatchdog() { if (resultWatchdog) { clearTimeout(resultWatchdog); resultWatchdog = null; } }
   // 神の祝福: 画面全体に、星形のキラキラが降りそそぐ（結果が終わるまで）
   function gxStars() {
     if (document.querySelector(".gx-screen")) return;
@@ -871,12 +885,12 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const list = roster(g);
     if (!VISIBLE().includes(ph(g)) || !list.length) {
       smkN.group = null; smkN.perm = null; smkN.sig = "";
-      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; bdCk = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; wraithv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; el.innerHTML = ""; if (ONW.sound) ONW.sound.resetFlips(); }
+      if (key !== null) { clearAll(); key = null; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; bdCk = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; wraithv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; disarmResultWatchdog(); el.innerHTML = ""; if (ONW.sound) ONW.sound.resetFlips(); }
       el.classList.remove("on");
       return;
     }
     const k = `${g.dealStart || 0}|${list.map((p) => p.id).join(",")}|${graveN(g)}`;
-    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; bdCk = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; wraithv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; build(g, list); if (ONW.sound) ONW.sound.resetFlips(); }
+    if (k !== key) { clearAll(); key = k; specShown = {}; specBusy = false; g.asnHold = null; up = {}; dead = {}; curse = {}; shot = {}; shotAnim = {}; shotBooted = false; released = {}; chainPend = {}; peekUp = {}; deathMarks = []; badge = {}; dkb = {}; glow = {}; shin = {}; lov = {}; shuf = {}; kp = {}; wf = {}; bd = {}; bdCk = {}; loveMate = null; asn = {}; bnt = {}; veil = {}; alm = {}; gx = {}; catv = {}; curv = {}; wraithv = {}; fqv = {}; tbv = {}; tbh = {}; starKeys = []; flashKeys = []; queenKeys = []; queenFlashKeys = []; kingKeys = []; kingFlashKeys = []; jobKeys = []; mindKeys = []; senseKeys = {}; nightKeys = []; held = {}; busy = false; seq = false; disarmResultWatchdog(); build(g, list); if (ONW.sound) ONW.sound.resetFlips(); }
     el.classList.add("on");
     smkNamesSync(g);   // 煙幕の名前隠し: 名前が ？？？ になる・席の並びがシャッフルされる（詳細設定がONのときだけ）
     // 観戦者（観戦ONのホスト含む）: 全員のカードを表にして見せる（結果の演出中は除く）
@@ -1314,12 +1328,20 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   }
   /** 結果発表の骨組み。役職ごとの演出は各役職ファイルの stageResult(下の hk(...) で呼ぶ)。R.t = 演出の現在時刻(ms)で、フックが進める */
   function startResult(g) {
+    armResultWatchdog(240000);   // 保険: どう転んでも制限時間内に最終形へ倒す（正確な期限は startResultMain の最後で張り直す）
+    try { startResultMain(g); }
+    catch (e) {
+      console.error("[onww] startResult error:", e);
+      later(() => { const gg = G(); if (gg && gg.phase === ONW.PHASE.ONLINE_RESULT && gg.resultStage !== "sheet") stage.skipResult(); }, 20000);   // 途中で例外が出ても固まらせない（登録済みの演出が終わるころに最終形へ）
+    }
+  }
+  function startResultMain(g) {
     seq = true; winNoteHtml = "";
     libraTilt = "level";   // 天秤: 結果発表の最初は水平（票数バッジのあとに傾く）
     const res = g.result, P = (id) => `p:${id}`;
     g.revRes = {}; res.history.forEach((h) => { if (h.rev > 0) g.revRes[P(h.id)] = h.rev; });   // 反転者: 反転された人のカードは、めくれるとき180度回転した状態で公開
     const order = res.chainOrder || [];
-    const HK = {}, hk = (key) => HK[key] || (HK[key] = ONW.roleHooksIn("stageResult", key));
+    const HK = {}, hk = (key) => HK[key] || (HK[key] = ONW.roleHooksIn("stageResult", key).map((h) => ({ ...h, fn: (...a) => { try { return h.fn(...a); } catch (e) { console.error("[onww] stageResult hook error:", key, e); return 0; } } })));   // フックは1つずつ隔離: 1役職の例外で結果発表全体を止めない
     const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));   // 通常の追放フリップから除く人（身代わりになった従者: 二重にめくらない）
     const exec = res.history.filter((h) => h.dead && h.cause !== "chain" && !skipIds.has(h.id) && !h.dukeDead);   // 魔界公爵追放会議で死んだ人(公爵・身代わりの従者)は、追放会議の場面(demon_duke.js)でめくれる
     const chain = res.history.filter((h) => h.cause === "chain" && h.kind !== "queen" && !h.late).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
@@ -1535,30 +1557,35 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     const losersN = R.noBlow ? [] : res.history.filter((h) => !h.win);   // 神の祝福以外: 結果の字幕のあと、負けた人のカードが吹き飛ぶ
     if (losersN.length) later(() => { losersN.forEach((h) => { gx[P(h.id)] = "blow"; }); if (ONW.sound) ONW.sound.se("card_fly"); paint(G()); }, R.t + 1300);   // SE: 負けた人のカードが吹っ飛ぶ
     later(toSheet, R.t + (losersN.length ? 3800 : 2800));
+    armResultWatchdog(R.t + (losersN.length ? 3800 : 2800) + 30000);   // 演出の予定総時間＋猶予を過ぎてもシートに届いていなければ、最終形へ倒す
   }
   function toSheet() {
-    const g = G(); clearAll(); g.asnHold = null;
+    const g = G(); clearAll(); disarmResultWatchdog(); g.asnHold = null;
     if (ONW.sound) ONW.sound.release();   // BGM: 演出中の固定を解除（このあとの描画でリザルト画面の曲になる）
     g.resultStage = "sheet";
     libraSync(g);   // 天秤: 皿に載せたカードを元の席に戻す
     ONW.ui.render(g);
   }
-  stage.skipResult = function () {
+  function skipResultMain() {
     const g = G(), res = g.result;
     if (!res) return;
-    const hk = (key) => ONW.roleHooksIn("stageResult", key);
+    const hk = (key) => ONW.roleHooksIn("stageResult", key).map((h) => ({ ...h, fn: (...a) => { try { return h.fn(...a); } catch (e) { console.error("[onww] skipResult hook error:", key, e); return undefined; } } }));   // フックは1つずつ隔離: 1役職の例外でスキップ自体を失敗させない
     g.revRes = {}; res.history.forEach((h) => { if (h.rev > 0) g.revRes[`p:${h.id}`] = h.rev; });
     clearAll(); Object.keys(gx).forEach((k) => { if (gx[k] === "bomb" || gx[k] === "boom") delete gx[k]; }); alm = {}; veil = {}; hk("clear").forEach((h) => h.fn(stage.kit));   // 身代わりの「めくれそう」演出・処刑人の演出も止める
     const skipIds = new Set(); hk("execExclude").forEach((h) => (h.fn(res) || []).forEach((id) => skipIds.add(id)));
     const skBmb = new Set(((res.bomber || {}).bombers || []).map((x) => x.id));   // 道化の爆弾魔: 演出なしの最終形でも、自爆した爆弾魔のバッジは「自爆」（結果シートの死因表示は変えていない）
     res.history.forEach((h) => { up[`p:${h.id}`] = h.role; if (h.lover) lov[`p:${h.id}`] = h.loverNos && h.loverNos.length > 1 ? h.loverNos : h.loverNo || true; if (h.shuf) shuf[`p:${h.id}`] = true; if (h.keep) kp[`p:${h.id}`] = true; if (h.prom) wf[`p:${h.id}`] = true; if (h.drunk) bd[`p:${h.id}`] = true; if (h.cocktail) bdCk[`p:${h.id}`] = true; if (h.day) { delete curse[`p:${h.id}`]; dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.dayLabel || "死亡"; } if (h.dead) { dead[`p:${h.id}`] = true; badge[`p:${h.id}`] = h.duke ? "魔界断罪" : skipIds.has(h.id) || h.sub || h.dukeDead ? "身代わり" : h.cause === "chain" ? (h.kind === "tomo" ? "道連れ" : h.kind === "lovers" ? "心中" : h.kind === "queen" ? "王国滅亡" : h.kind === "follow" || h.kind === "thread" ? "後追い" : h.kind === "bite" ? "噛殺" : h.kind === "bomb" ? "爆殺" : "無理心中") : h.mental ? "メンタル崩壊" : h.shock ? "ショック死" : h.reject ? "拒絶" : h.poisonKill ? "毒殺" : h.curseKill ? "呪殺" : h.oxMark === "push" ? "押し切り" : h.oxMark === "mutual" ? "相打ち" : h.execTg ? "処刑" : h.bounce ? "とばっちり" : h.dict ? (h.coup ? "クーデター" : "独裁処刑") : "追放"; if (skBmb.has(h.id) && !h.sub) badge[`p:${h.id}`] = "自爆"; if (h.cause === "chain") shin[`p:${h.id}`] = true; } });
     res.grave.forEach((c, i) => { up[`g:${i}`] = c.role; });
-    const R = Object.create(stage.kit); R.res = res;
+    const R = Object.create(stage.kit); Object.assign(R, { res, g, P: (id) => `p:${id}` });   // startResult の R と同じ道具を持たせる（R.P / R.g を使う skip フックが例外で落ちて、スキップ自体が効かなくなっていた）
     libraTilt = libraTiltOf(res);   // 天秤: 演出なしの最終形（つられた皿が下がったまま）
     hk("skip").forEach((h) => h.fn(R));
     (res.extraWin || []).forEach((x) => { if (!gx[`p:${x.id}`]) gx[`p:${x.id}`] = "extra"; });   // 追加勝利の人のカードは追加勝利の色   // 猫(2回目の面)・神の祝福・処刑人のターゲット(割れた状態)・アサシンに選ばれた人 を、演出なしの最終形で見せる
     if (!res.dictator) res.counts.forEach((c) => { if (!badge[`p:${c.id}`]) badge[`p:${c.id}`] = `${c.c}票`; });   // 独裁処刑のときは票が無い（対象の表示は独裁者の skip フックが付ける）
     toSheet();
+  }
+  stage.skipResult = function () {   // 何があっても最終結果（シート）へ進めることを保証する
+    try { skipResultMain(); }
+    catch (e) { console.error("[onww] skipResult error:", e); const g = G(); if (g && g.result) { try { toSheet(); } catch (e2) { g.resultStage = "sheet"; try { ONW.ui.render(g); } catch (e3) { /* 状態だけは進める */ } } } }
   };
 
   // ---------------------------------------------------------

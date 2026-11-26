@@ -494,7 +494,7 @@ window.ONW = window.ONW || {};
     if (d.t === "goranshindone") { g.thiefOpen = false; g.fairyOpen = false; g.icarusOpen = false; g.goranshinOpen = false; g.libraOpen = false; g.predOpen = false; g.goranshinDone = true; if (d.text && !(g.nightLogs || []).includes(d.text)) { g.nightLogs = [...(g.nightLogs || []), d.text]; if (ONW.ui.refreshInfo) ONW.ui.refreshInfo(); }   /* 何をしたかは情報確認に載せる */ g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); if (ONW.ui && g.phase === PH().ONLINE_DAY) ONW.ui.render(g); }   // 御乱心を使ったことを受け付けた（画面を閉じて「使用済み」にする。本人だけに届く）
     if (d.t === "thiefdone") { g.thiefOpen = false; g.fairyOpen = false; g.icarusOpen = false; g.goranshinOpen = false; g.libraOpen = false; g.predOpen = false; g.thiefDone = true; if (d.text && !(g.nightLogs || []).includes(d.text)) { g.nightLogs = [...(g.nightLogs || []), d.text]; if (ONW.ui.refreshInfo) ONW.ui.refreshInfo(); }   /* 何をしたか（盗めた/失敗）は情報確認に載せる（議論タイムの画面・チャットの上には出さない） */ g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); if (ONW.ui && g.phase === PH().ONLINE_DAY) ONW.ui.render(g); if (d.target && ONW.thief && ONW.thief.play) ONW.thief.play(d.target, !!d.ok); }   // 盗んだことを受け付けた（画面を閉じて「使用済み」を出す。本人だけに届く）。盗んだその瞬間に、本人の画面だけで盗む演出（再入室で戻すときは target なし＝演出しない）
     if (d.t === "forcevote") { g.voted = !!d.v; }   // デバッグ: ホストが投票先を指定した/解除した
-    if (d.t === "result") { g.dukeIds = null;
+    if (d.t === "result" && !(g.phase === PH().ONLINE_RESULT && g.result)) { g.dukeIds = null;   // 既にこの試合の結果を受け取り済みなら二重配布（再接続時の再送）は無視する: resultStage を "exec" に戻すと、開始済みの演出（stage の seq）が二度と始まらず固まってしまう
       g.strawPick = null; g.strawWait = null; g.detWait = false; if (ONW.detective && ONW.detective.closeAsk) ONW.detective.closeAsk(); g.strawShake = []; g.result = d.result; g.mimicView = { ...(g.mimicView || {}), ...((d.result && d.result.mimic) || {}) }; g.cloneView = { ...(g.cloneView || {}), ...((d.result && d.result.clone) || {}) }; g.personaView = { ...(g.personaView || {}), ...((d.result && d.result.persona) || {}) };   // クローン: 結果発表でめくれるカードに、思い込んでいる役職の枠を出す / ペルソナ: 仮面を被せる
       if (d.ghost) g.ghostLog = d.ghost; g.resultStage = d.result && d.result.abandoned ? "sheet" : "exec"; g.resultCap = ""; g.phase = PH().ONLINE_RESULT;   // 廃村は演出なしで最終結果（シート）へ飛ぶ
       if (ONW.stats && !g.isSpectator && !g.debugOn && !(d.result && d.result.abandoned)) ONW.stats.record(d.result, `${net.code || ""}:${g.dealStart || 0}`);   // 自分の戦績を保存（ログイン中のみ・デバッグモード中は保存しない）
@@ -2717,15 +2717,23 @@ window.ONW = window.ONW || {};
     if (net.isHost) hostRecv(net.selfSeat, msg); else net.hostConn && net.hostConn.send(msg);
   };
 
-  /** ロビーチャット: 「〇〇が入力中」の表示用。ホストが入力中の人の名前を集めて全員へ配る */
-  function broadcastLobbyTyping() {
+  /** ロビーチャット: 「〇〇が入力中」の表示用。ホストが入力中の人の名前を集めて全員へ配る。
+   *  入力中の人がいる間は2.5秒ごとに同じ内容でも配り直す: 名前集合が変わらないと配り直さない作りだと、
+   *  受け手の表示が「最終受信から5秒」で消えてしまい、打ち続けている間も表示が消えたまま戻らなかった（作者報告 2026-11-26「やっぱり出ない」の一因） */
+  let lobbyTypingTimer = null;
+  function broadcastLobbyTyping(force) {
     const g = G(), now = Date.now();
     const names = Object.entries(g.lobbyTyping || {}).filter(([, at]) => now - at < 4500).map(([id]) => { const p = byId(id); return p ? p.name : null; }).filter(Boolean);
     const key = names.slice().sort().join("\n");
-    if (key === g.lobbyTypingSent) return;
+    if (!force && key === g.lobbyTypingSent) { scheduleLobbyTypingRefresh(names); return; }
     g.lobbyTypingSent = key;
     sendAll({ t: "lobbytyping", names }); sendSpec({ t: "lobbytyping", names });
-    if (ONW.ui && ONW.ui.updateLobbyTyping) { g.lobbyTypingNames = names; ONW.ui.updateLobbyTyping(); }   // ホスト自身の画面
+    if (ONW.ui && ONW.ui.updateLobbyTyping) { g.lobbyTypingNames = names; g.lobbyTypingAt = Date.now(); ONW.ui.updateLobbyTyping(); }   // ホスト自身の画面
+    scheduleLobbyTypingRefresh(names);
+  }
+  function scheduleLobbyTypingRefresh(names) {
+    if (lobbyTypingTimer) { clearTimeout(lobbyTypingTimer); lobbyTypingTimer = null; }
+    if (names && names.length) lobbyTypingTimer = setTimeout(() => { lobbyTypingTimer = null; broadcastLobbyTyping(true); }, 2500);   // 入力中の人がいる間だけ、期限切れの掃除と表示の維持を兼ねて配り直す
   }
   /** ロビーチャットを送る（ロビー画面の入力欄から） */
   net.sendLobbyChat = function (text) {

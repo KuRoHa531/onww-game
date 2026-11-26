@@ -2969,7 +2969,7 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 /* 昼能力・夜能力ボタンのハイライト（いま使える能力があるとき。使い終わると消える）docs/ability-highlight.md */
 .co-bar .btn.btn--hl { border-color: #ffd54a; color: #ffe9a6; box-shadow: 0 0 0 2px rgba(255, 213, 74, .55), 0 0 12px 2px rgba(255, 213, 74, .55); animation: ab-hl-pulse 1.4s ease-in-out infinite; }
 @keyframes ab-hl-pulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(255, 213, 74, .45), 0 0 8px 1px rgba(255, 213, 74, .35); } 50% { box-shadow: 0 0 0 3px rgba(255, 213, 74, .9), 0 0 18px 4px rgba(255, 213, 74, .8); } }
-@media (prefers-reduced-motion: reduce) { .co-bar .btn.btn--hl { animation: none; } }
+/* （prefers-reduced-motion でハイライトの脈打ちを止めるのは廃止: OSのアニメ設定がオフなPCでは「使える能力がハイライトされない」ため。703行・各役職JSと同じ方針 2026-11-26 作者報告） */
 
 /* 役職履歴・墓地が長いとき: 折り返さず1行のまま。スマホ（タッチ）は行ごとに横スワイプ。
    PC（マウス）は横スクロールする手段が無くて右側が見えなかったので、履歴全体を1つの箱にして、見えるスクロールバーを出す（まとめて横に動く。Shift+ホイール・トラックパッドの横スワイプも使える） */

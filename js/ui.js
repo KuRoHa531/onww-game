@@ -2199,6 +2199,7 @@ window.ONW = window.ONW || {};
   };
   ui.closeLobbyChatOverlay = function () {
     lobbyChatOpen = false;
+    ui.lobbyTypingOff();   // 閉じたら入力中表示は即解除（作者指定 2026-11-26）
     const el = document.getElementById("lobby-chat-in");
     if (el) lobbyDraft = el.value;   // 閉じる前に下書きを残す
     const w = document.getElementById("lobby-chat-overlay");
@@ -2260,22 +2261,24 @@ window.ONW = window.ONW || {};
     if (err) err.textContent = "";
     el.focus();
   };
-  // 「〇〇が入力中…」（Discord式・ロビーだけ）: 打っている間だけホストへ申告する（送りすぎないよう間引く）
+  // 「〇〇が入力中…」（Discord式・ロビーだけ）: 判定は「入力欄に1文字でもある間」（作者指定 2026-11-26。フォーカスだけ・空欄では入力中にしない）。
+  // 文字が変わるたびに申告を維持し、文字の変動が5秒以上なかったら解除する。送信・空・閉じるでは即解除（送信は sendLobbyChat / 空と変動なしは lobbyChatInput / 閉じるは closeLobbyChatOverlay）。
   let typingOn = false, typingSentAt = 0, typingIdle = null;
   ui.lobbyTypingOff = function () {
     if (typingIdle) { clearTimeout(typingIdle); typingIdle = null; }
-    if (typingOn) { typingOn = false; if (ONW.net && ONW.net.sendLobbyTyping) ONW.net.sendLobbyTyping(false); }
+    if (typingOn) { typingOn = false; typingSentAt = 0; if (ONW.net && ONW.net.sendLobbyTyping) ONW.net.sendLobbyTyping(false); }
   };
   ui.lobbyChatInput = function () {
     const el = document.getElementById("lobby-chat-in");
     if (!el) return;
     lobbyDraft = el.value;
-    if (!ONW.net || !ONW.net.sendLobbyTyping) return;
-    if (!el.value.trim()) { ui.lobbyTypingOff(); return; }
-    const now = Date.now();
-    if (!typingOn || now - typingSentAt > 2000) { typingOn = true; typingSentAt = now; ONW.net.sendLobbyTyping(true); }
+    if (!el.value) { ui.lobbyTypingOff(); return; }   // 空になったら即解除
+    if (ONW.net && ONW.net.sendLobbyTyping) {
+      const now = Date.now();
+      if (!typingOn || now - typingSentAt > 1500) { typingOn = true; typingSentAt = now; ONW.net.sendLobbyTyping(true); }   // 申告の維持（ホスト側の有効期限 4.5秒より短い間隔で送り直す）
+    }
     if (typingIdle) clearTimeout(typingIdle);
-    typingIdle = setTimeout(() => ui.lobbyTypingOff(), 3000);   // 打つのをやめたら消す
+    typingIdle = setTimeout(() => ui.lobbyTypingOff(), 5000);   // 文字の変動が5秒以上なかったら解除（作者指定）
   };
   /** 入力中表示の描き直し（自分の入力中も自分に見える仕様。古い表示は5秒で自然に消える） */
   let typingClearTimer = null;
