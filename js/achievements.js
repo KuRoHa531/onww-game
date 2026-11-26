@@ -592,18 +592,18 @@ const tag = label? `<span class="bub__achv" style="color:${achv.colorOf(id)}">${
 return `<div class="bub__name">${mine? tag: ""}${tagHtml || ""}${nameHtml}${mine? "": tag}</div>`;
 };
 /** ロビーの名前まわり（作者決定 2026-11-26: 装備実績名は名前の上。色はカテゴリ色）。
-* 実績が無い人にも同じ高さの空き行（.pl-achv）を必ず確保し、実績の有無・到着タイミングで行の高さが変わってボタンがずれないようにする */
+* ラベルは .pl-stack に対して絶対配置で名前の上に重ねる（レイアウトフローの外）ので、
+* 実績の無い人にはラベル要素自体を出さず、名前の前に空白ができない。
+* ラベルが後から届いても行の高さは変わらないため、ボタン位置もずれない */
 achv.lobbyNameHtml = function (nameHtml, id) {
 const label = achv.labelOf(id);
-const style = label? ` style="color:${achv.colorOf(id)}"`: "";
-return `<span class="pl-stack"><span class="pl-achv"${style}>${esc(label)}</span><span class="pl-name">${nameHtml}</span></span>`;
+if (!label) return `<span class="pl-name">${nameHtml}</span>`;
+return `<span class="pl-stack"><span class="pl-achv" style="color:${achv.colorOf(id)}">${esc(label)}</span><span class="pl-name">${nameHtml}</span></span>`;
 };
-/** ロビーのCPU行用: 名前から決定的に1個選ぶ（表示専用。試合中のCPUは開始時にランダムで持ち直す） */
+/** ロビーのCPU行用: 呼ばれるたび（＝ロビーが表示されるたび）にランダムに1個選ぶ（表示専用。名前には依存しない）。
+ * 試合中のCPUの装備実績は、試合開始時に net.js が g.cpuAchv へ別途ランダムで割り当てるので、そちらとは混ざらない */
 achv.cpuDisplayAchv = function (name) {
-if (!DATA.length) return null;
-let h = 0; const s = String(name || "");
-for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-return DATA[h % DATA.length].i;
+return achv.randomId();
 };
 achv.randomId = () => (DATA.length? DATA[Math.floor(Math.random() * DATA.length)].i: null);
 

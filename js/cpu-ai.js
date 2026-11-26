@@ -124,8 +124,8 @@ window.ONW = window.ONW || {};
     emit(true);
   };
 
-  /** ONのままでは使えない状態（読み込めていない）なら、設定を OFF に戻す。ホストの設定を配る前に呼ぶ（ready のときだけONにできる） */
-  A.sanitize = function (g) { if (g && g.cpuAi && A.state !== "ready") g.cpuAi = false; };
+  /** 作者指示（2026-11-26）で「CPU AI議論(β版)」は設定から廃止。内部実装は残すが ON にはできない: 保存・引き継ぎ・配布のどこから ON が来ても、ここで必ず OFF に戻す（ホストの設定を配る前・引き継ぎ直後に呼ばれる） */
+  A.sanitize = function (g) { if (g) g.cpuAi = false; };
 
   /** エンジンを手放す（3of4: ロビーに戻る・ホスト交代のとき） */
   A.unload = async function () {

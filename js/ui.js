@@ -611,11 +611,6 @@ window.ONW = window.ONW || {};
             ${isHost ? `<button class="btn" onclick="ONW.net.toggleOpt('bubbleChat')">${game.bubbleChat === true ? "ON" : "OFF"}</button>` : `<span>${game.bubbleChat === true ? "ON" : "OFF"}</span>`}
           </div>
           <p class="night-step__hint">ON: チャットの発言を、アイコンと名前つきの吹き出しで表示します（自分の発言は右側）。OFF: 今までの「名前: 発言」の表示です。</p>
-          <div class="field-row"><label>CPU AI議論(β版)</label>
-            ${isHost ? (ONW.cpuAi && ONW.cpuAi.state === "loading" ? `<button class="btn" onclick="ONW.net.cancelCpuAi()">中断</button>` : `<button class="btn" ${ONW.cpuAi && !game.cpuAi && !ONW.cpuAi.supported().ok ? "disabled" : ""} onclick="ONW.net.toggleCpuAi()">${game.cpuAi === true ? "ON" : "OFF"}</button>`) : `<span>${game.cpuAi === true ? "ON" : "OFF"}</span>`}
-          </div>
-          ${isHost && ONW.cpuAi ? `<p class="night-step__hint" id="cpuai-prog" style="overflow-wrap:anywhere">${ONW.utils.esc(ONW.cpuAi.statusText())}</p>` : ""}
-          <p class="night-step__hint">ON: CPUの発言・返事の言い方を、ホストの端末の中で動くAIが自然な言葉にします。何をCOするか・誰に投票するか・どこで嘘をつくかは、これまでどおりCPUが決め、AIは言い方だけを変えます。AIが失敗したり遅いときは、自動で今までの発言に戻ります。ONにできるのは、ホストの端末にAIをインストールして動作確認ができたときだけです（初回はダウンロードあり・WebGPU対応の端末が必要）。AIが動くのはホストの端末だけで、参加者の端末には何も入りません。OFFでも、CPUは今までどおり会話します。（β版）</p>
           ${ONW.sound ? `<div class="field-row"><label>サウンド</label>
             <button class="btn" onclick="ONW.sound.toggleMute()">${ONW.sound.muted() ? "ミュート中" : "ON"}</button>
           </div>
@@ -669,7 +664,7 @@ window.ONW = window.ONW || {};
         <div class="room-code-row"><span class="night-step__role room-code-mask">＊＊＊＊</span><button class="btn tf-chip room-code-copy" onclick="ONW.ui.copyRoomCode(this)">コピー</button></div>
         <h2>参加者 ${total}/${size}</h2>
         <div class="lobby-list">${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
-        ${Array.from({ length: game.cpuCount || 0 }, (_, i) => { const cn = (game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`; return `<div class="result-role"><span class="pl">${ONW.achievements && ONW.achievements.lobbyNameHtml ? ONW.achievements.lobbyNameHtml(esc(cn), ONW.achievements.cpuDisplayAchv(cn)) : esc(cn)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`; }).join("")}</div>
+        ${Array.from({ length: game.cpuCount || 0 }, (_, i) => { const cn = (game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`; return `<div class="result-role"><span class="pl">${A.avatarHtml(cn, {}, "av--sm")}${ONW.achievements && ONW.achievements.lobbyNameHtml ? ONW.achievements.lobbyNameHtml(esc(cn), ONW.achievements.cpuDisplayAchv(cn)) : esc(cn)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`; }).join("")}</div>
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>

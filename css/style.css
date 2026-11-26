@@ -3092,11 +3092,13 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 
 /* ---- 実績（js/achievements.js） ---- */
 #achv-overlay { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 9, 14, .78); overscroll-behavior: contain; }
-/* ロビー: 装備実績名は名前の上（カテゴリ色はインラインstyle）。実績が無い人にも同じ高さの行を確保し、行の高さとボタン位置がずれないようにする */
-.pl-stack { display: inline-flex; flex-direction: column; min-width: 0; }
-.pl-achv { display: block; height: 13px; line-height: 13px; font-size: 10px; font-weight: 700; color: var(--gold, #d9a441); white-space: nowrap; overflow: hidden; }
+/* ロビー: 装備実績名は名前の上に絶対配置で重ねる（カテゴリ色はインラインstyle）。レイアウトフローの外なので、実績が無い人の名前前に空白はできず、実績の有無・到着タイミングで行の高さも変わらない（ボタン位置のずれ対策） */
+.pl-stack { position: relative; display: inline-flex; min-width: 0; }
+.pl-achv { position: absolute; left: 0; bottom: 100%; margin-bottom: 1px; font-size: 10px; line-height: 13px; font-weight: 700; color: var(--gold, #d9a441); white-space: nowrap; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
 .pl-name { overflow-wrap: anywhere; }
-.lobby-list .result-role { align-items: center; }
+/* ロビー: 名の上に重なる実績ラベルが上の行へ被らないよう、行の上側にだけ余白を確保する（全行共通の余白なので名前とアイコンの並びは全行で揃う） */
+.lobby-list .result-role { align-items: center; padding-top: 15px; }
+body.menu-tight .lobby-list .result-role { padding-top: 14px; }
 /* ロビー: 状態で文面が変わるヒントは高さを予約し、下のボタンが上下しないようにする */
 .lobby-hint { min-height: 2.7em; }
 /* ロビー: 操作ボタン行は画面下に貼り付け、参加者の出入りや再描画で位置が動かないようにする */

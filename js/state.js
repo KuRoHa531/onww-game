@@ -554,7 +554,7 @@ window.ONW.CPU_AUTO_DAY = window.ONW.CPU_AUTO_DAY || {};   // 例: { sheriff: tr
       smokeHideVote: false,             // 煙幕の狂人の詳細設定: 煙幕のあいだ、投票対象のプレイヤー名を ？？？ にして投票開始時に席をシャッフルする（初期値OFF。能力対象とは別の設定）
       winLadderFx: true,                // 勝利の乗っ取り演出（結果発表で、成立した勝利が低い順に貼り重ねられる）。OFFなら最終結果だけ
       bubbleChat: true,                 // 吹き出しチャット（アモアス風。ホストがルーム設定のシステム設定で切り替える。初期はON。保存済みの設定があればそちらを優先）
-      cpuAi: false,                     // CPU AI議論(β版)（ホストの端末の小型AIで、CPUの発言・返事の言い方を自然にする。インストール確認に通ったときだけONにできる。ルームごとに初期はOFF。js/cpu-ai.js）
+      cpuAi: false,                     // CPU AI議論(β版)（ホストの端末の小型AIで、CPUの発言・返事の言い方を自然にする。作者指示（2026-11-26）で設定は廃止され、常にOFF。内部実装だけ残る。js/cpu-ai.js）
   revealManualRoles: false,       // 配役した役職(変化していないカード)も変化公開に出す（マイクラ版 revealManualRolesAsTransforms）。変化公開がONのときだけ有効
       transformOff: [], cpuNames: [], specRoster: [], hostSpec: false,                // 変化先の有無設定: OFFにした「変化役:変化先」の一覧
       transformCandidates: true,      // 変化先の候補をCOの役職一覧に出す（変化公開OFFのとき）

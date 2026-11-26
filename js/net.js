@@ -202,7 +202,8 @@ window.ONW = window.ONW || {};
     if (d.t === "batch") { (d.msgs || []).forEach((m) => onMsg(m, true)); rerender(); return; }   // 再入室: 複数のメッセージをまとめて反映（途中の画面を出さない）
     if (d.t === "spectate") { if (d.phase === PH().ONLINE_ROLE) g.dealStart = Date.now(); Object.assign(g, { tfShown: true, tfIntro: false, isSpectator: true, isDead: false, specInfo: null, ghostLog: d.ghost || [], chatTab: "main", debugOn: !!d.dbg, specPhase: d.phase, chatLog: d.log || [], boardView: d.board || [], tfView: d.tf || null, remain: d.remain, phase: PH().ONLINE_SPECTATE }); }
     if (d.t === "specphase") { if (g.phase === PH().ONLINE_RESULT) return; g.specPhase = d.phase; g.remain = null; g.phase = PH().ONLINE_SPECTATE; }
-    if (d.t === "lobby") { g.deckCnt = null; g.smokeOn = false; g.dukeIds = null; g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.villageSize = d.vsize || 4; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.fakeSeerGraveCount = d.fsgrave ?? d.sgrave; g.madSeerGraveCount = d.msgrave ?? d.sgrave; g.mayorVoteCount = d.mvote ?? 2; g.madMayorVoteCount = d.mmvote ?? 2; g.drunkCount = d.drunk || 0; g.drunkChance = d.drunkp ?? 100; g.drunkChances = ONW.assign.sanitizeDup(d.drunkps, "drunk"); g.loverCount = d.lover || 0; g.loverChance = d.loverp ?? 100; g.loverChances = ONW.assign.sanitizeDup(d.loverps, "lover"); g.timers = { deal: 5, settle: 5, ...d.timers }; g.revealTransforms = d.reveal; g.revealManualRoles = !!d.revm; g.winLadderFx = d.wlf !== false; g.bubbleChat = d.bub === true; g.cpuAi = d.cai === true; g.smokeHideAbility = !!(d.smk && d.smk[0]); g.smokeHideVote = !!(d.smk && d.smk[1]); g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; ONW.assign.unpack(g, d.asg); g.debugOn = !!d.dbg; const keepRes = g.phase === PH().ONLINE_RESULT && net.rejoinedAt && Date.now() - net.rejoinedAt < 8000 && ONW.ui.hasLastResult(g); g.phase = PH().LOBBY; g.remain = null; if (keepRes) g.viewResult = true; }   // 結果画面のまま切れて、戻ったらもうロビーだった: 結果画面を開いたままにする（「ロビーに戻る」を押すまで）
+    // CPU AI議論(β版)は作者指示（2026-11-26）で廃止: 下のロビー受信では d.cai を読まず、g.cpuAi を常に false にする（ONを持ち込ませない）
+    if (d.t === "lobby") { g.deckCnt = null; g.smokeOn = false; g.dukeIds = null; g.isSpectator = false; g.isDead = false; g.specInfo = null; g.chatTab = "main"; g.lobbyPlayers = ONW.account.sanitizePlayers(d.players); ONW.account.setAvatarMap(g.lobbyPlayers); g.meIndex = d.me; g.roleCounts = d.counts; g.fakeWolfWhenNoWolf = d.fake; g.villageSize = d.vsize || 4; g.cpuCount = d.cpu; g.graveCount = d.grave; g.seerGraveCount = d.sgrave; g.fakeSeerGraveCount = d.fsgrave ?? d.sgrave; g.madSeerGraveCount = d.msgrave ?? d.sgrave; g.mayorVoteCount = d.mvote ?? 2; g.madMayorVoteCount = d.mmvote ?? 2; g.drunkCount = d.drunk || 0; g.drunkChance = d.drunkp ?? 100; g.drunkChances = ONW.assign.sanitizeDup(d.drunkps, "drunk"); g.loverCount = d.lover || 0; g.loverChance = d.loverp ?? 100; g.loverChances = ONW.assign.sanitizeDup(d.loverps, "lover"); g.timers = { deal: 5, settle: 5, ...d.timers }; g.revealTransforms = d.reveal; g.revealManualRoles = !!d.revm; g.winLadderFx = d.wlf !== false; g.bubbleChat = d.bub === true; g.cpuAi = false; g.smokeHideAbility = !!(d.smk && d.smk[0]); g.smokeHideVote = !!(d.smk && d.smk[1]); g.transformCandidates = d.cand; g.transformOff = d.off || []; g.cpuNames = d.cpuNames || []; ONW.assign.unpack(g, d.asg); g.debugOn = !!d.dbg; const keepRes = g.phase === PH().ONLINE_RESULT && net.rejoinedAt && Date.now() - net.rejoinedAt < 8000 && ONW.ui.hasLastResult(g); g.phase = PH().LOBBY; g.remain = null; if (keepRes) g.viewResult = true; }   // 結果画面のまま切れて、戻ったらもうロビーだった: 結果画面を開いたままにする（「ロビーに戻る」を押すまで）
     if (d.t === "noop") return;   // 何も出さない人へ送る空のメッセージ（ハッキングされた人にだけ出す公開演出で、その人の目線では何もないとき）
     if (d.t === "tfskip") { ONW.stage.skipPaper(); return; }   // ホストが変化公開をスキップした → 全員の紙を飛ばす
     if (d.t === "tick") { g.remain = d.sec; tkAuth = d.sec; tkAt = Date.now(); tkOff = 0; ONW.ui.updateTimer(); if (d.sec <= 1 && g.phase === PH().ONLINE_MORNING && !g.settling && ONW.stage.morningEnd) ONW.stage.morningEnd(); return; }   // 朝の残り1秒: 朝にめくれた面を裏に戻す（待機時間の演出と重ならないように）
@@ -464,7 +465,8 @@ window.ONW = window.ONW || {};
     if (d.t === "thiefdone") { g.thiefOpen = false; g.fairyOpen = false; g.icarusOpen = false; g.goranshinOpen = false; g.libraOpen = false; g.predOpen = false; g.thiefDone = true; if (d.text && !(g.nightLogs || []).includes(d.text)) { g.nightLogs = [...(g.nightLogs || []), d.text]; if (ONW.ui.refreshInfo) ONW.ui.refreshInfo(); }   /* 何をしたか（盗めた/失敗）は情報確認に載せる（議論タイムの画面・チャットの上には出さない） */ g.nightSel = { players: [], graves: [] }; ONW.stage.sync(g); if (ONW.ui && g.phase === PH().ONLINE_DAY) ONW.ui.render(g); if (d.target && ONW.thief && ONW.thief.play) ONW.thief.play(d.target, !!d.ok); }   // 盗んだことを受け付けた（画面を閉じて「使用済み」を出す。本人だけに届く）。盗んだその瞬間に、本人の画面だけで盗む演出（再入室で戻すときは target なし＝演出しない）
     if (d.t === "forcevote") { g.voted = !!d.v; }   // デバッグ: ホストが投票先を指定した/解除した
     if (d.t === "result") { g.dukeIds = null;
-      g.strawPick = null; g.strawWait = null; g.detWait = false; if (ONW.detective && ONW.detective.closeAsk) ONW.detective.closeAsk(); g.strawShake = []; g.result = d.result; g.mimicView = { ...(g.mimicView || {}), ...((d.result && d.result.mimic) || {}) }; g.cloneView = { ...(g.cloneView || {}), ...((d.result && d.result.clone) || {}) }; g.personaView = { ...(g.personaView || {}), ...((d.result && d.result.persona) || {}) };   // クローン: 結果発表でめくれるカードに、思い込んでいる役職の枠を出す / ペルソナ: 仮面を被せる if (d.ghost) g.ghostLog = d.ghost; g.resultStage = d.result && d.result.abandoned ? "sheet" : "exec"; g.resultCap = ""; g.phase = PH().ONLINE_RESULT;   // 廃村は演出なしで最終結果（シート）へ飛ぶ
+      g.strawPick = null; g.strawWait = null; g.detWait = false; if (ONW.detective && ONW.detective.closeAsk) ONW.detective.closeAsk(); g.strawShake = []; g.result = d.result; g.mimicView = { ...(g.mimicView || {}), ...((d.result && d.result.mimic) || {}) }; g.cloneView = { ...(g.cloneView || {}), ...((d.result && d.result.clone) || {}) }; g.personaView = { ...(g.personaView || {}), ...((d.result && d.result.persona) || {}) };   // クローン: 結果発表でめくれるカードに、思い込んでいる役職の枠を出す / ペルソナ: 仮面を被せる
+      if (d.ghost) g.ghostLog = d.ghost; g.resultStage = d.result && d.result.abandoned ? "sheet" : "exec"; g.resultCap = ""; g.phase = PH().ONLINE_RESULT;   // 廃村は演出なしで最終結果（シート）へ飛ぶ
       if (ONW.stats && !g.isSpectator && !g.debugOn && !(d.result && d.result.abandoned)) ONW.stats.record(d.result, `${net.code || ""}:${g.dealStart || 0}`);   // 自分の戦績を保存（ログイン中のみ・デバッグモード中は保存しない）
       g.achvReports = (d.result && d.result.achvReports) || {};   // 実績: 今回新規解除した人の申告（CPU分はホストが載せ済み。人間分は achvupdate で届く）
       if (ONW.achievements && !g.isSpectator && !g.debugOn && !(d.result && d.result.abandoned)) ONW.achievements.onResult(d.result, `${net.code || ""}:${g.dealStart || 0}`);   // 実績: 自分の新規解除を保存してホストへ申告する
@@ -705,7 +707,7 @@ window.ONW = window.ONW || {};
 
   function lobbyMsg(forId) {
     const g = G(), humans = g.players.filter((p) => !p.isCpu);
-    if (net.isHost && ONW.cpuAi) ONW.cpuAi.sanitize(g);   // CPU AI議論(β版)は、AIの準備ができているときだけONで配る
+    if (net.isHost && ONW.cpuAi) ONW.cpuAi.sanitize(g);   // CPU AI議論(β版)は廃止（常にOFF）: 配る前に必ずOFFに戻す
     return {
       t: "lobby", code: net.code, me: humans.findIndex((p) => p.id === forId),
       players: humans.map((p) => { const m = net.meta[p.id] || {}; return { name: p.name, status: p.id === HS() ? "host" : p.off ? "offline" : p.status, spec: !!p.spectate, uid: m.uid || null, av: m.av || 0, achv: m.achv || null }; }),
@@ -1071,7 +1073,7 @@ window.ONW = window.ONW || {};
     const own = {};
     if (!restore) SHARED_KEYS.forEach((k) => { if (g[k] !== undefined && g[k] !== null) own[k] = g[k]; });   // 復元のときは、保存しておいた値をそのまま使う（開き直した直後の初期値で上書きしない）
     Object.assign(g, s.g, own);
-    if (ONW.cpuAi) ONW.cpuAi.sanitize(g);   // CPU AI議論(β版): AIが動くのは準備ができたホストの端末だけ。引き継いだ・開き直した端末にはAIが無いので、OFFに戻して配り直す（待っていたAIの言い換えは clearTimers で捨てられ、決まった文で話す）
+    if (ONW.cpuAi) ONW.cpuAi.sanitize(g);   // CPU AI議論(β版)は廃止（常にOFF）: 引き継ぎ・開き直しでONが持ち込まれても、OFFに戻して配り直す
     net.peer = peer; net.isHost = true; net.hostConn = null; net.hostSeat = net.selfSeat; net.code = s.code;
     net.conns = {}; net.rx = {}; net.keys = s.keys || {}; net.meta = s.meta || {}; net.origHost = s.origHost || null;
     net.rec = null; net.xfer = null; net.frozen = false; net.snapStr = ""; net.snapPlanned = false; net.order = []; lastOrder = "";
@@ -1703,23 +1705,14 @@ window.ONW = window.ONW || {};
   };
 
   /**
-   * CPU AI議論(β版)の ON・OFF（システム設定）。OFF にするのはいつでもできる。
-   * ON にできるのは、この端末(ホスト)で小型AIのインストール・読み込み・動作テストに通ったときだけ（js/cpu-ai.js）。
-   * 非対応の端末・ダウンロードをやめた・失敗・中断のときは OFF のまま（理由は設定画面に出る）。
+   * CPU AI議論(β版)は作者指示（2026-11-26）で設定から廃止し、設定UIの項目も削除済み（js/ui.js）。
+   * 内部実装（js/cpu-ai.js・発言ゲート）は残すが、ON にはできない: この切替も OFF に戻すだけにし、
+   * 読み込み経路（ロビー受信の d.cai / ONW.cpuAi.sanitize）でも常に OFF へ強制する。
    */
   net.toggleCpuAi = async function () {
     if (!net.isHost) return;
-    const g = G(), A = ONW.cpuAi;
-    if (!A) return;
-    if (g.cpuAi) { g.cpuAi = false; persist(); broadcastLobby(); rerender(); return; }
-    if (A.state === "loading") return;   // 準備中に何度も押さない
-    const sup = A.supported();
-    if (!sup.ok) { rerender(); return; }   // 押しても ON にならない（理由は設定画面の状態の文に出ている）
-    const ok = await A.install({
-      confirmDownload: async () => window.confirm("CPU AI議論(β版)をONにします。\n\nAIのモデル（" + A.MODEL_LABEL + "・約" + A.MODEL_SIZE_MB + "MB）をこの端末にダウンロードします。\n・初回だけ（Wi-Fi推奨）\n・WebGPUに対応した端末が必要です\n・AIが動くのはホスト（この端末）だけです\n・参加者の端末には何も入りません\n\nインストールしますか？"),
-    });
-    if (!ok || !net.isHost || A.state !== "ready") { rerender(); return; }
-    G().cpuAi = true; persist(); broadcastLobby(); rerender();
+    const g = G();
+    if (g.cpuAi) { g.cpuAi = false; persist(); broadcastLobby(); rerender(); }
   };
   net.cancelCpuAi = function () { if (net.isHost && ONW.cpuAi) ONW.cpuAi.cancel(); };
 
