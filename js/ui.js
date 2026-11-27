@@ -2409,9 +2409,7 @@ window.ONW = window.ONW || {};
     const log = document.getElementById("chat-log-big");
     if (log) log.scrollTop = log.scrollHeight;
   };
-  /** 見えている高さ（キーボードを除く）を --app-h に反映する。CSS の高さ計算が全部これを見るので、キーボード開閉で画面がずれない */
-  ui.syncAppH = function () { const vv = window.visualViewport; if (vv) document.documentElement.style.setProperty("--app-h", vv.height + "px"); };
-  if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => { ONW.ui.syncAppH(); ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); ONW.ui.fitInvite(); }); window.visualViewport.addEventListener("scroll", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); ONW.ui.fitInvite(); }); ONW.ui.syncAppH(); }
+  if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); ONW.ui.fitInvite(); }); window.visualViewport.addEventListener("scroll", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); ONW.ui.fitInvite(); }); }
   let chatDraft = "";   // 大きいチャットの下書き: 閉じても消えず、開き直すと途中から書ける（作者要望 2026-11-26）
   ui.closeChat = function () { const bi = document.getElementById("chat-in-big"); if (bi) chatDraft = bi.value; const w = document.getElementById("chat-overlay"); if (w) w.remove(); ui.lockPage(false); };
 
