@@ -1257,6 +1257,7 @@ window.ONW = window.ONW || {};
     ui._menuResizeBound = true;
     const refit = () => { if (ONW.game && document.body.classList.contains("menu-fit")) { ui.fitMenu(); if (ONW.game.phase === ONW.PHASE.LOBBY) ui.fitLobbyScroll(); } };
     window.addEventListener("resize", refit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { refit(); });   // Webフォントの読み込み完了で行の高さが変わったら測り直す
     window.addEventListener("orientationchange", () => setTimeout(refit, 250));
     document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
   }
