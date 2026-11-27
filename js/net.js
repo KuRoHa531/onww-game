@@ -755,6 +755,7 @@ window.ONW = window.ONW || {};
 
   function lobbyMsg(forId) {
     const g = G(), humans = g.players.filter((p) => !p.isCpu);
+    if (g.lobbyOrder) { const rank = new Map(g.lobbyOrder.map((id, i) => [id, i])); humans.sort((a, b) => (rank.has(a.id) ? rank.get(a.id) : 1e9) - (rank.has(b.id) ? rank.get(b.id) : 1e9)); }   // ロビーの並びは入室順のまま（試合の席順シャッフルに引きずられない）
     if (net.isHost && ONW.cpuAi) ONW.cpuAi.sanitize(g);   // CPU AI議論(β版)は廃止（常にOFF）: 配る前に必ずOFFに戻す
     return {
       t: "lobby", code: net.code, me: humans.findIndex((p) => p.id === forId),
@@ -1854,6 +1855,8 @@ window.ONW = window.ONW || {};
     if (n < 3 || n !== g.villageSize || (g.assignOn ? roles.length < n + g.graveCount : roles.length !== n + g.graveCount)) return;   // 定員ぴったり（何人村）で開始
     if (humans.some((p) => p.id !== HS() && p.status !== "ready")) return;   // 全員の準備完了が必要
     g.players = [...humans, ...cpus];
+    g.lobbyOrder = lobbyHumans.map((p) => p.id);   // ロビーの並び（入室順）は試合で変えない。ロビー表示は lobbyMsg がこの順で出す
+    ONW.utils.shuffle(g.players);   // 席順（盤面のカードの並び）は試合ごとにランダムにする（作者要望 2026-11-27。試合中は変わらない。今後追加する役職の前提）
     g.cpuAchv = {};   // 実績: CPUの装備中実績（表示専用。マイクラ版どおり試合開始時にランダムで1個。保存はしない）
     if (ONW.achievements) cpus.forEach((p) => { g.cpuAchv[p.id] = ONW.achievements.randomId(); });
     g.achvReports = {};
