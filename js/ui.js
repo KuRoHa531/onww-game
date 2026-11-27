@@ -1202,6 +1202,7 @@ window.ONW = window.ONW || {};
     ui._dealResizeBound = true;
     const refit = () => { const root = document.querySelector("[data-deal]"); if (root) { ui.fitDeal(root); ui.placeDeal(root); } };
     window.addEventListener("resize", refit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { refit(); });   // Webフォントの読み込み完了で行の高さが変わったら測り直す
     window.addEventListener("orientationchange", () => setTimeout(refit, 250));
     document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
   }
@@ -1220,6 +1221,15 @@ window.ONW = window.ONW || {};
     const maxH = Math.max.apply(null, rows.slice(0, 6).map((r) => r.offsetHeight || 0));
     if (!maxH) return;
     sc.style.height = (maxH * (grid ? 3 : 6) + 2) + "px";
+    // スマホでは fitMenu の縮小（zoom）が寸法に絡んで計算がずれることがあるので、6人以下のときは
+    // 「中身がはみ出していないか」を実物で確かめて、はみ出した分だけ箱を広げて必ず収める
+    if (rows.length <= 6) {
+      for (let i = 0; i < 3; i++) {
+        const over = sc.scrollHeight - sc.clientHeight;
+        if (over <= 0) break;
+        sc.style.height = (parseFloat(sc.style.height) + over) + "px";
+      }
+    }
   };
 
   /** タイトル・ロビーを、スクロールなしで画面に収める（body.menu-fit のあいだだけ）。
@@ -1245,7 +1255,7 @@ window.ONW = window.ONW || {};
   };
   if (!ui._menuResizeBound) {
     ui._menuResizeBound = true;
-    const refit = () => { if (ONW.game && document.body.classList.contains("menu-fit")) ui.fitMenu(); };
+    const refit = () => { if (ONW.game && document.body.classList.contains("menu-fit")) { ui.fitMenu(); if (ONW.game.phase === ONW.PHASE.LOBBY) ui.fitLobbyScroll(); } };
     window.addEventListener("resize", refit);
     window.addEventListener("orientationchange", () => setTimeout(refit, 250));
     document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
