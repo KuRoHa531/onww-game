@@ -821,7 +821,7 @@ window.ONW = window.ONW || {};
   /** 観戦者・死亡者向けの入力欄（送信すると自動で霊界チャットになる） */
   ui.ghostInput = function (game) {
     if (!ui.canGhost()) return "";
-    return `<div class="chat-input"><input id="chat-in" class="onw-input" maxlength="100" placeholder="発言（霊界チャット: 観戦者と死亡者にだけ届きます）" ${ui.isPc() ? "" : "readonly"} onclick="ONW.ui.openChat()" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onclick="ONW.co.sendChat()">送信</button></div>`;
+    return `<div class="chat-input"><input id="chat-in" class="onw-input" maxlength="100" placeholder="発言（霊界チャット: 観戦者と死亡者にだけ届きます）" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onclick="ONW.co.sendChat()">送信</button></div>`;
   };
   ui.renderSpectate = function renderSpectate(game) {
     return `
@@ -2621,7 +2621,7 @@ window.ONW = window.ONW || {};
         ${ui.chatTabs(game)}
         <div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>
         ${game.isDead ? ui.ghostInput(game) : `${ui.tpToggle(game)}<div class="chat-input${ui.tpActive(game) ? " tp-on" : ""}">
-          <input id="chat-in" class="onw-input" maxlength="100" ${game.muzzled && !game.tpMode ? `disabled placeholder="🤐 あなたは口封じされています"` : `${ui.isPc() ? "" : "readonly"} onclick="ONW.ui.openChat()"${ui.tpActive(game) ? ` placeholder="${esc(ui.tpPlaceholder(game))}"` : ""}`} onkeydown="if(event.key==='Enter')ONW.co.sendChat()">
+          <input id="chat-in" class="onw-input" maxlength="100" ${game.muzzled && !game.tpMode ? `disabled placeholder="🤐 あなたは口封じされています"` : `${ui.tpActive(game) ? ` placeholder="${esc(ui.tpPlaceholder(game))}"` : ""}`} onkeydown="if(event.key==='Enter')ONW.co.sendChat()">
           <button class="btn" onclick="ONW.co.sendChat()"${game.muzzled && !game.tpMode ? " disabled" : ""}>送信</button>
         </div>`}
       </section>`;

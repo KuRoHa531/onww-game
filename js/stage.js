@@ -1688,11 +1688,13 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
         else { last = now; lx = e.clientX; ly = e.clientY; }
       });
     }
-    // SE: 変化公開の行が1行ずつ書き出されるタイミング（各行の --d = start(i) 秒）でアクセント音を鳴らす。
-    // paperTimers に載せるため、スキップ（fly）や終了（finishPaper）でタイマーが消えれば予約も一緒に消える。
-    // 紙は g.tfShown のガードで最初の1回だけ表示されるので、再入室・途中参加で復元された表示では鳴らない。
+    // SE: 文字が書き出される間、3文字ごとに「ひと筆」の書き音（鉛筆・ボールペンの擦過音）を鳴らす
+    // （勝負師・探偵の亡霊の紙と同じ間隔）。paperTimers に載せるため、スキップ（fly）や終了（finishPaper）で
+    // タイマーが消えれば予約も一緒に消える。紙は g.tfShown のガードで最初の1回だけ表示されるので、
+    // 再入室・途中参加で復元された表示では鳴らない。
     if (ONW.sound && lines && lines.length) lines.forEach((t, i) => {
-      paperTimers.push(setTimeout(() => { if (ONW.sound) ONW.sound.se("reveal_text"); }, Math.round(start(i) * 1000)));
+      const n = [...t].length, stepMs = (dur(t) / Math.max(1, n)) * 3 * 1000;
+      for (let k = 0; k * 3 < n; k++) paperTimers.push(setTimeout(() => { if (ONW.sound) ONW.sound.se("reveal_text"); }, Math.round(start(i) * 1000 + k * stepMs)));
     });
     const endAt = start(lines.length - 1) + dur(lines[lines.length - 1]) + 1.3;   // 書き終えて少し読ませてから下へ
     paperTimers.push(setTimeout(() => fly(wrap), endAt * 1000));
