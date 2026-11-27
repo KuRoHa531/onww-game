@@ -3142,11 +3142,10 @@ body.menu-tight .lobby-list .result-role { padding-top: 14px; }
 /* ロビー: 状態で文面が変わるヒントは高さを予約し、下のボタンが上下しないようにする */
 .lobby-hint { min-height: 2.7em; }
 /* ロビー: 操作ボタン行は画面下に貼り付け、参加者の出入りや再描画で位置が動かないようにする */
-.lobby-actions { position: fixed; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: min(680px, calc(100% - 40px)); z-index: 30; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; box-shadow: 0 -4px 18px rgba(0, 0, 0, .25); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-body:has(.lobby-panel) .onw-footer { display: none; }
+.lobby-actions { position: sticky; bottom: 8px; z-index: 30; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; box-shadow: 0 -4px 18px rgba(0, 0, 0, .25); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .lobby-actions .btn { width: 100%; }
 .lobby-actions__blank { visibility: hidden; }
-.lobby-panel { position: relative; padding-bottom: 140px; }
+.lobby-panel { position: relative; }
 .lobby-panel > .lede { padding: 0 56px; }
 .lobby-corner { width: 48px; padding: 5px 0 3px; display: flex; flex-direction: column; align-items: center; gap: 0; background: var(--bg-panel-raised); border: 1px solid var(--gold-dim); border-radius: 10px; color: var(--ink); cursor: pointer; }
 .lobby-corner--exit { position: absolute; top: 10px; left: 10px; z-index: 2; }
