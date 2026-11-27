@@ -221,7 +221,7 @@
   //  結果発表の血文字の紙（全員の画面）。全員のカードがめくれ終わったあと・負けた人が吹っ飛ぶ前
   //  （stage.js の startResult が playLadder の直前に呼ぶ。勝負師の紙と同じ位置）。
   //   推理した探偵の亡霊ごとに1枚、ダイニングメッセージ風の紙が出て、推理の文が血文字で
-  //   1文字ずつ書かれる（変化公開・勝負師の紙と同じ要領で se_reveal_text が鳴る）。
+  //   1画ずつ描くように少しゆっくり書かれる（書いた文字だけが見えてくる。se_reveal_text が3文字ごとに鳴る）。
   //   書き終わると、正解の紙には血の「正解」判子、外れの紙には血のにじんだ「外れ」が付く
   // ======================================================================
   function removePapers() { document.querySelectorAll(".dgp-wrap").forEach((e) => e.remove()); }
@@ -230,16 +230,17 @@
     if (!papers.length || res.abandoned) return;
     const texts = papers.map((x) => `探偵の亡霊${x.name}は ${x.target}の役職を「${x.guess}」と推理しました。`);
     const maxLen = Math.max(...texts.map((t) => [...t].length));
-    const STEP = 45, HOLD = 1500, t0 = R.t;
+    const STEP = 150, HOLD = 1500, t0 = R.t;   // 1画ずつ血で描くように、少しゆっくり（従来は45msでポンと出ていた）
+    const escC = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     R.later(() => {
       removePapers();
       const wrap = document.createElement("div"); wrap.className = "dgp-wrap";
-      wrap.innerHTML = `<div class="dgp-dim"></div><div class="dgp-papers">${papers.map((x, i) => `<div class="tfp-paper dgp-paper"><div class="dgp-paper__h">ダイニングメッセージ</div><div class="dgp-paper__t" data-dgp="${i}"></div><div class="dgp-stamp${x.success ? " dgp-stamp--hit" : " dgp-stamp--miss"}" data-dgp-stamp="${i}">${x.success ? "正解" : "外れ"}</div></div>`).join("")}</div>`;
+      wrap.innerHTML = `<div class="dgp-dim"></div><div class="dgp-papers">${papers.map((x, i) => `<div class="tfp-paper dgp-paper"><div class="dgp-paper__h">ダイニングメッセージ</div><div class="dgp-paper__t" data-dgp="${i}">${[...texts[i]].map((c) => `<span class="dgp-ch">${escC(c)}</span>`).join("")}</div><div class="dgp-stamp${x.success ? " dgp-stamp--hit" : " dgp-stamp--miss"}" data-dgp-stamp="${i}">${x.success ? "正解" : "外れ"}</div></div>`).join("")}</div>`;
       document.body.appendChild(wrap);
     }, t0);
     for (let s = 0; s < maxLen; s++) {
       R.later(() => {
-        document.querySelectorAll("[data-dgp]").forEach((el) => { const full = texts[+el.getAttribute("data-dgp")]; if (full) el.textContent = [...full].slice(0, s + 1).join(""); });
+        document.querySelectorAll("[data-dgp]").forEach((el) => { const ch = el.children[s]; if (ch) ch.classList.add("on"); });   // 書いた文字だけが、描かれて見えてくる
         if (ONW.sound && s % 3 === 0) ONW.sound.se("reveal_text");
       }, t0 + 350 + s * STEP);
     }
