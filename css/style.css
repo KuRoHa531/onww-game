@@ -456,7 +456,7 @@ body.is-title .credits-link {
 .chat-log { height: 200px; overflow-y: auto; text-align: left; background: var(--bg-night); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 10px 0; font-size: 14px; }
 .lobby-chat-log { height: 150px; margin: 6px 0; }
 #lobby-chat-overlay { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: flex-end; justify-content: center; padding: 12px; background: rgba(8, 9, 14, .45); overscroll-behavior: contain; }
-#invite-overlay { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: flex-end; justify-content: center; padding: 12px; background: rgba(8, 9, 14, .45); overscroll-behavior: contain; }
+#invite-overlay { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(8, 9, 14, .45); overscroll-behavior: contain; }
 .invite-card { width: min(480px, 100%); padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(27, 29, 43, .88); box-shadow: 0 10px 40px rgba(0,0,0,.55); backdrop-filter: blur(3px); }
 .invite-card #inv-list { max-height: min(38vh, 300px); overflow-y: auto; }
 .lobby-chat-card { width: min(480px, 100%); padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(27, 29, 43, .88); box-shadow: 0 10px 40px rgba(0,0,0,.55); backdrop-filter: blur(3px); }
