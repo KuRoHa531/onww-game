@@ -101,8 +101,8 @@ window.ONW = window.ONW || {};
     if (!sameResult) $app().innerHTML = html;
     ui._lastHtml = html;
     if (lcDraft !== null) { const ni = document.getElementById("lobby-chat-in"); if (ni) { ni.value = lcDraft; if (lcFocus) ni.focus(); } }
-    if (game.phase === ONW.PHASE.LOBBY) { ui.syncLobbyChatOverlay(); ui.updateLobbyChat(); ui.updateLobbyTyping(); }
-    else ui.closeLobbyChatOverlay();
+    if (game.phase === ONW.PHASE.LOBBY) { ui.syncLobbyChatOverlay(); ui.syncInviteOverlay(); ui.updateLobbyChat(); ui.updateLobbyTyping(); }
+    else { ui.closeLobbyChatOverlay(); ui.closeInviteOverlay(); }
     if (keepY && !sameResult) window.scrollTo(0, keepY);
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
@@ -238,11 +238,33 @@ window.ONW = window.ONW || {};
     return `<span class="dl-mask" style="${style || ""}"><span class="dl-mask-ic">🎭</span><b>${ui.nameBr(ONW.ROLE_INFO[mask].name)}</b></span>`;
   };
   ui.toggleGroup = function (key) { const g = ONW.game; g.roleOpen = { ...(g.roleOpen || {}), [key]: !(g.roleOpen || {})[key] }; ONW.ui.render(g); };
-  ui.toggleInvite = function () {
+  ui.toggleInvite = function (force) {
     const g = ONW.game;
-    g.invOpen = !g.invOpen;
-    ONW.ui.render(g);
+    g.invOpen = typeof force === "boolean" ? force : !g.invOpen;
+    ui.syncInviteOverlay();
     if (g.invOpen && ONW.friends) ONW.friends.reload();
+  };
+  ui.closeInviteOverlay = function () { const w = document.getElementById("invite-overlay"); if (w) w.remove(); };
+  /** フレンド招待はロビーに重ねて開く（背景透過）。ロビー本体を再描画しないので、開閉で画面がずれない */
+  ui.syncInviteOverlay = function () {
+    const g = ONW.game, can = !!(g && g.phase === ONW.PHASE.LOBBY && g.invOpen && ONW.net && ONW.net.isHost && ONW.account && ONW.account.user);
+    if (!can) { ui.closeInviteOverlay(); return; }
+    if (document.getElementById("invite-overlay")) { ui.fitInvite(); return; }
+    const w = document.createElement("div");
+    w.id = "invite-overlay";
+    w.onclick = (e) => { if (e.target === w) ui.toggleInvite(false); };
+    w.innerHTML = `<div class="invite-card" role="dialog" aria-modal="true">
+      <div class="lobby-chat-head"><span>フレンドを招待</span><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleInvite(false)">×</button></div>
+      <div id="inv-list">${ONW.friends ? ONW.friends.inviteListHtml() : ""}</div>
+      <p id="inv-msg" class="acct-msg"></p>
+    </div>`;
+    document.body.appendChild(w);
+    ui.fitInvite();
+  };
+  ui.fitInvite = function () {
+    const w = document.getElementById("invite-overlay"), vv = window.visualViewport;
+    if (!w || !vv) return;
+    w.style.top = vv.offsetTop + "px"; w.style.height = vv.height + "px"; w.style.bottom = "auto";
   };
   ui.toggleSettings = function () { ui.closeRoleMenu(); ONW.game.showSettings = !ONW.game.showSettings; ONW.game.setPage = null; ONW.game.roleSetPage = null; ONW.ui.render(ONW.game); };
   /** ルーム設定: タブ一覧 → そのページだけ表示 → 左上の戻るで一覧へ（page=null で一覧） */
@@ -679,7 +701,6 @@ window.ONW = window.ONW || {};
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>
-        ${canInvite && game.invOpen ? `<div class="invite-panel"><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleInvite()">×</button><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
         <div class="lobby-actions">
           ${isHost ? `<button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>` : `<span class="lobby-actions__blank"></span>`}
           ${ui.hasLastResult(game) ? `<button class="btn" onclick="ONW.ui.openResultReview()">前回の結果を見る</button>` : `<span class="lobby-actions__blank"></span>`}
@@ -2388,7 +2409,9 @@ window.ONW = window.ONW || {};
     const log = document.getElementById("chat-log-big");
     if (log) log.scrollTop = log.scrollHeight;
   };
-  if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); }); window.visualViewport.addEventListener("scroll", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); }); }
+  /** 見えている高さ（キーボードを除く）を --app-h に反映する。CSS の高さ計算が全部これを見るので、キーボード開閉で画面がずれない */
+  ui.syncAppH = function () { const vv = window.visualViewport; if (vv) document.documentElement.style.setProperty("--app-h", vv.height + "px"); };
+  if (window.visualViewport) { window.visualViewport.addEventListener("resize", () => { ONW.ui.syncAppH(); ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); ONW.ui.fitInvite(); }); window.visualViewport.addEventListener("scroll", () => { ONW.ui.fitChat(); ONW.ui.fitLobbyChat(); ONW.ui.fitInvite(); }); ONW.ui.syncAppH(); }
   let chatDraft = "";   // 大きいチャットの下書き: 閉じても消えず、開き直すと途中から書ける（作者要望 2026-11-26）
   ui.closeChat = function () { const bi = document.getElementById("chat-in-big"); if (bi) chatDraft = bi.value; const w = document.getElementById("chat-overlay"); if (w) w.remove(); ui.lockPage(false); };
 
