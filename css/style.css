@@ -2524,7 +2524,7 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .dg-ask__ok { display: block; margin: 2px auto 0; min-width: 160px; }
 .dg-ask__ok:disabled { opacity: .5; }
 
-/* 探偵の亡霊: 結果発表の血文字の紙（全員がめくれたあと・吹っ飛ぶ前。ダイニングメッセージ風。js/roles/neutral/detective_ghost.js の runPapers） */
+/* 探偵の亡霊: 結果発表の血文字の紙（全員がめくれたあと・吹っ飛ぶ前。ダイイングメッセージ風。js/roles/neutral/detective_ghost.js の runPapers） */
 .dgp-wrap { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .dgp-wrap.dgp-out { opacity: 0; transition: opacity .6s ease; }
 .dgp-dim { position: absolute; inset: 0; background: rgba(12, 4, 6, .55); animation: tfp-dim-in .2s ease both; }

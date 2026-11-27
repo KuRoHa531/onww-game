@@ -26,7 +26,7 @@
  *   作者メモの「めくれるとき『はてな』で見えなくなる効果」は、入力が終わるまで結果発表自体が始まらず、
  *   探偵の亡霊のカードもまだめくれない（＝伏せたまま）ことで再現する（名探偵・賞金稼ぎの Web版の作りと同じ）。
  * ・演出（作者メモ）: 結果発表で全員のカードがめくれたあと・負けた人が吹っ飛ぶ前に、血文字の
- *   ダイニングメッセージ風の紙が出る（stageResult フック。勝負師の紙と同じ場所＝playLadder の直前）。
+ *   ダイイングメッセージ風の紙が出る（stageResult フック。勝負師の紙と同じ場所＝playLadder の直前）。
  *   紙には推理の文が血文字で1文字ずつ書かれ、正解なら血の「正解」判子が押される。
  * ・結果情報（情報確認。第6バッチ共通指示）: マイクラ版 buildDetectiveGhostResultLines の文をそのまま使う:
  *   「探偵の亡霊{名前}は{対象}の役職を「{入力}」と推理し、成功/失敗していました。」（net.js の res.detectiveGhostLines → ui.js）。
@@ -220,7 +220,7 @@
   // ======================================================================
   //  結果発表の血文字の紙（全員の画面）。全員のカードがめくれ終わったあと・負けた人が吹っ飛ぶ前
   //  （stage.js の startResult が playLadder の直前に呼ぶ。勝負師の紙と同じ位置）。
-  //   推理した探偵の亡霊ごとに1枚、ダイニングメッセージ風の紙が出て、推理の文が血文字で
+  //   推理した探偵の亡霊ごとに1枚、ダイイングメッセージ風の紙が出て、推理の文が血文字で
   //   1画ずつ描くように少しゆっくり書かれる（書いた文字だけが見えてくる。se_reveal_text が3文字ごとに鳴る）。
   //   書き終わると、正解の紙には血の「正解」判子、外れの紙には血のにじんだ「外れ」が付く
   // ======================================================================
@@ -237,7 +237,7 @@
     R.later(() => {
       removePapers();
       const wrap = document.createElement("div"); wrap.className = "dgp-wrap";
-      wrap.innerHTML = `<div class="dgp-dim"></div><div class="dgp-papers">${papers.map((x, i) => `<div class="tfp-paper dgp-paper"><div class="dgp-paper__h">ダイニングメッセージ</div><div class="dgp-paper__t" data-dgp="${i}">${segsOf(x).map((seg) => `<span class="dgp-seg">${[...seg].map((c) => `<span class="dgp-ch">${escC(c)}</span>`).join("")}</span>`).join("")}</div><div class="dgp-stamp${x.success ? " dgp-stamp--hit" : " dgp-stamp--miss"}" data-dgp-stamp="${i}">${x.success ? "正解" : "外れ"}</div></div>`).join("")}</div>`;
+      wrap.innerHTML = `<div class="dgp-dim"></div><div class="dgp-papers">${papers.map((x, i) => `<div class="tfp-paper dgp-paper"><div class="dgp-paper__h">ダイイングメッセージ</div><div class="dgp-paper__t" data-dgp="${i}">${segsOf(x).map((seg) => `<span class="dgp-seg">${[...seg].map((c) => `<span class="dgp-ch">${escC(c)}</span>`).join("")}</span>`).join("")}</div><div class="dgp-stamp${x.success ? " dgp-stamp--hit" : " dgp-stamp--miss"}" data-dgp-stamp="${i}">${x.success ? "正解" : "外れ"}</div></div>`).join("")}</div>`;
       document.body.appendChild(wrap);
     }, t0);
     for (let s = 0; s < maxLen; s++) {

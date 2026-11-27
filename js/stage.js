@@ -1537,7 +1537,7 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
     }
     hk("wagerer").forEach((h) => h.fn(R));   // 勝負師: 全員がめくれたあと・勝利陣営が出る前に、予想した勝負師の紙が横に並んで、文字が同時に1文字ずつ出る（作者メモ。js/roles/neutral/wagerer.js の stageResult）
     hk("necromancer").forEach((h) => h.fn(R));   // ネクロマンサー: 全員がめくれたあと・負けた人のカードが吹っ飛ぶ前に、死霊化した人のカードが裏返って死霊の面でめくれる（作者メモ。js/roles/village/necromancer.js の stageResult）
-    hk("detectiveGhost").forEach((h) => h.fn(R));   // 探偵の亡霊: 全員がめくれたあと・負けた人のカードが吹っ飛ぶ前に、血文字のダイニングメッセージ風の紙が出て推理の文が書かれる（作者メモ。js/roles/neutral/detective_ghost.js の stageResult）
+    hk("detectiveGhost").forEach((h) => h.fn(R));   // 探偵の亡霊: 全員がめくれたあと・負けた人のカードが吹っ飛ぶ前に、血文字のダイイングメッセージ風の紙が出て推理の文が書かれる（作者メモ。js/roles/neutral/detective_ghost.js の stageResult）
     playLadder(res, R);   // 勝利の貼り重ね: 成立した勝利を優先度の低い順に貼っていく（最後の段 = 最終結果は、下の字幕が出す。docs/win-ladder.md）
     // 愉快犯: 愉快犯が影響する前の勝敗を先に発表 → 🤗が飛び出して、影響した勝敗に変わる。チキンの逆転演出(逆転前の勝敗を先に発表 → チキンが飛び出して覆す)とは、起きた順に並べる:
     //   愉快犯のあとにチキンが逆転した（既定。愉快犯 → チキン） / 愉快犯の前にチキンがもう逆転していた（pranksterFx.chickenFirst。チキン → 愉快犯）
