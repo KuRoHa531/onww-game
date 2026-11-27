@@ -13,8 +13,8 @@
   --wolf: #c9463d;
   --tanner: #b98a3d;
 
-  --font-display: "Shippori Mincho", serif;
-  --font-body: "Zen Kaku Gothic New", sans-serif;
+  --font-display: "DotGothic16", "Shippori Mincho", serif;
+  --font-body: "DotGothic16", "Zen Kaku Gothic New", sans-serif;
 }
 
 * { box-sizing: border-box; }

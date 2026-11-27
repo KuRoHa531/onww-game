@@ -14,8 +14,8 @@
   --wolf: #c9463d;
   --tanner: #b98a3d;
 
-  --font-display: "Shippori Mincho", serif;
-  --font-body: "Zen Kaku Gothic New", sans-serif;
+  --font-display: "DotGothic16", "Shippori Mincho", serif;
+  --font-body: "DotGothic16", "Zen Kaku Gothic New", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -65,6 +65,10 @@ body {
 }
 
 .onw-header__title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   margin: 0;
   text-align: center;
   font-family: var(--font-display);
@@ -79,7 +83,7 @@ body {
   display: block;
   height: 46px;
   width: auto;
-  max-width: min(52vw, 320px);
+  max-width: min(44vw, 320px);
   margin: 0 auto;
   image-rendering: pixelated;
 }
@@ -150,11 +154,11 @@ body {
   transition: opacity .4s ease;
 }
 .start-gate.gate-done { opacity: 0; pointer-events: none; }
-.start-gate__inner { text-align: center; }
+.start-gate__inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .start-gate__sub { color: var(--gold-dim); font-size: 13px; letter-spacing: .35em; margin-bottom: 10px; }
 .start-gate__title { font-family: var(--font-display); font-weight: 800; font-size: 34px; color: var(--ink); margin-bottom: 40px; }
-.start-gate__btn { font-size: 17px; padding: 12px 36px; }
-.start-gate__logo { width: min(92vw, 620px); height: auto; image-rendering: pixelated; margin-bottom: 38px; }
+.start-gate__btn { font-size: clamp(15px, 2.4vw, 20px); padding: clamp(11px, 2vh, 15px) clamp(30px, 5vw, 48px); }
+.start-gate__logo { width: min(92vw, 620px); height: auto; image-rendering: pixelated; margin-bottom: clamp(22px, 6vh, 40px); }
 
 /* ---- クレジット（タイトル画面のフッター、「オンライン対応」の上） ---- */
 .credits-link { display: none; }
@@ -440,7 +444,7 @@ body.is-title .credits-link {
 
 @media (max-width: 480px) {
   .onw-header { flex-wrap: wrap; }
-  .onw-header__title { order: -1; flex: 1 0 100%; }
+  .onw-header__title { position: static; transform: none; order: -1; flex: 1 0 100%; }
   .onw-header__logo { height: 54px; }
 }
 
