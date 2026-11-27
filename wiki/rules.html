@@ -11,8 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=20261125-99">
-<link rel="stylesheet" href="css/wiki.css?v=20261125-99">
+<link rel="stylesheet" href="css/style.css?v=20261125-101">
+<link rel="stylesheet" href="css/wiki.css?v=20261125-101">
 </head>
 <body>
 
@@ -116,5 +116,10 @@
       });
     })();
   </script>
+<script>
+/* 画像の保存ブロック（右クリック・長押しメニュー・ドラッグ） */
+document.addEventListener("contextmenu", (e) => { if (e.target && e.target.closest && e.target.closest("img")) e.preventDefault(); });
+document.addEventListener("dragstart", (e) => { if (e.target && e.target.tagName === "IMG") e.preventDefault(); });
+</script>
 </body>
 </html>

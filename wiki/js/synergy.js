@@ -112,3 +112,7 @@
   $search.addEventListener("input", render);
   render();
 })();
+
+/* 画像の保存ブロック（右クリック・長押しメニュー・ドラッグ） */
+document.addEventListener("contextmenu", (e) => { if (e.target && e.target.closest && e.target.closest("img")) e.preventDefault(); });
+document.addEventListener("dragstart", (e) => { if (e.target && e.target.tagName === "IMG") e.preventDefault(); });

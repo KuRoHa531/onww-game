@@ -665,7 +665,12 @@ window.ONW = window.ONW || {};
     else hint = me.status === "ready" ? "準備完了です。ホストの開始を待っています…" : "準備ができたら「準備完了」を押してください。";
     const summary = `${size}人村 / 墓地${game.graveCount}枚${game.assignOn ? " / アサインON" : ""} / 夜${game.timers.night}秒・議論${game.timers.day}秒・投票${game.timers.vote}秒`;
     return `
-      <section class="panel night-step">
+      <section class="panel night-step lobby-panel">
+        <button type="button" class="lobby-corner lobby-corner--exit" onclick="ONW.main.goToTitle()" aria-label="退出"><span class="lobby-corner__ic">↩</span><span class="lobby-corner__tx">退出</span></button>
+        <div class="lobby-corner-group">
+          ${ONW.net.code ? `<button type="button" class="lobby-corner" onclick="ONW.ui.toggleLobbyChat()"><span class="lobby-corner__ic">💬</span><span class="lobby-corner__tx">チャット</span></button>` : ""}
+          ${canInvite ? `<button type="button" class="lobby-corner" onclick="ONW.ui.toggleInvite()"><span class="lobby-corner__ic">👥</span><span class="lobby-corner__tx">招待</span></button>` : ""}
+        </div>
         <p class="lede">部屋コード（友達に教えてください）</p>
         <div class="room-code-row"><span class="night-step__role room-code-mask">＊＊＊＊</span><button class="btn tf-chip room-code-copy" onclick="ONW.ui.copyRoomCode(this)">コピー</button></div>
         <h2>参加者 ${total}/${size}</h2>
@@ -675,16 +680,13 @@ window.ONW = window.ONW || {};
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>
         ${canInvite && game.invOpen ? `<div class="invite-panel"><button class="pf-x" aria-label="閉じる" onclick="ONW.ui.toggleInvite()">×</button><h2>フレンドを招待</h2><div id="inv-list">${ONW.friends.inviteListHtml()}</div><p id="inv-msg" class="acct-msg"></p></div>` : ""}
-        <div class="btn-row lobby-actions" style="justify-content:center;">
-          ${ONW.net.code ? `<button class="btn" onclick="ONW.ui.toggleLobbyChat()">💬 チャット</button>` : ""}
-          ${isHost ? `<button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>` : ""}
-          ${ui.hasLastResult(game) ? `<button class="btn" onclick="ONW.ui.openResultReview()">前回の結果を見る</button>` : ""}
-          ${canInvite ? `<button class="btn" onclick="ONW.ui.toggleInvite()">フレンドを招待</button>` : ""}
+        <div class="lobby-actions">
+          ${isHost ? `<button class="btn" onclick="ONW.ui.toggleSettings()">ルーム設定</button>` : `<span class="lobby-actions__blank"></span>`}
+          ${ui.hasLastResult(game) ? `<button class="btn" onclick="ONW.ui.openResultReview()">前回の結果を見る</button>` : `<span class="lobby-actions__blank"></span>`}
           ${isHost
             ? `<button class="btn btn--primary" ${ok ? "" : "disabled"} onclick="ONW.net.startGame()">ゲーム開始</button>`
-            : me.spec ? "" : `<button class="btn btn--primary" onclick="ONW.net.setReady(${me.status === "ready" ? "false" : "true"})">${me.status === "ready" ? "準備を取り消す" : "準備完了"}</button>`}
+            : me.spec ? `<span class="lobby-actions__blank"></span>` : `<button class="btn btn--primary" onclick="ONW.net.setReady(${me.status === "ready" ? "false" : "true"})">${me.status === "ready" ? "準備を取り消す" : "準備完了"}</button>`}
           <button class="btn btn--spec ${me.spec ? "on" : ""}" onclick="ONW.net.setSpectate(${me.spec ? "false" : "true"})">観戦 ${me.spec ? "ON" : "OFF"}</button>
-          <button class="btn" onclick="ONW.main.goToTitle()">退出</button>
         </div>
         ${game.showSettings ? settingsPanel(game, isHost, total) : ""}
       </section>`;
