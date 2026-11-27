@@ -246,7 +246,8 @@ window.ONW = window.ONW || {};
     if (d.t === "lobbychatack") { if (net._lobbyAck) net._lobbyAck(d.cid); return; }   // ロビーチャット: ホストの受信確認（送信側が入力欄を消してよい合図）
     if (d.t === "lobbytyping") { g.lobbyTypingNames = d.names || []; g.lobbyTypingAt = Date.now(); if (ONW.ui && ONW.ui.updateLobbyTyping) ONW.ui.updateLobbyTyping(); return; }
     if (d.t === "tpchatlog") { g.tpLogView = d.log || []; ONW.ui.updateChat(); return; }   // テレパシー: 成分のメンバーと観戦者にだけ届く（ホストが宛先ごとに絞って送る）
-    if (d.t === "telepathyset") { g.myTelepathy = d.members || null; if (ONW.ui && ONW.ui.render) ONW.ui.render(g); return; }   // テレパシー: 自分の成分が分かった（昼のカード移動・酔い覚め）
+    if (d.t === "telepathyset") { const wasTp = !!(g.myTelepathy && g.myTelepathy.length > 1); g.myTelepathy = d.members || null; if (!g.myTelepathy) { g.tpMode = false; if (wasTp && !g.isDead) g.chatLog = [...(g.chatLog || []), { name: null, text: "テレパシーが切れました。", kind: "co" }]; } if (ONW.ui && ONW.ui.render) ONW.ui.render(g); return; }   // テレパシー: 自分の成分が分かった（昼のカード移動・酔い覚め・相手の死亡で切れた場合も含む。切れたら通常チャットに戻し、繋がっていた人には知らせる）
+    if (d.t === "tpchatnote") { g.chatLog = [...(g.chatLog || []), { name: null, text: d.text || "テレパシーは届きませんでした。", kind: "co" }]; if (ONW.ui && ONW.ui.render) ONW.ui.render(g); return; }   // テレパシー: 届かなかったことを本人にだけ知らせる（口封じ通知と同じ形）
     if (d.t === "deathnote") { g.deathNotes = d.lines || []; if (ONW.ui.refreshInfo) ONW.ui.refreshInfo(); return; }   // 昼中の死亡の知らせ: チャットには出さず、情報確認の「公開された情報」にだけ載せる
     if (d.t === "role") {
       g.deckCnt = d.dcnt || null;   // アサイン設定ON: 試合中のガイド「現在の配役」は、抽選後の枚数で出す（候補全部を出すと欠けが分かってしまう）
@@ -534,6 +535,20 @@ window.ONW = window.ONW || {};
     });
     if (log.length) sendSpec({ t: "tpchatlog", log });
   }
+  /** 死亡でテレパシーの成分が変わったあと、接続に関わる生存者へ最新の成分を送り直す（killPlayer の連鎖が終わった直後に呼ぶ）。
+   *  これをしないと、相手が死んだ人の画面に「〇〇にだけ届きます」が残り、送った秘密がホストで無言に捨てられる */
+  function refreshTelepathyAfterDeath() {
+    const g = G();
+    if (!ONW.telepathist || !g.inGame || !ONW.telepathist.picks) return;
+    const involved = new Set();
+    ONW.telepathist.picks(g).forEach(([h, t]) => { involved.add(h); involved.add(t); });
+    involved.forEach((pid) => {
+      const p = g.players.find((q) => q.id === pid);
+      if (!p || p.isCpu || isDead(pid)) return;
+      const comp = ONW.telepathist.component(g, pid);
+      send(pid, { t: "telepathyset", members: comp && comp.length > 1 ? comp : null });
+    });
+  }
 
 
   // ---- 死亡者 / 霊界チャット / 観戦者向けの全員情報 ----
@@ -617,6 +632,7 @@ window.ONW = window.ONW || {};
     const m = { t: "steverevive", id, name: p.name, when: "day", reason: "shot" };
     sendAll(m); sendSpec(m);
     sendBoard(); sendSpecInfo(); sendGhost();
+    refreshTelepathyAfterDeath();   // 復活でテレパシーの成分が戻ることもあるので送り直す
     rerender();
     return true;
   }
@@ -716,7 +732,7 @@ window.ONW = window.ONW || {};
     sendBoard(); sendSpecInfo(); sendGhost();
     rerender();
     } finally { killNest--; }
-    if (!killNest) { hostBeggarDay(); skipIfAllDead(); if (ONW.multiPersona) ONW.multiPersona.freezeDead(g); }   // 乞食の即時交換（今回の連鎖で死んだ人が対象。スティーブの復活で戻った人は deadIds から外れているので対象にならない）。そのあと全員死亡スキップの判定。多重人格: 昼に死んだら人格を凍結
+    if (!killNest) { hostBeggarDay(); skipIfAllDead(); if (ONW.multiPersona) ONW.multiPersona.freezeDead(g); refreshTelepathyAfterDeath(); }   // 乞食の即時交換（今回の連鎖で死んだ人が対象。スティーブの復活で戻った人は deadIds から外れているので対象にならない）。そのあと全員死亡スキップの判定。多重人格: 昼に死んだら人格を凍結。テレパシー: 死で成分が変わったら送り直す
   };
   /** 昼（議論・投票）の途中で全員が死んだら、残りの議論時間と投票時間を飛ばして、すぐ結果発表にする（死亡の演出が見える分だけ待つ）。何度呼んでも1回だけ */
   function skipIfAllDead() {
@@ -2984,6 +3000,9 @@ window.ONW = window.ONW || {};
           (g.telepathyLog = g.telepathyLog || []).push({ name: nameOf(id), text, kind: "tp", at: Date.now(), members: comp });
           if (g.telepathyLog.length > 200) g.telepathyLog.splice(0, g.telepathyLog.length - 200);
           deliverTelepathy();
+        } else {   // 届く相手がいない（相手の死亡などで成分が消えている）: 無言で捨てず、本人にだけ知らせて成分も送り直す。全体チャットへは流さない（漏洩になる）
+          send(id, { t: "tpchatnote", text: "テレパシーの相手がいないため、届きませんでした。" });
+          send(id, { t: "telepathyset", members: null });
         }
       }
     }
