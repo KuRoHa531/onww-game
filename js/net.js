@@ -243,6 +243,7 @@ window.ONW = window.ONW || {};
     if (d.t === "steverevive") { if (ONW.stage && ONW.stage.steveRevive) ONW.stage.steveRevive(d); }   // 不死のトーテムの演出（3of4 で stage に足す。ここは受け口だけ）   // 昼中に死亡した（霊界チャットに入る）
     if (d.t === "chatlog") { g.chatLog = d.log; ONW.ui.updateChat(); return; }
     if (d.t === "lobbychatlog") { g.lobbyChat = d.log || []; if (ONW.ui) { if (ONW.ui.updateLobbyChat) ONW.ui.updateLobbyChat(); const last = g.lobbyChat[g.lobbyChat.length - 1]; if (last && ONW.ui.popChat) ONW.ui.popChat(last); } return; }
+    if (d.t === "lobbychatack") { if (net._lobbyAck) net._lobbyAck(d.cid); return; }   // ロビーチャット: ホストの受信確認（送信側が入力欄を消してよい合図）
     if (d.t === "lobbytyping") { g.lobbyTypingNames = d.names || []; g.lobbyTypingAt = Date.now(); if (ONW.ui && ONW.ui.updateLobbyTyping) ONW.ui.updateLobbyTyping(); return; }
     if (d.t === "tpchatlog") { g.tpLogView = d.log || []; ONW.ui.updateChat(); return; }   // テレパシー: 成分のメンバーと観戦者にだけ届く（ホストが宛先ごとに絞って送る）
     if (d.t === "telepathyset") { g.myTelepathy = d.members || null; if (ONW.ui && ONW.ui.render) ONW.ui.render(g); return; }   // テレパシー: 自分の成分が分かった（昼のカード移動・酔い覚め）
@@ -2736,19 +2737,34 @@ window.ONW = window.ONW || {};
     if (lobbyTypingTimer) { clearTimeout(lobbyTypingTimer); lobbyTypingTimer = null; }
     if (names && names.length) lobbyTypingTimer = setTimeout(() => { lobbyTypingTimer = null; broadcastLobbyTyping(true); }, 2500);   // 入力中の人がいる間だけ、期限切れの掃除と表示の維持を兼ねて配り直す
   }
-  /** ロビーチャットを送る（ロビー画面の入力欄から） */
-  net.sendLobbyChat = function (text) {
+  /** ロビーチャットの受信確認待ち（cid → {done, timer}）。ホストの ack が来たら done(true)、約3秒来なければ done(false) */
+  net._lobbyAckWaiters = {};
+  net._lobbyAck = function (cid) {
+    const w = cid && net._lobbyAckWaiters[cid];
+    if (!w) return;
+    delete net._lobbyAckWaiters[cid];
+    clearTimeout(w.timer);
+    w.done(true);
+  };
+  /** ロビーチャットを送る（ロビー画面の入力欄から）。onDone は「ホストに届いたか」の確定通知（true=届いた）。
+   *  接続の open 表示だけでは死んだ接続への送信も成功扱いになり文章だけ消える（無言ロスト）ため、必ず ack で確定させる */
+  net.sendLobbyChat = function (text, onDone) {
     text = String(text || "").trim();
     if (!text) return false;
-    const msg = { t: "lobbychat", text };
-    if (net.isHost) { hostRecv(net.selfSeat, msg); return true; }
-    if (net.hostConn && net.hostConn.open) { net.hostConn.send(msg); return true; }
-    return false;   // 接続が切れている/再接続中: 送れたことにしない（呼び出し側が文章を残して知らせる）
+    const cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const msg = { t: "lobbychat", text, cid };
+    if (net.isHost) { hostRecv(net.selfSeat, msg); if (onDone) onDone(true); return true; }   // ホスト自身はその場で届いた扱い
+    if (net.hostConn && net.hostConn.open) {
+      if (onDone) net._lobbyAckWaiters[cid] = { done: onDone, timer: setTimeout(() => { delete net._lobbyAckWaiters[cid]; onDone(false); }, 3000) };
+      net.hostConn.send(msg);
+      return true;
+    }
+    return false;   // 接続が切れている/再接続中: 送れたことにしない（呼び出し側が文章を残して知らせる。onDone は呼ばれない）
   };
   /** ロビーチャット: 入力中かどうかをホストへ知らせる */
   net.sendLobbyTyping = function (on) {
     const msg = { t: "lobbytyping", on: !!on };
-    if (net.isHost) hostRecv(net.selfSeat, msg); else if (net.hostConn) net.hostConn.send(msg);
+    if (net.isHost) hostRecv(net.selfSeat, msg); else if (net.hostConn && net.hostConn.open) net.hostConn.send(msg);
   };
 
   net.sendCo = function (text, claim, setRole, flag, short) {
@@ -2937,6 +2953,7 @@ window.ONW = window.ONW || {};
       if (text && p) {
         if ((g.lobbyTyping || {})[id]) { delete g.lobbyTyping[id]; broadcastLobbyTyping(); }   // 送信されたら入力中表示を消す
         pushLobbyChat(p.name, text);
+        if (d.cid) send(id, { t: "lobbychatack", cid: d.cid });   // 受信確認: 送信側はこれが来るまで入力欄を消さない
       }
       return;
     }

@@ -2319,24 +2319,30 @@ window.ONW = window.ONW || {};
     el.scrollTop = el.scrollHeight;
   };
   let lobbyChatErrTimer = null;
+  let lobbyChatSending = false;   // ホストの受信確認（ack）待ちの間は二重送信しない
   ui.sendLobbyChat = function () {
     const el = document.getElementById("lobby-chat-in");
     if (!el) return;
     const v = el.value;
     if (!String(v || "").trim()) return;
-    const ok = !!(ONW.net && ONW.net.sendLobbyChat && ONW.net.sendLobbyChat(v));
-    if (!ok) {   // たまに送れない問題対策: 無言で消さず、文章を残して理由を知らせる（接続が戻ればそのまま再送できる）
+    if (lobbyChatSending) return;
+    const showErr = (msg) => {
       const err = document.getElementById("lobby-chat-err");
-      if (err) { err.textContent = "接続が不安定で送れませんでした。文章は残してあるので、少し待ってもう一度「送信」を押してください。"; clearTimeout(lobbyChatErrTimer); lobbyChatErrTimer = setTimeout(() => { err.textContent = ""; }, 5000); }
+      if (err) { err.textContent = msg; clearTimeout(lobbyChatErrTimer); lobbyChatErrTimer = setTimeout(() => { err.textContent = ""; }, 6000); }
       el.focus();
-      return;
-    }
-    el.value = "";
-    lobbyDraft = "";
-    ui.lobbyTypingOff();
-    const err = document.getElementById("lobby-chat-err");
-    if (err) err.textContent = "";
-    el.focus();
+    };
+    lobbyChatSending = true;
+    const done = (ok) => {   // ホストに届いたことが確定してから入力欄を消す（届く前に消すと、死んだ接続への送信で文章だけ消える）
+      lobbyChatSending = false;
+      if (!ok) { showErr("送れたか確認できませんでした。文章は残してあるので、届いていないようならもう一度「送信」を押してください。"); return; }
+      if (el.value === v) { el.value = ""; lobbyDraft = ""; }   // 確認待ちの間に書き足していたら、その分は消さない
+      ui.lobbyTypingOff();
+      const err = document.getElementById("lobby-chat-err");
+      if (err) err.textContent = "";
+      el.focus();
+    };
+    const sent = !!(ONW.net && ONW.net.sendLobbyChat && ONW.net.sendLobbyChat(v, done));
+    if (!sent) { lobbyChatSending = false; showErr("接続が不安定で送れませんでした。文章は残してあるので、少し待ってもう一度「送信」を押してください。"); }   // 接続が切れている/再接続中: 無言で消さず、文章を残して理由を知らせる
   };
   // 「〇〇が入力中…」（Discord式・ロビーだけ）: 判定は「入力欄に1文字でもある間」（作者指定 2026-11-26。フォーカスだけ・空欄では入力中にしない）。
   // 文字が変わるたびに申告を維持し、文字の変動が5秒以上なかったら解除する。送信・空・閉じるでは即解除（送信は sendLobbyChat / 空と変動なしは lobbyChatInput / 閉じるは closeLobbyChatOverlay）。
