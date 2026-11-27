@@ -167,10 +167,16 @@ const CUR = "cursed_one";   // 呪われし者（吊られてめくれたあと�
   const graveN = (g) => ((g.isSpectator || hostWatching(g)) && g.specInfo ? g.specInfo.center.length : g.graveCount || 0);
   const hostWatching = (g) => !!(g.hostSpec && ONW.net.isHost);
 
-  /** 席の一覧。自分が先頭。観戦のホストは全員、観戦者はCO欄の名簿から */
+  /** 席の一覧。席順のまま（自分も自分の席の位置に出る。配布の演出は盤面ではなく役職確認の画面なので、ここは夜以降ずっと席順）。観戦のホストは全員、観戦者はCO欄の名簿から */
   function roster(g) {
     if (hostWatching(g)) return (g.others || []).map((p) => ({ id: p.id, name: p.name }));
-    if (g.others && !g.isSpectator) return [{ id: ONW.net.myId(), name: g.myName || "あなた", me: true }, ...g.others];
+    if (g.others && !g.isSpectator) {
+      const me = { id: ONW.net.myId(), name: g.myName || "あなた", me: true };
+      const idx = (typeof g.mySeat === "number" && g.mySeat >= 0 && g.mySeat <= g.others.length) ? g.mySeat : 0;   // 席位置が分からないときだけ先頭（従来表示）
+      const list = [...g.others];
+      list.splice(idx, 0, me);
+      return list;
+    }
     return (g.boardView || []).map((p) => ({ id: p.id, name: p.name }));
   }
   stage.hasTable = (g) => VISIBLE().includes(ph(g)) && roster(g).length > 0;
