@@ -700,8 +700,8 @@ window.ONW = window.ONW || {};
         <div class="lobby-scroll">
         <div class="lobby-list">${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
         ${Array.from({ length: game.cpuCount || 0 }, (_, i) => { const cn = (game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`; return `<div class="result-role"><span class="pl">${A.avatarHtml(cn, {}, "av--sm")}${ONW.achievements && ONW.achievements.lobbyNameHtml ? ONW.achievements.lobbyNameHtml(esc(cn), ONW.achievements.cpuDisplayAchv(cn)) : esc(cn)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`; }).join("")}</div>
-        ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         </div>
+        ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>
         <div class="lobby-actions">
@@ -1212,11 +1212,14 @@ window.ONW = window.ONW || {};
   ui.fitLobbyScroll = function () {
     const sc = document.querySelector(".lobby-scroll");
     if (!sc) return;
-    const row = sc.querySelector(".result-role");
-    if (!row || !row.offsetHeight) return;
+    const rows = Array.from(sc.querySelectorAll(".result-role"));
+    if (!rows.length) return;
     const list = sc.querySelector(".lobby-list");
     const grid = list && window.getComputedStyle(list).display === "grid";
-    sc.style.height = (row.offsetHeight * (grid ? 3 : 6)) + "px";
+    // 最初の6人ぶんの中で一番高い行にそろえる（実績ラベル付きの行は高い）。6人までなら絶対にスクロールが出ない
+    const maxH = Math.max.apply(null, rows.slice(0, 6).map((r) => r.offsetHeight || 0));
+    if (!maxH) return;
+    sc.style.height = (maxH * (grid ? 3 : 6) + 2) + "px";
   };
 
   /** タイトル・ロビーを、スクロールなしで画面に収める（body.menu-fit のあいだだけ）。

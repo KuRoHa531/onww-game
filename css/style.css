@@ -3151,7 +3151,7 @@ body.menu-tight .lobby-list .result-role { padding-top: 14px; }
 .lobby-actions .btn { width: 100%; }
 .lobby-actions__blank { visibility: hidden; }
 .lobby-panel { position: relative; }
-.lobby-scroll { height: 336px; overflow-y: auto; overscroll-behavior: contain; }
+.lobby-scroll { height: 336px; overflow-y: auto; overscroll-behavior: contain; padding-right: 14px; }
 .lobby-panel > .lede { padding: 0 56px; }
 .lobby-corner { width: 48px; padding: 5px 0 3px; display: flex; flex-direction: column; align-items: center; gap: 0; background: var(--bg-panel-raised); border: 1px solid var(--gold-dim); border-radius: 10px; color: var(--ink); cursor: pointer; }
 .lobby-corner--exit { position: absolute; top: 10px; left: 10px; z-index: 2; }
