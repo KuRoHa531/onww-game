@@ -101,13 +101,14 @@ window.ONW = window.ONW || {};
     if (!sameResult) $app().innerHTML = html;
     ui._lastHtml = html;
     if (lcDraft !== null) { const ni = document.getElementById("lobby-chat-in"); if (ni) { ni.value = lcDraft; if (lcFocus) ni.focus(); } }
-    if (game.phase === ONW.PHASE.LOBBY) { ui.syncLobbyChatOverlay(); ui.syncInviteOverlay(); ui.updateLobbyChat(); ui.updateLobbyTyping(); }
+    if (game.phase === ONW.PHASE.LOBBY) { ui.syncLobbyChatOverlay(); ui.syncInviteOverlay(); ui.updateLobbyChat(); ui.updateLobbyTyping(); ui.fitLobbyScroll(); }
     else { ui.closeLobbyChatOverlay(); ui.closeInviteOverlay(); }
     if (keepY && !sameResult) window.scrollTo(0, keepY);
     if (keepM) { const np = document.querySelector(".settings-panel--modal"); if (np) np.scrollTop = keepM; }
     ui._lastPhase = game.phase;
     if (game.phase === ONW.PHASE.ONLINE_ROLE || ui.isSpecDeal(game)) ui.setupDeal();
     ui.fitMenu();
+    if (game.phase === ONW.PHASE.LOBBY) ui.fitLobbyScroll();
     if (ONW.accountUi && ONW.accountUi.updateFixed) ONW.accountUi.updateFixed();
     ui.updateBoard();
     ui.updateSpecInfo();
@@ -696,9 +697,11 @@ window.ONW = window.ONW || {};
         <p class="lede">部屋コード（友達に教えてください）</p>
         <div class="room-code-row"><span class="night-step__role room-code-mask">＊＊＊＊</span><button class="btn tf-chip room-code-copy" onclick="ONW.ui.copyRoomCode(this)">コピー</button></div>
         <h2>参加者 ${total}/${size}</h2>
+        <div class="lobby-scroll">
         <div class="lobby-list">${players.map((p) => `<div class="result-role">${lobbyName(p)}<span>${badge(p.status)}</span></div>`).join("")}
         ${Array.from({ length: game.cpuCount || 0 }, (_, i) => { const cn = (game.cpuNames && game.cpuNames[i]) || `CPU${i + 1}`; return `<div class="result-role"><span class="pl">${A.avatarHtml(cn, {}, "av--sm")}${ONW.achievements && ONW.achievements.lobbyNameHtml ? ONW.achievements.lobbyNameHtml(esc(cn), ONW.achievements.cpuDisplayAchv(cn)) : esc(cn)}</span><span>${isHost ? `<button class="btn tf-chip" onclick="ONW.net.renameCpu(${i})">名前変更</button> ` : ""}<span class="st st-cpu">CPU</span></span></div>`; }).join("")}</div>
         ${specs.length ? `<h2>観戦者 ${specs.length}</h2><div class="lobby-list">${specs.map((p) => `<div class="result-role">${lobbyName(p)}<span class="st st-spec">観戦</span></div>`).join("")}</div>` : ""}
+        </div>
         <p class="night-step__hint">ルール: ${summary}</p>
         <p class="night-step__hint lobby-hint">${hint}</p>
         <div class="lobby-actions">
@@ -1202,6 +1205,19 @@ window.ONW = window.ONW || {};
     window.addEventListener("orientationchange", () => setTimeout(refit, 250));
     document.addEventListener("fullscreenchange", () => setTimeout(refit, 150));
   }
+
+  /** ロビーの参加者リストの高さを「6人ぶん」に固定する（1行の実寸×6。2列表示のときは3行ぶん）。
+   *  人数が変わってもパネル全体の高さが変わらないので、下のボタンの位置が動かない。
+   *  6人を超えた分はリストの中だけがスクロールし、ボタンの裏には出ない */
+  ui.fitLobbyScroll = function () {
+    const sc = document.querySelector(".lobby-scroll");
+    if (!sc) return;
+    const row = sc.querySelector(".result-role");
+    if (!row || !row.offsetHeight) return;
+    const list = sc.querySelector(".lobby-list");
+    const grid = list && window.getComputedStyle(list).display === "grid";
+    sc.style.height = (row.offsetHeight * (grid ? 3 : 6)) + "px";
+  };
 
   /** タイトル・ロビーを、スクロールなしで画面に収める（body.menu-fit のあいだだけ）。
    *  1) そのまま（今までと同じ大きさ）で収まるならそのまま
