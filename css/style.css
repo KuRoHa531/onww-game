@@ -2532,6 +2532,7 @@ body.chat-mode .chat-log:not(.result-chat) { min-height: 110px; }
 .dgp-paper { width: auto; flex: 1 1 220px; max-width: 340px; min-height: 150px; padding: 20px 22px; }
 .dgp-paper__h { font-size: 13px; font-weight: 800; letter-spacing: .3em; color: #6d1420; border-bottom: 1px solid rgba(109, 20, 32, .4); padding-bottom: 6px; margin-bottom: 10px; text-align: center; }
 .dgp-paper__t { font-size: 19px; font-weight: 700; line-height: 1.7; color: #8f1020; text-shadow: 0 0 2px rgba(143, 16, 32, .55), 1px 1px 0 rgba(90, 5, 16, .35); min-height: 3.4em; text-align: left; word-break: break-all; }
+.dgp-paper__t .dgp-seg { display: inline-block; max-width: 100%; }
 .dgp-paper__t .dgp-ch { display: inline-block; white-space: pre; opacity: 0; }
 .dgp-paper__t .dgp-ch.on { animation: dgp-draw .3s ease-out forwards; }
 @keyframes dgp-draw {

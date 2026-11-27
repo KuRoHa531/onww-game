@@ -228,19 +228,21 @@
   function runPapers(R) {
     const res = R.res, papers = res.detectiveGhostPapers || [];
     if (!papers.length || res.abandoned) return;
-    const texts = papers.map((x) => `探偵の亡霊${x.name}は ${x.target}の役職を「${x.guess}」と推理しました。`);
+    // 改行は文節の切れ目だけ（「役/職」みたいな単語の途中で割らない）。文節ごとにまとめて、間でのみ折り返す
+    const segsOf = (x) => [`探偵の亡霊${x.name}は `, `${x.target}の役職を`, `「${x.guess}」と`, `推理しました。`];
+    const texts = papers.map((x) => segsOf(x).join(""));
     const maxLen = Math.max(...texts.map((t) => [...t].length));
     const STEP = 150, HOLD = 1500, t0 = R.t;   // 1画ずつ血で描くように、少しゆっくり（従来は45msでポンと出ていた）
     const escC = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     R.later(() => {
       removePapers();
       const wrap = document.createElement("div"); wrap.className = "dgp-wrap";
-      wrap.innerHTML = `<div class="dgp-dim"></div><div class="dgp-papers">${papers.map((x, i) => `<div class="tfp-paper dgp-paper"><div class="dgp-paper__h">ダイニングメッセージ</div><div class="dgp-paper__t" data-dgp="${i}">${[...texts[i]].map((c) => `<span class="dgp-ch">${escC(c)}</span>`).join("")}</div><div class="dgp-stamp${x.success ? " dgp-stamp--hit" : " dgp-stamp--miss"}" data-dgp-stamp="${i}">${x.success ? "正解" : "外れ"}</div></div>`).join("")}</div>`;
+      wrap.innerHTML = `<div class="dgp-dim"></div><div class="dgp-papers">${papers.map((x, i) => `<div class="tfp-paper dgp-paper"><div class="dgp-paper__h">ダイニングメッセージ</div><div class="dgp-paper__t" data-dgp="${i}">${segsOf(x).map((seg) => `<span class="dgp-seg">${[...seg].map((c) => `<span class="dgp-ch">${escC(c)}</span>`).join("")}</span>`).join("")}</div><div class="dgp-stamp${x.success ? " dgp-stamp--hit" : " dgp-stamp--miss"}" data-dgp-stamp="${i}">${x.success ? "正解" : "外れ"}</div></div>`).join("")}</div>`;
       document.body.appendChild(wrap);
     }, t0);
     for (let s = 0; s < maxLen; s++) {
       R.later(() => {
-        document.querySelectorAll("[data-dgp]").forEach((el) => { const ch = el.children[s]; if (ch) ch.classList.add("on"); });   // 書いた文字だけが、描かれて見えてくる
+        document.querySelectorAll("[data-dgp]").forEach((el) => { const ch = el.querySelectorAll(".dgp-ch")[s]; if (ch) ch.classList.add("on"); });   // 書いた文字だけが、描かれて見えてくる
         if (ONW.sound && s % 3 === 0) ONW.sound.se("reveal_text");
       }, t0 + 350 + s * STEP);
     }
