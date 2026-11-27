@@ -22,6 +22,21 @@ window.ONW = window.ONW || {};
 const achv = {};
 const DATA = (typeof window!== "undefined" && window.ONW_ACHIEVEMENTS) || [];
 const DEFS = new Map(DATA.map((e) => [e.i, e]));
+// 陣営分け実績の統合（2026-11-27 作者決定）: 廃止した旧ID→統合先IDの読み替え。
+// 判定フックが旧IDを返しても、保存済み（Supabase・端末）に旧IDが残っていても、統合先で所持扱いにする
+const ACHV_REMAP = {
+exposed_reveal_wolf: "exposed_reveal_village", exposed_reveal_third: "exposed_reveal_village",
+seal_fail_wolf: "seal_fail_village", seal_fail_third: "seal_fail_village",
+doppel_copy_wolf: "doppel_copy_village", doppel_copy_third: "doppel_copy_village",
+gremlin_copy_wolf: "gremlin_copy_village", gremlin_copy_third: "gremlin_copy_village",
+opportunist_with_wolf: "opportunist_with_village", opportunist_with_third: "opportunist_with_village",
+bomber_with_wolf: "bomber_with_village", bomber_with_third: "bomber_with_village",
+mind_wolf_find_wolf: "mind_wolf_find_village", mind_wolf_find_third: "mind_wolf_find_village",
+seen_by_mind_wolf_wolf: "seen_by_mind_wolf_village", seen_by_mind_wolf_third: "seen_by_mind_wolf_village",
+mad_seer_inspect_wolf: "mad_seer_inspect_village", mad_seer_inspect_third: "mad_seer_inspect_village",
+relic_steal_wolf: "relic_steal_village", relic_steal_third: "relic_steal_village",
+};
+const remapId = (id) => ACHV_REMAP[id] || id;
 const FIRST_BY_ROLE = {}, WIN_BY_ROLE = {};
 DATA.forEach((e) => {
 if (e.k === "first" && e.r) (FIRST_BY_ROLE[e.r] = FIRST_BY_ROLE[e.r] || []).push(e);
@@ -45,8 +60,9 @@ let mine = blank();
 function guestLoad() {
 try {
 const j = JSON.parse(localStorage.getItem(GUEST_KEY) || "{}");
-mine.unlocked = new Set((j.unlocked || []).filter((id) => DEFS.has(id)));
-mine.equipped = j.equipped && mine.unlocked.has(j.equipped)? j.equipped: null;
+mine.unlocked = new Set((j.unlocked || []).map(remapId).filter((id) => DEFS.has(id)));
+const geq = j.equipped? remapId(j.equipped): null;
+mine.equipped = geq && mine.unlocked.has(geq)? geq: null;
 mine.counters = {...blank().counters,...(j.counters || {})};
 mine.doneKeys = new Set(j.doneKeys || []);
 } catch (e) { /* 壊れた保存は初期状態から */}
@@ -84,9 +100,9 @@ countersLoad(A.user.id);
 try {
 const { data, error} = await A.sb.from("achievements").select("achievement_id").eq("user_id", A.user.id);
 if (error) throw error;
-mine.unlocked = new Set((data || []).map((r) => r.achievement_id).filter((id) => DEFS.has(id)));
+mine.unlocked = new Set((data || []).map((r) => remapId(r.achievement_id)).filter((id) => DEFS.has(id)));
 mine.sbOk = true;
-const eq = A.user.equipped_achievement || null;
+const eq = A.user.equipped_achievement? remapId(A.user.equipped_achievement): null;
 mine.equipped = eq && mine.unlocked.has(eq)? eq: null;
 } catch (e) { guestLoad(); mine.sbOk = false;} // setup.sql 未実行など: 端末保存に倒す（表示だけは動く）
 mine.loaded = true;
@@ -134,7 +150,7 @@ setTimeout(() => { try { b.remove();} catch (err) {}}, 3900 + ix * 300);
 achv.saveNew = async function (ids) {
 const A0 = ONW.account;
 if (!A0 ||!A0.user) return [];   // ゲストは実績を保存しない
-const fresh = (ids || []).filter((id) => DEFS.has(id) &&!mine.unlocked.has(id));
+const fresh = [...new Set((ids || []).map(remapId))].filter((id) => DEFS.has(id) &&!mine.unlocked.has(id));
 if (!fresh.length) return [];
 fresh.forEach((id) => mine.unlocked.add(id));
 const A = ONW.account;
@@ -179,8 +195,8 @@ A.sb.from("achievements").select("achievement_id").eq("user_id", uid),
 A.sb.from("profiles").select("equipped_achievement").eq("id", uid).maybeSingle(),
 ]);
 if (r1.error) return { error: true};
-const unlocked = new Set((r1.data || []).map((r) => r.achievement_id).filter((id) => DEFS.has(id)));
-const eq = r2.data && r2.data.equipped_achievement;
+const unlocked = new Set((r1.data || []).map((r) => remapId(r.achievement_id)).filter((id) => DEFS.has(id)));
+const eq = r2.data && r2.data.equipped_achievement? remapId(r2.data.equipped_achievement): null;
 return { unlocked, equipped: eq && unlocked.has(eq)? eq: null};
 } catch (e) { return { error: true};}
 };
@@ -204,7 +220,7 @@ achv.collect = function (g, winIds) {
 const out = {};
 if (!g ||!Array.isArray(g.players) || g.debugOn || g.abandoned) return out;   // デバッグモード中・廃村では実績の解除そのものが発生しない（戦績と同じ g.debugOn 判定。廃村は結果が正規フローで確定していない）
 const won = new Set(winIds || []);
-const add = (pid, aid) => { if (aid && DEFS.has(aid)) (out[pid] = out[pid] || new Set()).add(aid);};
+const add = (pid, aid) => { aid = aid && remapId(aid); if (aid && DEFS.has(aid)) (out[pid] = out[pid] || new Set()).add(aid);};
 // 1) 各役職ファイルの判定フック
 const hooks = hookList();
 for (const p of g.players) {

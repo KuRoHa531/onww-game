@@ -439,7 +439,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "first_baker",
-        "name": "はじめてのパン作り",
+        "name": "窯開きの日",
         "desc": "初めてパン屋になる。"
       },
       {
@@ -1005,7 +1005,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "first_lookout",
-        "name": "初めての夜番",
+        "name": "眠らぬ番人の瞳",
         "desc": "初めて見張り番になる。"
       },
       {
@@ -1180,17 +1180,17 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "exchanger_swap_vote",
-        "name": "票先交換",
+        "name": "すり替えの票",
         "desc": "交換者で票先を交換する。"
       },
       {
         "id": "exchanger_swap_self",
-        "name": "自分も巻き込む交換",
+        "name": "渦中の交換者",
         "desc": "交換者で自身と誰かを交換する。"
       },
       {
         "id": "exchanger_swap_others",
-        "name": "他人同士の交換",
+        "name": "運命の交差点",
         "desc": "交換者で他人同士を交換する。"
       },
       {
@@ -1459,7 +1459,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "seer_player_inspect",
-        "name": "初めての人物占い",
+        "name": "水晶に映る顔",
         "desc": "占い師でプレイヤーを占う。"
       },
       {
@@ -1572,12 +1572,12 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "libra_win",
-        "name": "天秤の勝利",
+        "name": "秤にかけた勝利",
         "desc": "天秤で能力を発動して勝利する。"
       },
       {
         "id": "libra_loss",
-        "name": "天秤の敗北",
+        "name": "傾いた秤",
         "desc": "天秤で能力を発動したうえで敗北する。"
       },
       {
@@ -1639,7 +1639,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "dictator_execute",
-        "name": "独裁処刑",
+        "name": "一声の処刑台",
         "desc": "独裁者で独裁処刑を行う。"
       },
       {
@@ -1788,7 +1788,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "sheriff_execute_success",
-        "name": "執行成功",
+        "name": "正義の一弾",
         "desc": "保安官で人外を執行する。"
       },
       {
@@ -1829,18 +1829,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "relic_steal_village",
-        "name": "墓地の村役職",
-        "desc": "墓荒らしで村人陣営役職を盗む。"
-      },
-      {
-        "id": "relic_steal_wolf",
-        "name": "墓地の狼役職",
-        "desc": "墓荒らしで人狼陣営役職を盗む。"
-      },
-      {
-        "id": "relic_steal_third",
-        "name": "墓地の第三役職",
-        "desc": "墓荒らしで第三陣営役職を盗む。"
+        "name": "墓地に眠る力",
+        "desc": "墓荒らしで墓地の役職を盗む。"
       },
       {
         "id": "first_relic_robber",
@@ -2179,12 +2169,12 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "first_hayatochiri",
-        "name": "はじめての早とちり",
+        "name": "思い込みの芽生え",
         "desc": "初めて早とちりになる。"
       },
       {
         "id": "win_hayatochiri",
-        "name": "早とちりで初勝利",
+        "name": "早合点の金星",
         "desc": "早とちりで勝利する。"
       }
     ],
@@ -2200,7 +2190,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "first_hunter",
-        "name": "はじめてなった",
+        "name": "狩りの始まり",
         "desc": "初めてハンターになる。"
       },
       {
@@ -2293,7 +2283,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "win_screw_gum",
-        "name": "スクリューガムで初勝利",
+        "name": "機械生命体の在り方",
         "desc": "スクリューガムで勝利する。"
       }
     ],
@@ -2422,7 +2412,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "first_lone_wolf",
-        "name": "孤独な遠吠え",
+        "name": "群れなき狼",
         "desc": "初めて一匹狼になる。"
       },
       {
@@ -2578,17 +2568,17 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "mad_exchanger_swap_vote",
-        "name": "狂った票先交換",
+        "name": "狂騒に踊る票",
         "desc": "狂った交換者で票先を交換する。"
       },
       {
         "id": "mad_exchanger_swap_self",
-        "name": "自分も巻き込む狂交換",
+        "name": "狂騒の渦中へ",
         "desc": "狂った交換者で自身と誰かを交換する。"
       },
       {
         "id": "mad_exchanger_swap_others",
-        "name": "他人同士の狂交換",
+        "name": "狂騒の運命交差",
         "desc": "狂った交換者で他人同士を交換する。"
       },
       {
@@ -2666,18 +2656,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "mad_seer_inspect_village",
-        "name": "狂眼に映る村",
-        "desc": "狂った占い師で村人陣営を占う。"
-      },
-      {
-        "id": "mad_seer_inspect_wolf",
-        "name": "狂眼に映る狼",
-        "desc": "狂った占い師で人狼陣営を占う。"
-      },
-      {
-        "id": "mad_seer_inspect_third",
-        "name": "狂眼に映る第三",
-        "desc": "狂った占い師で第三陣営を占う。"
+        "name": "狂眼に映るもの",
+        "desc": "狂った占い師で陣営を占う。"
       },
       {
         "id": "mad_seer_curse_fox",
@@ -3054,33 +3034,13 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "mind_wolf_find_village",
-        "name": "村の心眼",
-        "desc": "心眼の人狼で村人陣営を見抜く。"
-      },
-      {
-        "id": "mind_wolf_find_wolf",
-        "name": "狼の心眼",
-        "desc": "心眼の人狼で人狼陣営を見抜く。"
-      },
-      {
-        "id": "mind_wolf_find_third",
-        "name": "第三の心眼",
-        "desc": "心眼の人狼で第三陣営を見抜く。"
+        "name": "見通す心眼",
+        "desc": "心眼の人狼で陣営を見抜く。"
       },
       {
         "id": "seen_by_mind_wolf_village",
-        "name": "心眼に映る村",
-        "desc": "心眼の人狼に村人陣営として見抜かれる。"
-      },
-      {
-        "id": "seen_by_mind_wolf_wolf",
-        "name": "心眼に映る狼",
-        "desc": "心眼の人狼に人狼陣営として見抜かれる。"
-      },
-      {
-        "id": "seen_by_mind_wolf_third",
-        "name": "心眼に映る第三",
-        "desc": "心眼の人狼に第三陣営として見抜かれる。"
+        "name": "見抜かれた心",
+        "desc": "心眼の人狼に陣営を見抜かれる。"
       },
       {
         "id": "first_mind_wolf",
@@ -3457,7 +3417,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "rebel_coup",
-        "name": "クーデター成功",
+        "name": "反逆の狼煙",
         "desc": "反逆の狂人でクーデターを起こす。"
       },
       {
@@ -3483,18 +3443,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "seal_fail_village",
-        "name": "村を封じる",
-        "desc": "封印の狂人で村人陣営を封印して失敗させる。"
-      },
-      {
-        "id": "seal_fail_wolf",
-        "name": "狼を封じる",
-        "desc": "封印の狂人で人狼陣営を封印して失敗させる。"
-      },
-      {
-        "id": "seal_fail_third",
-        "name": "第三を封じる",
-        "desc": "封印の狂人で第三陣営を封印して失敗させる。"
+        "name": "封印の印",
+        "desc": "封印の狂人で封印して失敗させる。"
       },
       {
         "id": "first_seal_madman",
@@ -3545,18 +3495,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "exposed_reveal_village",
-        "name": "村を暴く",
-        "desc": "暴露狂人で村人陣営役職を暴露する。"
-      },
-      {
-        "id": "exposed_reveal_wolf",
-        "name": "狼を暴く",
-        "desc": "暴露狂人で人狼陣営役職を暴露する。"
-      },
-      {
-        "id": "exposed_reveal_third",
-        "name": "第三を暴く",
-        "desc": "暴露狂人で第三陣営役職を暴露する。"
+        "name": "暴露の快感",
+        "desc": "暴露狂人で役職を暴露する。"
       },
       {
         "id": "exposed_reveal_lover",
@@ -3652,7 +3592,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "win_eraser_wolf",
-        "name": "抹消完了",
+        "name": "すべてを白紙に",
         "desc": "抹消の人狼で勝利する。"
       }
     ],
@@ -3962,18 +3902,8 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "opportunist_with_village",
-        "name": "村と機会を掴む",
-        "desc": "オポチュニストで村人陣営と共に勝つ。"
-      },
-      {
-        "id": "opportunist_with_wolf",
-        "name": "狼と機会を掴む",
-        "desc": "オポチュニストで人狼陣営と共に勝つ。"
-      },
-      {
-        "id": "opportunist_with_third",
-        "name": "第三と機会を掴む",
-        "desc": "オポチュニストで第三陣営と共に勝つ。"
+        "name": "ご都合主義のオポチュニティ",
+        "desc": "オポチュニストでいずれかの陣営と共に勝つ。"
       },
       {
         "id": "opportunist_god_loss",
@@ -4024,18 +3954,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "gremlin_copy_village",
-        "name": "村を写す悪戯",
-        "desc": "グレムリンで村人陣営をコピーする。"
-      },
-      {
-        "id": "gremlin_copy_wolf",
-        "name": "狼を写す悪戯",
-        "desc": "グレムリンで人狼陣営をコピーする。"
-      },
-      {
-        "id": "gremlin_copy_third",
-        "name": "第三を写す悪戯",
-        "desc": "グレムリンで第三陣営をコピーする。"
+        "name": "真似っこ悪戯",
+        "desc": "グレムリンでコピーする。"
       },
       {
         "id": "gremlin_copy_dependency_despair",
@@ -4101,12 +4021,12 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "shuffler_self",
-        "name": "自分をシャッフル",
+        "name": "転生シャ",
         "desc": "シャッフラーで自身をシャッフルする。"
       },
       {
         "id": "shuffler_other",
-        "name": "他者をシャッフル",
+        "name": "召喚シャ",
         "desc": "シャッフラーで他者をシャッフルする。"
       },
       {
@@ -4261,7 +4181,7 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "freeter_reemployed_after_death",
-        "name": "議論中の再就職",
+        "name": "渡り鳥の再就職",
         "desc": "フリーターで就職先が議論中に死亡し別のプレイヤーに再就職する。"
       },
       {
@@ -4426,7 +4346,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "first_love_tanner",
-        "name": "一目惚れ",
+        "name": "一目で落ちる心",
         "desc": "初めて一目惚れしてるてるになる。"
       },
       {
@@ -4632,12 +4552,12 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "first_executioner",
-        "name": "はじめての処刑人",
+        "name": "断頭台の番人",
         "desc": "初めて処刑人になる。"
       },
       {
         "id": "win_executioner",
-        "name": "処刑人で初勝利",
+        "name": "狙い通りの断頭台",
         "desc": "処刑人で勝利する。"
       }
     ],
@@ -4756,7 +4676,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "win_god",
-        "name": "神の祝福",
+        "name": "神の思し召し",
         "desc": "神で勝利する。"
       }
     ],
@@ -4880,18 +4800,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "bomber_with_village",
-        "name": "村と爆ぜる",
-        "desc": "道化の爆弾魔で村人陣営と勝利する。"
-      },
-      {
-        "id": "bomber_with_wolf",
-        "name": "狼と爆ぜる",
-        "desc": "道化の爆弾魔で人狼陣営と勝利する。"
-      },
-      {
-        "id": "bomber_with_third",
-        "name": "第三と爆ぜる",
-        "desc": "道化の爆弾魔で第三陣営と勝利する。"
+        "name": "爆ぜる道化",
+        "desc": "道化の爆弾魔でいずれかの陣営と勝利する。"
       },
       {
         "id": "bomber_explode_all_others",
@@ -4921,12 +4831,12 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "heartbreaker_success",
-        "name": "破局成功",
+        "name": "引き裂かれた恋",
         "desc": "破局師で破局に成功する。"
       },
       {
         "id": "heartbreaker_fail",
-        "name": "破局失敗",
+        "name": "壊れなかった恋",
         "desc": "破局師で破局に失敗する。"
       },
       {
@@ -4941,7 +4851,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "win_heartbreaker",
-        "name": "破局成立",
+        "name": "愛を終わらせた果てに",
         "desc": "破局師で勝利する。"
       }
     ],
@@ -4998,12 +4908,12 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "reversed_once",
-        "name": "反転を受ける",
+        "name": "反転の烙印",
         "desc": "反転をつけられる。"
       },
       {
         "id": "reversed_even",
-        "name": "偶数反転",
+        "name": "裏返しの裏返し",
         "desc": "反転を偶数回つけられる。"
       },
       {
@@ -5121,7 +5031,7 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "lawyer_client_moved",
-        "name": "依頼人変更",
+        "name": "移りゆく依頼人",
         "desc": "役職交換によって依頼人が別プレイヤーへ移動する。"
       }
     ],
@@ -5683,18 +5593,8 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "doppel_copy_village",
-        "name": "村を写す影",
-        "desc": "ドッペルゲンガーで村人陣営をコピーする。"
-      },
-      {
-        "id": "doppel_copy_wolf",
-        "name": "狼を写す影",
-        "desc": "ドッペルゲンガーで人狼陣営をコピーする。"
-      },
-      {
-        "id": "doppel_copy_third",
-        "name": "第三を写す影",
-        "desc": "ドッペルゲンガーで第三陣営をコピーする。"
+        "name": "写し身",
+        "desc": "ドッペルゲンガーでコピーする。"
       },
       {
         "id": "doppel_copy_doppel_to_villager",

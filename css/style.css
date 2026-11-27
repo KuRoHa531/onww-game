@@ -74,6 +74,15 @@ body {
   line-height: 1.4;
 }
 
+.onw-header__logo {
+  display: block;
+  height: 46px;
+  width: auto;
+  max-width: min(52vw, 320px);
+  margin: 0 auto;
+  image-rendering: pixelated;
+}
+
 .onw-header__title-sub {
   display: block;
   font-size: 11px;
@@ -144,6 +153,7 @@ body {
 .start-gate__sub { color: var(--gold-dim); font-size: 13px; letter-spacing: .35em; margin-bottom: 10px; }
 .start-gate__title { font-family: var(--font-display); font-weight: 800; font-size: 34px; color: var(--ink); margin-bottom: 40px; }
 .start-gate__btn { font-size: 17px; padding: 12px 36px; }
+.start-gate__logo { width: min(92vw, 620px); height: auto; image-rendering: pixelated; margin-bottom: 38px; }
 
 /* ---- クレジット（タイトル画面のフッター、「オンライン対応」の上） ---- */
 .credits-link { display: none; }
@@ -430,6 +440,7 @@ body.is-title .credits-link {
 @media (max-width: 480px) {
   .onw-header { flex-wrap: wrap; }
   .onw-header__title { order: -1; flex: 1 0 100%; }
+  .onw-header__logo { height: 54px; }
 }
 
 /* 入力欄（ルーム作成・参加） */
@@ -1461,6 +1472,12 @@ body.deal-fit .onw-app > .deal-stage { flex: 0 0 auto; margin: 0; }
 .chat-tab.on { color: var(--gold); border-color: var(--gold-dim); background: var(--bg-panel-raised); }
 .chat-tab--ghost.on { color: #2f7bff; border-color: #fff; -webkit-text-stroke: 2px #fff; paint-order: stroke fill; }   /* 霊界: 白縁の青文字 */
 .chat-tabs + .chat-log { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+/* テレパシー: 送信先がテレパシーの間は、注記・入力欄・ログ行を紫で統一して「全体チャットではない」ことを一目で分かるようにする */
+.tp-note { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: #b18cff; }
+.chat-input.tp-on input { border-color: #8a5cff; background: rgba(124,77,255,.14); }
+.chat-tp { color: #cdb2ff; }
+.chat-tp .chat-ghost__tag { color: #b18cff; font-weight: 700; }
+.chat-tp strong { color: #b18cff; }
 .cb-chip.cb-dead { opacity: .55; }
 
 

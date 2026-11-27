@@ -762,12 +762,36 @@ window.ONW = window.ONW || {};
   ui.canGhost = () => !!(ONW.net && ONW.net.canGhost && ONW.net.canGhost());
   /** マイクラ版と同じく、議論と霊界のタブ分けはしない（霊界の発言は見える人にだけ同じ欄に流れる） */
   ui.chatTabs = function () { return ""; };
-  /** テレパシーの送信先切り替え（人狼ジャッジメント式）。接続の成分に入っている生存者だけに出る。送信先は g.tpMode（false=全体チャット / true=テレパシー） */
+  /** テレパシーの相手（自分以外の成分メンバー）の名前 */
+  ui.tpPartners = function (game) {
+    const map = {}; (game.others || []).forEach((o) => { map[o.id] = o.name; });
+    return (game.myTelepathy || []).filter((id) => id !== ONW.net.myId()).map((id) => map[id] || "?");
+  };
+  /** テレパシー送信が有効な状態か（成分に入っている生存者で、テレパシーモード中） */
+  ui.tpActive = function (game) { return !!(game && game.tpMode && game.myTelepathy && game.myTelepathy.length > 1 && !game.isDead && !game.isSpectator); };
+  /** テレパシーモード中の入力欄プレースホルダ（誰に届くか一目で分かるように） */
+  ui.tpPlaceholder = function (game) { return `テレパシーで送信（${ui.tpPartners(game).join("・")}にだけ届きます）`; };
+  /** テレパシーの送信先切り替え（人狼ジャッジメント式）。接続の成分に入っている生存者だけに出る。送信先は g.tpMode（false=全体チャット / true=テレパシー）。
+   *  テレパシーモード中は「誰にだけ届くか」の注記も出す（全体チャットと間違えて秘密を喋る事故を防ぐ） */
   ui.tpToggle = function (game) {
     if (!game.myTelepathy || game.myTelepathy.length < 2 || game.isDead || game.isSpectator) return "";
-    return `<div class="chat-tabs"><button class="btn${game.tpMode ? "" : " btn--on"}" onclick="ONW.ui.setTpMode(false)">全体チャット</button><button class="btn${game.tpMode ? " btn--on" : ""}" onclick="ONW.ui.setTpMode(true)">テレパシー</button></div>`;
+    return `<div class="tp-toggle"><div class="chat-tabs"><button class="btn${game.tpMode ? "" : " btn--on"}" onclick="ONW.ui.setTpMode(false)">全体チャット</button><button class="btn${game.tpMode ? " btn--on" : ""}" onclick="ONW.ui.setTpMode(true)">テレパシー</button></div>${game.tpMode ? `<p class="tp-note">テレパシー中： ${esc(ui.tpPartners(game).join("・"))} にだけ届きます</p>` : ""}</div>`;
   };
-  ui.setTpMode = function (on) { const g = ONW.game; g.tpMode = !!on; ui.render(g); ui.updateChat(); };
+  /** 送信先の切り替え: 画面全体を作り直さず、切り替えボタンと入力欄だけをその場で直す（大きいチャットを開いたままでも、下書きを消さずに切り替えられる） */
+  ui.setTpMode = function (on) { const g = ONW.game; if (!g) return; g.tpMode = !!on; ui.syncTpUi(); };
+  ui.syncTpUi = function () {
+    const g = ONW.game; if (!g) return;
+    document.querySelectorAll(".tp-toggle").forEach((el) => { const h = ui.tpToggle(g); if (h) el.outerHTML = h; });
+    const tp = ui.tpActive(g), blocked = !!g.muzzled && !tp;   // 口封じが止めるのは全体チャットだけ（テレパシーは口封じ無効・マイクラ版準拠）
+    ["chat-in", "chat-in-big"].forEach((id) => {
+      const inp = document.getElementById(id); if (!inp) return;
+      const row = inp.closest(".chat-input"), btn = row ? row.querySelector("button") : null;
+      if (row) row.classList.toggle("tp-on", tp);
+      inp.disabled = blocked;
+      inp.placeholder = tp ? ui.tpPlaceholder(g) : blocked ? "🤐 あなたは口封じされています" : "";
+      if (btn) btn.disabled = blocked;
+    });
+  };
   /** 観戦者・死亡者向けの入力欄（送信すると自動で霊界チャットになる） */
   ui.ghostInput = function (game) {
     if (!ui.canGhost()) return "";
@@ -2332,17 +2356,18 @@ window.ONW = window.ONW || {};
   ui.openChat = function () {
     if (document.getElementById("chat-overlay")) return;
     if (ui.isPc()) return;   // PC版はチャット欄が最初から大きいので、全画面にしない
-    const g = ONW.game, day = g.phase === ONW.PHASE.ONLINE_DAY, canGhost = ui.canGhost(), canSend = canGhost || (day && !g.isSpectator && !g.muzzled);   // 観戦者・死亡者はいつでも書ける（霊界チャットになる）
+    const g = ONW.game, day = g.phase === ONW.PHASE.ONLINE_DAY, canGhost = ui.canGhost(), canSend = canGhost || (day && !g.isSpectator && (!g.muzzled || (g.myTelepathy && g.myTelepathy.length > 1)));   // 観戦者・死亡者はいつでも書ける（霊界チャットになる）。口封じ中でもテレパシーの成分に入っていれば、テレパシー送信のために開ける（口封じはテレパシーに効かない）
     const wrap = document.createElement("div");
     wrap.id = "chat-overlay";
     wrap.innerHTML = `<div class="co-head"><span>チャット</span><span id="chat-timer" class="chat-timer"></span><button class="btn" onclick="ONW.ui.closeChat()">閉じる</button></div>
       <div id="chat-log-big" class="chat-log chat-log--big"></div>
-      ${canSend ? `${ui.tpToggle(g)}<div class="chat-input"><input id="chat-in-big" class="onw-input" maxlength="100" onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" ontouchend="event.preventDefault();ONW.co.sendChat()" onclick="ONW.co.sendChat()">送信</button></div>` : ""}`;
+      ${canSend ? `${ui.tpToggle(g)}<div class="chat-input${ui.tpActive(g) ? " tp-on" : ""}"><input id="chat-in-big" class="onw-input" maxlength="100"${ui.tpActive(g) ? ` placeholder="${esc(ui.tpPlaceholder(g))}"` : ""} onkeydown="if(event.key==='Enter')ONW.co.sendChat()"><button class="btn" onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" ontouchend="event.preventDefault();ONW.co.sendChat()" onclick="ONW.co.sendChat()">送信</button></div>` : ""}`;
     document.body.appendChild(wrap);
     ui.lockPage(true);                 // 開いている間、ページ本体は動かさない
     ui.fitChat();
     ui.updateTimer();                  // 開いた直後からタイマーを出す（次の毎秒更新を待たない）
     ui.updateChat();
+    ui.syncTpUi();                     // 口封じ中（全体チャット不可）など、入力欄の有効・無効と表示を現在の送信先に合わせる
     const inp = document.getElementById("chat-in-big");
     if (inp) { if (chatDraft) inp.value = chatDraft; if (document.activeElement && document.activeElement !== inp) document.activeElement.blur(); inp.focus({ preventScroll: true }); }
   };
@@ -2542,8 +2567,8 @@ window.ONW = window.ONW || {};
         ${(ui.logsHeld(game) ? [] : game.dayLines || []).map((t) => `<p class="night-step__hint"><strong>${esc(t)}</strong></p>`).join("")}
         ${ui.chatTabs(game)}
         <div id="chat-log" class="chat-log" onclick="ONW.ui.openChat()"></div>
-        ${game.isDead ? ui.ghostInput(game) : `${ui.tpToggle(game)}<div class="chat-input">
-          <input id="chat-in" class="onw-input" maxlength="100" ${game.muzzled && !game.tpMode ? `disabled placeholder="🤐 あなたは口封じされています"` : `${ui.isPc() ? "" : "readonly"} onclick="ONW.ui.openChat()"`} onkeydown="if(event.key==='Enter')ONW.co.sendChat()">
+        ${game.isDead ? ui.ghostInput(game) : `${ui.tpToggle(game)}<div class="chat-input${ui.tpActive(game) ? " tp-on" : ""}">
+          <input id="chat-in" class="onw-input" maxlength="100" ${game.muzzled && !game.tpMode ? `disabled placeholder="🤐 あなたは口封じされています"` : `${ui.isPc() ? "" : "readonly"} onclick="ONW.ui.openChat()"${ui.tpActive(game) ? ` placeholder="${esc(ui.tpPlaceholder(game))}"` : ""}`} onkeydown="if(event.key==='Enter')ONW.co.sendChat()">
           <button class="btn" onclick="ONW.co.sendChat()"${game.muzzled && !game.tpMode ? " disabled" : ""}>送信</button>
         </div>`}
       </section>`;

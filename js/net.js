@@ -28,6 +28,7 @@ window.ONW = window.ONW || {};
   const NIGHT_STAGES = ["seal", "seer", "chesed", "relic", "doppel", "shuffler", "gremlin", "robber", "tm"];   // chesed: ケセド（占いの結果は初期役職で決まるので、占いの直後・入れ替え系より前）
   const G = () => ONW.game;
   const PH = () => ONW.PHASE;
+  const byId = (x) => G().players.find((p) => p.id === x);   // 席IDから参加者を引く（broadcastLobbyTyping・abilityHlOf が使う。これが無くて「〇〇が入力中」が ReferenceError で一度も出なかった・作者報告 2026-11-27）
   const rerender = () => ONW.ui.render(G());
   const rn = (r) => ONW.roles.getInfo(r).name;
   /** 役職ファイル(js/roles/*.js)のフックへ渡すコンテキスト。役職ファイルは net.js の中身に直接触らず、ここにある道具だけを使う */
