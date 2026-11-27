@@ -143,7 +143,39 @@ b.innerHTML = `<span class="achv-banner__icon">🏆</span><span class="achv-bann
 document.body.appendChild(b);
 setTimeout(() => { try { b.remove();} catch (err) {}}, 3900 + ix * 300);
 });
+if ((ids || []).length && ONW.sound) ONW.sound.se("achv");
 } catch (e) { /* 通知の失敗でログイン処理を止めない */}
+};
+
+/** 試合結果の新規解除を、盤面の上にパン屋バナーと同じ形で1枚ずつ順番に出す（作者要望 2026-11-27。SE付き）。
+ *  5個以上は最初の3枚＋「ほか〇個の実績を解除しました」にまとめる */
+achv.showUnlockQueue = function (ids) {
+try {
+if (typeof document === "undefined" ||!document.body) return;
+const list = (ids || []).filter((id) => DEFS.get(id));
+if (!list.length) return;
+const items = list.slice(0, list.length > 4 ? 3 : list.length);
+const rest = list.length - items.length;
+let ix = 0;
+const next = () => {
+document.querySelectorAll(".achv-banner--q").forEach((e) => { try { e.remove();} catch (err) {}});
+if (ix > items.length) return;
+if (ix === items.length && !rest) return;
+const b = document.createElement("div");
+b.className = "achv-banner achv-banner--fast achv-banner--q";
+if (ix < items.length) {
+const def = DEFS.get(items[ix]);
+b.innerHTML = `<span class="achv-banner__icon">🏆</span><span class="achv-banner__text">実績<span style="color:${catDefOf(def.c).col || "inherit"}">『${esc(def.n)}』</span>を解除しました</span>`;
+} else {
+b.innerHTML = `<span class="achv-banner__icon">🏆</span><span class="achv-banner__text">ほか${rest}個の実績を解除しました</span>`;
+}
+document.body.appendChild(b);
+if (ONW.sound) ONW.sound.se("achv");
+ix++;
+setTimeout(next, 1650);
+};
+next();
+} catch (e) { /* 通知の失敗で結果処理を止めない */}
 };
 
 /** 新規解除分を保存する（ログイン中は Supabase、失敗時は端末にも控える）。ゲストは保存しない（作者指示 2026-11-26）。失敗しても投げない */
@@ -428,6 +460,7 @@ if (totalAfter >= DATA.length - 1 &&!mine.unlocked.has("achievement_all_497")) f
 fresh = [...new Set(fresh)].filter((id) => DEFS.has(id));
 if (fresh.length) await achv.saveNew(fresh);
 if (fresh.length && A && A.user && ONW.net.reportAchv) ONW.net.reportAchv(fresh);   // 作者指示（2026-11-26）: ゲストは実績通知なし（申告しないのでリザルトの解除行・モーダルにも出ない。ゲストは保存自体もしない＝onResult の入口で対象外）
+if (fresh.length) achv.showUnlockQueue(fresh);   // 盤面の上のバナー通知（作者要望 2026-11-27。結果が届いた瞬間＝結果発表の盤面が出ている間に出す）
 return fresh;
 } catch (e) { return []; /* 実績の失敗でゲームを止めない */}
 };
