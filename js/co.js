@@ -92,7 +92,7 @@ window.ONW = window.ONW || {};
     if (kind === "command") return set({ step: "command", kind, chain });   // 統率の人狼: 対象を選ばず「統率の人狼として人狼陣営の配置を確認していました。」の1択
     if (kind === "sam") return set({ step: "sam", kind, chain });   // サム: 対象を選ばず「サムに変身していました。」の1択
     if (kind === "magician") return set({ step: "magicrole", kind, chain });   // 魔法使い: 奪った役職を選ぶ（マイクラ版の魔法使いCO。ロックで失敗の選択肢つき）
-    if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid" || kind === "chesed" || kind === "thread_spinner") return set({ step: "tm", kind, chain, sel: [] });   // chesed: 占い先 → コーヒーを渡した相手の2人 / thread_spinner: ペアにした2人
+    if (kind === "tm" || kind === "gremlin" || kind === "evil_woman" || kind === "cupid" || kind === "chesed" || kind === "thread_spinner" || kind === "exchanger" || kind === "mad_exchanger" || kind === "libra") return set({ step: "tm", kind, chain, sel: [] });   // chesed: 占い先 → コーヒーを渡した相手の2人 / thread_spinner: ペアにした2人 / exchanger・mad_exchanger: 票数を交換した2人 / libra: 投票対象を制限した2人
     if (kind === "insom") return set({ step: "ikind", kind, chain });
     if (kind === "mason") return set({ step: "mason", kind, chain, sel: [] });
     if (kind === "love") return set({ step: "love", kind, chain });
@@ -184,7 +184,7 @@ co.poetPick = function (id) {
     const s = G().co, sel = s.sel.includes(id) ? s.sel.filter((x) => x !== id) : [...s.sel, id];
     if (sel.length < 2) return set({ ...s, sel });
     if (s.kind === "gremlin") return set({ step: "gcopy", kind: "gremlin", chain: s.chain, sel });   // グレムリン: 2人(コピー元 → コピー先)を選んだら、コピーした役職を選ぶ
-    done(...(hookOfKind(s.kind === "gremlin" || s.kind === "evil_woman" || s.kind === "cupid" || s.kind === "chesed" || s.kind === "thread_spinner" ? s.kind : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先 / 悪女: 1人目が本命、2人目がキープ / キューピッド: 恋人にした2人 / ケセド: 1人目が占い先、2人目がコーヒーを渡した相手 / 糸紡ぎ: ペアにした2人
+    done(...(hookOfKind(["gremlin", "evil_woman", "cupid", "chesed", "thread_spinner", "exchanger", "mad_exchanger", "libra"].includes(s.kind) ? s.kind : "tm")).pickTwo(sel, K));   // グレムリン: 1人目がコピー元、2人目がコピー先 / 悪女: 1人目が本命、2人目がキープ / キューピッド: 恋人にした2人 / ケセド: 1人目が占い先、2人目がコーヒーを渡した相手 / 糸紡ぎ: ペアにした2人 / 交換者・狂った交換者: 票数を交換した2人 / 天秤: 投票対象を制限した2人
   };
   co.gremlinRole = (role) => done(...hookOfKind("gremlin").pickRole(role, (G().co || {}).sel || [], K));   // コピーした役職（または「伏せる」）
   co.pickMason = function (id) {

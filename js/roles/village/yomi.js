@@ -278,5 +278,10 @@
     info: { sealTarget: true, deck: 113, name: "黄泉", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 16.95,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、自分を含む生きている1人を選ぶと、その人に付与されている状態（シャッフラー・反転・恋人・未覚醒の酔っ払い・処刑人や復讐者の対象・従者の主人・フリーターの就職先・グレムリンの対象・妖精さんの対象・封印・口封じなど）を断ち切ります。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に黄泉を持っている人が使えます。使った人にだけ、カードを刀で切りつける演出が出ます。" },
     groups: { "transform:light_apostle": 51 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER（wiki の order 49）で決まる（番号は所属を表すだけ）
+    // 結果開示(COボタン・co.js が kind で引く): 「黄泉CO」だけで終わらせられる(noChain)。結果開示で状態を断ち切った相手を選ぶ → 「〇〇 の状態を断ち切りました。」（マイクラ版 main.js の黄泉の結果開示と同じ）
+    coResult: {
+      kind: "yomi", targetLabel: "状態を断ち切った相手", noChain: true,
+      pickPlayer: (id, K) => [`${K.nameOf(id)} の状態を断ち切りました。`, { kind: "yomi", target: id }, null, "disclose", `${K.nameOf(id)} の状態を断ち切った`],
+    },
   });
 })(window.ONW);

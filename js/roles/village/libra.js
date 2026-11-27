@@ -180,10 +180,15 @@
   ONW.defineRole("libra", {
     info: { sealTarget: true, deck: 88, name: "天秤", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.991,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから、生きている人を2人（自分を含めてよい）選ぶと、議論をそこで打ち切ってすぐ投票に移り、その投票では選んだ2人のどちらかにしか投票できなくなります。選ばれた2人は投票が始まるときに全員に知らされますが、誰が天秤を使ったかは結果発表までわかりません。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に天秤を持っている人が使えます。投票画面には上皿天秤が出て、皿のカードを押して投票します。" },
-    // CPU（4of4）: 本物は必ず「天秤CO」。天秤は使うとすぐ投票に移る（結果を言う前に議論が終わる）ので、結果開示はない（COボタンも役職COだけ）。
+    // CPU（4of4）: 本物は必ず「天秤CO」。天秤は使うとすぐ投票に移るので、CPUは結果を言わない。
     //   騙りは「天秤CO」だけ（結果なし。claim を書かないと、村人が配役にいるとき「村人CO」に置き換わってしまう）。自動で使う・投票判断は上の cpuPick / cpuVoteSee
     cpuClaim(k, g, p, r, i, c) { c.co = "libra"; },
     cpuLie: { role: "libra", weight: 4, order: 17, claim: () => ({ co: "libra", result: null }) },
+    // 結果開示(COボタン・co.js が kind で引く): 「天秤CO」だけで終わらせられる(noChain)。結果開示で投票先を制限する2人を選ぶ → 「〇〇 と 〇〇 に投票先を制限します。」（作者決定 2026-11-27: 天秤は使うとすぐ投票に移って開示できないので、使う前に言う前提で現在形・「投票先」表記にする。マイクラ版の過去形「投票対象を制限していました」から変更）
+    coResult: {
+      kind: "libra", twoHint: "投票先を制限する2人を選んでください。", noChain: true,
+      pickTwo: (sel, K) => [`${K.nameOf(sel[0])} と ${K.nameOf(sel[1])} に投票先を制限します。`, { kind: "libra", a: sel[0], b: sel[1] }, null, "disclose", `${K.nameOf(sel[0])}・${K.nameOf(sel[1])} に投票先を制限`],
+    },
     cpuPick, cpuVoteSee,
     groups: { "transform:light_apostle": 33 },   // 光の使徒の変化先（村人系）。並びは ROLE_ORDER（wiki の order 33）で決まる（番号は所属を表すだけ）
     // 夜の画面: 夜の行動がない天秤向けの説明

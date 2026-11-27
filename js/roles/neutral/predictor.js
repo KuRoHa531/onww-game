@@ -205,11 +205,16 @@
   ONW.defineRole("predictor", {
     info: { sealTarget: true, deck: 95, name: "予想屋", team: ONW.TEAM.THIRD, wakeOrder: null, sort: 35.98,
       desc: "第三陣営。昼に最終的に死亡するプレイヤーを何人でも選べます。最終死亡者全員と完全に一致すると単独勝利します。" },
-    // CPU（3of4）: 本物は半分の確率で「予想屋CO」（結果開示なし。予想は昼能力で決めるだけで、言うことはない）。しないときは村人などを騙る（cpu.js の既定）。
+    // CPU（3of4）: 本物は半分の確率で「予想屋CO」（CPUは結果開示しない。COボタンの結果開示は下の coResult）。しないときは村人などを騙る（cpu.js の既定）。
     //   騙りは「予想屋CO」だけ（結果なし）。予想の決め方・投票判断は上の cpuPick / cpuVoteSee
     cpuClaim(k, g, p, r, i, c) { if (Math.random() < 0.5) { c.co = "predictor"; return true; } return false; },
     cpuLie: { role: "predictor", weight: 3, order: 18, claim: () => ({ co: "predictor", result: null }) },
     cpuPick, cpuVoteSee,
+    // 結果開示(COボタン・co.js が kind で引く): 「予想屋CO」だけで終わらせられる(noChain)。結果開示で死亡すると予想している相手を選ぶ（自分も選べる）→ 「〇〇 が死亡すると予想しています。」（作者決定 2026-11-27: 予想は投票が始まるまで選び直せるので現在形にする。マイクラ版の過去形「予想していました」から変更）
+    coResult: {
+      kind: "predictor", targetLabel: "死亡すると予想している相手", self: true, noChain: true,
+      pickPlayer: (id, K) => [`${K.nameOf(id)} が死亡すると予想しています。`, { kind: "predictor", target: id }, null, "disclose", `${K.nameOf(id)} → 死亡予想`],
+    },
     groups: { "transform:silver_shadow": 28 },   // 銀色の影の変化先（第三陣営の役職は必ずここに入れる）
     // 夜の画面: 夜の行動がない予想屋向けの説明
     uiNight: {

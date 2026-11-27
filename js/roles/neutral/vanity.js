@@ -200,6 +200,11 @@ groups: { "transform:silver_shadow": 30, selfAsSheriff: 1}, // 銀色の影の�
 cpuClaim(k, g, p, r, i, c) { c.co = "sheriff";},
 cpuPick,
 cpuSpeak,
+// 結果開示(COボタン・co.js が kind で引く): 「ヴァニティCO」だけで終わらせられる(noChain)。結果開示で執行した相手を選ぶ → 「〇〇 を執行しました。」（マイクラ版 main.js のヴァニティの結果開示と同じ。本人は保安官だと思い込むので通常は保安官COから保安官の結果開示を使う）
+coResult: {
+kind: "vanity", targetLabel: "執行した相手", noChain: true,
+pickPlayer: (id, K) => [`${K.nameOf(id)} を執行しました。`, { kind: "vanity", target: id }, null, "disclose", `${K.nameOf(id)} を執行した`],
+},
 // 昼の気づき演出（stage.js の flashes("early") が g.vanityFlash を渡す。本人だけに届く "vanityaware" で積まれる）:
 // 自分のカードがヴァニティとしてめくれ、数秒後に裏に戻る（心眼の人狼の stageFlash と同じ仕組み）。観戦者・他の人には届かない
 stageFlash: {

@@ -90,6 +90,11 @@
     info: { sealTarget: true, deck: 65, name: "交換者", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 17.9,
       desc: "村人陣営。夜の能力はありません。昼の議論中に「昼能力」ボタンから生きている人を2人（自分を含めてよい）選ぶと、その2人の票数を入れ替えます。入れ替わるのは投票の集計のときで、結果発表で票数が出たあとに入れ替わる様子が見えます。使えるのは酔いが覚めたあとの昼に1回だけで、最終的に交換者を持っている人が使えます。交換者が複数いれば、使った順に入れ替わります。" },
     groups: { "transform:light_apostle": 26 },   // 光の使徒の変化先（村人系）
+    // 結果開示(COボタン・co.js が kind で引く): 「交換者CO」だけで終わらせられる(noChain)。結果開示で票数を交換した2人を選ぶ → 「〇〇 と 〇〇 の票数を交換します。」（マイクラ版 main.js の交換者の結果開示と同じ）
+    coResult: {
+      kind: "exchanger", twoHint: "票数を交換した2人を選んでください。", noChain: true,
+      pickTwo: (sel, K) => [`${K.nameOf(sel[0])} と ${K.nameOf(sel[1])} の票数を交換します。`, { kind: "exchanger", a: sel[0], b: sel[1] }, null, "disclose", `${K.nameOf(sel[0])} ⇄ ${K.nameOf(sel[1])}`],
+    },
 
     // 結果発表の演出（stage.js の startResult / skipResult が引く）
     //   counts : 「N票」が全員ぶん出たあと（カードをめくる前）に呼ばれる。交換者が使った順に1回ずつ:

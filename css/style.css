@@ -2797,6 +2797,8 @@ body.smoke-on .onw-app .chat-log:not(.result-chat), body.smoke-on .onw-app .chat
 /* 送信ボタン: 入力欄の行(.chat-input)ごと煙の上に出ているが、地が透明で白い煙が透けて見えにくかったので、ほかの欄と同じ暗い地を敷く */
 body.smoke-on .onw-app .chat-input { padding: 4px 6px; border-radius: 8px; background: rgba(18,19,28,.97); }
 body.smoke-on .onw-app .chat-input .btn { position: relative; z-index: 1; text-shadow: none; box-shadow: none; }
+/* 昼能力の操作欄(.sober-box)も曇らせない: 昼能力ボタンで開くメニューが煙の下に隠れて見えなかった（作者指摘 2026-11-27）。ほかの曇らせない欄と同じ暗い地を敷く */
+body.smoke-on .onw-app .sober-box { position: relative; z-index: 3; padding: 4px 6px; border-radius: 8px; background: rgba(18,19,28,.97); }
 body.smoke-on .tb-name { padding: 1px 6px; border-radius: 8px; background: rgba(18,19,28,.9); box-sizing: border-box; text-shadow: none; box-shadow: none; }
 /* 2026-11-07(4): タイマーも曇らせない（光らせない）。議論タイムの大きな時計(.timer-display)・ヘッダーの時間表示(#phase-label / #day-clock)・PC版の左の大きなタイマー(#big-timer。stage-col が z-index 3 で煙の上）。
    ヘッダーは z-index:1 の層を作って煙の下になっていたので、煙幕中だけ層を作らない(auto)にして、時間表示の2つを煙の上に出す。議論タイムの時計は見出し・案内と同じ暗い地を敷く */
