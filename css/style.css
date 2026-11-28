@@ -161,6 +161,10 @@ body {
 .upd-btn[hidden] { display: none; }
 .backhost-btn { top: calc(58px + env(safe-area-inset-top, 0px)); }
 .backhost-btn[disabled] { opacity: .55; cursor: default; }
+/* ホスト用スキップボタン（左上。タイマーのダブルタップと同じ確認を出す。ダブルタップが効かない環境でも必ず押せるように） */
+.skip-btn { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; z-index: 1400; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--gold); background: var(--bg-panel-raised); color: var(--gold); font-family: var(--font-body); font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 16px rgba(0, 0, 0, .5); cursor: pointer; }
+.skip-btn[hidden] { display: none; }
+.skip-btn:hover { background: var(--gold); color: var(--bg-night); }
 .upd-btn:hover { background: var(--gold); color: var(--bg-night); }
 
 /* ---- スタートゲート（開いた直後に出る「ゲームを始める」） ---- */

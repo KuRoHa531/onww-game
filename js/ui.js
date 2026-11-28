@@ -925,6 +925,8 @@ window.ONW = window.ONW || {};
   const SKIP_PHASES = ["online_role", "online_night", "online_morning", "online_day", "online_vote"];
   const skipPhase = (game) => game.phase === "online_spectate" && game.specPhase ? game.specPhase : game.phase;   // 観戦中のホストは自分の画面用に phase が online_spectate へ化け、実フェーズは specPhase にある（再接続・再同期のたびに化けるので、実フェーズで判定しないとスキップが押せなくなる）
   const canSkip = (game) => ONW.net.isHost && game.inGame !== false && SKIP_PHASES.includes(skipPhase(game));
+  // ホスト用スキップボタン（左上）の表示同期: スキップできる間だけ出す。ダブルタップ判定が効かない事態（復帰直後など）でも、このボタンは必ず押せる
+  const syncSkipBtn = () => { const b = document.getElementById("skip-btn"); if (b) b.hidden = !canSkip(ONW.game); };   // 毎秒の updateTimer から呼ばれる（読み込み時にタイマーを置くと検証ハーネスが終わらない）
   ui.closeSkip = function () { const el = document.getElementById("skip-confirm"); if (el) el.remove(); ui._skipPhase = null; };
   ui.openSkip = function () {
     const g = ONW.game;
@@ -1249,6 +1251,7 @@ window.ONW = window.ONW || {};
     if (!over()) return;                       // 1) そのままで収まる
     b.classList.add("menu-tight");
     if (!over() || app.querySelector(".settings-modal")) return;   // 2) 小さくすれば収まる（設定ウィンドウが出ているときは縮めない）
+    if (window.matchMedia && window.matchMedia("(min-width: 1000px)").matches) return;   // PCでは縮めない: ルーム設定を開いたときと同じ大きいサイズに統一する（作者要望）
     let lo = 0.45, hi = 1;                     // 3) 収まる最大の縮め方を測る
     setK(lo); if (over()) return;              // 最小でも収まらないときは最小のまま
     for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; setK(mid); if (over()) hi = mid; else lo = mid; }
@@ -2203,6 +2206,7 @@ window.ONW = window.ONW || {};
   ui.updateTimer = function () {
     if (ONW.stage && ONW.stage.drunkTick) ONW.stage.drunkTick();   // 酔っ払い: 自分のカードの「酔いが覚めるまで」を毎秒更新
     if (ONW.stage && ONW.stage.coffeeTick) ONW.stage.coffeeTick();   // ケセド: 自分のカードの「コーヒータイム終了まで」を毎秒更新
+    syncSkipBtn();   // ホスト用スキップボタンの表示を毎秒合わせる
     const g = ONW.game, el = document.getElementById("phase-label");
     if (!el) return;
     const base = g.phase === ONW.PHASE.ONLINE_SPECTATE ? `観戦中（${PHASE_LABEL[g.specPhase] ?? "―"}）` : phaseName(g);
