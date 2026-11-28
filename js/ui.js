@@ -2933,6 +2933,7 @@ window.ONW = window.ONW || {};
       return `<section class="panel night-step res-intro"><div id="res-cap" class="res-cap">${game.resultCap || ""}</div>
         <div class="btn-row" style="justify-content:center;"><button class="btn" onclick="ONW.stage.skipResult()">スキップ</button></div></section>`;
     }
+    if (ONW.achievements && ONW.achievements.flushUnlockQueue) ONW.achievements.flushUnlockQueue();   // 実績の獲得通知はリザルト画面が出てから（結果発表中のネタバレ防止。作者要望 2026-11-28）
     return ui.resultSheetHtml(game, res) + `
       <div class="res-dock">
         <div class="btn-row">

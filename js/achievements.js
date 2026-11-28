@@ -180,6 +180,13 @@ next();
 } catch (e) { /* 通知の失敗で結果処理を止めない */}
 };
 
+/** リザルト画面（シート）が表示されたタイミングで、保留中の獲得通知バナーを出す（ui.renderOnlineResult のシート側から呼ばれる） */
+achv.flushUnlockQueue = function () {
+const ids = achv._pendingUnlock;
+achv._pendingUnlock = null;
+if (ids && ids.length) achv.showUnlockQueue(ids);
+};
+
 /** 新規解除分を保存する（ログイン中は Supabase、失敗時は端末にも控える）。ゲストは保存しない（作者指示 2026-11-26）。失敗しても投げない */
 achv.saveNew = async function (ids) {
 const A0 = ONW.account;
@@ -463,7 +470,7 @@ if (totalAfter >= DATA.length - 1 &&!mine.unlocked.has("achievement_all_497")) f
 fresh = [...new Set(fresh)].filter((id) => DEFS.has(id));
 if (fresh.length) await achv.saveNew(fresh);
 if (fresh.length && A && A.user && ONW.net.reportAchv) ONW.net.reportAchv(fresh);   // 作者指示（2026-11-26）: ゲストは実績通知なし（申告しないのでリザルトの解除行・モーダルにも出ない。ゲストは保存自体もしない＝onResult の入口で対象外）
-if (fresh.length) achv.showUnlockQueue(fresh);   // 盤面の上のバナー通知（作者要望 2026-11-27。結果が届いた瞬間＝結果発表の盤面が出ている間に出す）
+if (fresh.length) achv._pendingUnlock = fresh;   // バナー通知は結果発表の演出が終わってリザルト画面（シート）が出るまで出さない（作者要望 2026-11-28: 結果発表の最中に出ると勝敗のネタバレになる）
 return fresh;
 } catch (e) { return []; /* 実績の失敗でゲームを止めない */}
 };
