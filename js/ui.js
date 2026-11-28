@@ -2323,6 +2323,7 @@ window.ONW = window.ONW || {};
     if (el) lobbyDraft = el.value;   // 閉じる前に下書きを残す
     const w = document.getElementById("lobby-chat-overlay");
     if (w) w.remove();
+    ui.lockPage(false);
   };
   /** 開いている間だけオーバーレイを body 直下に保つ（ロビーの再描画で消えたり入力が飛んだりしない） */
   ui.syncLobbyChatOverlay = function () {
@@ -2345,6 +2346,7 @@ window.ONW = window.ONW || {};
     document.body.appendChild(w);
     const li = document.getElementById("lobby-chat-in");
     if (li && lobbyDraft) li.value = lobbyDraft;   // 下書きを復元する
+    ui.lockPage(true);                 // 開いている間、ページ本体は動かさない（大きいチャットと同じ。キーボードで画面が上にずれるのを防ぐ）
     ui.fitLobbyChat();
   };
   /** ロビーチャットを「見えている範囲」（キーボードを除いた部分）に合わせる。全画面チャットの fitChat と同じ理由: スマホでキーボードが開くと、固定配置のカードがキーボードの裏に隠れて入力欄も「入力中」表示も見えなくなる（作者報告 2026-11-26） */
@@ -2352,6 +2354,7 @@ window.ONW = window.ONW || {};
     const w = document.getElementById("lobby-chat-overlay"), vv = window.visualViewport;
     if (!w || !vv) return;
     w.style.top = vv.offsetTop + "px"; w.style.height = vv.height + "px"; w.style.bottom = "auto";
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);       // iOSがページを持ち上げた分を戻す（fitChat と同じ）
   };
   /** ロビーチャットのログだけ描き直す（入力欄には触らない） */
   ui.updateLobbyChat = function () {

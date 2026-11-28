@@ -2793,7 +2793,7 @@ window.ONW = window.ONW || {};
   net.sendCo = function (text, claim, setRole, flag, short) {
     if (G().muzzled) return;   // 口封じされている人はCO・結果開示ができない
     if (ONW.stage && ONW.stage.coffeeLeft && ONW.stage.coffeeLeft(G()) !== null) return;   // ケセド: コーヒータイム中はCO・結果開示ができない
-    const msg = { t: "co", text, short: short ? String(short).slice(0, 80) : "", claim, setRole, hold: flag === "hold" || flag === "holddisclose", disclose: flag === "disclose" || flag === "holddisclose" };
+    const msg = { t: "co", text, short: short ? String(short).slice(0, 80) : "", claim, setRole, hold: flag === "hold" || flag === "holddisclose", disclose: flag === "disclose" || flag === "holddisclose", info: flag === "info" };
     const dupKey = [msg.text, msg.short, msg.setRole || "", msg.hold ? 1 : 0, msg.disclose ? 1 : 0, JSON.stringify(msg.claim || null)].join("\u0001"), now = Date.now();
     if (net._lastCo && net._lastCo.key === dupKey && now - net._lastCo.at < 800) return;   // ボタンの二重タップ・二重発火で同じCOを続けて送らない
     net._lastCo = { key: dupKey, at: now };
@@ -3034,7 +3034,7 @@ window.ONW = window.ONW || {};
       if (d.hold) g.holdUntil = Date.now() + 25000;      // CO→結果開示の途中はCPUの発言を待たせる
       if (d.disclose && !d.hold) g.holdUntil = 0;   // holddisclose(結果を残しつつ、次の結果開示へ続ける)のときは待たせ続ける
       if (d.setRole && d.setRole !== "merlin" && (g.coDeck.some((x) => x.r === d.setRole) || String(d.setRole).startsWith("team:"))) { g.coState[id] = d.setRole; boardEntry(id).co = d.setRole; }
-      if (d.disclose) boardEntry(id).results.push(String(d.short || text).slice(0, 80));
+      if (d.disclose || d.info) boardEntry(id).results.push(String(d.short || text).slice(0, 80));   // 結果開示も情報開示もCO履歴（COボード）に載せる
       const c = d.claim;
       if (c && ["seer", "robber", "doppel", "freeter", "servant", "sheriff", "mind", "sense", "seal_madman", "elfrinde"].includes(c.kind) && byId(c.target) && g.initialRoles[id] !== undefined) g.cpuClaims.push({ from: id, kind: c.kind, target: c.target, role: c.role, key: c.key });   // フリーター・従者は、名指しされたCPUが騙りで話を合わせるために記録する / 保安官は、撃ったという申告をCPUの投票判断（保安官 cpuVoteSee）が見る
       if (c && c.kind === "poet" && g.initialRoles[id] !== undefined) g.cpuClaims.push({ from: id, kind: "poet", role: typeof c.role === "string" ? c.role : undefined, targets: (Array.isArray(c.targets) ? c.targets : []).filter((x) => byId(x)), none: !!c.none });   // 詩人の結果申告（使われていた役職と対象。CPUの投票判断が、配役にない役職を言った嘘を見る）

@@ -299,8 +299,6 @@ co.poetPick = function (id) {
   co.pickTelepathist = (id) => done(`テレパシストの${K.nameOf(id)}に接続されました。`, null, null, "disclose", `${K.nameOf(id)}に接続された`);
   co.telepathistNoName = () => done("テレパシストに接続されました。", null, null, "disclose", "テレパシストに接続された");
   co.pickDonutInfo = (defective) => done(defective ? "粗悪なドーナツが届いていました。" : "ドーナツが届いていました。", null, null, "disclose", defective ? "粗悪なドーナツが届いた" : "ドーナツが届いた");
-  // 草むらに隠れていたことを伝える（情報開示。マイクラ版の結果画面の「隠れていた」ボタン相当。隠れた本人は気づいていないので、これは名乗り・嘘のどちらもありうる）
-  co.hiddenInfo = () => done("草むらに隠れていました。", { kind: "hidden", by: "rabbit_madman" }, null, "disclose", "草むらに隠れていた");
   // フリーターに就職されている（本家と同じ: 「誰がフリーターか」も伝えるかを選ぶ）
   co.freeterInfo = () => set({ step: "fjob" });
   co.freeterNoName = () => done(...hookOfKind("freeter").infoNoName());
@@ -550,7 +548,7 @@ co.poetPick = function (id) {
     } else if (s.step === "info") {
       title = "情報開示";
       body = `<p class="night-step__hint">伝える情報を選んでください。</p>` +
-        `<div class="co-sub">自分が受けたこと</div>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()") + btn("カクテルを渡された", "ONW.co.cocktailInfo()") + btn("ドーナツが届いた", "ONW.co.donutInfo()") + btn("テレパシストに接続された", "ONW.co.telepathistInfo()") + btn("草むらに隠れていた", "ONW.co.hiddenInfo()") +
+        `<div class="co-sub">自分が受けたこと</div>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()") + btn("カクテルを渡された", "ONW.co.cocktailInfo()") + btn("ドーナツが届いた", "ONW.co.donutInfo()") + btn("テレパシストに接続された", "ONW.co.telepathistInfo()") +
         `<div class="co-sub">自分の役職への影響</div>` + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedMenu()") + btn("反転されている", "ONW.co.reversedInfo()");
     } else if (s.step === "sealedby") {
       title = "封印されていた";
@@ -616,7 +614,7 @@ co.poetPick = function (id) {
     }
     const isInfo = !!INFO_BACK[s.step];
     const backBtn = isInfo ? `<button class="co-back" type="button" onclick="${infoBackFn(s.step)}">← 戻る</button>` : "";
-    el.innerHTML = `<div class="co-panel"><div class="co-title">${backBtn}<span class="co-title__t">${title}</span><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.co.close()">✕</button></div><div class="co-grid${isInfo ? " co-grid--2" : ""}">${body}</div></div>`;
+    el.innerHTML = `<div class="co-panel${isInfo ? " co-panel--info" : ""}"><div class="co-title">${backBtn}<span class="co-title__t">${title}</span><button class="x-close" type="button" aria-label="閉じる" title="閉じる" onclick="ONW.co.close()">✕</button></div><div class="co-grid${isInfo ? " co-grid--2" : ""}">${body}</div></div>`;
     try { fitPanel(); } catch (e) { /* 高さ合わせに失敗してもパネルは出す */ }
   };
 

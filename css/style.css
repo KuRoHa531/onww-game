@@ -511,6 +511,10 @@ body.is-title .credits-link {
 .co-sub { flex: 0 0 100%; grid-column: 1 / -1; font-size: .78em; opacity: .75; margin-top: 2px; }
 .co-btn__d { display: block; font-size: .72em; opacity: .75; font-weight: normal; }
 .co-search { flex: 0 0 100%; grid-column: 1 / -1; }
+/* 情報開示はスクロールなしで全部出す: 上限は fitPanel が見える範囲に合わせる分だけ（60vh の一律上限はかけない）。ボタンも少し小さくして収める */
+.co-dock .co-panel--info { max-height: none; }
+.co-panel--info .co-grid { gap: 6px; }
+.co-panel--info .co-grid--2 .co-btn { min-height: 36px; padding: 5px 6px; }
 .co-back { flex: 0 0 auto; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel); color: var(--ink); font-size: 13px; cursor: pointer; }
 .co-title__t { flex: 1 1 auto; min-width: 0; }
 
@@ -1573,6 +1577,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   .info-overlay { inset: 0 0 auto 0; align-items: flex-start; padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 0; background: transparent; pointer-events: none; }
   .info-overlay .info-card { pointer-events: auto; max-height: 42vh; max-height: 42dvh; box-shadow: 0 8px 28px rgba(0,0,0,.7); }
   body.info-open .co-dock .co-panel { max-height: 34vh; max-height: 34dvh; }   /* 開いた CO パネルが情報確認と重なりすぎないように */
+  body.info-open .co-dock .co-panel--info { max-height: none; }   /* 情報開示だけは全部見せる（情報確認より優先） */
 }
 @media (min-width: 1000px) {
   body:has(#table.on) .info-overlay { inset: 0 clamp(400px, 31vw, 560px) 0 0; background: transparent; pointer-events: none; }
