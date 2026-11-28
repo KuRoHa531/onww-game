@@ -847,7 +847,7 @@ window.ONW = window.ONW || {};
   net.__localTick = { start() { clearInterval(ltId); ltId = setInterval(localTick, 1000); }, stop() { clearInterval(ltId); ltId = null; }, step: localTick, recv: onHostData };   // テスト用に公開
 
   const connSeat = new Map();   // ホスト側: DataConnection → 席ID
-  let hbId = null, snapTimer = null, snapPeriodic = null, watchId = null, touchId = null, backTimer = null, lastOrder = "", dropTimers = {};
+  let hbId = null, snapTimer = null, snapPeriodic = null, watchId = null, touchId = null, backTimer = null, backTries = 0, lastOrder = "", dropTimers = {};
   net.rx = {};   // ホスト側: 席ごとの最後に受信した時刻
 
   net.leave = function (opt) {
@@ -868,7 +868,7 @@ window.ONW = window.ONW || {};
     { const g0 = G(); if (g0) { g0.result = null; g0.viewResult = false; } }   // 部屋を出たら前回の結果も消す（別の部屋に「前回の結果を見る」が残らないように）
     if (opt && opt.forget) clearLocalSnap();   // 自分から退出したときだけ、端末内の引き継ぎ記録も消す
     if (opt && opt.forget && ONW.account && ONW.account.roomClear) net.forgetP = ONW.account.roomClear();   // 消し終わる前に checkRejoin が古い記録を拾わないよう待てるようにする
-    Object.assign(net, { peer: null, conns: {}, hostConn: null, isHost: false, code: "", meta: {}, hostSeat: "host", selfSeat: "", keys: {}, origHost: null, order: [], myKey: "", myName: "", rec: null, xfer: null, frozen: false, snapStr: "", snapPlanned: false, rx: {}, onFail: null });
+    Object.assign(net, { peer: null, conns: {}, hostConn: null, isHost: false, code: "", meta: {}, hostSeat: "host", selfSeat: "", keys: {}, origHost: null, order: [], myKey: "", myName: "", rec: null, xfer: null, frozen: false, snapStr: "", snapPlanned: false, origSeat: null, rx: {}, onFail: null });
   };
 
   // ---------------------------------------------------------------------
@@ -910,10 +910,10 @@ window.ONW = window.ONW || {};
     net.order = o;
     if (str === lastOrder) return;
     lastOrder = str;
-    Object.values(net.conns).forEach((c) => { if (c && c.open) { try { c.send({ t: "succ", order: o, hostSeat: HS() }); } catch (e) {} } });
+    Object.values(net.conns).forEach((c) => { if (c && c.open) { try { c.send({ t: "succ", order: o, hostSeat: HS(), orig: net.origHost ? net.origHost.seat : null }); } catch (e) {} } });
     scheduleSnap();
   }
-  const welcomeMsg = (seat) => ({ t: "welcome", seat, hostSeat: HS(), order: net.order, code: net.code });
+  const welcomeMsg = (seat) => ({ t: "welcome", seat, hostSeat: HS(), order: net.order, code: net.code, orig: net.origHost ? net.origHost.seat : null });   // orig: 最初のホストの席（取り戻しボタンの判定用）
 
   // ---------------------------------------------------------------------
   // ホスト側: 接続の受け付け
@@ -932,6 +932,7 @@ window.ONW = window.ONW || {};
         if (d.t === "hb") return;
         if (d.t === "bye") return onBye(seat, conn);
         if (d.t === "xfer-ack") return onXferAck(seat);
+        if (d.t === "wantback") { if (net.origHost && net.origHost.seat === seat) { backTries = 0; maybeHandBack(seat); } return; }   // 最初のホスト本人からの「ホストを取り戻す」: 返却をやり直す
         if (net.frozen) return;   // ホスト交代の準備中は操作を受け付けない
         hostRecv(seat, d);
         scheduleSnap();
@@ -1293,6 +1294,7 @@ window.ONW = window.ONW || {};
   function onXferAck(seat) {
     const x = net.xfer;
     if (!x || x.to !== seat) return;
+    backTries = 0;
     clearTimeout(x.timer);
     Object.values(net.conns).forEach((c) => { if (c && c.open) { try { c.send({ t: "newhost", seat: x.to }); } catch (e) {} } });
     setTimeout(() => demoteToClient(x.to), 300);
@@ -1305,7 +1307,12 @@ window.ONW = window.ONW || {};
     banner(null);
     let s = null; try { s = JSON.parse(x.snap); } catch (e) {}
     resumeTimers(s);
+    if (!x.permanent && net.origHost && net.origHost.seat === x.to && backTries < 10) { backTries++; maybeHandBack(x.to); }   // 元のホストへの返却が応答なしで終わった: 少し置いて返却をやり直す（1回失敗しただけで諦めると、元のホストが参加者のまま固定されてタイマーのスキップ等が二度と押せなくなる）
   }
+  /** 「ホストを取り戻す」ボタンを出してよいか（最初のホストだった人が、いまホストでないとき） */
+  net.canTakeBack = function () { return !net.isHost && !!net.hostConn && !!net.selfSeat && (net.origSeat === net.selfSeat || !!(net.origHost && net.origHost.seat === net.selfSeat)); };
+  /** 取り戻しをお願いする（いまのホストが返却処理をやり直す） */
+  net.takeBack = function () { if (!net.canTakeBack()) return false; try { net.hostConn.send({ t: "wantback" }); return true; } catch (e) { return false; } };
   /** 元のホストが戻ってきたら、ホストを返す（試合中は参加者として戻ったときだけ。観戦席だった場合は試合が終わってから） */
   function maybeHandBack(seat) {
     const o = net.origHost, g = G();
@@ -1313,7 +1320,9 @@ window.ONW = window.ONW || {};
     if (g.inGame && !g.players.some((p) => !p.isCpu && p.id === seat)) return;
     backTimer = setTimeout(() => {
       backTimer = null;
-      if (net.isHost && net.origHost && net.origHost.seat === seat && !net.xfer) net.handoffTo(seat, false);
+      if (!net.isHost || !net.origHost || net.origHost.seat !== seat || net.xfer) return;
+      if (net.handoffTo(seat, false)) return;   // 送れたら引き継ぎの応答待ち（失敗したら abortHandoff 側でやり直す）
+      if (backTries < 10) { backTries++; maybeHandBack(seat); }   // 戻った直後は接続が不安定で送れないことがある: 諦めずに少し置いてやり直す
     }, 1500);
   }
   /** ロビーのホスト譲渡ボタンから。idx はロビーの人間の並び（lobbyMsg の players と同じ順） */
@@ -1394,13 +1403,13 @@ window.ONW = window.ONW || {};
     if (d.t === "hb") return;
     if (d.t === "welcome") {
       net.rejoinedAt = net.rec ? Date.now() : 0;   // 再接続で戻れた時刻（直後に来るロビーで結果画面を残すため）
-      net.selfSeat = d.seat; net.hostSeat = d.hostSeat; net.order = d.order || []; net.rec = null;
+      net.selfSeat = d.seat; net.hostSeat = d.hostSeat; net.order = d.order || []; net.origSeat = d.orig || null; net.rec = null;
       banner(null);
       if (ONW.account && ONW.account.roomSave) ONW.account.roomSave(net.code, net.selfSeat, net.myKey);
       startTouch();
       return;
     }
-    if (d.t === "succ") { net.order = d.order || []; net.hostSeat = d.hostSeat; return; }
+    if (d.t === "succ") { net.order = d.order || []; net.hostSeat = d.hostSeat; if (d.orig) net.origSeat = d.orig; return; }
     if (d.t === "snap") { net.snapStr = d.s; net.snapPlanned = false; return; }
     if (d.t === "xfer") { net.snapStr = d.s; net.snapPlanned = true; try { net.hostConn.send({ t: "xfer-ack" }); } catch (e) {} banner("ホストを引き継いでいます…"); return; }
     if (d.t === "newhost") { net.order = [d.seat]; banner("ホストを交代しています…", { cancel: true }); return; }
@@ -2566,25 +2575,26 @@ window.ONW = window.ONW || {};
   };
 
   /** 画面ごとの「次へ」（ホストのみ。タイマーを待たずに進めるスキップ） */
+  const effPhase = (g) => (g.phase === PH().ONLINE_SPECTATE && g.specPhase ? g.specPhase : g.phase);   // 観戦中のホストは画面用に phase が online_spectate へ化ける（実フェーズは specPhase）。進行系は実フェーズで見る
   net.hostNext = function () {
-    const g = G();
+    const g = G(), ph = effPhase(g);
     if (!net.isHost) return;
-    if (g.phase === PH().ONLINE_ROLE) toNight();
-    else if (g.phase === PH().ONLINE_NIGHT) toMorning();
-    else if (g.phase === PH().ONLINE_MORNING) { if (g.settling) toDay(); else toSettle(); }
-    else if (g.phase === PH().ONLINE_DAY) toVote();
-    else if (g.phase === PH().ONLINE_VOTE) { if (ghostAsking()) Object.keys(g.ghostAsk).forEach(ghostAuto); else if (detAsking()) Object.keys(g.detAsk).forEach(detAuto); else if (chainAsking()) Object.keys(g.strawAsk).forEach(autoAsk); else finishVoting(); }   // 名探偵の推理・道連れ・暗殺を選んでいる最中のスキップ: 選んでいる人を自動で進める   // 道連れ・暗殺を選んでいる最中のスキップ: 選んでいる人をランダムで進める
-    else if (g.phase === PH().ONLINE_RESULT) net.returnToRoom();
+    if (ph === PH().ONLINE_ROLE) toNight();
+    else if (ph === PH().ONLINE_NIGHT) toMorning();
+    else if (ph === PH().ONLINE_MORNING) { if (g.settling) toDay(); else toSettle(); }
+    else if (ph === PH().ONLINE_DAY) toVote();
+    else if (ph === PH().ONLINE_VOTE) { if (ghostAsking()) Object.keys(g.ghostAsk).forEach(ghostAuto); else if (detAsking()) Object.keys(g.detAsk).forEach(detAuto); else if (chainAsking()) Object.keys(g.strawAsk).forEach(autoAsk); else finishVoting(); }   // 名探偵の推理・道連れ・暗殺を選んでいる最中のスキップ: 選んでいる人を自動で進める   // 道連れ・暗殺を選んでいる最中のスキップ: 選んでいる人をランダムで進める
+    else if (ph === PH().ONLINE_RESULT) net.returnToRoom();
   };
 
   /** スキップメニューの「朝に / 昼前に / 昼に / 夕に」（ホストのみ・先へ進むだけ）。いまの進行位置: 0=役職配布 1=夜 2=朝 3=待機時間 4=昼の演出待ち(変化公開・新聞など) 5=昼の議論 6=投票 (それ以外は -1) */
   net.stageIdx = function () {
-    const g = G(), P = PH();
-    if (g.phase === P.ONLINE_ROLE) return 0;
-    if (g.phase === P.ONLINE_NIGHT) return 1;
-    if (g.phase === P.ONLINE_MORNING) return g.settling ? 3 : 2;
-    if (g.phase === P.ONLINE_DAY) return g.dayStartId && g.dayBegin ? 4 : 5;
-    if (g.phase === P.ONLINE_VOTE) return 6;
+    const g = G(), P = PH(), ph = effPhase(g);
+    if (ph === P.ONLINE_ROLE) return 0;
+    if (ph === P.ONLINE_NIGHT) return 1;
+    if (ph === P.ONLINE_MORNING) return g.settling ? 3 : 2;
+    if (ph === P.ONLINE_DAY) return g.dayStartId && g.dayBegin ? 4 : 5;
+    if (ph === P.ONLINE_VOTE) return 6;
     return -1;
   };
   net.JUMP_TARGET = { morning: 2, settle: 3, day: 5, vote: 6 };   // 朝=朝の開始 / 昼前=待機時間の開始 / 昼=演出のあとの議論の開始 / 夕=投票の開始
@@ -3621,6 +3631,9 @@ window.ONW = window.ONW || {};
     const r = ONW.hack.dayAct(g, id, d);
     if (!r) return;
     if (r.predsaved) { send(id, { t: "predsaved", names: r.names, text: r.text, close: r.close }); return; }
+    if (d.kind === "hokma") send(id, { t: "hokmafx" });   // ホクマーを思い込んだ人: 本物は使うと全員の画面に時計演出が出るので、偽でも本人だけには同じ時計演出を出す（タイマーは減らさない・他の人には見せない）
+    if (r.mind) { send(id, { t: "mindday", id: r.mind.target, text: r.text, role: r.mind.role, items: [{ id: r.mind.target, role: r.mind.role }] }); send(id, { t: "minddone" }); return; }   // 心眼の人狼を思い込んだ人: 本物と同じく対象のカードがめくれる演出を本人だけに出す（文は mindday 側で情報確認に残る）
+    if (r.sense) { send(id, { t: "senseday", id: r.sense.target, text: r.text, key: r.sense.key }); send(id, { t: "minddone" }); return; }   // 感覚の占い師を思い込んだ人: 同じくカードがめくれて気配が出る演出を本人だけに
     send(id, { t: "hackday", text: r.text });
   }
   /** 銀狼にハッキングされた人の偽の連鎖（朝のうち・酔い覚め後の議論中に1回）。選択が足りなければ何もしない。使うと偽の結果の文（と偽の占いの演出）だけが出る */
