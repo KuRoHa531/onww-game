@@ -981,15 +981,19 @@ body.chat-mode .tb-name .av { display: none; }
 .tb-pile .tb-card i:last-child::after { content: "☾"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--gold-dim); font-size: calc(var(--cw) * .42); }
 
 /* 選べるカード（夜の対象 / 投票先） */
-.tb-seat.pick .tb-card { cursor: pointer; animation: tb-pulse 1.5s ease-in-out infinite; }
+/* 2026-11-28 作者報告「弱い」→ 光を消えきらないようにし、金の枠も足して候補と分かるようにした */
+.tb-seat.pick .tb-card { cursor: pointer; animation: tb-pulse 1.3s ease-in-out infinite; }
+.tb-seat.pick .tb-back, .tb-seat.pick .tb-front { border-color: rgba(255, 213, 74, .85); }
 .tb-seat.pick:hover .tb-card { transform: translateY(-4px); }
-@keyframes tb-pulse { 0%, 100% { filter: drop-shadow(0 0 0 rgba(217,196,143,0)); } 50% { filter: drop-shadow(0 0 7px rgba(217,196,143,.85)); } }
+@keyframes tb-pulse { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 213, 74, .8)); } 50% { filter: drop-shadow(0 0 15px rgba(255, 213, 74, 1)); } }
 
 /* 見張り番: 待機時間に「動いていた」対象のカードが踊る（見張り番本人の画面だけ。約3秒で止まる） */
 .tb-dance { animation: tb-dance .5s ease-in-out 6; }
 @keyframes tb-dance { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-7px) rotate(-5deg); } 50% { transform: translateY(0) rotate(0deg); } 75% { transform: translateY(-7px) rotate(5deg); } }
-.tb-seat.sel .tb-card { transform: translateY(-9px); animation: none; filter: drop-shadow(0 0 9px rgba(201,70,61,.95)); }
-.tb-seat.sel .tb-back { border-color: var(--blood); }
+/* 選択済み（2026-11-28 作者報告「弱い」→ 光と枠を強くし、名前も色づけて選んだカードが一目で分かるように） */
+.tb-seat.sel .tb-card { transform: translateY(-10px) scale(1.05); animation: none; filter: drop-shadow(0 0 16px rgba(255, 82, 66, .95)) drop-shadow(0 0 5px rgba(255, 82, 66, .9)); }
+.tb-seat.sel .tb-back, .tb-seat.sel .tb-front { border-color: #ff5242; border-width: 2px; }
+.tb-seat.sel .tb-name { color: #ff8a7a; font-weight: 700; }
 .tb-seat.dead .tb-front { border-color: var(--blood); box-shadow: 0 0 16px rgba(201,70,61,.85); }
 .tb-seat.gone .tb-back { background: linear-gradient(150deg, #3a3a3f 0%, #17171a 55%, #060607 100%); border-color: #5a5a60; color: #4a4a50; }
 .tb-seat.gone .tb-card { filter: grayscale(1) brightness(.75); }
@@ -1205,7 +1209,7 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
   body:has(#table.on) .tb-name { font-size: clamp(13px, 1.05vw, 18px); max-width: calc(var(--cw) + 56px); }
   body:has(#table.on) .tb-name .av { display: inline-flex; width: 22px; height: 22px; }
   body:has(#table.on) .tb-badge { font-size: clamp(12px, 1vw, 16px); top: -12px; right: -14px; padding: 2px 9px; }
-  body:has(#table.on) .tb-seat.sel .tb-card { transform: translateY(-14px); }
+  body:has(#table.on) .tb-seat.sel .tb-card { transform: translateY(-14px) scale(1.05); }
   body:has(#table.on) .tb-seat.pick:hover .tb-card { transform: translateY(-7px) scale(1.04); }
 
   /* 右: チャット・操作パネル（ここだけがスクロールする） */
@@ -1297,7 +1301,7 @@ body.res-phase #big-timer { visibility: hidden; }   /* 結果発表ではタイ�
   body:has(#table.on) .tb-name { font-size: 10px; max-width: calc(var(--cw) + 20px); }
   body:has(#table.on) .tb-name .av { display: none; }
   body:has(#table.on) .tb-badge { font-size: 10px; top: -8px; right: -9px; padding: 1px 6px; }
-  body:has(#table.on) .tb-seat.sel .tb-card { transform: translateY(-6px); }
+  body:has(#table.on) .tb-seat.sel .tb-card { transform: translateY(-6px) scale(1.03); }
 
   /* 右: 操作パネル */
   body:has(#table.on) .onw-app {
@@ -2325,6 +2329,10 @@ body:has(.dbg-sheet) .snd-btn, body:has(.dbg-sheet) .snd-panel { visibility: hid
 }
 
 /* 昼能力・夜能力の操作欄: 説明だけ閉じ開きでき、チャットが押し出されて見えなくならないようにする（スマホ） */
+/* 能力メニューの見出し（何の役職の能力か）と一行説明（2026-11-28: メニューをシンプルに） */
+.ab-head { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--gold); border-bottom: 1px solid rgba(217, 196, 143, .35); padding-bottom: 4px; margin-bottom: 6px; }
+.ab-lead { margin: 4px 0 6px; font-size: 13.5px; line-height: 1.55; }
+body.chat-mode .panel .sober-box .ab-lead { margin: 3px 0; font-size: 13px; }
 .ab-help { margin: 0 0 4px; }
 .ab-help > summary { cursor: pointer; color: var(--gold-dim); font-size: 13px; padding: 2px 0; list-style: none; }
 .ab-help > summary::-webkit-details-marker { display: none; }

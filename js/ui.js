@@ -1325,6 +1325,7 @@ window.ONW = window.ONW || {};
     } else {
       action = `<p class="night-step__hint">夜の行動は完了しました。朝を待ちましょう。</p>`;
     }
+    action = ui.nightLead(game, action);   // やることだけを出し、詳しい説明は「説明」の中にしまう（慣れた人が読まずに済むように。2026-11-28 作者提案）
     return `
       <section class="panel night-step">
         <p class="lede">${game.myRole === "drunk" ? "夜 — あなたは <strong>酔っ払い</strong>です" : `夜 — あなたは <strong>${info.name}</strong>（配られた役職）`}</p>
@@ -1334,6 +1335,23 @@ window.ONW = window.ONW || {};
 
   /** 昼能力・夜能力の説明文だけ閉じ開きできるようにする（説明は長く、スマホだとチャットを押し出して見えなくなるため）。開閉は再描画しても保つ */
   ui.abHelpStart = (game) => `<details class="ab-help"${game.abHelpOpen ? " open" : ""} ontoggle="ONW.game.abHelpOpen=this.open"><summary>説明（タップで開閉）</summary>`;
+  /** 夜の説明文を「やること（最初の段落の1行目まで）＋詳細（タップで開閉）」に分ける。
+   *  「選択中」の段落とボタンは詳細に入れず常時出す。詳細側に操作要素が混ざる場合は分けずにそのまま出す */
+  ui.nightLead = (game, html) => {
+    if (!html) return "";
+    const m = html.match(/^<p class="night-step__hint">([\s\S]*?)<\/p>([\s\S]*)$/);
+    if (!m) return html;
+    const br = m[1].indexOf("<br>");
+    const lead = br >= 0 ? m[1].slice(0, br) : m[1];
+    const tail = br >= 0 ? m[1].slice(br + 4) : "";
+    let keepOut = "";
+    const rest = m[2].replace(/<p class="night-step__hint">選択中:[\s\S]*?<\/p>|<div class="btn-row"[\s\S]*?<\/div>/g, (s) => { keepOut += s; return ""; });
+    const detail = (tail ? `<p class="night-step__hint">${tail}</p>` : "") + rest;
+    if (!detail.trim() || /<button|<select|<input/.test(detail)) return html;
+    return `<p class="night-step__hint">${lead}</p><details class="ab-help"${game.nightHelpOpen ? " open" : ""} ontoggle="ONW.game.nightHelpOpen=this.open"><summary>説明（タップで開閉）</summary>${detail}</details>${keepOut}`;
+  };
+  /** 能力メニューの見出し: 何の役職の能力を開いているか、メニューの一番上に常時出す（2026-11-28 作者要望） */
+  ui.abHead = (title) => `<div class="ab-head">${title}</div>`;
   /** 昼能力・夜能力ボタンのハイライト（docs/ability-highlight.md）。昼: ホストの判定（abhl）/ 夜: ホストの判定 + 酔い覚めの能力が手元で使える状態のとき。死亡・観戦中は光らない */
   ui.abilityHl = (game) => {
     if (!game || game.isDead || game.isSpectator || game.phase !== ONW.PHASE.ONLINE_DAY) return { day: false, night: false };
@@ -1394,8 +1412,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("フリーターの昼能力（再就職）")}
+      <p class="ab-lead">就職先が死亡しました。上のテーブルから、<strong>新しい就職先のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>フリーターの昼能力（再就職）</strong>: 就職先が死亡しました。上のテーブルから、<strong>新しい就職先のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「再就職する」を押すと、新しい就職先の<strong>最終役職</strong>がわかります。新しい就職先が死亡するまで、再就職はできません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1423,16 +1442,19 @@ window.ONW = window.ONW || {};
     const sense = game.mindRole === "sense_seer";   // 感覚の占い師も同じ操作欄を使う（昼能力ボタン → カードを選ぶ → 確定）
     const photo = game.mindRole === "mitsuki_nanoka";   // 三月なのかの写真撮影も同じ操作欄を使う
     const head = photo
-      ? `<p class="night-step__hint"><strong>三月なのかの昼能力「写真撮影」</strong>: 上のテーブルから、<strong>写真を撮る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
-      <p class="night-step__hint">「撮影する」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人陣営・人狼陣営・第三陣営</strong>のどの気配かが写真に写ります。使えるのは1回だけで、取り消せません。写真は情報確認で見返せます。</p>`
+      ? `${ui.abHead("三月なのかの昼能力「写真撮影」")}<p class="ab-lead">上のテーブルから、<strong>写真を撮る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>`
       : sense
-      ? `<p class="night-step__hint"><strong>感覚の占い師の昼能力</strong>: 上のテーブルから、<strong>気配を感じ取る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
-      <p class="night-step__hint">「感じ取る」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人・人狼・狂っている・第三陣営・恋人陣営</strong>のどの気配かがわかります。使えるのは1回だけで、取り消せません。妖狐を感じ取っても呪殺しません。</p>`
-      : `<p class="night-step__hint"><strong>心眼の人狼の昼能力</strong>: 上のテーブルから、<strong>最終役職を見抜く相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
-      <p class="night-step__hint">「見抜く」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）がわかります。使えるのは1回だけで、取り消せません。妖狐を見抜いても呪殺しません。</p>`;
+      ? `${ui.abHead("感覚の占い師の昼能力")}<p class="ab-lead">上のテーブルから、<strong>気配を感じ取る相手のカード</strong>を押してください（生きている自分以外の1人）。</p>`
+      : `${ui.abHead("心眼の人狼の昼能力")}<p class="ab-lead">上のテーブルから、<strong>最終役職を見抜く相手のカード</strong>を押してください（生きている自分以外の1人）。</p>`;
+    const sub = photo
+      ? `<p class="night-step__hint">「撮影する」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人陣営・人狼陣営・第三陣営</strong>のどの気配かが写真に写ります。使えるのは1回だけで、取り消せません。写真は情報確認で見返せます。</p>`
+      : sense
+      ? `<p class="night-step__hint">「感じ取る」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）から、<strong>村人・人狼・狂っている・第三陣営・恋人陣営</strong>のどの気配かがわかります。使えるのは1回だけで、取り消せません。妖狐を感じ取っても呪殺しません。</p>`
+      : `<p class="night-step__hint">「見抜く」を押すと、選んだ相手の<strong>最終役職</strong>（そのときのカード）がわかります。使えるのは1回だけで、取り消せません。妖狐を見抜いても呪殺しません。</p>`;
     return `<div class="sober-box dict-box">
-      ${ui.abHelpStart(game)}
       ${head}
+      ${ui.abHelpStart(game)}
+      ${sub}
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
       <div class="btn-row" style="justify-content:center;"><button class="btn" ${id ? "" : "disabled"} onclick="ONW.ui.mindConfirm()">${photo ? "撮影する" : sense ? "感じ取る" : "見抜く"}</button><button class="btn" onclick="ONW.ui.mindCancel()">キャンセル</button></div>
@@ -1459,8 +1481,9 @@ window.ONW = window.ONW || {};
     const ids = (game.nightSel && game.nightSel.players) || [];
     const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : nmv(id, (((game.others || []).find((p) => p.id === id) || {}).name || "?"));
     return `<div class="sober-box dict-box">
+      ${ui.abHead(`${esc((ONW.roles.getInfo(game.exchRole || "exchanger") || {}).name || "交換者")}の昼能力`)}
+      <p class="ab-lead">上のテーブルから、<strong>票数を入れ替える2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo(game.exchRole || "exchanger") || {}).name || "交換者")}の昼能力</strong>: 上のテーブルから、<strong>票数を入れ替える2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
       <p class="night-step__hint">「交換する」を押すと、その2人の票数を入れ替えます（投票の集計のときに入れ替わります）。議論は続きます。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${ids.length ? ids.map((x) => esc(nm(x))).join(" ⇔ ") : "まだ選んでいません"}</strong>${ids.length === 1 ? "（あと1人）" : ""}</p>
@@ -1501,8 +1524,9 @@ window.ONW = window.ONW || {};
     const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : nmv(id, (((game.others || []).find((p) => p.id === id) || {}).name || "?"));
     const all = ids;
     return `<div class="sober-box dict-box">
+      ${ui.abHead(`${esc((ONW.roles.getInfo("predictor") || {}).name || "予想屋")}の昼能力`)}
+      <p class="ab-lead">上のテーブルから、<strong>最終的に死亡すると思う人のカード</strong>を押してください（死亡した人も含めて何人でも。自分も選べます。もう一度押すと解除）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo("predictor") || {}).name || "予想屋")}の昼能力</strong>: 上のテーブルから、<strong>最終的に死亡すると思う人のカード</strong>を押してください（死亡した人も含めて何人でも。自分も選べます。もう一度押すと解除）。</p>
       <p class="night-step__hint">選んだ人は押すたびに保存されます。投票が始まるまで何度でも選び直せます。最終的な死亡者（追放・道連れ・昼の死亡など）と<strong>完全に一致</strong>すれば単独勝利です（1人でも多くても少なくてもだめ。誰も死亡しないと思うなら、誰も選ばずに「確定して閉じる」）。昼のうちに死亡した人も選べます。</p>
       </details>
       <p class="night-step__hint">死亡すると予想: <strong>${all.length ? all.map((x) => esc(nm(x))).join("、") : "誰も選んでいません（確定すると「誰も死亡しない」予想）"}</strong></p>
@@ -1562,8 +1586,9 @@ window.ONW = window.ONW || {};
     const ids = (game.nightSel && game.nightSel.players) || [];
     const nm = (id) => id === ONW.net.myId() ? (game.myName || "自分") : nmv(id, (((game.others || []).find((p) => p.id === id) || {}).name || "?"));
     return `<div class="sober-box dict-box">
+      ${ui.abHead(`${esc((ONW.roles.getInfo(game.libraRole || "libra") || {}).name || "天秤")}の昼能力`)}
+      <p class="ab-lead">上のテーブルから、<strong>投票対象にする2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>${esc((ONW.roles.getInfo(game.libraRole || "libra") || {}).name || "天秤")}の昼能力</strong>: 上のテーブルから、<strong>投票対象にする2人のカード</strong>を押してください（生きている人。自分も選べます）。</p>
       <p class="night-step__hint">「投票対象を制限する」を押すと、議論をそこで打ち切ってすぐ投票に移り、その投票では選んだ2人のどちらかにしか投票できなくなります。選んだ2人は投票が始まるときに全員に知らされますが、誰が使ったかは結果発表までわかりません。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${ids.length ? ids.map((x) => esc(nm(x))).join(" ⚖ ") : "まだ選んでいません"}</strong>${ids.length === 1 ? "（あと1人）" : ""}</p>
@@ -1591,8 +1616,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("保安官の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>撃つ相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>保安官の昼能力</strong>: 上のテーブルから、<strong>撃つ相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「撃つ」を押すと、選んだ相手を撃ちます。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1620,8 +1646,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("盗賊の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>票数を盗む相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>盗賊の昼能力</strong>: 上のテーブルから、<strong>票数を盗む相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「盗む」を押すと、選んだ相手の投票数を1票ぶん盗みます（相手は1票減り、あなたは1票増えます）。相手の投票数が0票のときは失敗します。使えるのは1回だけで、失敗しても使用済みになり、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1649,8 +1676,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("妖精さんの昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>バリアを付与する相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>妖精さんの昼能力</strong>: 上のテーブルから、<strong>バリアを付与する相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「バリアを付与する」を押すと、選んだ相手に入る票が1票ぶん防がれます（結果発表で、本来の得票数が出たあとに妖精が来て票を1減らします）。相手に票が入らなかったときは何も起きません。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1678,8 +1706,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("鼠の狂人の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>逃げ込む相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>鼠の狂人の昼能力</strong>: 上のテーブルから、<strong>逃げ込む相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「逃げ込む」を押すと、その人のカードの裏に逃げ込みます。逃げ込んだ先が死亡しない限り、投票の追放などでは死亡しません（保安官やヴァニティの執行・呪術の人狼の呪殺は防げません）。逃げ込んだ先が死亡した場合は後追いし、第三陣営の人の裏に逃げ込んでいた場合は投票の終了時に後追いします。使えるのは1回だけで、取り消せません。逃げたことは結果発表まで誰にも分かりません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1706,8 +1735,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("黄泉の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>状態を断ち切る相手のカード</strong>を押してください（生きている人から1人。自分も選べます）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>黄泉の昼能力</strong>: 上のテーブルから、<strong>状態を断ち切る相手のカード</strong>を押してください（生きている人から1人。自分も選べます）。</p>
       <p class="night-step__hint">「状態を断ち切る」を押すと、選んだ相手に付与されている状態（シャッフラー・反転・恋人・未覚醒の酔っ払い・各役職の対象・封印など）を断ち切ります。何も付与されていなくても使ったことになります。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1734,8 +1764,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("イカロスの昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>票を分け与える相手のカード</strong>を押してください（生きている自分以外の1人。もう使い切った人は選べません）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>イカロスの昼能力</strong>: 上のテーブルから、<strong>票を分け与える相手のカード</strong>を押してください（生きている自分以外の1人。もう使い切った人は選べません）。</p>
       <p class="night-step__hint">「票を分け与える」を押すと、選んだ相手の投票数が増えます（村人陣営の人には1票、それ以外の人には2票。増えた票数は誰にも公開されません）。使うと全員の画面に、太陽へ翼が飛び上がる演出が出ます（だれが・だれに使ったかは分かりません）。同じ人には1回だけ（カルメンに囁かれたときは各プレイヤーに2回ずつ）で、取り消せません。昼のうちなら、昼能力ボタンからまた別の人にも使えます。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1784,8 +1815,9 @@ window.ONW = window.ONW || {};
       const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
       const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
       return `<div class="sober-box dict-box">
+      ${ui.abHead("代行者の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>守る対象のカード</strong>を押してください（自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>代行者の昼能力</strong>: 上のテーブルから、<strong>守る対象のカード</strong>を押してください（自分以外の1人）。</p>
       <p class="night-step__hint">「守る対象にする」を押すと、その人を守る対象にします。取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1793,8 +1825,9 @@ window.ONW = window.ONW || {};
     </div>`;
     }
     return `<div class="sober-box dict-box">
+      ${ui.abHead("代行者の昼能力")}
+      <p class="ab-lead">「指令対象を確認する」を押すと、あなたの指令対象が分かります。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>代行者の昼能力</strong>: 「指令対象を確認する」を押すと、あなたの指令対象が分かります。</p>
       <p class="night-step__hint">指令対象が生存していれば追加勝利します。確認できるのは1日1回だけです。取り消せません。</p>
       </details>
       <div class="btn-row" style="justify-content:center;"><button class="btn" onclick="ONW.ui.agentUse()">指令対象を確認する</button><button class="btn" onclick="ONW.ui.agentCancel()">キャンセル</button></div>
@@ -1806,8 +1839,9 @@ window.ONW = window.ONW || {};
     if (!game.hokmaOpen) return "";
     const n = game.hokmaCount || 0;
     return `<div class="sober-box dict-box">
+      ${ui.abHead("ホクマーの昼能力")}
+      <p class="ab-lead">「昼時間を10秒短縮する」を押すと、議論時間が<strong>10秒短く</strong>なります。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>ホクマーの昼能力</strong>: 「昼時間を10秒短縮する」を押すと、議論時間が<strong>10秒短く</strong>なります。</p>
       <p class="night-step__hint">何度でも使えます（使うたびに10秒ずつ短くなります）。使うと全員の画面に時計が薄く浮き出て針が進む演出が出ます（だれが使ったかは分かりません）。取り消せません。${n ? `（これまでに${n}回使いました）` : ""}</p>
       </details>
       <div class="btn-row" style="justify-content:center;"><button class="btn" onclick="ONW.ui.hokmaUse()">昼時間を10秒短縮する</button><button class="btn" onclick="ONW.ui.hokmaCancel()">キャンセル</button></div>
@@ -1832,8 +1866,9 @@ window.ONW = window.ONW || {};
     if (!game.wagererOpen) return "";
     const opts = game.wagererOptions || [], cur = game.wagererCur || null;
     return `<div class="sober-box dict-box">
+      ${ui.abHead("勝負師の昼能力")}
+      <p class="ab-lead">勝利すると思う陣営を1つ選んでください。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>勝負師の昼能力</strong>: 勝利すると思う陣営を1つ選んでください。</p>
       <p class="night-step__hint">村人陣営か人狼陣営を当てると<strong>追加勝利</strong>、単独の第三陣営を当てると<strong>乗っ取り単独勝利</strong>します。昼時間中なら何度でも選び直せます。予想は自分にだけ通知され、他の人には分かりません。</p>
       </details>
       <div class="btn-row" style="justify-content:center;flex-wrap:wrap;">${opts.map((o) => `<button class="btn${cur === o.key ? " btn--on" : ""}" onclick="ONW.ui.wagererPick('${esc(o.key)}')">${esc(o.label)}の勝利${cur === o.key ? " ✓" : ""}</button>`).join("")}</div>
@@ -1861,8 +1896,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("御乱心の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>投票先を変える相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>御乱心の昼能力</strong>: 上のテーブルから、<strong>投票先を変える相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「投票先を変える」を押すと、選んだ相手の投票先が、生きている全員の中からランダムな1人に変わります（自分自身になることもあります）。相手が投票しなかったときは何も起きません。誰になったかは結果発表まで分かりません。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1890,8 +1926,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("羊の狂人の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>迷える子羊にする相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>羊の狂人の昼能力</strong>: 上のテーブルから、<strong>迷える子羊にする相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「迷える子羊にする」を押すと、選んだ相手の投票先が、生きている全員の中からランダムな1人に変わります（自分自身や羊の狂人本人になることもあります）。人狼陣営の人に使うと、自分の投票先もランダムになります。相手が投票しなかったときは何も起きません。誰になったかは結果発表まで分かりません。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1920,8 +1957,9 @@ window.ONW = window.ONW || {};
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     const none = !(game.mediumTargets || []).length;
     return `<div class="sober-box dict-box">
+      ${ui.abHead("霊媒師の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>霊媒する死亡者のカード</strong>を押してください（昼議論中に死亡した自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>霊媒師の昼能力</strong>: 上のテーブルから、<strong>霊媒する死亡者のカード</strong>を押してください（昼議論中に死亡した自分以外の1人）。</p>
       <p class="night-step__hint">「霊媒する」を押すと、選んだ人の<strong>最終役職</strong>が分かります。結果はあなただけに伝わり、情報確認で見返せます。呪殺で死亡した人は対象にできません。使えるのは1回だけで、取り消せません。</p>
       </details>
       ${none ? `<p class="night-step__hint"><strong>霊媒できる死亡者がいません。</strong></p>` : `<p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>`}
@@ -1949,8 +1987,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("カウンセラーの昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>更生させる相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>カウンセラーの昼能力</strong>: 上のテーブルから、<strong>更生させる相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「更生させる」を押すと、選んだ相手の最終役職が<strong>狂人系なら村人に更生</strong>します（昇格した狂人も更生でき、昇格は解けます）。狂人系でない相手の場合は失敗します。対象が鍵師にロックされていると、成功したかどうかも分からないまま終わります。使えるのは1回だけで、取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -1979,8 +2018,9 @@ window.ONW = window.ONW || {};
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     const rem = typeof game.renRemain === "number" ? game.renRemain : null;
     return `<div class="sober-box dict-box">
+      ${ui.abHead("レンの昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>役職の変化を調べる相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>レンの昼能力</strong>: 上のテーブルから、<strong>役職の変化を調べる相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「調べる」を押すと、選んだ相手の<strong>最終役職が初期役職から変化しているかどうか</strong>が分かります。対象の最終役職が<strong>モーゼス</strong>の場合は、そのことも分かります。${rem !== null ? `あと<strong>${rem}回</strong>使えます（同じ相手を何度も調べられます）。` : "合計3回まで使えます（同じ相手を何度も調べられます）。"}取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -2009,8 +2049,9 @@ window.ONW = window.ONW || {};
     const names = sel.map((id) => nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name));
     const rem = typeof game.psyRemain === "number" ? game.psyRemain : null;
     return `<div class="sober-box dict-box">
+      ${ui.abHead("心理士の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>検査する2人のカード</strong>を押してください（生きている自分以外の2人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>心理士の昼能力</strong>: 上のテーブルから、<strong>検査する2人のカード</strong>を押してください（生きている自分以外の2人）。</p>
       <p class="night-step__hint">「検査する」を押すと、選んだ2人の<strong>最終役職が同じ陣営扱いかどうか</strong>が分かります（同じなら適合、別なら不適合。第三陣営は基本的に役職ごとに別陣営扱いですが、同じ役職同士は同じ扱いです）。結果はあなたにだけ分かり、情報確認に残ります。${rem !== null ? `あと<strong>${rem}回</strong>使えます。` : "1日に1回だけ使えます（カルメンに村人陣営として囁かれると2回まで）。"}取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${sel.length ? sel.map((id, i) => esc(names[i] || "?")).join(" と ") : "まだ選んでいません"}（${sel.length}/2人）</strong></p>
@@ -2028,8 +2069,9 @@ window.ONW = window.ONW || {};
     const id = game.nightSel && game.nightSel.players && game.nightSel.players[0];
     const nm = id ? nmv(id, ((game.others || []).find((p) => p.id === id) || {}).name) : "";
     return `<div class="sober-box dict-box">
+      ${ui.abHead("独裁者の昼能力")}
+      <p class="ab-lead">上のテーブルから、<strong>独裁で処刑する相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       ${ui.abHelpStart(game)}
-      <p class="night-step__hint"><strong>独裁者の昼能力</strong>: 上のテーブルから、<strong>独裁で処刑する相手のカード</strong>を押してください（生きている自分以外の1人）。</p>
       <p class="night-step__hint">「独裁を宣言する」を押すと、すぐに議論を打ち切って、選んだ相手だけを処刑します（投票はしません）。取り消せません。</p>
       </details>
       <p class="night-step__hint">選択中: <strong>${id ? esc(nm || "?") : "まだ選んでいません"}</strong></p>
@@ -2465,12 +2507,12 @@ window.ONW = window.ONW || {};
       else if (!late && game.settling) chain = `<p class="night-step__hint">待機時間になったので、新しい役職（${esc(ONW.roles.getInfo(ar).name)}）の能力は、昼の議論中に使えます。</p>`;   // 待機時間は選んでも受け付けられない（ホストが朝の連鎖として処理しない）ので、押せるように見せない
       else if (!game.morningChainReady) chain = late ? "" : `<p class="night-step__hint">新しい役職（${esc(ONW.roles.getInfo(ar).name)}）の能力を、このあと朝のうちに使えます…</p>`;
       else if (late && !game.abilityOpen) chain = "";
-      else if (late) chain = `${ui.abHelpStart(game)}<p class="night-step__hint">上のテーブルから、${how}ください。選んだら「確定」で能力が発動します。</p></details>
+      else if (late) chain = `${ui.abHead(esc(ONW.roles.getInfo(ar).name) + "の夜能力")}<p class="ab-lead">上のテーブルから、${how}ください。選んだら「確定」で能力が発動します。</p>
         <p class="night-step__hint">選択中: <strong>${chosen.length ? chosen.join("、") : "まだ選んでいません"}</strong></p>
         <div class="btn-row" style="justify-content:center;"><button class="btn" ${ready ? "" : "disabled"} onclick="ONW.ui.abilityConfirm()">確定</button><button class="btn" onclick="ONW.ui.abilityCancel()">キャンセル</button></div>`;
-      else chain = `<p class="night-step__hint">${late ? "最終的な役職" : "新しい役職"}（<strong>${esc(ONW.roles.getInfo(ar).name)}</strong>）の能力を使えます。上のテーブルから、${how}、「能力を使う」を押してください。<br>押すとその場で結果が分かります（${late ? "議論中に" : "朝の間に"}1回だけ）。</p>
+      else chain = ui.nightLead(game, `<p class="night-step__hint">${late ? "最終的な役職" : "新しい役職"}（<strong>${esc(ONW.roles.getInfo(ar).name)}</strong>）の能力を使えます。上のテーブルから、${how}、「能力を使う」を押してください。<br>押すとその場で結果が分かります（${late ? "議論中に" : "朝の間に"}1回だけ）。</p>
         <p class="night-step__hint">選択中: <strong>${chosen.length ? chosen.join("、") : "まだ選んでいません"}</strong></p>
-        <div class="btn-row" style="justify-content:center;"><button class="btn" ${ready ? "" : "disabled"} onclick="ONW.net.morningUse()">能力を使う</button></div>`;
+        <div class="btn-row" style="justify-content:center;"><button class="btn" ${ready ? "" : "disabled"} onclick="ONW.net.morningUse()">能力を使う</button></div>`);
     }
     return chain;
   };
