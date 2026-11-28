@@ -201,7 +201,7 @@
         if (flashed) return;
         flashed = true;
         el.classList.add("wiki-card--flash");
-        setTimeout(() => el.classList.remove("wiki-card--flash"), 1900);
+        setTimeout(() => el.classList.remove("wiki-card--flash"), 2500);
       };
       window.addEventListener("scrollend", flash, { once: true });
       setTimeout(flash, 900);

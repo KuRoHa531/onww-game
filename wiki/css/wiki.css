@@ -190,12 +190,12 @@
 
 /* リンクで飛んだ先のカードを一瞬光らせる */
 @keyframes wiki-card-flash {
-  0% { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(217, 196, 143, .45); }
-  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 transparent; }
+  0% { box-shadow: 0 0 0 3px var(--gold), 0 0 28px rgba(217, 196, 143, .85); background-color: rgba(217, 196, 143, .16); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 transparent; background-color: transparent; }
 }
 
 .wiki-card--flash {
-  animation: wiki-card-flash 1.8s ease-out;
+  animation: wiki-card-flash 2.4s ease-out;
 }
 
 .wiki-card__hit {

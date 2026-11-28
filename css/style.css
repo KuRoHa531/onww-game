@@ -141,6 +141,26 @@ body {
   border-top: 1px solid var(--line);
 }
 
+/* ---- 更新お知らせ（js/update.js が出す。試合中は出ない） ---- */
+.upd-btn {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  right: 10px;
+  z-index: 1400;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--gold);
+  background: var(--bg-panel-raised);
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .5);
+  cursor: pointer;
+}
+.upd-btn[hidden] { display: none; }
+.upd-btn:hover { background: var(--gold); color: var(--bg-night); }
+
 /* ---- スタートゲート（開いた直後に出る「ゲームを始める」） ---- */
 .start-gate {
   position: fixed;
@@ -3006,8 +3026,9 @@ body.chat-mode .em-line--bg { stroke-width: 4.2; }
 .yo-fx--target .yo-line { box-shadow: 0 0 10px 3px rgba(255,40,90,.95), 0 0 26px 8px rgba(190,0,40,.6); }
 
 /* 昼能力・夜能力ボタンのハイライト（いま使える能力があるとき。使い終わると消える）docs/ability-highlight.md */
-.co-bar .btn.btn--hl { border-color: #ffd54a; color: #ffe9a6; box-shadow: 0 0 0 2px rgba(255, 213, 74, .55), 0 0 12px 2px rgba(255, 213, 74, .55); animation: ab-hl-pulse 1.4s ease-in-out infinite; }
-@keyframes ab-hl-pulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(255, 213, 74, .45), 0 0 8px 1px rgba(255, 213, 74, .35); } 50% { box-shadow: 0 0 0 3px rgba(255, 213, 74, .9), 0 0 18px 4px rgba(255, 213, 74, .8); } }
+/* 2026-11-28 作者報告「弱い」→ 枠だけの光から、金色に塗って文字を濃く＋少し膨らむ脈打ちに強化 */
+.co-bar .btn.btn--hl { border-color: #ffd54a; background: linear-gradient(180deg, #ffe066, #ffc93c); color: #221a00; font-weight: 700; box-shadow: 0 0 0 2px rgba(255, 213, 74, .75), 0 0 16px 4px rgba(255, 213, 74, .65); animation: ab-hl-pulse 1.2s ease-in-out infinite; }
+@keyframes ab-hl-pulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(255, 213, 74, .65), 0 0 10px 2px rgba(255, 213, 74, .5); transform: scale(1); } 50% { box-shadow: 0 0 0 3px rgba(255, 213, 74, 1), 0 0 24px 8px rgba(255, 213, 74, .9); transform: scale(1.07); } }
 /* （prefers-reduced-motion でハイライトの脈打ちを止めるのは廃止: OSのアニメ設定がオフなPCでは「使える能力がハイライトされない」ため。703行・各役職JSと同じ方針 2026-11-26 作者報告） */
 
 /* 役職履歴・墓地が長いとき: 折り返さず1行のまま。スマホ（タッチ）は行ごとに横スワイプ。
