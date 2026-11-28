@@ -146,6 +146,44 @@
   const kanaIndexByKey = {};
   roles.forEach((r, i) => { kanaIndexByKey[r.key] = i; });
 
+  // --- 役職名リンク(Wikipedia式): 説明文中の他役職の名前を、その役職のカードへ飛べるリンクにする ---
+  // 名前が長い順に並べて正規表現にする(「封印の狂人」が「狂人」より先に一致するように)。
+  const ROLE_KEY_BY_NAME = new Map(roles.map((r) => [r.name, r.key]));
+  const ROLE_NAMES_BY_LEN = [...ROLE_KEY_BY_NAME.keys()].sort((a, b) => b.length - a.length);
+  const ROLE_NAME_RE = new RegExp(ROLE_NAMES_BY_LEN.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+
+  /** 説明文をHTML化する。他役職の名前はリンク、自分の名前と「精神」の神は素のまま */
+  function linkifyDesc(text, selfKey) {
+    const src = String(text);
+    let out = "", last = 0;
+    for (const m of src.matchAll(ROLE_NAME_RE)) {
+      const key = ROLE_KEY_BY_NAME.get(m[0]);
+      if (key === selfKey) continue; // 自分の名前はリンクにしない
+      if (m[0] === "神" && src[m.index - 1] === "精") continue; // 「精神」の神は役職ではない
+      out += escapeHtml(src.slice(last, m.index));
+      out += `<a class="wiki-role-link" href="#role-${key}" data-role-link="${key}">${escapeHtml(m[0])}</a>`;
+      last = m.index + m[0].length;
+    }
+    return out + escapeHtml(src.slice(last));
+  }
+
+  /** 役職リンクの飛び先: 検索・絞り込みを解除してカードを開き、スクロールして光らせる */
+  function jumpToRole(key) {
+    if (!roles.some((r) => r.key === key)) return;
+    state.query = "";
+    $search.value = "";
+    if (state.filter !== "all") { state.filter = "all"; buildFilters(); }
+    state.openKeys.add(key);
+    render();
+    const el = document.getElementById(`role-${key}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.classList.add("wiki-card--flash");
+      setTimeout(() => el.classList.remove("wiki-card--flash"), 1900);
+    }
+    if (window.history && history.replaceState) history.replaceState(null, "", `#role-${key}`);
+  }
+
   const $list = document.getElementById("wiki-list");
   const $empty = document.getElementById("empty-state");
   const $count = document.getElementById("role-count");
@@ -276,7 +314,7 @@
       .map((role) => {
         const open = state.openKeys.has(role.key);
         return `
-        <article class="wiki-card" data-team="${role.team}">
+        <article class="wiki-card" id="role-${role.key}" data-card="${role.key}" data-team="${role.team}">
           <button class="wiki-card__head" type="button" data-toggle="${role.key}" aria-expanded="${open}">
             <span class="wiki-card__name">${escapeHtml(role.name)}</span>
             <span class="wiki-card__head-right">
@@ -287,7 +325,7 @@
           ${renderMatchHits(role)}
           ${open ? `
           <div class="wiki-card__body">
-            <p class="wiki-card__desc">${escapeHtml(role.desc)}</p>
+            <p class="wiki-card__desc">${linkifyDesc(role.desc, role.key)}</p>
             ${renderAchievements(role)}
           </div>` : ""}
         </article>
@@ -378,7 +416,7 @@
                   <span class="wiki-ach__name">${escapeHtml(ach.name)}</span>
                   <span class="wiki-ach__arrow">${achOpen ? "▲" : "▼"}</span>
                 </button>
-                ${achOpen ? `<p class="wiki-ach__desc">${escapeHtml(ach.desc)}</p>` : ""}
+                ${achOpen ? `<p class="wiki-ach__desc">${linkifyDesc(ach.desc, role.key)}</p>` : ""}
               </li>
             `;
             })
@@ -413,11 +451,22 @@
     });
   }
 
+  // 役職名リンクのクリック(カード再描画でも効くよう一覧側で受ける)
+  $list.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest ? e.target.closest("[data-role-link]") : null;
+    if (!a) return;
+    e.preventDefault();
+    jumpToRole(a.dataset.roleLink);
+  });
+
   buildFilters();
   buildSearchScope();
   buildSortToggle();
   buildControlsToggle();
   render();
+
+  // URLの #role-<key> で開いたときは、その役職を開いて出す
+  if (location.hash.startsWith("#role-")) jumpToRole(location.hash.slice("#role-".length));
 })();
 
 /* 画像の保存ブロック（右クリック・長押しメニュー・ドラッグ） */
