@@ -177,9 +177,21 @@
     render();
     const el = document.getElementById(`role-${key}`);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.classList.add("wiki-card--flash");
-      setTimeout(() => el.classList.remove("wiki-card--flash"), 1900);
+      // 飛び先のカードの一番上が、画面の一番上(固定バーのすぐ下)に来る位置まで滑らかに移動する
+      const bar = document.querySelector(".wiki-controls");
+      const barH = bar ? bar.getBoundingClientRect().height : 0;
+      const y = el.getBoundingClientRect().top + window.scrollY - barH;
+      window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+      // 光らせるのはスクロールが着いてから(着く前に始めると見えないうちに終わる)
+      let flashed = false;
+      const flash = () => {
+        if (flashed) return;
+        flashed = true;
+        el.classList.add("wiki-card--flash");
+        setTimeout(() => el.classList.remove("wiki-card--flash"), 1900);
+      };
+      window.addEventListener("scrollend", flash, { once: true });
+      setTimeout(flash, 900);
     }
     if (window.history && history.replaceState) history.replaceState(null, "", `#role-${key}`);
   }
