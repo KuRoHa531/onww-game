@@ -235,7 +235,7 @@
         if (G_.length) { const items = G_.slice().sort((x, y) => x - y).map((i) => ({ k: "g:" + i, role: rnd(g) })); return { text: items.map((it) => `墓地${+it.k.slice(2) + 1}枚目は「${rn(it.role)}」でした。`).join("\n"), rev: { kind: "peek", items } }; }
         return t(null);
       }
-      if (fake === "finger_reader") return t(`${A} を占って ${R()} でした。`);
+      if (fake === "finger_reader") { const ts = P.slice(0, 2); if (!ts.length) return t(null); const items = ts.map((x) => ({ k: "p:" + x, role: rnd(g) })); return { text: items.map((it) => `${nameOf(g, it.k.slice(2))} の初期役職は ${rn(it.role)} でした。`).join("\n"), rev: { kind: "peek", items } }; }   // 本物と同じ: 選んだ2人の初期役職の文＋両カードがめくれる（中身は偽の役職）
       if (fake === "robber") { const r = rnd(g); return { text: `${A} と役職を交換しました。あなたの新しい役職は「${rn(r)}」です。`, rev: a ? { kind: "swap", target: a, role: sh(r) } : null }; }
       if (fake === "relic_robber") { const r = rnd(g); return { text: `墓地${(G_[0] || 0) + 1}枚目と役職を交換しました。あなたの新しい役職は「${rn(r)}」です。`, rev: { kind: "relic", target: G_[0] || 0, role: sh(r) }, newRole: r }; }   // newRole: 偽の新しい役職（朝の連鎖の偽の画面に使う）。rev: 墓地と入れ替わる演出
       if (fake === "patch") {   // パッチと思い込んだ人: 偽の相方が見えていれば「相方がいるため発動しなかった」、いなければ墓地から奪ったことにする（墓荒らしと同じ入れ替わり演出＋偽の連鎖。本物の盤面・記録には影響しない）
@@ -248,30 +248,30 @@
       if (fake === "troublemaker") return { text: `${A} と ${B} の役職を入れ替えました。`, rev: a && b ? { kind: "tm", a, b } : null };
       if (fake === "gremlin") { const r = rnd(g); return { text: `${A} の役職「${rn(r)}」を ${B} にコピーしました。`, rev: a && b ? { kind: "gremlin", from: a, to: b, role: sh(r), copied: sh(r) } : null }; }
       if (fake === "shuffler") { const r = rnd(g); return { text: `${A} をランダムな役職「${rn(r)}」に変化させました。`, rev: a ? { kind: "shuffler", target: a, role: sh(r) } : null }; }
-      if (fake === "freeter") return t(`${A} の初期役職は「${R()}」でした。${A} に就職しました。`);
-      if (fake === "cupid") return t(`${A} と ${B} を恋人にしました。`);
-      if (fake === "evil_woman") return t(`本命は ${A}、キープは ${B} です。`);
-      if (fake === "avenger") return t(`${A} を復讐対象にしました。`);
-      if (fake === "jester_ghost") return t(`${A}を恨みました。`);   // 道化の怨霊と思い込んだ人（マイクラ版 night.js の fakeRole 分岐の文そのまま）
+      if (fake === "freeter") { if (!a) return t(null); const r = rnd(g); return { text: `${A} の初期役職は「${rn(r)}」でした。${A} に就職しました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: r }] } }; }   // 本物と同じ: 就職先のカードが初期役職でめくれる
+      if (fake === "cupid") return a && b ? { text: `${A} と ${B} を恋人にしました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__cupid" }, { k: "p:" + b, role: "__cupid" }] } } : t(null);   // 本物と同じ: 選んだ2人のカードが💘でめくれる
+      if (fake === "evil_woman") return a && b ? { text: `本命は ${A}、キープは ${B} です。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__love" }, { k: "p:" + b, role: "__keep" }] } } : t(null);   // 本物と同じ: 本命が❤・キープが♡でめくれる
+      if (fake === "avenger") return a ? { text: `${A} を復讐対象にしました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__avenger" }] } } : t(null);   // 本物と同じ: 対象のカードが印でめくれる
+      if (fake === "jester_ghost") return a ? { text: `${A}を恨みました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__jester_ghost" }] } } : t(null);   // 道化の怨霊と思い込んだ人（文はマイクラ版 night.js の fakeRole 分岐そのまま。本物と同じく対象のカードが印でめくれる）
       if (fake === "telepathist") return t(`${A}に接続しました。`);   // テレパシストと思い込んだ人（文だけ。チャット・後追い・追加勝利は本物だけ）   // 道化の怨霊と思い込んだ人（マイクラ版 night.js の fakeRole 分岐の文そのまま）
       if (fake === "heartbreaker") return t(`${A} を破局対象に選びました。`);
       if (fake === "love_tanner") return t(`${A} に一目惚れしました。`);
       if (fake === "prankster") return t(`${A} を対象に選びました。`);
-      if (fake === "pure_lover") return t(`${A} を恋人に選びました。`);
+      if (fake === "pure_lover") return a ? { text: `${A} を恋人に選びました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__love" }] } } : t(null);   // 本物と同じ: 選んだ人のカードがハートでめくれる
       if (fake === "reverser") return t(`${A} を反転させました。`);
       if (fake === "exposed_madman") return t(`${A} を暴露の対象に選びました。`);
       if (fake === "eraser_wolf") return t(`${A} を抹消対象にしました。`);
       if (fake === "visitor") return t(`${A} を訪問しました。`);
-      if (fake === "watchdog") return t(`${A} を飼い主にしました。`);
-      if (fake === "dog_madman") return t(`${A} を飼い主にしました。`);
-      if (fake === "boar_madman") return t(`あなたは${A}にしか投票できません。`);   // 猪の狂人と思い込んだ人（マイクラ版の偽の夜結果文と同じ。本物の記録・投票の強制には影響しない）
+      if (fake === "watchdog") return a ? { text: `${A} を飼い主にしました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__bone" }] } } : t(null);   // 本物と同じ: 飼い主のカードが🦴でめくれる
+      if (fake === "dog_madman") return a ? { text: `${A} を飼い主にしました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__bone" }] } } : t(null);   // 本物と同じ: 飼い主のカードが🦴でめくれる
+      if (fake === "boar_madman") return a ? { text: `あなたは${A}にしか投票できません。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__boar" }] } } : t(null);   // 猪の狂人と思い込んだ人（文はマイクラ版の偽の夜結果文と同じ。本物と同じく対象のカードが🐗でめくれる。本物の記録・投票の強制には影響しない）
       if (fake === "keymaster") { const lock = Math.random() < 0.5; return { text: lock ? `${A} の役職をロックしました。` : `${A} の役職のロックを解除しました。`, rev: a ? { kind: "key", mode: lock ? "lock" : "unlock", ids: [a] } : null }; }
       if (fake === "major") return t(`${A} を救済しようとしました。`);
       if (fake === "carmen") return t(`${A} に囁きました。`);
       if (fake === "seal_madman") return t(`${A} を封印しました。`);
       if (fake === "elfrinde") return t(`${A} を封印しました。`);   // エルフリンデと思い込んだ人: 封印の狂人と同じ偽の結果文（本物の盤面・封印には影響しない）
-      if (fake === "mercenary") return t(`${A}を護衛しました。`);   // 傭兵と思い込んだ人（マイクラ版の偽傭兵文と同じ。本物の記録・守りには影響しない）
-      if (fake === "thread_spinner") return t(`${A}と${B}をペア状態にしました。`);   // 糸紡ぎと思い込んだ人（マイクラ版の偽糸紡ぎ文と同じ。本物のペア・記録には影響しない）
+      if (fake === "mercenary") return a ? { text: `${A}を護衛しました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__shield" }] } } : t(null);   // 傭兵と思い込んだ人（文はマイクラ版の偽傭兵文と同じ。本物と同じく対象のカードが🛡でめくれる。本物の記録・守りには影響しない）
+      if (fake === "thread_spinner") return a && b ? { text: `${A}と${B}をペア状態にしました。`, rev: { kind: "peek", items: [{ k: "p:" + a, role: "__thread" }, { k: "p:" + b, role: "__thread" }], thread: [a, b] } } : t(null);   // 糸紡ぎと思い込んだ人（文はマイクラ版の偽糸紡ぎ文と同じ。本物と同じく2人のカードが🧵でめくれる。本物のペア・記録には影響しない）
       if (fake === "mimic_wolf") return t(`あなたは ${R()} の能力を模倣しました。`);
       if (fake === "cosplayer") {   // 山札から偽の3枚 → 選んだ1枚にコスプレ（選んでいなければ3枚とも山札へ戻る）。朝の演出は本物と同じ rev.kind "cosplay"
         const d = id ? H.cosDraw(g, id) : null;
@@ -593,6 +593,16 @@
         const text = `${ONW.wagerer.labelOf(d.key)}勝利を予想しました。`;
         ((g.hackDayLog = g.hackDayLog || {})[id] = g.hackDayLog[id] || []).push(text);
         return { text };
+      }
+      if (f === "mind_wolf" || f === "sense_seer") {   // 心眼の人狼・感覚の占い師を思い込んだ人: 本物と同じく対象のカードがめくれる演出を本人だけに出す（めくれる中身は文と同じ偽の結果にする）
+        const t = d.target;
+        if (!valid(t)) return null;
+        g.hackDayUsed[id] = true;
+        let text, extra;
+        if (f === "mind_wolf") { const rk = rnd(g); text = ONW.mindWolf && ONW.mindWolf.resultText ? ONW.mindWolf.resultText(nameOf(g, t), roleName(rk)) : `${nameOf(g, t)} の最終役職は「${roleName(rk)}」でした。`; extra = { mind: { target: t, role: rk } }; }
+        else { const ks = Object.keys((ONW.senseSeer && ONW.senseSeer.FEEL) || { village: 1, wolf: 1, third: 1 }); const key = pick(ks); text = ONW.senseSeer && ONW.senseSeer.resultText ? ONW.senseSeer.resultText(nameOf(g, t), key) : `${nameOf(g, t)} から村人の気配を感じました。`; extra = { sense: { target: t, key } }; }
+        ((g.hackDayLog = g.hackDayLog || {})[id] = g.hackDayLog[id] || []).push(text);
+        return { text, ...extra };
       }
       const ids = e.n === 2 ? [d.a, d.b] : [d.target];
       if (!ids.every(valid) || new Set(ids).size !== ids.length) return null;

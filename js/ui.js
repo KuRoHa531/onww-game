@@ -923,7 +923,8 @@ window.ONW = window.ONW || {};
    * position:fixed の重ねだけなので、画面（レイアウト）はずれない。
    */
   const SKIP_PHASES = ["online_role", "online_night", "online_morning", "online_day", "online_vote"];
-  const canSkip = (game) => ONW.net.isHost && game.inGame !== false && SKIP_PHASES.includes(game.phase);
+  const skipPhase = (game) => game.phase === "online_spectate" && game.specPhase ? game.specPhase : game.phase;   // 観戦中のホストは自分の画面用に phase が online_spectate へ化け、実フェーズは specPhase にある（再接続・再同期のたびに化けるので、実フェーズで判定しないとスキップが押せなくなる）
+  const canSkip = (game) => ONW.net.isHost && game.inGame !== false && SKIP_PHASES.includes(skipPhase(game));
   ui.closeSkip = function () { const el = document.getElementById("skip-confirm"); if (el) el.remove(); ui._skipPhase = null; };
   ui.openSkip = function () {
     const g = ONW.game;
@@ -937,36 +938,36 @@ window.ONW = window.ONW || {};
       <button class="btn sc-abandon sc-tolobby" onclick="ONW.ui.confirmToLobby()">ロビーに戻る</button></div>`;
     // 外側タップでは閉じない（ダブルタップ直後のクリックが背景に当たって即消えるため）。「いいえ」を押すまで残る
     document.body.appendChild(wrap);
-    ui._skipPhase = g.phase;
+    ui._skipPhase = skipPhase(g);
   };
   /** 廃村: 試合を打ち切って全員をルームへ戻す（押し間違い防止に、もう一度確認する） */
   ui.confirmAbandon = function () {
-    const g = ONW.game, same = ui._skipPhase === g.phase;
+    const g = ONW.game, same = ui._skipPhase === skipPhase(g);
     if (!window.confirm("廃村にしますか？\nこの試合は勝者も敗者もなしで終わり、最終結果（廃村）が表示されます。")) return;
     ui.closeSkip();
     if (same && canSkip(g)) ONW.net.abandonGame();
   };
   /** ロビーに戻る: 試合を打ち切って、結果発表を出さずに全員をすぐロビーへ戻す（押し間違い防止に、もう一度確認する） */
   ui.confirmToLobby = function () {
-    const g = ONW.game, same = ui._skipPhase === g.phase;
+    const g = ONW.game, same = ui._skipPhase === skipPhase(g);
     if (!window.confirm("ロビーに戻りますか？\nこの試合は結果発表なしで終わり、全員がロビーに戻ります。")) return;
     ui.closeSkip();
     if (same && canSkip(g)) ONW.net.abandonToLobby();
   };
   /** 朝に / 昼前に / 昼に / 夕に: その時点まで一気に進める（先へ進むだけ） */
   ui.jumpSkip = function (key) {
-    const g = ONW.game, same = ui._skipPhase === g.phase;
+    const g = ONW.game, same = ui._skipPhase === skipPhase(g);
     ui.closeSkip();
     if (same && canSkip(g)) ONW.net.jumpTo(key);
   };
   ui.confirmSkip = function () {
-    const g = ONW.game, same = ui._skipPhase === g.phase;
+    const g = ONW.game, same = ui._skipPhase === skipPhase(g);
     ui.closeSkip();
     if (same && canSkip(g)) ONW.net.hostNext();   // 確認中にフェーズが変わっていたら何もしない（二重スキップ防止）
   };
   /** 画面が切り替わった / ホストでなくなったら確認を閉じる（render のたびに呼ぶ） */
   ui.updateSkip = function (game) {
-    if (document.getElementById("skip-confirm") && (!canSkip(game) || ui._skipPhase !== game.phase)) ui.closeSkip();
+    if (document.getElementById("skip-confirm") && (!canSkip(game) || ui._skipPhase !== skipPhase(game))) ui.closeSkip();
   };
   // タイマー（ヘッダーの残り時間 / PC版の大きなタイマー）のダブルタップを拾う。dblclick はスマホで不安定なので自前で判定
   (function () {

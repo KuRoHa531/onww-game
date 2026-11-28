@@ -159,6 +159,8 @@ body {
   cursor: pointer;
 }
 .upd-btn[hidden] { display: none; }
+.backhost-btn { top: calc(58px + env(safe-area-inset-top, 0px)); }
+.backhost-btn[disabled] { opacity: .55; cursor: default; }
 .upd-btn:hover { background: var(--gold); color: var(--bg-night); }
 
 /* ---- スタートゲート（開いた直後に出る「ゲームを始める」） ---- */
