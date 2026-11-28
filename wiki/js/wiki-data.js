@@ -611,7 +611,7 @@ window.ONW_WIKI_ROLES = [
     "name": "わら人形",
     "team": "village",
     "order": 9,
-    "desc": "夜行動はありません。死んだときに1人選んで道連れにします。",
+    "desc": "夜行動はありません。追放または道連れされたときに1人選んで道連れにします。",
     "achievements": [
       {
         "id": "first_straw_doll",
@@ -682,33 +682,13 @@ window.ONW_WIKI_ROLES = [
     "achievements": [
       {
         "id": "robber_steal_village",
-        "name": "村の力を盗む",
-        "desc": "怪盗で村人陣営役職を盗む。"
-      },
-      {
-        "id": "robber_steal_wolf",
-        "name": "狼の爪を盗む",
-        "desc": "怪盗で人狼陣営役職を盗む。"
-      },
-      {
-        "id": "robber_steal_third",
-        "name": "第三の道を盗む",
-        "desc": "怪盗で第三陣営役職を盗む。"
+        "name": "盗みの美学",
+        "desc": "怪盗で役職を盗む。"
       },
       {
         "id": "robbed_village",
-        "name": "村の力を奪われる",
-        "desc": "怪盗に村人陣営役職を盗まれる。"
-      },
-      {
-        "id": "robbed_wolf",
-        "name": "狼の爪を奪われる",
-        "desc": "怪盗に人狼陣営役職を盗まれる。"
-      },
-      {
-        "id": "robbed_third",
-        "name": "第三の道を奪われる",
-        "desc": "怪盗に第三陣営役職を盗まれる。"
+        "name": "怪盗の餌食",
+        "desc": "怪盗に役職を盗まれる。"
       },
       {
         "id": "first_robber",
@@ -717,8 +697,8 @@ window.ONW_WIKI_ROLES = [
       },
       {
         "id": "win_robber",
-        "name": "勝利を盗み取る",
-        "desc": "怪盗で勝利する。"
+        "name": "能ある鷹は爪を隠す",
+        "desc": "怪盗で盗まずに勝利する。（封印や鍵師、草むらなどでの失敗を除く）"
       },
       {
         "id": "robber_steal_detective",
@@ -733,7 +713,7 @@ window.ONW_WIKI_ROLES = [
       {
         "id": "robber_back_to_initial",
         "name": "元の鞘",
-        "desc": "怪盗で交換した結果、初期役職と同じ役職になる。"
+        "desc": "怪盗で交換したうえで最終的に怪盗で試合を終える。"
       }
     ],
     "kana": "かいとう"

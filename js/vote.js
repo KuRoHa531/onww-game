@@ -704,6 +704,9 @@ window.ONW = window.ONW || {};
     // 封印の狂人に封印されている人は、めくれても自動の効果（一目惚れの無理心中・猫又/黒猫/ネコカボチャ/わら人形の道連れ・アサシンの暗殺）が発動しない（2of4b。マイクラ版 resolveChainDeaths / triggeredAssassinIds）。賞金稼ぎはマイクラ版が封印を見ていないので対象外
     const sealedAct = (id, role) => role !== R.BOUNTY_HUNTER && ONW.seal.is(game, id);
     const loveDead = (id, role) => (game.chainKind[id] === "love" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.BOUNTY_HUNTER)) || (game.chainKind[id] === "lovers" && (ONW.TOMO_ROLES.includes(role) || role === R.ASSASSIN || role === R.BOUNTY_HUNTER || role === R.LOVE_TANNER));   // 無理心中で死んだ人は道連れ能力（わら人形・猫又・黒猫）・アサシンの暗殺・賞金稼ぎの指名が発動しない / 心中で死んだ人は、さらに一目惚れの連鎖も発動しない
+    // わら人形の発動条件（2026-11-28 作者決定。マイクラ版の「死んだとき」から変更）: 追放か道連れで死んだときだけ発動する。
+    //   追放 = 投票の追放集合（メンタル崩壊・ショック死・呪殺は追放に数えない）。爆殺・恨殺・王国滅亡・身代わり死などでは発動しない
+    const strawCauseOk = (id) => game.chainKind[id] === "tomo" || ((game.eliminated || []).includes(id) && !(game.mentalIds || []).includes(id) && !(game.shockIds || []).includes(id) && !(game.curseKillIds || []).includes(id));
     // 番犬の噛殺（マイクラ版 resolveChainDeaths）: 最終盤面の番犬（酔いが覚めている・昼中に死んでいない）が、自分の飼い主に投票していたら、飼い主を噛み殺す（kind: "bite"）。
     //   ・飼い主がすでに追放される / 昼中に死亡しているときは噛まない。噛み殺された人は道連れ・暗殺などの能力が発動しない（chain=false。恋人の心中・後追いは kill() が処理する）
     //   ・飼い主がネコカボチャなら、噛み返されて番犬も死ぬ（kind: "bite"・by = ネコカボチャ）。結果は game.dogBites = [{ by, target, back? }]（起きた順）
@@ -830,6 +833,7 @@ window.ONW = window.ONW || {};
         const role = E(game, id);
         if (loveDead(id, role) || sealedAct(id, role)) return;
         if (role === R.STRAW_DOLL) {
+          if (!strawCauseOk(id)) return;                                  // 追放・道連れ以外の死因では発動しない（2026-11-28 作者決定）
           const c = snap.filter((x) => x !== id);
           if (!c.length || c.every(immune)) return;                       // 道連れにできる人がいない（残りが全員タフガイなど）: 選ばずに終わり
           const t = game.strawTargets[id];
@@ -864,6 +868,7 @@ window.ONW = window.ONW || {};
         const role = E(game, id);
         if (loveDead(id, role) || sealedAct(id, role)) return;
         if (role === R.STRAW_DOLL) {
+          if (!strawCauseOk(id)) return;                                  // 追放・道連れ以外の死因では発動しない（2026-11-28 作者決定）
           const t = game.strawTargets[id];
           if (t && !done.has(t) && !gone.has(t)) take(t, id, "tomo");   // 同じ波の誰かがすでに巻き込んでいたら、そのまま
         } else if (role === R.ASSASSIN) {

@@ -16,8 +16,11 @@
       out.push("robber_steal_" + teamKey(seen));   // 奪った役職の陣営（村人/人狼/第三）
       if (seen === "detective") out.push("robber_steal_detective");   // 名探偵を奪った
       if (Object.entries(g.robberTarget || {}).some(([rid, tid]) => rid !== id && tid === id)) out.push("robber_robbed_after_steal");   // 盗んだあとに別の怪盗に盗まれた
-      if ((g.robberTarget || {})[id] && ini === fin) out.push("robber_back_to_initial");   // 交換したのに初期役職に戻った
+      if ((g.robberTarget || {})[id] && fin === "robber") out.push("robber_back_to_initial");   // 交換したうえで最終的に怪盗で試合を終えた（2026-11-28 作者決定で仕様変更。旧: 交換して初期役職に戻った）
     }
+    // 「勝利を盗み取る」の置き換え（2026-11-28 作者決定）: 盗まずに勝利する。交換が成功した記録（robberTarget）が無いことが条件。
+    // 封印・鍵師・草むらなどで交換が失敗した場合は成功記録が付かないので、盗んだうちに入らない（作者の注記どおり）
+    if (won && fin === "robber" && !(g.robberTarget || {})[id]) out.push("win_robber");
     for (const [rid, tid] of Object.entries(g.robberTarget || {})) {   // 盗まれた側
       if (tid === id && (g.robberSeen || {})[rid]) out.push("robbed_" + teamKey((g.robberSeen || {})[rid]));
     }

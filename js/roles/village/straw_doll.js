@@ -21,7 +21,7 @@
   ONW.defineRole("straw_doll", {
     achievements,   // 実績
     info: { deck: 20, name: "わら人形", team: ONW.TEAM.VILLAGE, wakeOrder: null, sort: 21,
-      desc: "村人陣営。夜行動はありません。死んだときに1人選んで道連れにします。" },
+      desc: "村人陣営。夜行動はありません。追放または道連れされたときに1人選んで道連れにします。" },
     groups: { tomo: 1, "transform:light_apostle": 8 },
   });
 })(window.ONW);

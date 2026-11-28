@@ -160,6 +160,7 @@
       const key = ROLE_KEY_BY_NAME.get(m[0]);
       if (key === selfKey) continue; // 自分の名前はリンクにしない
       if (m[0] === "神" && src[m.index - 1] === "精") continue; // 「精神」の神は役職ではない
+      if (src[m.index + m[0].length] === "陣") continue; // 「村人陣営」「人狼陣営」の陣営名は役職ではない（2026-11-28 作者報告）
       out += escapeHtml(src.slice(last, m.index));
       out += `<a class="wiki-role-link" href="#role-${key}" data-role-link="${key}">${escapeHtml(m[0])}</a>`;
       last = m.index + m[0].length;

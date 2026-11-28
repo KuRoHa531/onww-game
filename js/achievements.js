@@ -35,6 +35,8 @@ mind_wolf_find_wolf: "mind_wolf_find_village", mind_wolf_find_third: "mind_wolf_
 seen_by_mind_wolf_wolf: "seen_by_mind_wolf_village", seen_by_mind_wolf_third: "seen_by_mind_wolf_village",
 mad_seer_inspect_wolf: "mad_seer_inspect_village", mad_seer_inspect_third: "mad_seer_inspect_village",
 relic_steal_wolf: "relic_steal_village", relic_steal_third: "relic_steal_village",
+robber_steal_wolf: "robber_steal_village", robber_steal_third: "robber_steal_village",
+robbed_wolf: "robbed_village", robbed_third: "robbed_village",
 };
 const remapId = (id) => ACHV_REMAP[id] || id;
 const FIRST_BY_ROLE = {}, WIN_BY_ROLE = {};
