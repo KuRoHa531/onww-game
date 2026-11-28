@@ -999,7 +999,7 @@ window.ONW = window.ONW || {};
     };
     cats.forEach((id) => {
       const r = resolve(id, []), vs = votersOf(id);
-      info[id] = { ...r, team: ONW.isLover(game, id) ? "lover" : r.team, votes: vs.length, voters: vs };
+      info[id] = { ...r, team: ONW.isLover(game, id) ? "lover" : r.team, affTeam: r.team, votes: vs.length, voters: vs };   // affTeam: 恋人陣営に上書きされる前の所属陣営（実績の schrodinger_no_team / team_lost 判定用。MC版 schrodingerTeamKey は恋人でも所属陣営で判定する）
     });
     game.catInfo = info;
     return info;
@@ -1038,6 +1038,24 @@ window.ONW = window.ONW || {};
    */
   vote.deadSet = function deadSet(game) {
     return new Set([...(game.executed || []), ...(game.deadIds || [])]);
+  };
+
+  /**
+   * 実績用の「追放」判定（マイクラ版 isVoteExiledForAchievement 相当）: 投票でそのまま追放された人だけを数える。
+   * 追放トリガーの能力が道連れでも発動すること自体は仕様だが、実績のカウントでは追放と道連れを分ける（2026-11-28 作者決定）。
+   *   ・連鎖死（chainKind あり: 道連れ・心中・恨殺・身代わり連鎖など）は追放に数えない
+   *   ・メンタル崩壊・ショック死・呪殺、従者/マティアスの身代わり、タフガイのとばっちりで死んだ人も追放に数えない
+   */
+  vote.isVoteExiled = function isVoteExiled(game, id) {
+    if (!(game.eliminated || []).includes(id)) return false;
+    if ((game.chainKind || {})[id]) return false;
+    if ((game.mentalIds || []).includes(id)) return false;
+    if ((game.shockIds || []).includes(id)) return false;
+    if ((game.curseKillIds || []).includes(id)) return false;
+    if ((game.servantSubs || []).some((s) => s.servant === id)) return false;
+    if ((game.matthiasSubs || []).some((s) => s.d === id)) return false;
+    if ((game.toughBounces || []).some((b) => (b.to || []).includes(id))) return false;
+    return true;
   };
 
   /**

@@ -40,6 +40,7 @@ window.ONW = window.ONW || {};
   // ---- 役職CO ----
   co.roleMenu = () => set({ step: "role" });
   co.roleCo = function (role) {
+    if (role === "cosplayer" || role === "doppelganger" || role === "relic_robber") G().myViaRole = null;   // 変化役を新しくCOしたら、手にした役職の覚えは消す（COし直しで選び直せる）
     if (kindOf(role) && !coOf(role).noChain) {   // noChain: 結果がまだない状態でもCOだけで終われる役職（保安官: 撃つ前にCOする。撃ったあとで「結果開示」を押す）
       // 役職COのあと、同じ人がそのまま結果開示へ続ける（その間CPUは割り込まない）
       ONW.net.sendCo(`${rn(role)}CO`, null, role, "hold");
@@ -53,6 +54,8 @@ window.ONW = window.ONW || {};
   co.result = function () {
     const my = G().myCo;
     if (!my || String(my).startsWith("team:")) return set({ step: "msg", msg: "先に役職COをしてください。" });
+    const via = G().myViaRole;   // コスプレ・ドッペル・墓荒らしで手にした役職があるときは、その役職の結果開示を開く（マイクラ版の resultRole と同じ）
+    if ((my === "cosplayer" || my === "doppelganger" || my === "relic_robber") && via && kindOf(via)) return startResult(kindOf(via));
     if (kindOf(my)) return startResult(kindOf(my));
     set({ step: "msg", msg: "あなたがCOしている役職には結果開示が必要ありません。" });
   };
@@ -66,14 +69,57 @@ window.ONW = window.ONW || {};
     if (!c || c.noChain) return null;
     if (c.kind === "relic") return via === "doppel" || via === "cosplay" ? c.kind : null;   // コスプレイヤーが墓荒らしにコスプレしたときも、墓地の交換結果 → 手にした役職の結果へ続く
     if (c.kind === "doppel") return via === "relic" ? c.kind : null;
+    if (c.kind === "bell" || c.kind === "donut" || c.kind === "hokma") return c.kind;   // 夜の結果がその場で分かる役職は、変化で手にしたときも続けて開示できる（鈴の回数・ドーナツの配達・ホクマーの短縮）
     return ONW.cpu && ONW.cpu.hasChainResult && ONW.cpu.hasChainResult(role) ? c.kind : null;
   };
   function doneChain(args, role, via) {   // args: done と同じ [text, claim, setRole, flag, short]。手にした役職 role の結果開示があれば続ける
     const k = chainKindOf(role, via);
+    if (role && role !== "hide" && coOf(role)) G().myViaRole = role;   // 手にした役職を覚えておく（あとで「結果開示」を押すと、その役職の結果開示が開く。マイクラ版の resultRole と同じ考え方。続けられる役職も同じ）
     if (!k) return done(...args);
     ONW.net.sendCo(args[0], args[1], args[2], "holddisclose", args[4]);
     return startResult(k, true);
   }
+  // ---- シャッフル候補・コスプレ候補（マイクラ版 chooseRoleWithShuffleCosplay と同じ仕組み） ----
+  // シャッフラー/コスプレイヤーが初期役職にいる試合では、結果開示の役職選択の一番下に「シャッフル候補」「コスプレ候補」ボタンを足し、
+  // 配役にない役職（シャッフラーが変化させた・コスプレした結果として出た役職）も選べるようにする。
+  const initialHas = (role) => (G().deck || []).some((x) => (typeof x === "string" ? x : x.r) === role && !(typeof x === "object" && x.cand));   // フォールバック用: 配役の素の1枚にいるか（変化候補としてだけ載っている場合は数えない）
+  const candOn = (role, key) => { const cb = G().candBtn; return cb ? !!cb[key] : initialHas(role); };   // ボタンを出す条件はホストが配布時に決める（配役にいるか、光の使徒・銀色の影から出たときだけ。作者決定）
+  const candPools = () => {
+    const pools = [];
+    if (candOn("shuffler", "sh") && ONW.shuffler) pools.push({ key: "shuffle", label: "シャッフル候補", note: "シャッフラーが山札から引いて変化させた役職は、配役にない役職でも選べます。", roles: ONW.shuffler.pool() });
+    if (candOn("cosplayer", "co") && ONW.cosplayer) pools.push({ key: "cosplay", label: "コスプレ候補", note: "コスプレイヤーがコスプレした役職は、配役にない役職でも選べます。", roles: ONW.cosplayer.pool() });
+    return pools;
+  };
+  // 詩人・龍の狂人の候補は、夜に対象を選ぶ能力を持つ役職だけに絞る（マイクラ版 shuffleCosplayNarrowFilter と同じ。墓荒らしと自分自身は除く）
+  const candNarrow = (roles, caller) => roles.filter((r) => r !== "relic_robber" && r !== caller && (ONW.roleDef(r) || {}).night);
+  const candBtns = (apply) => candPools().map((p) => btn(`${p.label}から選ぶ`, `ONW.co.openCand('${p.key}', '${apply}')`)).join("");
+  co.openCand = function (key, apply) {
+    const p = candPools().find((x) => x.key === key);
+    if (!p) return;
+    const narrow = apply === "poetRole" ? "poet" : apply === "dragonRole" ? "dragon_madman" : null;
+    const base = { pool: key, label: p.label, note: p.note, roles: narrow ? candNarrow(p.roles, narrow) : p.roles, apply, backState: G().co, query: "" };
+    set({ ...base, step: key === "shuffle" ? "candteam" : "candlist" });   // シャッフル候補は陣営ごとに分かれる（マイクラ版と同じ: 陣営 → 人狼陣営は人狼系/狂人系 → 役職）
+  };
+  co.candTeam = function (team) { const s = G().co || {}; if (team === "wolf") return set({ ...s, step: "candkind", query: "" }); return set({ ...s, step: "candlist", team, kind: null, query: "" }); };
+  co.candKind = function (kind) { const s = G().co || {}; return set({ ...s, step: "candlist", team: "wolf", kind, query: "" }); };
+  co.candBack = () => { const s = G().co || {}; if (s.backState) set(s.backState); };
+  co.candListBack = function () { const s = G().co || {}; if (s.pool === "shuffle") return set({ ...s, step: s.kind ? "candkind" : "candteam", query: "" }); return co.candBack(); };   // シャッフル候補の一覧からは陣営選択へ戻る
+  co.candSearch = function (q) {   // 検索は再描画せず、その場でボタンを絞り込む（入力のフォーカスを保つため）
+    const s = G().co; if (s) s.query = q || "";
+    const host = document.getElementById("co-cand-roles"); if (!host) return;
+    const query = (q || "").trim();
+    host.querySelectorAll("[data-rname]").forEach((b) => { b.style.display = !query || b.getAttribute("data-rname").includes(query) ? "" : "none"; });
+    host.querySelectorAll("[data-teamhead]").forEach((h) => {
+      const t = h.getAttribute("data-teamhead");
+      h.style.display = [...host.querySelectorAll(`[data-rname][data-team="${t}"]`)].some((b) => b.style.display !== "none") ? "" : "none";
+    });
+  };
+  co.candPick = function (role) {
+    const s = G().co || {}, apply = s.apply, back = s.backState;
+    if (!apply || !back) return;
+    G().co = back;   // 選ぶ前の画面の状態（対象・墓地の選択など）に戻してから、その画面の決定処理に役職を渡す
+    return co[apply](role);
+  };
   /** 結果開示の最初の画面（種類ごと）。seer/robber: 相手を選ぶ / relic: 墓地を選ぶ / tm: 2人選ぶ / insom: 最終役職を選ぶ */
   function startResult(kind, chain) {
     if (kind === "relic") return set({ step: "rgrave", kind, chain });
@@ -212,21 +258,29 @@ co.poetPick = function (id) {
     else if (whimClaim()) set({ step: "gfail", sel });   // 気まぐれな占い師: 墓地を選び終わったら、まず成功したかどうかを聞く（マイクラ版の墓地開示と同じ）
     else set({ step: "grole", sel, k: 0, results: [], shorts: [] });
   };
-  co.graveOk = function () { const s = G().co; set({ step: "grole", sel: s.sel || [], k: 0, results: [], shorts: [] }); };   // 気まぐれな占い師の墓地開示: 成功 → 役職を選ぶ
-  co.graveFail = function () { return done("墓地を占いましたが失敗しました。", null, null, "disclose", "墓地 → 失敗"); };   // 気まぐれな占い師の墓地開示: 失敗
+  co.graveOk = function () { const s = G().co; set({ step: "grole", sel: s.sel || [], k: 0, results: [], shorts: [], chain: s.chain, again: s.again }); };   // 気まぐれな占い師の墓地開示: 成功 → 役職を選ぶ
+  co.graveFail = function () { ONW.net.sendCo("墓地を占いましたが失敗しました。", null, null, "holddisclose", "墓地 → 失敗"); return seerAgain(); };   // 気まぐれな占い師の墓地開示: 失敗（言い終わっても対象選択に戻る）
+  // 占い師系の開示は「対象を選ぶ」に戻って続けられる（プレイヤーの結果と墓地の結果を1回の流れで両方言える）。終わるときは「開示を終わる」
+  const seerAgain = () => set({ step: "target", kind: "seer", chain: true, again: true });
+  co.seerDone = () => { if (ONW.net.releaseCoHold) ONW.net.releaseCoHold(); set(null); };
   co.pickRole = function (role) {            // role: 役職ID or "hide" or "fail"（気まぐれな占い師の失敗）
     const s = G().co, who = nameOf(s.target);
-    if (role === "fail") return done(`${who} を占いましたが失敗しました。`, null, null, "disclose", `${who} → 失敗`);   // 気まぐれな占い師の結果開示: 失敗（マイクラ版の文面と同じ）
+    if (role === "fail") {   // 気まぐれな占い師の結果開示: 失敗（マイクラ版の文面と同じ）
+      if (s.kind === "seer") { ONW.net.sendCo(`${who} を占いましたが失敗しました。`, null, null, "holddisclose", `${who} → 失敗`); return seerAgain(); }
+      return done(`${who} を占いましたが失敗しました。`, null, null, "disclose", `${who} → 失敗`);
+    }
     const h = hookOfKind(s.kind) || hookOfKind("robber");   // 結果役職の文言は種類ごと(占い師・ドッペル・フリーター)。それ以外は怪盗と同じ形
     if (!h.pickRole) return done(...hookOfKind("robber").pickRole(role, who, s, K));
     if (s.kind === "doppel") return doneChain(h.pickRole(role, who, s, K), role, "doppel");   // ドッペル → コピーして手にした役職の結果
+    if (s.kind === "seer") { const a = h.pickRole(role, who, s, K); ONW.net.sendCo(a[0], a[1], a[2], "holddisclose", a[4]); return seerAgain(); }   // 占い師系: 言い終わっても対象選択に戻る（墓地の結果も続けて言える）
     return done(...h.pickRole(role, who, s, K));
   };
   co.graveRole = function (role) {
     const s = G().co, idx = s.sel[s.k];
     const results = [...s.results, `墓地${idx + 1} を見て ${rn(role)}`], shorts = [...(s.shorts || []), `墓地${idx + 1} → ${rn(role)}`];
     if (s.k + 1 < s.sel.length) return set({ ...s, k: s.k + 1, results, shorts });
-    done(`${results.join("、")} でした。`, null, null, "disclose", shorts.join("、"));
+    ONW.net.sendCo(`${results.join("、")} でした。`, null, null, "holddisclose", shorts.join("、"));   // 墓地の結果を言い終わっても対象選択に戻る（プレイヤーの結果も続けて言える）
+    return seerAgain();
   };
 
   co.history = () => set({ step: "history" });
@@ -343,17 +397,17 @@ co.poetPick = function (id) {
     if (!s) { el.innerHTML = ""; return; }
     const back = btn("戻る", "ONW.co.back()");
     let title = "COボタン", body = "";
-    if (s.step === "menu") body = btn("役職CO", "ONW.co.roleMenu()") + btn("結果開示", "ONW.co.result()") + btn("情報開示", "ONW.co.info()") + btn("CO履歴", "ONW.co.history()");
+    if (s.step === "menu") { const mb = (label, desc, fn) => `<button class="btn co-btn" onclick="${fn}">${label}<span class="co-btn__d">${desc}</span></button>`; body = mb("役職CO", "自分の役職を名乗る", "ONW.co.roleMenu()") + mb("結果開示", "能力の結果を言う", "ONW.co.result()") + mb("情報開示", "自分が受けたことを伝える", "ONW.co.info()") + mb("CO履歴", "みんなのCOを見る", "ONW.co.history()"); }
     else if (s.step === "role") {
       title = "役職CO";
       body = roleBtns("roleCo") + ["village", "wolf", "third"].map((t) => btn(`<span class="t-${t}">${{ village: "村人陣営CO", wolf: "人狼陣営CO", third: "第三陣営CO" }[t]}</span>`, `ONW.co.teamCo('${t}')`)).join("") + back;
     } else if (s.step === "msg") body = `<p class="night-step__hint">${esc(s.msg)}</p>` + back;
     else if (s.step === "target") {
       title = "結果開示";
-      body = `<p class="night-step__hint">${(hookOfKind(s.kind) || {}).targetLabel || "奪った相手"}を選んでください。</p>` +
+      body = `<p class="night-step__hint">${s.again ? "続けて開示できます。終わるときは「開示を終わる」を押してください。" : `${(hookOfKind(s.kind) || {}).targetLabel || "奪った相手"}を選んでください。`}</p>` +
         ((hookOfKind(s.kind) || {}).self ? btn("自分", `ONW.co.pickPlayer('${ONW.net.myId()}')`) : "") +   // 自分も選べる結果開示（シャッフラー）
         (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickPlayer('${p.id}')`)).join("") +
-        ((hookOfKind(s.kind) || {}).graves ? Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`)).join("") : "") + lockBtn(s.kind) + back;
+        ((hookOfKind(s.kind) || {}).graves ? Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickGrave(${i})`)).join("") : "") + lockBtn(s.kind) + (s.again ? btn("開示を終わる", "ONW.co.seerDone()") : "") + back;
     } else if (s.step === "gpick") {
       title = "結果開示";
       body = `<p class="night-step__hint">${s.sel.length + 1}枚目の墓地を選んでください。</p>` +
@@ -363,16 +417,16 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">墓地の占いは成功しましたか？</p>` + btn("成功", "ONW.co.graveOk()") + btn("失敗", "ONW.co.graveFail()") + back;   // 気まぐれな占い師の墓地開示だけ、役職の前に成功/失敗を聞く
     } else if (s.step === "prole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">${pn(nameOf(s.target))} ${(hookOfKind(s.kind) || {}).roleHint || "の結果役職"}を選んでください。</p>` + (((hookOfKind(s.kind) || {}).optionList) ? hookOfKind(s.kind).optionList().map((o) => btn(`<span class="t-${o.team}">${esc(o.label)}</span>`, `ONW.co.pickRole('${o.id}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : ((hookOfKind(s.kind) || {}).roleList) ? hookOfKind(s.kind).roleList().map((r) => btn(rc(r), `ONW.co.pickRole('${r}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : roleBtns("pickRole", btn("伏せる", "ONW.co.pickRole('hide')"))) + (whimClaim() ? btn("失敗", "ONW.co.pickRole('fail')") : "") + back;   // roleList: 配役ではなく、その役職固有の一覧から選ぶ結果開示（シャッフラーの山札）。気まぐれな占い師を名乗っているときは「失敗」も選べる
+      body = `<p class="night-step__hint">${pn(nameOf(s.target))} ${(hookOfKind(s.kind) || {}).roleHint || "の結果役職"}を選んでください。</p>` + (((hookOfKind(s.kind) || {}).optionList) ? hookOfKind(s.kind).optionList().map((o) => btn(`<span class="t-${o.team}">${esc(o.label)}</span>`, `ONW.co.pickRole('${o.id}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : ((hookOfKind(s.kind) || {}).roleList) ? hookOfKind(s.kind).roleList().map((r) => btn(rc(r), `ONW.co.pickRole('${r}')`)).join("") + btn("伏せる", "ONW.co.pickRole('hide')") : roleBtns("pickRole", btn("伏せる", "ONW.co.pickRole('hide')"))) + (whimClaim() ? btn("失敗", "ONW.co.pickRole('fail')") : "") + candBtns("pickRole") + back;   // roleList: 配役ではなく、その役職固有の一覧から選ぶ結果開示（シャッフラーの山札）。気まぐれな占い師を名乗っているときは「失敗」も選べる
     } else if (s.step === "grole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">墓地${s.sel[s.k] + 1} の役職を選んでください。</p>` + roleBtns("graveRole") + back;
+      body = `<p class="night-step__hint">墓地${s.sel[s.k] + 1} の役職を選んでください。</p>` + roleBtns("graveRole") + candBtns("graveRole") + back;
     } else if (s.step === "rgrave") {
       title = "結果開示";
       body = `<p class="night-step__hint">交換した墓地を選んでください。</p>` + Array.from({ length: G().graveCount || 0 }, (_, i) => btn(`墓地${i + 1}`, `ONW.co.pickRelicGrave(${i})`)).join("") + lockBtn(s.kind) + back;
     } else if (s.step === "rrole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">墓地${s.idx + 1} と交換して、新しくなった役職を選んでください。</p>` + roleBtns("relicRole", btn("伏せる", "ONW.co.relicRole('hide')")) + back;
+      body = `<p class="night-step__hint">墓地${s.idx + 1} と交換して、新しくなった役職を選んでください。</p>` + roleBtns("relicRole", btn("伏せる", "ONW.co.relicRole('hide')")) + candBtns("relicRole") + back;
     } else if (s.step === "crole") {
       title = "結果開示";
       const hc = hookOfKind("cosplay") || {};
@@ -439,7 +493,7 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("サムに変身していました", "ONW.co.pickSam()") + back;
     } else if (s.step === "magicrole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">奪った役職を選んでください。</p>` + roleBtns("magicRole", btn("伏せる", "ONW.co.magicRole('hide')")) + btn("ロックされていて失敗しました", "ONW.co.magicFail()") + back;
+      body = `<p class="night-step__hint">奪った役職を選んでください。</p>` + roleBtns("magicRole", btn("伏せる", "ONW.co.magicRole('hide')")) + candBtns("magicRole") + btn("ロックされていて失敗しました", "ONW.co.magicFail()") + back;
     } else if (s.step === "command") {
       title = "結果開示";
       body = `<p class="night-step__hint">結果を選んでください。</p>` + btn("統率の人狼として人狼陣営の配置を確認していました", "ONW.co.pickCommand()") + back;
@@ -456,7 +510,7 @@ co.poetPick = function (id) {
         (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.pickTm('${p.id}')`)).join("") + (s.sel.length ? "" : lockBtn(s.kind)) + back;
     } else if (s.step === "gcopy") {
       title = "結果開示";
-      body = `<p class="night-step__hint">${pn(nameOf(s.sel[0]))} の役職を ${pn(nameOf(s.sel[1]))} にコピーして、コピーした役職を選んでください。</p>` + roleBtns("gremlinRole", btn("伏せる", "ONW.co.gremlinRole('hide')")) + btn("2人を選び直す", "ONW.co.lockBack()") + back;
+      body = `<p class="night-step__hint">${pn(nameOf(s.sel[0]))} の役職を ${pn(nameOf(s.sel[1]))} にコピーして、コピーした役職を選んでください。</p>` + roleBtns("gremlinRole", btn("伏せる", "ONW.co.gremlinRole('hide')")) + candBtns("gremlinRole") + btn("2人を選び直す", "ONW.co.lockBack()") + back;
     } else if (s.step === "lock1") {
       title = "ロックされて失敗";
       const sf = (hookOfKind(s.kind) || {}).self;   // 自分も選べる結果開示（シャッフラー）
@@ -476,7 +530,7 @@ co.poetPick = function (id) {
         btn(s.sel.length ? "この人たちで確定" : "自分だけで確定", "ONW.co.masonDone()") + back;
     } else if (s.step === "poetrole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">能力を使われていた役職を選んでください。</p>` + poetRoleList().map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.poetRole('${x.r}')`)).join("") + btn("情報がなかった", "ONW.co.poetNone()") + back;
+      body = `<p class="night-step__hint">能力を使われていた役職を選んでください。</p>` + poetRoleList().map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.poetRole('${x.r}')`)).join("") + candBtns("poetRole") + btn("情報がなかった", "ONW.co.poetNone()") + back;
     } else if (s.step === "poettgt") {
       title = "結果開示";
       const two = (hookOfKind("poet") || { twoRoles: [] }).twoRoles.includes(s.role);
@@ -485,7 +539,7 @@ co.poetPick = function (id) {
         (G().others || []).map((p) => btn((s.sel.includes(p.id) ? "✓ " : "") + pn(p.name), `ONW.co.poetPick('${p.id}')`)).join("") + btn("役職を選び直す", "ONW.co.poetBack()") + back;
     } else if (s.step === "dragonrole") {
       title = "結果開示";
-      body = `<p class="night-step__hint">能力を使われていた役職を選んでください。</p>` + dragonRoleList().map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.dragonRole('${x.r}')`)).join("") + back;
+      body = `<p class="night-step__hint">能力を使われていた役職を選んでください。</p>` + dragonRoleList().map((x) => btn(rc(x.r) + (x.cand ? " (変化候補)" : ""), `ONW.co.dragonRole('${x.r}')`)).join("") + candBtns("dragonRole") + back;
     } else if (s.step === "dragontgt") {
       title = "結果開示";
       body = `<p class="night-step__hint">${rc(s.role)} の能力をあなたに使っていた人を選んでください。</p>` +
@@ -495,7 +549,9 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">一目惚れした相手を選んでください。</p>` + (G().others || []).map((p) => btn(pn(p.name), `ONW.co.pickLove('${p.id}')`)).join("") + back;
     } else if (s.step === "info") {
       title = "情報開示";
-      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedMenu()") + btn("反転されている", "ONW.co.reversedInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()") + btn("カクテルを渡された", "ONW.co.cocktailInfo()") + btn("ドーナツが届いた", "ONW.co.donutInfo()") + btn("テレパシストに接続された", "ONW.co.telepathistInfo()") + btn("草むらに隠れていた", "ONW.co.hiddenInfo()");
+      body = `<p class="night-step__hint">伝える情報を選んでください。</p>` +
+        `<div class="co-sub">自分が受けたこと</div>` + btn("訪問された", "ONW.co.visited()") + btn("フリーターに就職されている", "ONW.co.freeterInfo()") + btn("従者がいる", "ONW.co.servantInfo()") + btn("囁かれていた", "ONW.co.whisperInfo()") + btn("カクテルを渡された", "ONW.co.cocktailInfo()") + btn("ドーナツが届いた", "ONW.co.donutInfo()") + btn("テレパシストに接続された", "ONW.co.telepathistInfo()") + btn("草むらに隠れていた", "ONW.co.hiddenInfo()") +
+        `<div class="co-sub">自分の役職への影響</div>` + btn("役職が変わっている", "ONW.co.changedInfo()") + btn("ロックされて失敗した", "ONW.co.lockFailed()") + btn("封印されていた", "ONW.co.sealedMenu()") + btn("反転されている", "ONW.co.reversedInfo()");
     } else if (s.step === "sealedby") {
       title = "封印されていた";
       body = `<p class="night-step__hint">どちらに封印されていましたか？</p>` + btn("封印の狂人に封印されていた", "ONW.co.sealedInfo()") + btn("エルフリンデに封印されていた", "ONW.co.sealedInfoElf()") + back;
@@ -528,10 +584,32 @@ co.poetPick = function (id) {
       body = `<p class="night-step__hint">元々の状態を選んでください。</p>` + btn("元々後覚者であった", "ONW.co.insomOrig('same')") + btn("別の役職から後覚者になった", "ONW.co.insomOrig('other')") + back;
     } else if (s.step === "iorole") {
       title = "元々の役職";
-      body = `<p class="night-step__hint">元々の役職を選んでください。</p>` + roleBtns("insomOrigRole", "", ["insomniac"]) + back;
+      body = `<p class="night-step__hint">元々の役職を選んでください。</p>` + roleBtns("insomOrigRole", "", ["insomniac"]) + candBtns("insomOrigRole") + back;
     } else if (s.step === "ichg") {
       title = "変化後の役職";
-      body = `<p class="night-step__hint">変化していた役職を選んでください。</p>` + roleBtns("insomChanged", "", ["insomniac"]) + back;
+      body = `<p class="night-step__hint">変化していた役職を選んでください。</p>` + roleBtns("insomChanged", "", ["insomniac"]) + candBtns("insomChanged") + back;
+    } else if (s.step === "candteam") {
+      title = s.label || "候補";
+      body = `<p class="night-step__hint">${esc(s.note || "")}まず陣営を選んでください。</p>` + btn("村人陣営", "ONW.co.candTeam('village')") + btn("人狼陣営", "ONW.co.candTeam('wolf')") + btn("第三陣営", "ONW.co.candTeam('third')") + btn("戻る", "ONW.co.candBack()");
+    } else if (s.step === "candkind") {
+      title = s.label || "候補";
+      body = `<p class="night-step__hint">人狼系か狂人系を選んでください。</p>` + btn("人狼系", "ONW.co.candKind('wolf')") + btn("狂人系", "ONW.co.candKind('mad')") + btn("陣営を選び直す", "ONW.co.candListBack()");
+    } else if (s.step === "candlist") {
+      title = s.label || "候補";
+      let rs = [...(s.roles || [])];
+      if (s.pool === "shuffle" && s.team) {   // シャッフル候補: 選んだ陣営（人狼陣営は人狼系/狂人系）だけに絞った一覧
+        rs = rs.filter((r) => (ONW.roles.getInfo(r) || {}).team === s.team);
+        if (s.team === "wolf") rs = rs.filter((r) => (s.kind === "mad") === (ONW.MAD_KIND || []).includes(r));
+        rs.sort((a, b) => ONW.roleRank(a) - ONW.roleRank(b));
+      } else rs.sort((a, b) => teamRank(a) - teamRank(b) || ONW.roleRank(a) - ONW.roleRank(b));
+      const rbtn = (r) => `<button class="btn co-btn" data-rname="${esc(rn(r))}" data-team="${(ONW.roles.getInfo(r) || {}).team}" onclick="ONW.co.candPick('${r}')">${rc(r)}</button>`;
+      const list = s.pool === "shuffle"
+        ? rs.map(rbtn).join("")
+        : [["village", "村人陣営"], ["wolf", "人狼陣営"], ["third", "第三陣営"]].map(([t, tn]) => { const gr = rs.filter((r) => (ONW.roles.getInfo(r) || {}).team === t); return gr.length ? `<div class="co-sub" data-teamhead="${t}">${tn}</div>` + gr.map(rbtn).join("") : ""; }).join("");
+      body = `<p class="night-step__hint">${esc(s.note || "")}</p>` +
+        `<input class="onw-input co-search" type="text" placeholder="役職名で検索" value="${esc(s.query || "")}" oninput="ONW.co.candSearch(this.value)">` +
+        `<div id="co-cand-roles" style="display:contents">${list}</div>` +
+        (rs.length ? "" : `<p class="night-step__hint">候補となる役職がありません。</p>`) + btn("戻る", "ONW.co.candListBack()");
     } else if (s.step === "history") {
       title = "CO履歴";
       body = `<div class="co-hist">${ONW.ui.coTable()}</div>` + back;

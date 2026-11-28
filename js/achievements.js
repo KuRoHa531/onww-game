@@ -283,12 +283,13 @@ return res;
 
 function basicJudge(g, won, add) {
 const players = g.players || [], ids = players.map((p) => p.id);
-const dead = new Set([...(g.eliminated || []),...(g.deadIds || []),...(g.dukeDead || [])]);
-let counts = {};
-try { counts = ONW.vote.tally(g) || {};} catch (e) { counts = {};}
+const dead = new Set([...ONW.vote.deadSet(g), ...(g.dukeDead || [])]);   // 死者 = 結果の死亡者全員（追放＋連鎖死＋昼死。vote.deadSet が唯一の定義。以前は連鎖死が抜けて生存扱いになっていた）
+const votes = g.votes || {};
+// 票数の実績は生の投票（1人1票）で数える（マイクラ版 achievementVoteCounts。重み・ペンギン・交換・煽動などの実効集計は使わない）
+const counts = {};
+Object.values(votes).forEach((t) => { if (t) counts[t] = (counts[t] || 0) + 1; });
 const top = Math.max(0,...ids.map((id) => counts[id] || 0));
 const topIds = ids.filter((id) => top > 0 && (counts[id] || 0) === top);
-const votes = g.votes || {};
 const castTargets = Object.values(votes).filter(Boolean);
 const trailOf = (id) => {
 const t = [g.initialRoles && g.initialRoles[id],...(((g.roleTrail || {})[id]) || [])];
@@ -334,7 +335,7 @@ if (cardAfter === cardBefore && BASES.has(stages[i - 1])) continue;   // カー�
 kittenMoves++;
 }
 }
-const onlyBases = players.length > 0 && players.every((p) => ["light_apostle", "dark_avatar", "silver_shadow"].includes((g.initialRoles || {})[p.id]));
+const onlyBases = players.length > 0 && players.every((p) => ["light_apostle", "dark_avatar", "silver_shadow"].includes((g.initialRoles || {})[p.id])) && (g.center || []).every((c) => ["light_apostle", "dark_avatar", "silver_shadow"].includes(c && typeof c === "object" ? c.role : c));   // 墓地（中央）のカードも全部変化の素でないと付かない（マイクラ版 isOnlyTransformBaseRolesMatch）
 const loverPartners = (id) => {
 if (!ONW.loverPairs) return [];
 const s = new Set();
@@ -349,7 +350,7 @@ const ini = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
 add(id, "first_participation");
 if (w) add(id, "first_win"); else add(id, "first_loss");
 if (votes[id]) add(id, "first_vote");
-if ((g.eliminated || []).includes(id)) add(id, "first_exile");
+if (ONW.vote.isVoteExiled(g, id)) add(id, "first_exile");   // 追放のカウントは道連れ等と分ける（vote.isVoteExiled。2026-11-28 作者決定）
 if (alive) add(id, "first_survive"); else add(id, "first_death");
 if ((g.sheriffShots || []).some((e) => e && e.mode === "execute" && ((e.victims || []).includes(id) || e.target === id))) add(id, "executed_by_sheriff");
 if (topIds.length >= 2) add(id, "vote_close_game");
@@ -357,10 +358,9 @@ if (castTargets.length && castTargets.every((t) => t === id)) add(id, "unanimous
 if ((counts[id] || 0) >= 3) add(id, "suspected");
 if (alive && (counts[id] || 0) <= 0) add(id, "no_vote_survive");
 const myT = votes[id];
-if (myT && topIds.length === 1 && topIds[0] === myT && (g.eliminated || []).includes(myT)) {
-let myW = 1; try { myW = ONW.vote.weightOf(g, id);} catch (e) {}
+if (myT && topIds.length === 1 && topIds[0] === myT) {
 const maxRest = Math.max(0,...ids.filter((x) => x!== myT).map((x) => counts[x] || 0));
-if ((counts[myT] || 0) - myW <= maxRest) add(id, "deciding_vote");
+if ((counts[myT] || 0) - 1 <= maxRest) add(id, "deciding_vote");   // 自分の生の1票を引いて決め手か判定（マイクラ版 didDecideVoteForAchievement）
 }
 if (!dead.size) add(id, "peaceful_morning"); // 説明文どおり「誰も死亡せず」（MC版は追放者だけで判定していたのを修正）
 if (dead.size >= 3) add(id, "catastrophe");
@@ -391,7 +391,7 @@ if (teams.has("village") && teams.has("wolf")) add(id, "lover_forbidden_love");
 if (alive && players.filter((q) =>!dead.has(q.id)).every((q) => ONW.isLover(g, q.id))) add(id, "lover_only_world");
 }
 // 妖狐投票の同数最多追放（結果オブジェクトの history.foxTie と同じ条件）
-if (fin === "fox" && g.foxVote && (g.foxVote.executedIds || []).includes(id) && (g.foxVote.topIds || []).length >= 2 && (g.foxVote.topIds || []).includes(id)) add(id, "fox_vote_tie_exile");
+if (fin === "fox" && g.foxVote && (g.foxVote.executedIds || []).includes(id) && (g.foxVote.topIds || []).length >= 2) add(id, "fox_vote_tie_exile");   // 同点で追放された妖狐（本人が同点トップにいることは MC では要求されない）
 // 反転された回数
 const rev = ONW.reverser? ONW.reverser.count(g, id): 0;
 if (rev > 0) add(id, "reversed_once");
@@ -401,12 +401,13 @@ if (ini === "fanatic" && fin === "madman") add(id, "fanatic_to_madman");
 // シュレディンガーの猫
 if (fin === "schrodinger_cat") {
 const ci = (g.catInfo || {})[id];
-const hasTeam =!!(ci && ((ci.votes || 0) >= 1 || ci.fixed) && ci.team && ci.team!== "lover");
+const aff = ci && (ci.affTeam || ci.team);   // 所属陣営（恋人上書き前）。ループ・ヴァニティ固定は MC では「無所属」扱い
+const hasTeam =!!(ci && ((ci.votes || 0) >= 1 || ci.fixed) && ["village", "wolf", "third"].includes(aff));
 if (!hasTeam) add(id, "schrodinger_no_team"); else if (!w) add(id, "schrodinger_team_lost");
 }
 // 女王が2人とも生存勝利 / 名探偵が2人以上同時勝利 / 番犬の飼い主が女王で勝利
 if (fin === "queen" && w && players.filter((q) => (g.currentRoles || {})[q.id] === "queen" &&!dead.has(q.id)).length >= 2) add(id, "queen_two_crowns");
-if (fin === "detective" && w && players.filter((q) => (g.currentRoles || {})[q.id] === "detective" && won.has(q.id)).length >= 2) add(id, "detective_duo_win");
+if (fin === "detective" && w && players.filter((q) => (g.currentRoles || {})[q.id] === "detective" && won.has(q.id) && (g.detectiveSuccess || {})[q.id]).length >= 2) add(id, "detective_duo_win");   // 推理に成功した名探偵の勝者が2人以上（マイクラ版 successfulDetectiveWinnerCount）
 if (fin === "watchdog" && w && ONW.watchdog && ONW.watchdog.pairs(g).some(([wd, ow]) => wd === id && (g.currentRoles || {})[ow] === "queen")) add(id, "watchdog_queen_win");
 // 道化の爆弾魔: どの陣営と勝ったか
 if (fin === "jester_bomber" && w) {
