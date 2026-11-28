@@ -167,9 +167,22 @@
     return out + escapeHtml(src.slice(last));
   }
 
-  /** 役職リンクの飛び先: 検索・絞り込みを解除してカードを開き、スクロールして光らせる */
-  function jumpToRole(key) {
+  // 役職リンクで移動した履歴(戻るボタン用)。リンクで飛んだときだけ積む
+  const navStack = [];
+  const $back = document.getElementById("wiki-back");
+  function syncBackBtn() { if ($back) $back.hidden = navStack.length === 0; }
+  if ($back) {
+    $back.addEventListener("click", () => {
+      const prev = navStack.pop();
+      syncBackBtn();
+      if (prev) jumpToRole(prev);
+    });
+  }
+
+  /** 役職リンクの飛び先: 検索・絞り込みを解除してカードを開き、スクロールして光らせる。fromKey は移動元の役職(戻る用) */
+  function jumpToRole(key, fromKey) {
     if (!roles.some((r) => r.key === key)) return;
+    if (fromKey && fromKey !== key) { navStack.push(fromKey); syncBackBtn(); }
     state.query = "";
     $search.value = "";
     if (state.filter !== "all") { state.filter = "all"; buildFilters(); }
@@ -468,7 +481,8 @@
     const a = e.target && e.target.closest ? e.target.closest("[data-role-link]") : null;
     if (!a) return;
     e.preventDefault();
-    jumpToRole(a.dataset.roleLink);
+    const card = a.closest("[data-card]");
+    jumpToRole(a.dataset.roleLink, card ? card.dataset.card : null);
   });
 
   buildFilters();

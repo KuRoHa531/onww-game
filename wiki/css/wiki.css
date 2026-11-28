@@ -167,6 +167,27 @@
   border-bottom-color: transparent;
 }
 
+/* 役職リンクで移動したときだけ出る「戻る」ボタン */
+.wiki-back {
+  position: fixed;
+  left: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--gold-dim);
+  background: var(--bg-panel-raised);
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  cursor: pointer;
+}
+
+.wiki-back:hover {
+  border-color: var(--gold);
+}
+
 /* リンクで飛んだ先のカードを一瞬光らせる */
 @keyframes wiki-card-flash {
   0% { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(217, 196, 143, .45); }
