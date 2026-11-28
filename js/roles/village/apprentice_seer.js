@@ -108,7 +108,7 @@
       // 占い師と同じ人を占った（マイクラ版 apprenticeSeerSameTargetAsSeer。Web版は観測ログの「占い師が使われた記録」で判定）
       const seerTargets = new Set((g.observeLog || []).filter((e) => e.role === "seer" && e.from !== id).flatMap((e) => e.players || []));
       if (seerTargets.has(d.targetId)) out.push("apprentice_seer_same_target_as_seer");
-      if (d.isWolfResult && (g.executed || []).includes(d.targetId) && won) out.push("apprentice_seer_black_result_exiled");   // 人狼と占った人が追放されて勝利（マイクラ版 isVoteExiledForAchievement 相当として g.executed で判定）
+      if (d.isWolfResult && ONW.vote.isVoteExiled(g, d.targetId) && won) out.push("apprentice_seer_black_result_exiled");   // 人狼と占った人が追放されて勝利（マイクラ版 isVoteExiledForAchievement 相当。道連れ死は追放に数えない）
     }
     return out;
   }

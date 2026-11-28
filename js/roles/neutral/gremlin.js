@@ -25,6 +25,7 @@
       return;
     }
     if (ONW.keymaster.blocks(g, sp.b)) {   // 鍵師のロック: コピー先の席がロック中（A.A.なら逆に、ロックされていない）なら弾かれて失敗（コピーしない・追加勝利の記録もしない）
+      (g.gremlinSourceTarget = g.gremlinSourceTarget || {})[p.id] = sp.a;   // 実績用: ロックで失敗してもコピー元の記録は残す（マイクラ版準拠。コピー系の実績は成否を問わない）
       i.mode = "gremlin"; i.keyFail = { kind: ONW.keymaster.kindOf(g, sp.b), from: a, to: b };
       n.hold(p.id, ONW.keymaster.fail(g, p.id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${label} ${p.name}`));
       ONW.watcher.keyFailShown(g, p.id, [b], [sp.b]);
@@ -56,14 +57,16 @@
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
-    if (fin === "gremlin" && (g.gremlinSuccess || {})[id]) {
-      const copied = (g.gremlinCopiedRole || {})[id];
-      if (copied) {
-        out.push("gremlin_copy_" + teamKey(copied));
-        if (["freeter", "servant", "reverser"].includes(copied)) out.push("gremlin_copy_dependency_despair");
-        if (copied === "loser") out.push("gremlin_copy_loser");
-      }
+    if (fin === "gremlin") {
       const src = (g.gremlinSourceTarget || {})[id];
+      if (src) {   // コピー系は成否を問わず、コピー元の「最終役職」で判定（マイクラ版 gremlinCopiedRole 準拠。ロックで失敗しても付く）
+        const copied = roleOf(src);
+        if (copied) {
+          out.push("gremlin_copy_" + teamKey(copied));
+          if (["freeter", "servant", "reverser"].includes(copied)) out.push("gremlin_copy_dependency_despair");
+          if (copied === "loser") out.push("gremlin_copy_loser");
+        }
+      }
       if (src && (g.doppelCopy || {})[src]) out.push("gremlin_copy_copied_doppel");
     }
     return out;
@@ -137,7 +140,7 @@
         const [a, b] = c.selOf(p).players; if (!a || !b || a === b) return;   // a, b = 選んだ2人（文章・演出・ログ・記録はこの2人で出す）
         const sp = ONW.watcher.shiftPair(g, p.id, a, b);   // 静観者を選んだら、実際にコピー元・コピー先になる席は別の人（選んだ本人には静観者を選んだように見える。docs/watcher.md）
         if (!sp.ok) { c.hold(p.id, ONW.watcher.noneLine("入れ替え")); return; }   // 移す先が足りなければコピーしない（新聞・観測にも載らない）
-        if (ONW.keymaster.blocks(g, sp.b)) { c.hold(p.id, ONW.keymaster.fail(g, p.id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [b], [sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: コピー先の席がロック中なら失敗。コピーせず、追加勝利の記録・新聞・観測にも載らない
+        if (ONW.keymaster.blocks(g, sp.b)) { (g.gremlinSourceTarget = g.gremlinSourceTarget || {})[p.id] = sp.a; c.hold(p.id, ONW.keymaster.fail(g, p.id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${rn(c.eff(p))} ${p.name}`)); ONW.watcher.keyFailShown(g, p.id, [b], [sp.b]); c.rev[p.id] = ONW.keymaster.failRev(g, p.id, p.id); return; }   // 鍵師のロック: コピー先の席がロック中なら失敗。コピーせず、追加勝利の記録・新聞・観測にも載らない（実績用にコピー元の記録だけ残す）
         if (ONW.moses) ONW.moses.before(g, p.id, [sp.a], [a, b]);   // モーゼス: コピー元に +1 してからコピー
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, p.id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（コピー元・コピー先の両方）
         const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b);
@@ -157,7 +160,7 @@
         const [a, b] = c.players;   // a, b = 選んだ2人（文章・演出はこの2人）
         const sp = ONW.watcher.shiftPair(g, id, a, b);   // 静観者を選んだら、実際にコピー元・コピー先になる席は別の人（墓荒らし・ドッペル・酔い覚め経由でも同じ）
         if (!sp.ok) return { lines: [ONW.watcher.noneLine("入れ替え")], reveal: null, nextChain: null, failed: true };
-        if (ONW.keymaster.blocks(g, sp.b)) { const fl = ONW.keymaster.fail(g, id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [b], [sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }   // 朝のうち・酔い覚めにもロックは効く
+        if (ONW.keymaster.blocks(g, sp.b)) { (g.gremlinSourceTarget = g.gremlinSourceTarget || {})[id] = sp.a; const fl = ONW.keymaster.fail(g, id, ONW.keymaster.kindOf(g, sp.b), "コピー", [b], `${c.label} ${c.me.name}`); ONW.watcher.keyFailShown(g, id, [b], [sp.b]); return { lines: [fl], reveal: ONW.keymaster.failRev(g, id, id), nextChain: null, failed: true }; }   // 朝のうち・酔い覚めにもロックは効く（実績用にコピー元の記録だけ残す）
         if (ONW.moses) ONW.moses.before(g, id, [sp.a], [a, b]);   // モーゼス: コピー元に +1 してからコピー
         if (ONW.dragonMadman) ONW.dragonMadman.before(g, id, [sp.a, sp.b], [a, b]);   // 龍の狂人: 役職が変わる前に、実際に効く席で逆鱗を判定する（コピー元・コピー先の両方）
         const seen = g.currentRoles[sp.a], got = ONW.gremlinCopy(g, sp.a, sp.b);   // 朝の時点のコピー元の役職を、コピー先にコピー

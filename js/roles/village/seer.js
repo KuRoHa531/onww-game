@@ -24,7 +24,7 @@
       const seerTargets = new Set(Object.values(g.seerData || {}).filter((d) => d && d.role === "seer" && d.targetId).map((d) => d.targetId));
       if (Object.values(g.seerData || {}).some((d) => d && d.role === "mad_seer" && d.targetId && seerTargets.has(d.targetId))) out.push("seer_mad_seer_same_target");
     }
-    if ((ini === "mad_seer" || fin === "mad_seer") && data && data.role === "mad_seer" && data.targetId) {
+    if (fin === "mad_seer" && data && data.role === "mad_seer" && data.targetId) {   // 狂った占い師の実績は最終役職が狂った占い師のときだけ（マイクラ版準拠）
       out.push("mad_seer_inspect_" + teamKey(actualOf(data.targetId)));
       if (actualOf(data.targetId) === "fox" && (g.foxCursed || []).includes(data.targetId)) out.push("mad_seer_curse_fox");
       if (actualOf(data.targetId) === "fox_marked" && (g.foxCursed || []).includes(data.targetId)) out.push("mad_seer_curse_fox_marked");

@@ -83,6 +83,10 @@
     const line = failLine(kind, verb, two);
     (g.keyFails = g.keyFails || {})[ONW.cardAt(g, actor)] = { kind, verb, targets: [...(targets || [])], locked: kind === "self" ? [actor] : (targets || []).filter((t) => blocks(g, t)) };
     (g.keyBlockedActors = g.keyBlockedActors || {})[actor] = true;   // 実績用: ロックで役職変化に失敗した人（追加記録のみ）   // 弾かれた席（A.A.に弾かれた席も、ロックに弾かれた席と同じ見え方: 🔒に弾かれる）
+    // 実績 keymaster_block_change / locked_change_failed 用（マイクラ版 roleChangeBlockedByLock 相当）: 対象は「ドッペルゲンガーのコピー失敗」と「シャッフラーが自分自身を対象にして弾かれた失敗」だけ
+    const aRole = (g.currentRoles || {})[actor];
+    if (aRole === "doppelganger") (g.keyDoppelBlocked = g.keyDoppelBlocked || {})[actor] = true;
+    if (aRole === "shuffler" && (targets || []).includes(actor)) (g.keyShufflerSelfBlocked = g.keyShufflerSelfBlocked || {})[actor] = true;
     const tn = (targets || []).map((t) => nm(g, t)).join(" と ");
     g.nightLogsAll.push(kind === "self" ? `${label} は 自身の役職がロックされていたため${verb}に失敗しました。` : `${label} は ${tn} の役職がロックされていたため${verb}に失敗しました。`);
     return line;
@@ -153,16 +157,17 @@
     const players = g.players || [];
     const locks = (g.keyLog || []).filter((e) => e && e.action === "lock");
     const myLock = locks.filter((e) => e.by === id).pop();
+    const blockedByLock = (pid) => !!((g.keyDoppelBlocked || {})[pid] || (g.keyShufflerSelfBlocked || {})[pid]);   // マイクラ版 roleChangeBlockedByLock（ドッペルのコピー失敗・シャッフラーの自分対象失敗のみ）
     if (has("keymaster") && myLock) {
       const t = myLock.target;
       if (t && ((g.initialRoles || {})[t] === "aa" || (g.currentRoles || {})[t] === "aa")) out.push("keymaster_unlock_aa");
-      if (t === id) out.push("keymaster_lock_self");
-      if (t && t !== id) out.push("keymaster_lock_other");
-      if (t && (g.keyBlockedActors || {})[t]) out.push("keymaster_block_change");
+      if (fin === "keymaster" && t === id) out.push("keymaster_lock_self");   // 自分/他人ロックは最終役職が鍵師のときだけ（マイクラ版準拠）
+      if (fin === "keymaster" && t && t !== id) out.push("keymaster_lock_other");
+      if (t && blockedByLock(t)) out.push("keymaster_block_change");
       if (t && (g.sealedBy || {})[t]) out.push("keymaster_full_lockdown");
     }
     if (has("keymaster") && locks.length && Object.keys(g.keyBlockedActors || {}).some((pid) => (g.initialRoles || {})[pid] === "shuffler" || (g.currentRoles || {})[pid] === "shuffler")) out.push("keymaster_stop_shuffler");
-    if ((g.keyBlockedActors || {})[id]) out.push("locked_change_failed");   // ロックで役職変化に失敗した側（役職ゲートなし）
+    if (blockedByLock(id)) out.push("locked_change_failed");   // ロックで役職変化に失敗した側（ドッペルのコピー失敗・シャッフラーの自分対象失敗のみ。マイクラ版準拠）
     return out;
   }
 

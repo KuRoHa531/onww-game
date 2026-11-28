@@ -90,8 +90,8 @@
     if (data.targetId && (g.votes || {})[id] === data.targetId) {
       const t = data.seen && ONW.ROLE_INFO[data.seen] && ONW.ROLE_INFO[data.seen].team;
       if (t === ONW.TEAM.VILLAGE) out.push("fake_seer_vote_village_result");   // 村結果に投票
-      if (matched && (g.executed || []).includes(data.targetId)) out.push("fake_seer_truth_exiled");   // 本当の結果で追放
     }
+    if (matched && data.targetId && ONW.vote.isVoteExiled(g, data.targetId)) out.push("fake_seer_truth_exiled");   // 本当の結果で追放（自分の投票は不問・道連れ死は追放に数えない。マイクラ版準拠）
     if (data.mode === "grave" && (data.graves || []).filter((x) => x.seen === x.actualSeen).length >= 2) out.push("fake_seer_twice_correct");   // 2回連続で本当
     return out;
   }

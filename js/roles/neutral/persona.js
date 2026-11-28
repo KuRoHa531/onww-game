@@ -182,11 +182,8 @@
     const out = [], ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
     if (ini === ID || cur === ID) out.push("first_persona");
     if (cur === ID && won) out.push("win_persona");
-    const trail = (g.roleTrail || {})[id] || [];
-    if (ini === ID && cur !== ID && trail.length) {   // 怪盗にペルソナを盗まれた（近似: 自分はペルソナから変わり、誰かの履歴に「怪盗 → ペルソナ」がある）
-      const stolen = (g.players || []).some((q) => { const t = (g.roleTrail || {})[q.id] || []; return t.some((r, k) => r === ID && k > 0 && t[k - 1] === "robber") || ((g.initialRoles || {})[q.id] === "robber" && (g.currentRoles || {})[q.id] === ID); });
-      if (stolen) out.push("persona_stolen_by_robber");
-    }
+    // 怪盗にペルソナを盗まれた: 誰かの怪盗が自分を交換相手に選び、奪った役職がペルソナだった（マイクラ版 robberTarget / robberSeen 準拠。自分の初期・最終役職は不問）
+    if (Object.keys(g.robberTarget || {}).some((r) => (g.robberTarget || {})[r] === id && (g.robberSeen || {})[r] === ID)) out.push("persona_stolen_by_robber");
     return out;
   }
 

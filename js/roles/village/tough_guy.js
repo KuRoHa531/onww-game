@@ -15,8 +15,8 @@
     const players = g.players || [];
     const bounced = (g.toughBounces || []);
     if (fin === "tough_guy" && !exiled(id)) {
-      let cnt = 0; try { cnt = (ONW.vote.tally(g) || {})[id] || 0; } catch (e) {}
-      if (cnt > 0 && bounced.some((b) => b && (b.id === id || b.by === id))) out.push("tough_substitute_exile");
+      const cnt = Object.values(g.votes || {}).filter((t) => t === id).length;   // 生の投票で1票以上
+      if (cnt > 0 && bounced.some((b) => b && (b.to || []).length)) out.push("tough_substitute_exile");   // 試合のどこかでタフガイの身代わり死が起きた（自分のバウンドでなくてもよい。マイクラ版準拠）
     }
     if (bounced.some((b) => b && (b.to || []).includes(id))) out.push("tough_got_substituted");   // タフガイのはじき返しで追放された側
     return out;

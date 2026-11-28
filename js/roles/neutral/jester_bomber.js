@@ -89,7 +89,10 @@
       if (teams.includes(T.VILLAGE)) out.push("bomber_with_village");
       if (teams.includes(T.WOLF)) out.push("bomber_with_wolf");
       if (teams.includes(T.THIRD)) out.push("bomber_with_third");
-      const others = (g.players || []).map((p) => p.id).filter((x) => !hanged.includes(x)), blown = B.explodedIds(g);
+    }
+    // 全員爆発: 最終役職が道化の爆弾魔で、自分以外の全員が爆発した（自分の勝利・追放は不問。マイクラ版準拠）
+    if (g.currentRoles && g.currentRoles[id] === R().JESTER_BOMBER) {
+      const others = (g.players || []).map((p) => p.id).filter((x) => x !== id), blown = B.explodedIds(g);
       if (others.length && others.every((x) => blown.includes(x))) out.push("bomber_explode_all_others");
     }
     return out.filter((x, k) => out.indexOf(x) === k);

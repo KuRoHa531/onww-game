@@ -8,7 +8,7 @@
     const t = n.validPlayer(p, f.player) ? g.players.find((q) => q.id === f.player) : n.pick(g.players.filter((q) => q.id !== p.id));
     ONW.setRoleBound(g, "loveTargets", p.id, t.id);   // 役職についていく（state.js の【必読】メモ参照）。移動「あと」に選んでも現在の持ち主に予約される
     i.mode = "love"; i.target = t.id;
-    g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を選んでいました。`);
+    g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を選びました。`);
     n.hold(p.id, `${t.name} に一目惚れしました。`);
     n.ob(p.id, [t.id]);
     n.nn(rid);
@@ -64,7 +64,7 @@
         const g = c.g, nameOf = c.nameOf;
         const t = c.selOf(p).players[0]; if (!t) return;
         ONW.setRoleBound(g, "loveTargets", p.id, t);   // 役職についていく（以降に役職が動いたら、移動先の人の選択になる）
-        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を選んでいました。`);
+        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を選びました。`);
         c.hold(p.id, `${nameOf(t)} に一目惚れしました。`);
         ONW.observeNote(g, p.id, [t], null, "love_tanner");
         ONW.newsNote(g, "love_tanner");
@@ -75,7 +75,7 @@
         if (!c.players.length) return null;
         const g = c.g, id = c.id, t = c.players[0];
         ONW.setRoleBound(g, "loveTargets", id, t);   // 移動「あと」の選択も、その時点の持ち主に予約され、以降の移動にもついていく
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を選んでいました。`);
+        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を選びました。`);
         return { lines: [`${c.nameOf(t)} に一目惚れしました。`], reveal: null, nextChain: null };
       },
     },

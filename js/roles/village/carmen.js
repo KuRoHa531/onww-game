@@ -169,10 +169,11 @@
    *  first_carmen（初めてカルメンになる）は履歴の判定（保存側）なのでここでは返さない。 */
   function achievements(g, id, won) {
     const out = [];
+    // carmen_outsider_whisper_loss は初期/最終のどちらかがカルメンなら対象（マイクラ版準拠）
+    const mine = Object.keys(g.carmenOutsider || {}).some((t) => g.carmenOutsider[t] === id);
+    if (!won && mine && ((g.initialRoles || {})[id] === R_() || (g.currentRoles || {})[id] === R_())) out.push("carmen_outsider_whisper_loss");
     if ((g.currentRoles || {})[id] !== R_()) return out;
     out.push(won ? "win_carmen" : "carmen_loss");
-    const mine = Object.keys(g.carmenOutsider || {}).some((t) => g.carmenOutsider[t] === id);
-    if (!won && mine) out.push("carmen_outsider_whisper_loss");
     return out;
   }
   ONW.carmen = { coText, claimOf, achievements, dayUses, nightRole, grantNight, nextNight, NOTICE_TEXT, noticeText, srcName, srcOf, outsiderText, buildSettle, deliverDay, apply, whisperNight, resolvePending, isVillageNow, lineOf, targetOf, whisperedBy, PENDING_STAGE };

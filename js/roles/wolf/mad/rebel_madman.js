@@ -50,7 +50,7 @@
     const out = [], M = R().REBEL_MADMAN, ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id], d = g.dictator;
     if (ini === M) out.push("first_rebel_madman");
     if (cur === M) {
-      if (d && d.coup && g.currentRoles[d.by] === R().DICTATOR) out.push("rebel_coup");
+      if (d && d.coup) out.push("rebel_coup");   // クーデターが起きた試合の反逆の狂人全員（独裁者の最終役職は不問。マイクラ版準拠）
       if (won) out.push("win_rebel_madman");
     }
     if (d && d.coup && d.by === id && cur === R().DICTATOR) out.push("dictator_couped");

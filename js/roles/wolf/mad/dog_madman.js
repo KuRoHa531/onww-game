@@ -138,7 +138,7 @@ setOwner(g, p.id, t.id); // 役職についていく（移動「あと」に選�
 ONW.newsNote(g, "dog_madman");
 if (!cur) { i.mode = "dog_madman"; i.target = t.id;}
 i.owner = t.id; // 結果開示（cpuChainResult）が使う
-g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を飼い主にしていました。`);
+g.nightLogsAll.push(`${label} ${p.name} は ${t.name} を飼い主にしました。`);
 n.hold(p.id, ownerLine(t.name));
 n.ob(p.id, [t.id]);
 n.nn(rid);
@@ -167,7 +167,7 @@ resolve(c, p) {
 const g = c.g, nameOf = c.nameOf;
 const t = c.selOf(p).players[0]; if (!t) return;
 setOwner(g, p.id, t);
-g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を飼い主にしていました。`);
+g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を飼い主にしました。`);
 c.hold(p.id, ownerLine(nameOf(t)));
 ONW.observeNote(g, p.id, [t], null, "dog_madman");
 ONW.newsNote(g, "dog_madman");
@@ -180,7 +180,7 @@ run(c) {
 if (!c.players.length) return null;
 const g = c.g, id = c.id, t = c.players[0];
 setOwner(g, id, t);
-g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を飼い主にしていました。`);
+g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を飼い主にしました。`);
 return { lines: [ownerLine(c.nameOf(t))], reveal: boneReveal(t), nextChain: null};
 },
 },

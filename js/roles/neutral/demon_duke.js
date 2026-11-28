@@ -55,9 +55,11 @@
     const dead = ONW.vote.deadSet(g);
     const hasDuke = g.players.some((p) => g.currentRoles[p.id] === R().DEMON_DUKE);
     if (!hasDuke) return { run: false };
-    // 発動条件（最終盤面で見る）: 人狼判定の人が1人以上死亡 / 最終盤面にそもそも人狼判定の人がいない（途中で役職が変わって人狼判定でなくなった人は数えない）
+    // 発動条件（マイクラ版 runDemonDukeMeetingIfNeeded 準拠）: 最終盤面で人狼判定の死者がいるか、初期役職に人狼判定の人がそもそもいないときだけ会議を行う。
+    // 初期は人狼判定だった人が全員役職を変えて生き残っている場合は、死んだ人狼がいないので会議は飛ぶ（初期役職ベースで判定する）
     const wolfJ = ONW.vote.wolfJudgeIds(g), deadWolf = wolfJ.filter((id) => dead.has(id));
-    if (!deadWolf.length && wolfJ.length > 0) return { run: false, skipped: true };   // 人狼判定の人が最終盤面にいて、1人も死んでいない
+    const initialWolfJ = g.players.filter((q) => { const r = (g.initialRoles || {})[q.id]; return r && (ONW.ROLE_INFO[r] || {}).team === ONW.TEAM.WOLF; });
+    if (!deadWolf.length && initialWolfJ.length > 0) return { run: false, skipped: true };   // 初期役職に人狼判定がいたのに、死んだ人狼判定がいない
     const dukeIds = D.aliveDukes(g, dead);
     if (!dukeIds.length) return { run: false };
     const aliveIds = g.players.map((p) => p.id).filter((id) => !dead.has(id));

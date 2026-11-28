@@ -16,7 +16,7 @@
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
     if (fin === "tofu_wolf") {
       if ((g.mentalIds || []).includes(id) && dead.has(id)) out.push("tofu_mental_break");
-      if (g.mapoAnnounced && players.some((q) => q.id !== id && roleOf(q.id) === "mapo_wolf")) out.push("tofu_mapo_complete");
+      if (g.mapoAnnounced && players.some((q) => q.id !== id && ONW.mimic.eff(g, q.id) === "mapo_wolf")) out.push("tofu_mapo_complete");   // 模倣の人狼は模倣先の役職として在場を数える（マイクラ版 hasEffectRoleInPlay 準拠）
     }
     return out;
   }

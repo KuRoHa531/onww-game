@@ -233,7 +233,7 @@
     const out = [], ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
     if (ini === R().WATCHER) out.push("first_watcher");
     if (cur !== R().WATCHER) return out;
-    const touched = W.touchedBy(g, id).length > 0, voted = W.votedBy(g, id).length > 0 || W.voted(g, id), extra = W.extraWinnerExists(g, id, winners);
+    const touched = W.touchedBy(g, id).length > 0, voted = Object.values(g.votes || {}).includes(id), extra = W.extraWinnerExists(g, id, winners);   // 票は生の投票で数える（入れ替え・0票化されても「入れられた」こと自体は残る。マイクラ版準拠。勝敗判定の W.voted とは別）
     if (won) out.push("win_watcher");
     if (touched) out.push("watcher_touched");
     if (voted) out.push("watcher_voted");

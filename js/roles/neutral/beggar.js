@@ -219,8 +219,8 @@
     if (g.initialRoles && (g.initialRoles[id] === r.BEGGAR || (g.currentRoles || {})[id] === r.BEGGAR)) out.push("first_beggar");   // 初めて乞食になる
     const e = (g.beggarResults || []).find((x) => x.by === id);
     if (e) {
-      if (e.failed && e.failed !== "dead") out.push("beggar_failed");   // 乞食の交換に失敗する
-      if (e.role) {
+      if (e.failed) out.push("beggar_failed");   // 乞食の交換に失敗する（乞食のまま死んだ場合も含む。マイクラ版準拠）
+      if (e.role && e.role !== "doppelganger") {   // ドッペルゲンガーは素の陣営なし（マイクラ版 baseTeamOf）なので陣営系は付かない
         const team = (ONW.ROLE_INFO[e.role] || {}).team;
         if (team === ONW.TEAM.VILLAGE) out.push("beggar_become_village");   // 村人陣営の役職と交換する
         if (team === ONW.TEAM.WOLF) out.push("beggar_become_wolf");         // 人狼陣営の役職と交換する

@@ -100,14 +100,14 @@
     return [{ p, text: stoleText(nm), short: stoleShort(nm), result: true, claim: { kind: "thief", target: e.target }, gap: 3500 }];
   }
   /**
-   * 実績（マイクラ版 stats.js と同じ条件）: 最終役職が盗賊で盗んだ（thief_steal_vote。失敗した盗みも「使った」ので数える）/ 盗賊に票を盗まれた（vote_stolen。盗賊の対象になれば、失敗でも）
+   * 実績（マイクラ版 stats.js と同じ条件）: 最終役職が盗賊で盗んだ（thief_steal_vote。マイクラ版は成功した盗みだけ thiefTarget に記録するので、失敗した盗みは数えない）/ 盗賊に票を盗まれた（vote_stolen。成功した盗みの対象だけ）
    *   / 初期役職が盗賊（first_thief。初めてかどうかは保存側が数える）/ 最終役職が盗賊で勝利（win_thief）。won: その人が勝ったか
    */
   function achievements(g, id, won) {
     const out = [], T = R().THIEF, ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
     if (ini === T) out.push("first_thief");
-    if (cur === T && used(g, id)) out.push("thief_steal_vote");
-    if ((g.thiefSteals || []).some((e) => e.target === id)) out.push("vote_stolen");
+    if (cur === T && (g.thiefSteals || []).some((e) => e.by === id && e.ok)) out.push("thief_steal_vote");
+    if ((g.thiefSteals || []).some((e) => e.target === id && e.ok)) out.push("vote_stolen");
     if (cur === T && won) out.push("win_thief");
     return out;
   }

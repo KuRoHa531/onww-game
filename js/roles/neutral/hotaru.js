@@ -92,7 +92,7 @@
     achievements(g, id, won) {
       const r = (g.currentRoles || {})[id];
       if (r === ID) { const out = ["first_hotaru"]; if (won) out.push("win_hotaru"); return out; }
-      if (r === SAM && choiceOf(g, id) === "sam") { const out = ["first_sam"]; if (won) out.push("win_sam"); return out; }
+      if (r === SAM) { const out = ["first_sam"]; if (won) out.push("win_sam"); return out; }   // 最終役職がサムで勝利（変身した記録は不問。マイクラ版準拠）
       return [];
     },
   });

@@ -42,8 +42,8 @@
       if (g.initialRoles && g.initialRoles[id] === R.MARTYR) out.push("first_martyr");
       if (g.currentRoles && g.currentRoles[id] === R.MARTYR) {
         if (won) out.push("win_martyr");
-        if (!ONW.vote.deadSet(g).has(id)) out.push("martyr_survived");
-        if (g.godMode === "bless" && !won) out.push("martyr_god_loss");
+        if (!(g.executed || []).includes(id)) out.push("martyr_survived");   // 追放・連鎖死していなければ生存扱い（昼に死んでいても付く。マイクラ版 finalExecutedSet 準拠）
+        if (g.godMode === "bless" && !won) out.push("martyr_god_loss");   // 神の祝福が起きた試合で敗北（Web版の祝福は「追放された神以外の追放者が勝つ」形で、神本人は勝者に入らないため、祝福の発動そのもので判定する）
       }
       return out;
     },

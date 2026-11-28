@@ -18,9 +18,9 @@
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
     if (has("big_wolf")) {
       const entry = (g.coBoard || {})[id] || {};
-      const lines = [entry.co || "", ...((entry.results || []).map((r) => (r && (r.text || r.short)) || ""))].join(" ");
+      const lines = [entry.co || "", ...((entry.results || []).map((r) => (r && (r.text || r.short)) || ""))];
       const centerNames = [...new Set((g.center || []).filter(Boolean))].map((r) => (ONW.ROLE_INFO[r] || {}).name).filter(Boolean);
-      if ((lines.includes("墓地") || lines.includes("中央")) && centerNames.some((n) => lines.includes(n))) out.push("big_wolf_center_role");
+      if (lines.some((ln) => (ln.includes("墓地") || ln.includes("中央")) && centerNames.some((n) => ln.includes(n)))) out.push("big_wolf_center_role");   // 同じ発言の中で墓地の役職名に触れたときだけ（マイクラ版準拠。全発言の連結では付かない）
     }
     return out;
   }

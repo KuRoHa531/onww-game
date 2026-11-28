@@ -36,6 +36,7 @@
       if (!t || g.exposeAnnounced[p.id] || ONW.mimic.eff(g, p.id) !== ONW.ROLE.EXPOSED_MADMAN || ONW.hiddenDrunk(g, p.id) || ONW.seal.is(g, p.id) || c.isDead(p.id)) return;
       if (!g.players.some((q) => q.id === t)) return;
       g.exposeAnnounced[p.id] = true;
+      (g.exposeRevealed = g.exposeRevealed || {})[p.id] = g.currentRoles[t];   // 実績用: 公開された時点の役職（最終役職ではなく公開時の役職で判定する。マイクラ版 exposedMadmanRevealedRole 相当）
       const extras = [];
       if (g.drunkOverlay && g.drunkOverlay[t]) extras.push("酔っ払い");   // 本家: 酔っぱらい・恋人なら付加情報も公開
       if (ONW.isLover(g, t)) extras.push("恋人");
@@ -93,11 +94,11 @@
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
     if (fin === "exposed_madman") {
-      const t = (g.exposeTargets || {})[id];
-      if (t) {
-        out.push("exposed_reveal_" + teamOfP(t));
+      const t = (g.exposeTargets || {})[id], rev = (g.exposeRevealed || {})[id];
+      if (t && rev) {   // 実際に公開された役職で判定（マイクラ版準拠）
+        out.push("exposed_reveal_" + teamKey(rev));
         if (ONW.isLover && ONW.isLover(g, t)) out.push("exposed_reveal_lover");
-        if (roleOf(t) === "queen") out.push("exposed_reveal_queen");
+        if (rev === "queen") out.push("exposed_reveal_queen");
       }
     }
     return out;

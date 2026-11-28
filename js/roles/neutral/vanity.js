@@ -160,10 +160,11 @@ function achievements(g, id, won) {
 const out = [], r = R();
 if (g.initialRoles && (g.initialRoles[id] === r.VANITY || (g.currentRoles || {})[id] === r.VANITY)) out.push("first_vanity"); // 初めてヴァニティになる（配られたカード・最終盤面のどちらかでヴァニティだった）
 const e = (g.vanityShots || []).find((x) => x.by === id);
-if (e) {
+if (e && (g.currentRoles || {})[id] === r.VANITY) {   // 3実績とも最終役職がヴァニティのときだけ（マイクラ版準拠）
 if ((g.currentRoles || {})[e.target] === r.SHERIFF) out.push("vanity_shoot_sheriff"); // ヴァニティで保安官を撃つ
-if (won && e.kind === "village") out.push("vanity_fake_justice"); // 村人陣営を撃ち、村人陣営が敗北して勝利する
-if (won && e.kind === "outsider") out.push("vanity_second_sheriff"); // 人外を撃ち、村人陣営と共に勝利する
+const rawTeam = (ONW.ROLE_INFO[(g.currentRoles || {})[e.target]] || {}).team;   // 分類は標的の素の陣営（保安官の人狼判定ではない。恋人・シャッフラー印の村人は村人陣営、人狼判定される白い人狼は人狼陣営）
+if (won && rawTeam === ONW.TEAM.VILLAGE) out.push("vanity_fake_justice"); // 村人陣営を撃ち、村人陣営が敗北して勝利する
+if (won && rawTeam && rawTeam !== ONW.TEAM.VILLAGE) out.push("vanity_second_sheriff"); // 人外を撃ち、村人陣営と共に勝利する
 }
 return out;
 }

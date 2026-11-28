@@ -111,7 +111,7 @@
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
-    if (fin === "fanatic" && (g.chainKind || {})[id] === "follow" && (g.foxCursed || []).length > 0) out.push("fanatic_follow_curse");
+    if (fin === "fanatic" && ((g.chainKind || {})[id] === "follow" || (g.deadKind || {})[id] === "fanatic") && (g.foxCursed || []).length > 0) out.push("fanatic_follow_curse");   // 投票時の後追いだけでなく、昼の呪殺（感覚の占い師・見抜き等）への後追いも含む（マイクラ版 followDeathIds 準拠）
     return out;
   }
 

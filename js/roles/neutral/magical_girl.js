@@ -88,7 +88,7 @@
   function achievements(g, id, won) {
     const out = [], r = R();
     if (g.initialRoles && (g.initialRoles[id] === r.MAGICAL_GIRL || (g.currentRoles || {})[id] === r.MAGICAL_GIRL)) out.push("first_magical_girl");   // 初めて魔法少女になる
-    if (eff(g, id) === ID) {
+    if ((g.currentRoles || {})[id] === ID) {   // 最終役職が魔法少女本人のときだけ（模倣の人狼が模倣していても付かない。マイクラ版準拠）
       const dark = isDark(g, id);
       if (dark && won) out.push("magical_girl_dark_win");          // 闇堕ちして勝利する
       if (dark && !won) out.push("magical_girl_dark_loss");        // 闇堕ちして敗北する

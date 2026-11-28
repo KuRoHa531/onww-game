@@ -10,7 +10,7 @@
 * ウサギの狂人の草むらに隠れた対象は選んでも失敗（Web版の夜解決の共通処理が担う）。
 * 封印されているテレパシストは夜に選べない（Web版は封印中は夜の resolve が呼ばれない）。
 * 新聞屋に役職が記録される（ONW.newsNote）。詩人は接続先を知る（poetNightTargetEvents。観測ログ経由）。
-* 本人の夜の知らせ（マイクラ版 tell）: 「あなたは {対象} に接続しました。」。夜ログ: 「テレパシスト {名前} は {対象} に接続した」。
+* 本人の夜の知らせ（マイクラ版 tell）: 「あなたは {対象} に接続しました。」。夜ログ: 「テレパシスト {名前} は {対象} に接続しました。」（リザルトの夜行動結果では「接続していました。」に変換して出す）。
 * ・待機時間の知らせ（作者メモ）: 接続された側へ「テレパシストに接続されました。」を知らせる。
 * その人の画面でだけ、テレパシスト本人のカードがテレパシストの面でめくれる（マイクラ版は文だけ。めくりは作者メモ）。
 * 接続された側が酔っ払い中（未覚醒）のときは知らせない（酔いが覚めたときに届く。マイクラ版 isHiddenDrunkPlayer の除外）。
@@ -154,7 +154,7 @@ function achievements(g, id, won) {
 const out = [], ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
 if (ini === T || cur === T) out.push("first_telepathist");
 if (cur === T && won) out.push("win_telepathist");
-if (cur === T && (g.telepathistFollows || []).some((f) => f.tp === id)) out.push("telepathist_follow_death");
+if (cur === T && ((g.telepathistFollows || []).some((f) => f.tp === id) || ["follow", "lovers"].includes((g.chainKind || {})[id]) || ["follow", "lovers"].includes((g.deadKind || {})[id]))) out.push("telepathist_follow_death");   // 自分の接続先への後追い以外に、恋人・キューピッド等の後追い/心中で死んだ場合も含む（マイクラ版 followDeathIds 準拠）
 return out;
 }
 ONW.telepathist = { nm, setTarget, targetOf, holdsCard, fix, picks, seen, seenOf, toldOf, cpuLearn, followersOf, noteFollow, component, extraWins, lines, achievements};
@@ -179,7 +179,7 @@ const t = f.player && f.player!== p.id && n.validPlayer(p, f.player)? f.player: 
 setTarget(g, p.id, t); seen(g, p.id, t);
 if (!cur) { i.mode = "telepathist"; i.target = t;}
 i.telepathistTarget = t;
-g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} に接続した`);
+g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} に接続しました。`);
 n.hold(p.id, `あなたは ${nm(g, t)} に接続しました。`);
 n.ob(p.id, [t]);
 n.nn(rid);
@@ -221,7 +221,7 @@ resolve(c, p) {
 const g = c.g, nameOf = c.nameOf;
 const t = c.selOf(p).players[0]; if (!t || t === p.id) return; // 自分自身は選べない（自己参照になるのは役職交換・コピーの結果だけ）
 setTarget(g, p.id, t); seen(g, p.id, t);
-g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} に接続した`);
+g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} に接続しました。`);
 c.hold(p.id, `あなたは ${nameOf(t)} に接続しました。`);
 ONW.observeNote(g, p.id, [t], null, "telepathist");
 ONW.newsNote(g, "telepathist");
@@ -308,7 +308,7 @@ if (!c.players.length) return null;
 const g = c.g, id = c.id, t = c.players[0];
 if (t === id) return null; // 自分自身は選べない
 setTarget(g, id, t); seen(g, id, t);
-g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} に接続した`);
+g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} に接続しました。`);
 return { lines: [`あなたは ${c.nameOf(t)} に接続しました。`], nextChain: null};
 },
 },

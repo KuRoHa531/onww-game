@@ -188,9 +188,9 @@
       if (!g) return [];
       const out = [];
       if ((g.threadFollowDeaths || []).includes(id)) out.push("thread_pair_follow_victim");   // ペアにされた状態で後追い死亡した
+      if ((g.threadRemovedOwners || []).includes(id)) out.push("thread_pair_removed");   // 作ったペアを黄泉または抹消の人狼に消された（最終役職は不問。マイクラ版準拠）
       if ((g.currentRoles || {})[id] !== ID) return out;
       out.push("first_thread_spinner");
-      if ((g.threadRemovedOwners || []).includes(id)) out.push("thread_pair_removed");   // 作ったペアを黄泉または抹消の人狼に消された
       if (won) out.push("win_thread_spinner");
       else out.push("thread_spinner_loss");   // 糸紡ぎで敗北する
       return out;

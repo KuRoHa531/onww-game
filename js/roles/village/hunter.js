@@ -78,7 +78,7 @@
       const tRole = (g.currentRoles || {})[t];
       const tTeam = ((ONW.ROLE_INFO || {})[tRole] || {}).team;
       if (tTeam === ONW.TEAM.VILLAGE) out.push("hunter_chain_village");
-      else if (tRole) out.push("hunter_chain_nonvillage");
+      else if (tTeam === ONW.TEAM.THIRD) out.push("hunter_chain_nonvillage");   // 人外 = 第三陣営のみ（人狼陣営の人を連れても付かない。マイクラ版 hasChainTargetTeam "nonwolf" かつ村人以外、の合算条件）
     }
     return out;
   }

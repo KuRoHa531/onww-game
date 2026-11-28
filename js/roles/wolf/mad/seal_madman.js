@@ -84,7 +84,7 @@
     }
     commit(g, holder, target);
     noteElfrinde(g, holder, target);
-    (g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${nm(g, holder)} は ${nm(g, target)} を封印した`);
+    (g.nightLogsAll = g.nightLogsAll || []).push(`${label} ${nm(g, holder)} は ${nm(g, target)} を封印しました。`);
     hold(holder, sealLine(g, target));
     return "ok";
   }
@@ -115,7 +115,7 @@
         }
         commit(g, h, t);
         noteElfrinde(g, h, t);
-        g.nightLogsAll.push(`${label} ${nm(g, h)} は ${nm(g, t)} を封印した`);
+        g.nightLogsAll.push(`${label} ${nm(g, h)} は ${nm(g, t)} を封印しました。`);
         hold(h, sealLine(g, t));
         if (rv) rv(h, ONW.seal.revealPut(t, markOf(g, h)));       // 3of4d: 封印に成功した人は、封印した相手のカードに封印（自分の見た目）が貼られる
         ONW.newsNote(g, roleOfNews(g, h));          // 新聞・観測は、封印に成功した分だけ
@@ -146,7 +146,7 @@
   /** 封印を無視した判定で fn を動かす（昼能力ボタンが「封印されていなければ使えたか」を調べるため） */
   const ignoringSeal = (fn) => { dayOff++; try { return fn(); } finally { dayOff--; } };
   /** 観戦者の「封印」欄（specInfo.seal）: { rows: [{ by, target, fail }], sealed: [封印されている人の名前] }。観戦者は全員の役職が見えるので事実をそのまま出す。
-   *  夜ログ(nightLogsAll)の「封印の狂人 A は B を封印した」「…封印されていたため能力に失敗しました。」と同じ内容を、欄にまとめたもの */
+   *  夜ログ(nightLogsAll)の「封印の狂人 A は B を封印しました。」「…封印されていたため能力に失敗しました。」と同じ内容を、欄にまとめたもの */
   function specLines(g, nm) {
     const rows = [], seen = new Set();
     Object.entries(g.sealTargets || {}).forEach(([by, t]) => { seen.add(by); rows.push({ by: nm(by), target: nm(t), fail: false }); });

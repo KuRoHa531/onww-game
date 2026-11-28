@@ -107,14 +107,14 @@
    *  won: その人が勝ったか / res: 省略可 */
   function achievements(g, id, won) {
     const out = [], M = R_().MIMIC_WOLF, ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
-    if (ini === M) {
-      out.push("first_mimic_wolf");                                          // 初めて模倣の人狼になる（初回かどうかは保存側が数える）
+    if (ini === M) out.push("first_mimic_wolf");                                          // 初めて模倣の人狼になる（初回かどうかは保存側が数える）
+    if (cur === M) {   // コピー系は最終役職が模倣の人狼で、模倣先の陣営で判定（マイクラ版準拠）
       const mr = roleOf(g, id), tm = mr && ONW.ROLE_INFO[mr] && ONW.ROLE_INFO[mr].team;
       if (tm === ONW.TEAM.VILLAGE) out.push("mimic_copy_village");
       if (tm === ONW.TEAM.WOLF) out.push("mimic_copy_wolf");
     }
     if (cur === M && won) out.push("win_mimic_wolf");
-    (g.sheriffShots || []).filter((e) => e.by === id && e.rev && e.mode === "execute").forEach((e) => {
+    if (isMimicSheriff(g, id)) (g.sheriffShots || []).filter((e) => e.by === id && e.rev && e.mode === "execute").forEach((e) => {   // 本人が模倣保安官として執行したときだけ（本物の保安官の執行では付かない。マイクラ版準拠）
       const t = ONW.ROLE_INFO[g.currentRoles[e.target]];
       if (t && t.team === ONW.TEAM.VILLAGE) out.push("mimic_sheriff_execute_village");
       if (eff(g, e.target) === R_().QUEEN) out.push("mimic_sheriff_execute_queen");

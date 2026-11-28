@@ -68,7 +68,11 @@
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
     if (fin === "smoke_madman" && g.smokeOn) {
-      const notice = !!(g.newsAnnounced || (g.newsRoles || []).length > 0 || Object.keys(g.exposeTargets || {}).length > 0 || Object.keys(g.princessUp || {}).length > 0 || Object.keys(g.formerQueens || {}).length > 0);
+      // 朝の告知があったか（マイクラ版 hasAnyDayNoticeForSmokeAchievement の8種）: パン屋/新聞/女王の通知/人狼王の通知/姫君の朝昇格/スター/暴露狂人。記録が無い告知は最終盤面から導く（パン屋・スター・人狼王・女王は最終盤面にいれば朝に告知が出ている）
+      const effIs = (role) => players.some((p) => (ONW.mimic && ONW.mimic.eff ? ONW.mimic.eff(g, p.id) : (g.currentRoles || {})[p.id]) === role);
+      const notice = !!(g.newsAnnounced || (g.newsRoles || []).length > 0 || Object.keys(g.exposeTargets || {}).length > 0
+        || Object.values(g.princessUp || {}).some((u) => u && u.when === "settle")
+        || effIs("baker") || effIs("star") || effIs("wolf_king") || effIs("queen"));
       if (notice) out.push("smoke_hid_notice");
     }
     return out;

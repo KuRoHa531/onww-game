@@ -33,7 +33,9 @@
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
-    if (fin === "schrodinger_cat" && (g.sheriffCatFix || {})[id] && ((g.catInfo || {})[id] || {}).team === "village") out.push("schrodinger_sheriff_village");
+    // 所属陣営が村人陣営に決まり、参照元（自分に投票した人から選ばれた1人）がいる猫（マイクラ版準拠。保安官固定に限らない）
+    const ci = (g.catInfo || {})[id];
+    if (fin === "schrodinger_cat" && ci && (ci.affTeam || ci.team) === "village" && (g.catSources || {})[id]) out.push("schrodinger_sheriff_village");
     return out;
   }
 

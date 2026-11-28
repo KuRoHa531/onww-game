@@ -13,7 +13,7 @@
     const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
     const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
     const teamOfP = (pid) => teamKey(roleOf(pid));
-    const exiled = (pid) => (g.executed || []).includes(pid);
+    const exiled = (pid) => ONW.vote.isVoteExiled(g, pid);   // 追放のカウントは道連れ等と分ける（2026-11-28 作者決定）
     const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
     const players = g.players || [];
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);

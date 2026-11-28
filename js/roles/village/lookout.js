@@ -94,7 +94,7 @@
   /** 通知の文（マイクラ版の見張り通知どおり） */
   const noticeText = (name, acted) => acted ? `${name}は行動していました。` : `${name}は行動していませんでした。`;
   const pickText = (name) => `あなたは ${name} を見張ることにしました。結果は昼開始時に通知されます。`;
-  const logText = (label, p, nameOf, t) => `${label} ${p.name} は ${nameOf(t)} を見張ることにしていました。`;
+  const logText = (label, p, nameOf, t) => `${label} ${p.name} は ${nameOf(t)} を見張ることにしました。`;
 
   /** 結果発表の「役職情報」の行（マイクラ版 vote.js の見張り情報。最終役職が見張り番の人だけ） */
   function lines(g, nm2) {

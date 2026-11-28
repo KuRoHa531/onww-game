@@ -314,7 +314,7 @@ const M = (ONW.multiPersona = {
     if (was || is) out.push("multi_personality_first");
     if (is && won) out.push(M.finalState(g, id) === "madman" ? "multi_personality_win_wolf" : "multi_personality_win_village");
     if (is && !won) out.push("multi_personality_loss");
-    if ((g.mpSeen[id] || 0) >= 3) out.push("multi_personality_flip3");
+    if (is && (g.mpSeen[id] || 0) >= 3) out.push("multi_personality_flip3");   // 最後まで多重人格を持っていた人だけ（途中で離れた人には付かない。マイクラ版準拠）
     return out;
   },
 

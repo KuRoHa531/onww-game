@@ -27,14 +27,14 @@
   /**
    * 実績（4of4。wiki の「A.A.」に定義済み。fairy の achievements と同じ形: 「この試合で id が満たした実績ID」を返すだけ。保存側ができたら呼ぶ）
    *   aa_win「錆鉄の魔女」 = 最終役職が A.A. で勝利 / aa_loss「全て錆びてしまうなら」 = 最終役職が A.A. で敗北 /
-   *   aa_locked_win「錆鉄の空」 = 鍵師にロックされた A.A.（最終役職）で勝利。first_aa は初回判定（保存側）なのでここでは返さない。
+   *   aa_locked_win「錆鉄の空」 = 初期役職が A.A. で、鍵師にロックされて勝利（マイクラ版準拠。最終役職は不問）。first_aa は初回判定（保存側）なのでここでは返さない。
    *   最終役職で判定（酔っ払い・墓荒らし・怪盗・ドッペル経由で A.A. になった人も対象。模倣の人狼が模倣しているだけでは対象外）。封印されていても最終役職が A.A. なら対象。
    */
   function achievements(g, id, won) {
     const out = [];
-    if (!g || !g.currentRoles || g.currentRoles[id] !== ONW.ROLE.AA) return out;
-    out.push(won ? "aa_win" : "aa_loss");
-    if (won && ONW.keymaster && ONW.keymaster.locked && ONW.keymaster.locked(g, id)) out.push("aa_locked_win");
+    if (g && g.currentRoles && g.currentRoles[id] === ONW.ROLE.AA) out.push(won ? "aa_win" : "aa_loss");
+    // aa_locked_win は初期役職が A.A. であることが条件（マイクラ版準拠。最終役職は不問）
+    if (won && g && (g.initialRoles || {})[id] === ONW.ROLE.AA && ONW.keymaster && ONW.keymaster.locked && ONW.keymaster.locked(g, id)) out.push("aa_locked_win");
     return out;
   }
   ONW.aa = { is, holders, blocks, achievements };

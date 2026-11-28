@@ -72,7 +72,7 @@
     const out = [], ini = g.initialRoles && g.initialRoles[id], cur = g.currentRoles && g.currentRoles[id];
     if (ini === ID || cur === ID) out.push("first_command_wolf");
     if (cur === ID && won) out.push("win_command_wolf");
-    if (ini === ID || cur === ID) {
+    if (cur === ID) {   // 確認系の実績は最終役職が統率の人狼のときだけ（マイクラ版準拠）
       const rows = visibleRows(g, id, g.initialRoles);
       if (rows.some((r) => (ONW.MAD_KIND || []).includes(r.role))) out.push("command_wolf_checked_mad");
       if (rows.some((r) => r.role === "lone_wolf")) out.push("command_wolf_checked_lone");

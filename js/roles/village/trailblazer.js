@@ -136,8 +136,9 @@
   function achievements(g, id, won) {
     const out = [], cur = (g.currentRoles || {})[id], drunk = !!(g.drunkOverlay && g.drunkOverlay[id]);
     if (!g || !g.currentRoles) return out;
-    if ((g.initialRoles || {})[id] === TB() && (!drunk || cur === TB())) { const f = dealtFate(g, id); if (f) out.push("trailblazer_first_" + f); }
-    if (cur === TB()) { const f = fateOf(g, id); if (f) { out.push("trailblazer_first_" + f); if (won) out.push("trailblazer_win_" + f); } }
+    // マイクラ版準拠: 役職履歴に開拓者が含まれていて運命の記録があれば first、勝利で win（初期/最終のどちらかだけでは付かない）
+    const hist = [(g.initialRoles || {})[id], ...(((g.roleTrail || {})[id]) || []), cur].filter(Boolean);
+    if (hist.includes(TB())) { const f = dealtFate(g, id) || fateOf(g, id); if (f) { out.push("trailblazer_first_" + f); if (won) out.push("trailblazer_win_" + f); } }
     return out.filter((x, k) => out.indexOf(x) === k);
   }
   Object.assign(ONW.trailblazer, { TB, dealtFate, perceivedFate, fateClaim, trueFollow, fateSpeech, achievements });

@@ -187,7 +187,7 @@
     const target = targetOf(g, id);
     if (ini === ID || cur === ID || target) out.push("first_copyist");
     if (won && cur === ID) out.push("win_copyist");   // 勝利系は最終役職のみで判定する（初期役職・コピー先では付けない。マイクラ版 finalRole === COPYIST）
-    if (!won && target) {   // 二番煎じ: コピーした役職の持ち主が最後まで生きていて、墓地にも無かった
+    if (!won && target) {   // 二番煎じ: コピーして敗北し、コピーした役職の持ち主が最後まで生きていて、墓地にも無かった（マイクラ版は finalRole===COPYIST で判定するが、マイクラ版ではコピー後も最終役職の記録はコピリストのまま。Web版は現在役職がコピー先に変わるため、コピー記録の有無で判定する）
       const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set();
       const holderAlive = (g.players || []).some((q) => (g.currentRoles || {})[q.id] === target && !dead.has(q.id));
       if (holderAlive && !(g.center || []).includes(target)) out.push("copyist_second_fiddle");
@@ -231,7 +231,7 @@
     const r = doCopy(g, p.id, role);
     if (!r.ok) { i.copylist.failed = "changed"; n.hold(p.id, "既に別の役職に変化していたため、コピーに失敗しました。"); if (!cur) n.nn(rid); return; }
     i.copylist.target = role; i.known[p.id] = role;
-    g.nightLogsAll.push(`コピリスト ${p.name} は ${n.rn(role)} をコピーした`);
+    g.nightLogsAll.push(`コピリスト ${p.name} は ${n.rn(role)} をコピーしました。`);
     n.hold(p.id, `あなたは${n.rn(role)}をコピーしました。`);
     if (role === "screw_gum" && !r.stolen && ONW.screwGum) n.hold(p.id, ONW.screwGum.silverText(g));
     if (!r.stolen) ONW.cpu.learnInfo(g, p.id, role);   // コピー先の「夜の始まりに見える情報」も知る。魔法使いに奪われたときは村人なので知らない
@@ -363,7 +363,7 @@
           c.rev[p.id] = { kind: "copylist", cards, pick: null, role: null };
           return;
         }
-        g.nightLogsAll.push(`コピリスト ${p.name} は ${c.rn(role)} をコピーした`);
+        g.nightLogsAll.push(`コピリスト ${p.name} は ${c.rn(role)} をコピーしました。`);
         c.hold(p.id, `あなたは${c.rn(role)}をコピーしました。`);
         if (role === "screw_gum" && !r.stolen && ONW.screwGum) c.hold(p.id, ONW.screwGum.silverText(g));   // スクリューガムをコピーしたら、その場で銀狼の気配を知る（マイクラ版 finalize の専用分岐）
         const ga = ONW.mimic.gotAct(g, p.id, role);   // 模倣の人狼になったら模倣先の能力
@@ -385,7 +385,7 @@
         const role = cards[pick];
         const r = doCopy(g, id, role);
         if (!r.ok) return { lines: ["既に別の役職に変化していたため、コピーに失敗しました。"], reveal: { kind: "copylist", cards, pick: null, role: null }, nextChain: null };
-        g.nightLogsAll.push(`コピリスト ${c.me.name} は ${c.rn(role)} をコピーした`);
+        g.nightLogsAll.push(`コピリスト ${c.me.name} は ${c.rn(role)} をコピーしました。`);
         const lines = [`あなたは${c.rn(role)}をコピーしました。`];
         if (role === "screw_gum" && !r.stolen && ONW.screwGum) lines.push(ONW.screwGum.silverText(g));
         lines.push(...c.soberInfoLines(g, id, role));

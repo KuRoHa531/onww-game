@@ -49,7 +49,7 @@
         i.grave.forEach((x) => { g.nightLogsAll.push(`${label} ${p.name} は 墓地${x.idx + 1} を確認し、${n.rn(x.role)} でした。`); n.hold(p.id, `墓地${x.idx + 1}枚目は「${n.rn(x.role)}」でした。`); });
       } else {
         i.failed = true; markFailed(g, p.id);
-        g.nightLogsAll.push(`${label} ${p.name} は墓地占いに失敗していました。`);
+        g.nightLogsAll.push(`${label} ${p.name} は墓地占いに失敗しました。`);
         n.hold(p.id, "占いに失敗し、墓地の役職を確認できませんでした。");
       }
       n.ob(p.id, [], picked);
@@ -64,7 +64,7 @@
         n.hold(p.id, `${t.name} の役職は「${n.rn(seen)}」でした。`);
       } else {
         i.failed = true; markFailed(g, p.id);
-        g.nightLogsAll.push(`${label} ${p.name} は ${t.name} の占いに失敗していました。`);
+        g.nightLogsAll.push(`${label} ${p.name} は ${t.name} の占いに失敗しました。`);
         n.hold(p.id, `${t.name} の占いに失敗し、役職を確認できませんでした。`);
       }
       n.ob(p.id, [t.id]);
@@ -131,7 +131,7 @@
             rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: r }] };
           } else {
             markFailed(g, p.id);
-            g.nightLogsAll.push(`${label} ${p.name} は ${nameOf(t)} の占いに失敗していました。`);
+            g.nightLogsAll.push(`${label} ${p.name} は ${nameOf(t)} の占いに失敗しました。`);
             hold(p.id, `${nameOf(t)} の占いに失敗し、役職を確認できませんでした。`);
             rev[p.id] = { kind: "peek", items: [{ k: `p:${t}`, role: FAIL_MARK }] };   // 「失敗」の文字でめくれる（パリンのSEは stage.js が面の変化で鳴らす）
           }
@@ -145,7 +145,7 @@
             rev[p.id] = { kind: "peek", items };
           } else {
             markFailed(g, p.id);
-            g.nightLogsAll.push(`${label} ${p.name} は墓地占いに失敗していました。`);
+            g.nightLogsAll.push(`${label} ${p.name} は墓地占いに失敗しました。`);
             hold(p.id, "占いに失敗し、墓地の役職を確認できませんでした。");
             rev[p.id] = { kind: "peek", items: idxs.map((i) => ({ k: `g:${i}`, role: FAIL_MARK })) };
           }
@@ -170,7 +170,7 @@
           } else {
             markFailed(g, me.id);
             lines = ["占いに失敗し、墓地の役職を確認できませんでした。"];
-            g.nightLogsAll.push(`${label} ${me.name} は墓地占いに失敗していました。`);
+            g.nightLogsAll.push(`${label} ${me.name} は墓地占いに失敗しました。`);
             reveal = { kind: "peek", items: graves.map((i) => ({ k: `g:${i}`, role: FAIL_MARK })) };
           }
         } else if (players.length) {
@@ -184,7 +184,7 @@
           } else {
             markFailed(g, me.id);
             lines = [`${nameOf(t)} の占いに失敗し、役職を確認できませんでした。`];
-            g.nightLogsAll.push(`${label} ${me.name} は ${nameOf(t)} の占いに失敗していました。`);
+            g.nightLogsAll.push(`${label} ${me.name} は ${nameOf(t)} の占いに失敗しました。`);
             reveal = { kind: "peek", items: [{ k: `p:${t}`, role: FAIL_MARK }] };
           }
         }

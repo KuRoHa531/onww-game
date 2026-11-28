@@ -135,19 +135,21 @@
   function achievements(g, id, won) {
     const out = [], init = (g.initialRoles || {})[id], fin = (g.currentRoles || {})[id];
     if (init === ID || fin === ID) out.push("first_agitator");
-    if (fin !== ID) return out;
-    if (won) out.push("win_agitator"); else out.push("agitator_loss");
     settleBackground(g);
     const t = targetOf(g, id);
     if (t) {
+      const executed = g.executed || [];
+      // 独裁の裏で、もう一人（マイクラ版 agitatorCausedExtraExile）: 独裁処刑が実行された試合で、煽動先（独裁先とは別人）も死亡者に入った。役職ゲートなし
+      if (g.dictator && !g.dictator.coup && t !== g.dictator.target && executed.includes(t)) out.push("agitator_extra_exile");
+      // クーデターの鎮圧（マイクラ版 agitatorSuppressedCoup）: 独裁者がいる試合でクーデターが起きず、煽動先の反逆の狂人が死亡者に入った。役職ゲートなし
+      const dictatorInGame = !!g.dictator || (g.players || []).some((p) => (g.initialRoles || {})[p.id] === "dictator" || (g.currentRoles || {})[p.id] === "dictator");
+      if (dictatorInGame && !(g.dictator && g.dictator.coup) && (g.currentRoles || {})[t] === "rebel_madman" && executed.includes(t)) out.push("agitator_coup_suppressed");
+    }
+    if (fin !== ID) return out;
+    if (won) out.push("win_agitator"); else out.push("agitator_loss");
+    if (t) {
       // 双極の煽動: 煽動者と狂った煽動者がお互いに煽動する（マイクラ版 hasMutualAgitation。狂った煽動者側の実績でも同じ判定をする）
       if ((g.currentRoles || {})[t] === "mad_agitator" && (g.agitatorTarget || {})[t] === id) out.push("agitator_mutual");
-      const executed = g.executed || [];
-      // 独裁の裏で、もう一人: 独裁処刑があった試合で、煽動先（独裁先とは別）が投票の同数で一緒に追放された（マイクラ版 agitatorCausedExtraExile。
-      // Web版の独裁は投票自体を行わない形のため、独裁先と煽動先が両方 g.executed に入っている場合に限って判定する = Web版ではほぼ発動しない。docs 参照）
-      if (g.dictator && !g.dictator.coup && t !== g.dictator.target && t !== g.dictator.chosen && executed.includes(t) && executed.includes(g.dictator.target)) out.push("agitator_extra_exile");
-      // クーデターの鎮圧: 独裁・クーデターの処刑が無かった試合で、反逆の狂人を煽って投票で追放した（マイクラ版 agitatorSuppressedCoup の Web版相当。docs 参照）
-      if (!g.dictator && (g.currentRoles || {})[t] === "rebel_madman" && executed.includes(t)) out.push("agitator_coup_suppressed");
     }
     return out;
   }

@@ -26,13 +26,12 @@
     const roleOf = (pid) => (g.currentRoles || {})[pid] ?? (g.initialRoles || {})[pid];
     const teamKey = (r) => { if (r === "doppelganger") return "third"; const t = r && ONW.ROLE_INFO[r] && ONW.ROLE_INFO[r].team; return t === ONW.TEAM.WOLF ? "wolf" : t === ONW.TEAM.THIRD ? "third" : "village"; };
     const teamOfP = (pid) => teamKey(roleOf(pid));
-    const exiled = (pid) => (g.executed || []).includes(pid);
     const dead = ONW.vote && ONW.vote.deadSet ? ONW.vote.deadSet(g) : new Set(g.deadIds || []);
     const players = g.players || [];
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
-    if (fin === "jester_madman" && won && (exiled(id) || (g.deadKind || {})[id] === "shot" || (g.chainIds || []).includes(id))) out.push("jester_madman_reverse");
+    if (fin === "jester_madman" && won && (ONW.vote.isVoteExiled(g, id) || (g.chainKind || {})[id] === "tomo")) out.push("jester_madman_reverse");   // 追放か道連れで死んで勝利（マイクラ版: isVoteExiled か死因 execute/chain。昼の銃殺は対象外）
     return out;
   }
 

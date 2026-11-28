@@ -126,7 +126,7 @@
     if (card) out.push(won ? "libra_win" : "libra_loss");
     if (ini === L || cur === L) out.push("first_libra");
     if (cur === L && won) out.push("win_libra");
-    if (mine) {
+    if (mine && cur === L) {   // 最終役職が天秤であることが前提（マイクラ版準拠。模倣で使った人には付かない）
       const w = new Set(g.winnerIds || []), alive = [l.a, l.b].filter((x) => !dead(g, x));
       if (alive.length === 1 && w.has(alive[0]) && ![l.a, l.b].filter((x) => x !== alive[0]).some((x) => w.has(x))) out.push("libra_chosen_winner");
     }

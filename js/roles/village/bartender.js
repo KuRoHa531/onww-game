@@ -106,7 +106,7 @@ g.drunkOverlay[t] = true;
 g.cocktailDrunk = g.cocktailDrunk || {};
 g.cocktailDrunk[t] = true;
 if (opts && opts.late) { g.drunkRevealed = g.drunkRevealed || {}; g.drunkRevealed[t] = true;}
-if (Array.isArray(g.nightLogsAll)) g.nightLogsAll.push(`バーテンダー ${nm(g, id)} は ${nm(g, t)} にカクテルを渡していました。`);
+if (Array.isArray(g.nightLogsAll)) g.nightLogsAll.push(`バーテンダー ${nm(g, id)} は ${nm(g, t)} にカクテルを渡しました。`);
 return t;
 }
 /**

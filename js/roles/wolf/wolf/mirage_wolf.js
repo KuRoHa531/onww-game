@@ -57,7 +57,7 @@
     if (ini === M) out.push("first_mirage_wolf");   // 初めて蜃気狼になる（初回かどうかは保存側が数える）
     if (cur === M && won) out.push("win_mirage_wolf");
     if (cur === M && !won) out.push("lose_mirage_wolf");   // 蜃気狼で初めて敗北する（初回かどうかは保存側が数える）
-    if (((g.mirageInspections || {})[id] || []).length && (ini === M || cur === M)) out.push("mirage_wolf_inspected");
+    if ((ini === M || cur === M) && ((g.mirageInspections || {})[id] || []).some((k) => ["seer", "finger_reader", "sense_seer"].includes(k))) out.push("mirage_wolf_inspected");   // 占い師系・見抜き・感覚の占い師に確認されたときだけ（心眼の人狼の見抜きは数えない。マイクラ版準拠・説明文とも一致）
     if ((ini === M || cur === M) && ((g.mirageInspections || {})[id] || []).includes("fake_seer")) out.push("mirage_wolf_fake_seer");   // 偽占い師に確認された
     return out.filter((x, k) => out.indexOf(x) === k);
   }

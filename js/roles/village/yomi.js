@@ -206,11 +206,13 @@
    */
   function achievements(g, id, won) {
     const out = [];
-    if (!g || !g.currentRoles || g.currentRoles[id] !== R().YOMI) return out;
+    if (!g) return out;
     const mine = (g.yomiCuts || []).filter((e) => e.by === id);
-    if (!won) out.push("yomi_loss");
+    // 断ち切りの2実績は役職ゲートなし（マイクラ版準拠。断ち切ったあと役職が変わっても付く）
     if (mine.some((e) => e.badge)) out.push("yomi_cut_village_badge");
     if (mine.some((e) => e.memory)) out.push("yomi_awaken_memory");
+    if (!g.currentRoles || g.currentRoles[id] !== R().YOMI) return out;
+    if (!won) out.push("yomi_loss");
     return out;
   }
   /** 役職別の統計（マイクラ版 stats.js）。最終役職が黄泉の人だけ: 「状態を断ち切った回数」「恋人を断ち切った回数」「記憶や酔いを戻した回数」 */

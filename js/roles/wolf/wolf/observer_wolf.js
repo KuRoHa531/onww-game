@@ -41,7 +41,24 @@
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
-    if (fin === "observer_wolf" && (g.observerSeen || {})[id] && (g.observeLog || []).some((e) => e && (e.players || []).includes(id))) out.push("observer_observed_self");
+    // 「自分が能力の対象になった」はマイクラ版 watcherTouched と同じ固定11種の記録だけで数える（観測ログ全体ではない。ドーナツ配達などは対象外）
+    if (fin === "observer_wolf") {
+      const vals = (m) => Object.values(m || {});
+      const seerHit = vals(g.seerData).some((d) => d && d.targetId === id) || vals(g.apprenticeSeerData).some((d) => d && d.targetId === id) || vals(g.senseSeerTarget).includes(id) || vals(g.fingerReaderTargets).includes(id);
+      const touched =
+        vals(g.robberTarget).includes(id) ||          // 怪盗の交換
+        vals(g.visitorTargets).includes(id) ||        // 訪問者の訪問
+        vals(g.watchdogOwners).includes(id) ||        // 番犬の飼い主
+        vals(g.keyTargets).includes(id) || ((g.keyLocks || {})[id] || 0) > 0 ||   // 鍵師のロック
+        vals(g.exposeTargets).includes(id) ||         // 暴露
+        vals(g.sealTargets).includes(id) ||           // 封印
+        vals(g.muzzleTargets).includes(id) ||         // 口封じ
+        vals(g.boarMadmanTarget).includes(id) ||      // 猪の狂人の印
+        vals(g.mindWolfTarget).includes(id) ||        // 心眼の人狼の見抜き
+        seerHit ||                                    // 占い師系の確認
+        vals(g.troubleChoice).some((pr) => Array.isArray(pr) && pr.includes(id));   // いたずらっ子の入れ替え
+      if (touched) out.push("observer_observed_self");
+    }
     return out;
   }
 

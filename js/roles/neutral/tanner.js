@@ -27,7 +27,7 @@
     const wolfPartners = (pid) => players.filter((q) => q.id !== pid && (teamOfP(q.id) === "wolf" || (g.promotedWolfIds || []).includes(q.id))).map((q) => q.id);
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
-    if (fin === "tanner" && won && (g.executed || []).length >= 2) out.push("tanner_multi_exile_win");
+    if (fin === "tanner" && won && players.filter((p) => ONW.vote.isVoteExiled(g, p.id)).length >= 2) out.push("tanner_multi_exile_win");   // 追放は2人以上（連鎖死は数えない。vote.isVoteExiled）
     return out;
   }
 

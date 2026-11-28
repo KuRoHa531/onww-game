@@ -91,7 +91,10 @@
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
     if (fin === "servant") {
-      if ((g.servantSubs || []).some((x) => x && x.servant === id && !x.major)) out.push("servant_substitute");
+      // 身代わりで実際に死んだときだけ（投票の身代わり＋保安官/ヴァニティの銃撃の身代わり。守られて生き残った場合は付かない。マイクラ版: 死因 "servant" 準拠）
+      const voteSub = (g.servantSubs || []).some((x) => x && x.servant === id && !x.major);
+      const shotSub = [...(g.sheriffShots || []), ...(g.vanityShots || [])].some((e) => e && e.sub === id);
+      if ((voteSub || shotSub) && dead.has(id)) out.push("servant_substitute");
       const master = (g.servantMasters || {})[id];
       if (master) {
         const mr = roleOf(master);

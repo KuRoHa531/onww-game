@@ -137,6 +137,7 @@ if (!g.currentRoles || g.currentRoles[id]!== R().WAGERER) return "none";
 const key = W.predictionOf(g, id);
 if (!key) return "none";
 if (ONW.seal && ONW.seal.is(g, id)) return "none"; // 封印されている勝負師は的中しない（マイクラ版）
+if ((g.copylistTarget || {})[id]) return "none"; // コピリストがコピーしてなった勝負師は的中扱いにならない（マイクラ版 isCopyistCopiedHolder）
 if (!W.succeeded(g, key, teams || g.winTeams || [])) return "fail";
 if (key === "village" || key === "wolf") return "additional";
 if (ONW.reverser && ONW.reverser.odd(g, id)) return "fail"; // 単独予想は、その人に反転が奇数回かかっていると失敗（マイクラ版）
@@ -186,10 +187,10 @@ return W.holders(g).filter((id) => W.predictionOf(g, id)).map((id) => ({ by: nm(
 */
 W.achievements = function achievements(g, id, won) {
 const out = [];
-if (won && g.currentRoles && g.currentRoles[id] === R().WAGERER) {
+if (g.currentRoles && g.currentRoles[id] === R().WAGERER) {
 const oc = W.outcomeOf(g, id, g.winTeams || []);
-if (oc === "additional") out.push("wagerer_additional_win");
-if (oc === "solo") out.push("wagerer_solo_win");
+if (won && oc === "additional") out.push("wagerer_additional_win");
+if (oc === "solo") out.push("wagerer_solo_win");   // 単独的中は本人の勝敗を問わない（マイクラ版準拠）
 }
 return out;
 };

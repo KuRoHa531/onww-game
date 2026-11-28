@@ -10,7 +10,7 @@
  *   ウサギの狂人の草むらに隠れた対象は選んでも失敗（消費される。Web版の夜解決の共通処理が担う）。
  *   封印されている怨霊は夜に選べない（マイクラ版 failSealedNightAction。Web版も封印中は夜の resolve が呼ばれない）。
  *   新聞屋に役職が記録される（ONW.newsNote）。見張り番の「行動した」判定・鈴の巫女のカウント対象（夜に行動する役職）。
- *   本人の夜の知らせ（マイクラ版 tell）: 「あなたは {対象} を恨みました。」。夜ログ: 「道化の怨霊 {名前} は {対象} を恨んだ」。
+ *   本人の夜の知らせ（マイクラ版 tell）: 「あなたは {対象} を恨みました。」。夜ログ: 「道化の怨霊 {名前} は {対象} を恨みました。」（リザルトの夜行動結果では「恨んでいました。」に変換して出す）。
  * ・朝の演出（作者メモ）: 怨霊本人の画面でだけ、選んだ対象のカードが待機時間に 🕯️（恨み）の面でめくれる
  *   （復讐者の🔪と同じ peek の作り。stage.js の JESTER_GHOST_MARK。他の人には見えない）。
  * ・恨殺（投票の連鎖）: 最終盤面の道化の怨霊が投票解決で死亡し、封印されておらず、恨み対象がまだ死んでいなければ、
@@ -189,7 +189,7 @@
     setTarget(g, p.id, t); seen(g, p.id, t);
     if (!cur) { i.mode = "jester_ghost"; i.target = t; }
     i.jesterGhostTarget = t;
-    g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} を恨んだ`);
+    g.nightLogsAll.push(`${label} ${p.name} は ${nm(g, t)} を恨みました。`);
     n.hold(p.id, `あなたは ${nm(g, t)} を恨みました。`);
     n.ob(p.id, [t]);
     n.nn(rid);
@@ -232,7 +232,7 @@
         const g = c.g, nameOf = c.nameOf;
         const t = c.selOf(p).players[0]; if (!t || t === p.id) return;   // 自分自身は選べない（自己参照になるのは役職交換・コピーの結果だけ）
         setTarget(g, p.id, t); seen(g, p.id, t);
-        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を恨んだ`);
+        g.nightLogsAll.push(`${c.rn(c.eff(p))} ${p.name} は ${nameOf(t)} を恨みました。`);
         c.hold(p.id, `あなたは ${nameOf(t)} を恨みました。`);
         ONW.observeNote(g, p.id, [t], null, "jester_ghost");
         ONW.newsNote(g, "jester_ghost");
@@ -296,7 +296,7 @@
         const g = c.g, id = c.id, t = c.players[0];
         if (t === id) return null;   // 自分自身は選べない
         setTarget(g, id, t); seen(g, id, t);
-        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を恨んだ`);
+        g.nightLogsAll.push(`${c.label} ${c.me.name} は ${c.nameOf(t)} を恨みました。`);
         return { lines: [`あなたは ${c.nameOf(t)} を恨みました。`], reveal: ghostReveal(t), nextChain: null };
       },
     },

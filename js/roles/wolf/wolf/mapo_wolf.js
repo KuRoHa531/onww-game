@@ -50,7 +50,7 @@
     const voteTeam = () => { const t = (g.votes || {})[id]; return t ? teamOfP(t) : null; };
     const chainTargets = (pid) => Object.keys(g.chainBy || {}).filter((v) => (g.chainBy || {})[v] === pid && (g.chainKind || {})[v] === "tomo");
     if (fin === "mapo_wolf") {
-      const tofuIn = players.some((q) => q.id !== id && roleOf(q.id) === "tofu_wolf");
+      const tofuIn = players.some((q) => q.id !== id && ONW.mimic.eff(g, q.id) === "tofu_wolf");   // 模倣の人狼は模倣先の役職として在場を数える（マイクラ版 hasEffectRoleInPlay 準拠）
       if (!tofuIn) out.push("mapo_no_tofu");
       if (g.mapoAnnounced && tofuIn) out.push("mapo_complete");
     }

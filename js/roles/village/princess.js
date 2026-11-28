@@ -126,12 +126,13 @@
     const players = g.players || [];
     if (ini === "princess" && fin === "queen") {
       out.push("princess_succeeds");
-      if (((g.princessUp || {})[id] || {}).when === "settle") out.push("princess_day_succeeds");   // 待機時間（朝イチ）の昇格 = マイクラ版の princessPromotedAtDayStart
+      if (Object.values(g.princessUp || {}).some((u) => u && u.when === "settle")) out.push("princess_day_succeeds");   // 待機時間（朝イチ）に「誰か」が昇格した試合か（マイクラ版 princessPromotedAtDayStart は試合全体のフラグ）
     }
     if (has("princess") && players.some((x) => (g.currentRoles || {})[x.id] === "queen" && exiled(x.id)) && players.some((x) => ((g.initialRoles || {})[x.id] === "princess" || (g.currentRoles || {})[x.id] === "princess") && exiled(x.id))) out.push("queen_princess_both_die");
-    const succeeded = ini === "princess" && fin === "queen" && Object.keys(g.formerQueens || {}).length > 0;
-    if (succeeded && won) out.push("princess_crown_continues");
-    if (succeeded && Object.keys(g.formerQueens || {}).some((qid) => ["follow", "lovers"].includes((g.chainKind || {})[qid]))) out.push("princess_love_follow_succession");
+    // 継承系は「役職履歴に姫君があり最終役職が女王」が条件（マイクラ版準拠。初期役職が姫君でなくても、途中で姫君になって女王に昇格すれば付く）
+    const histPrincess = [ini, ...(((g.roleTrail || {})[id]) || []), fin].includes("princess");
+    if (histPrincess && fin === "queen" && won && Object.keys(g.formerQueens || {}).some((qid) => exiled(qid))) out.push("princess_crown_continues");
+    if (histPrincess && fin === "queen" && Object.keys(g.formerQueens || {}).some((qid) => ["follow", "lovers"].includes((g.chainKind || {})[qid]))) out.push("princess_love_follow_succession");
     return out;
   }
 

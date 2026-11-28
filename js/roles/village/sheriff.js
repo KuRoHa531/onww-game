@@ -328,7 +328,7 @@
       if (special) out.push("sheriff_special_village");
     }
     // 従者が女王を保安官から守った（従者側の実績もここで拾う。マイクラ版 servant_shield_queen）
-    if (fin === "servant" && (g.sheriffShots || []).some((e) => e && e.sub === id && roleOf(e.target) === "queen")) out.push("servant_shield_queen");
+    if (fin === "servant" && [...(g.sheriffShots || []), ...(g.vanityShots || [])].some((e) => e && e.sub === id && roleOf(e.target) === "queen")) out.push("servant_shield_queen");   // ヴァニティの銃撃から守った場合も含む（マイクラ版準拠）
     // ネコカボチャが保安官に撃たれて道連れにした
     if (fin === "cat_pumpkin" && (g.sheriffShots || []).some((e) => e && e.target === id) && Object.entries(g.chainBy || {}).some(([v, src]) => src === id && (g.chainKind || {})[v] === "tomo")) out.push("cat_pumpkin_sheriff_chain");
     return out;
